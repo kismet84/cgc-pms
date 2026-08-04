@@ -51,7 +51,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
         }
 
         Long payAppId = resolveBusinessId(instance);
-        PayApplication app = requireApplication(payAppId);
+        PayApplication app = payApplicationService.lockForAmountGate(payAppId);
         if (!"DRAFT".equals(app.getApprovalStatus())) {
             throw new BusinessException("PAY_APP_RESUBMIT_STATUS_INVALID", "只有已恢复为草稿的付款申请可以重新提交");
         }
@@ -79,7 +79,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
         log.info("付款申请审批通过，重新校验并更新状态 payAppId={}", payAppId);
 
         // Re-validate at approval time (authoritative two-phase validation)
-        PayApplication app = payApplicationMapper.selectById(payAppId);
+        PayApplication app = payApplicationService.lockForAmountGate(payAppId);
         if (app == null) {
             throw new IllegalStateException("付款申请不存在 payAppId=" + payAppId);
         }

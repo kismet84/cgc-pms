@@ -4,9 +4,12 @@ import type {
   DictionaryItem,
   ProjectMember,
   ProjectMemberCommand,
+  ProjectActivationReadiness,
+  ProjectCommencementRecord,
   ProjectOverview,
   ProjectRecord,
   ProjectUpsertCommand,
+  SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -26,6 +29,7 @@ import {
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import { loadCloseoutOverview } from '@/services/closeout'
+import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   addProjectMember,
   archiveProject,
@@ -34,12 +38,16 @@ import {
   deleteProject,
   deleteProjectMember,
   loadProject,
+  loadProjectActivationReadiness,
+  loadProjectCommencement,
   loadProjectDictionary,
   loadProjectMembers,
   loadProjectOverview,
   loadProjectPage,
   loadProjectUsers,
   submitProject,
+  saveProjectCommencement,
+  submitProjectCommencement,
   updateProject,
   updateProjectMember,
 } from '@/services/projects'
@@ -69,6 +77,9 @@ const total = ref(0)
 const project = ref<ProjectRecord | null>(null)
 const overview = ref<ProjectOverview | null>(null)
 const constructionOverview = ref<CloseoutOverview | null>(null)
+const activationReadiness = ref<ProjectActivationReadiness | null>(null)
+const commencement = ref<ProjectCommencementRecord | null>(null)
+const commencementFiles = ref<SiteFileRecord[]>([])
 const members = ref<ProjectMember[]>([])
 const projectTypes = ref<DictionaryItem[]>([])
 const projectStatuses = ref<DictionaryItem[]>([])
@@ -76,6 +87,8 @@ const userOptions = ref<Array<{ value: string; label: string }>>([])
 const createOpen = ref(false)
 const memberOpen = ref(false)
 const statusOpen = ref(false)
+const commencementOpen = ref(false)
+const commencementFile = ref<File | null>(null)
 const editingMemberId = ref('')
 const filter = reactive({ keyword: '', projectType: '', status: '', pageNo: 1, pageSize: 10 })
 const form = reactive<ProjectUpsertCommand>(emptyProjectCommand())
@@ -89,6 +102,11 @@ const memberForm = reactive<ProjectMemberCommand>({
   remark: '',
 })
 const statusForm = reactive({ targetStatus: '', reason: '' })
+const commencementForm = reactive({
+  plannedStartDate: '',
+  basisType: 'COMMENCEMENT_BASIS',
+  remark: '',
+})
 type ProjectAction = 'archive' | 'submit' | 'status' | 'delete'
 type PendingConfirmation =
   | {
@@ -156,6 +174,22 @@ const approvalStatusTone = (value: string) =>
       : value === 'APPROVING'
         ? 'info'
         : 'neutral'
+const readinessLabels: Record<string, string> = {
+  PROJECT_STATE_NOT_READY: '项目状态不允许开工',
+  PROJECT_INITIATION_BASIS_INVALID: '项目立项依据未确认',
+  PROJECT_OWNER_CONTRACT_REQUIRED: '缺少已批准业主主合同',
+  PROJECT_OWNER_CONTRACT_MISMATCH: '业主主合同与项目绑定不一致',
+  COST_TARGET_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效目标成本',
+  COST_TARGET_SOURCE_CONTRACT_MISMATCH: '目标成本与业主主合同不同源',
+  COST_TARGET_CONTRACT_AMOUNT_MISMATCH: '目标成本合同金额快照不一致',
+  PROJECT_BUDGET_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效项目预算',
+  PROJECT_BUDGET_SOURCE_MISMATCH: '项目预算与目标成本不同源',
+  PROJECT_WBS_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效WBS计划',
+  PROJECT_COMMENCEMENT_REQUIRED: '缺少开工准入单',
+  PROJECT_COMMENCEMENT_BASIS_FILE_REQUIRED: '缺少已通过扫描的开工依据附件',
+  PROJECT_COMMENCEMENT_NOT_APPROVED: '开工准入尚未审批通过',
+}
+const readinessLabel = (code: string) => readinessLabels[code] ?? code
 const currentStageGate = computed(() => {
   if (!project.value || !constructionOverview.value) return null
   const gates = constructionOverview.value.stageGates
@@ -288,14 +322,27 @@ async function load(preserveNotice = false): Promise<boolean> {
         total.value = 1
       }
       if (mode.value === 'overview') {
-        const [projectOverview, closeoutOverview] = await Promise.all([
-          loadProjectOverview(projectId.value, controller.signal),
-          can('closeout:query')
-            ? loadCloseoutOverview(projectId.value, controller.signal)
-            : Promise.resolve(null),
-        ])
+        const canReadCommencement = can('project:commencement:query')
+        const [projectOverview, closeoutOverview, readiness, commencementRecord] =
+          await Promise.all([
+            loadProjectOverview(projectId.value, controller.signal),
+            can('closeout:query')
+              ? loadCloseoutOverview(projectId.value, controller.signal)
+              : Promise.resolve(null),
+            canReadCommencement
+              ? loadProjectActivationReadiness(projectId.value, controller.signal)
+              : Promise.resolve(null),
+            canReadCommencement
+              ? loadProjectCommencement(projectId.value, controller.signal)
+              : Promise.resolve(null),
+          ])
         overview.value = projectOverview
         constructionOverview.value = closeoutOverview
+        activationReadiness.value = readiness
+        commencement.value = commencementRecord
+        commencementFiles.value = commencementRecord
+          ? await listSiteFiles('PROJECT_COMMENCEMENT', commencementRecord.id, controller.signal)
+          : []
       }
       if (mode.value === 'members') {
         const page = await loadProjectMembers(
@@ -327,6 +374,9 @@ async function load(preserveNotice = false): Promise<boolean> {
       project.value = null
       overview.value = null
       constructionOverview.value = null
+      activationReadiness.value = null
+      commencement.value = null
+      commencementFiles.value = []
       members.value = []
       errorMessage.value = message(error, '项目数据加载失败')
     }
@@ -350,6 +400,65 @@ function openStatus() {
   statusForm.reason = ''
   statusOpen.value = true
   resetNotices()
+}
+function openCommencement() {
+  Object.assign(commencementForm, {
+    plannedStartDate: commencement.value?.plannedStartDate ?? project.value?.plannedStartDate ?? '',
+    basisType: commencement.value?.basisType ?? 'COMMENCEMENT_BASIS',
+    remark: commencement.value?.remark ?? '',
+  })
+  commencementFile.value = null
+  commencementOpen.value = true
+  resetNotices()
+}
+function selectCommencementFile(event: Event) {
+  commencementFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+async function saveCommencement() {
+  if (!commencementForm.plannedStartDate) {
+    errorMessage.value = '拟开工日期不能为空'
+    return
+  }
+  saving.value = true
+  resetNotices()
+  try {
+    const saved = await saveProjectCommencement(projectId.value, {
+      ...(commencement.value ? { version: commencement.value.version } : {}),
+      plannedStartDate: commencementForm.plannedStartDate,
+      basisType: commencementForm.basisType,
+      ...(commencementForm.remark.trim() ? { remark: commencementForm.remark.trim() } : {}),
+    })
+    if (commencementFile.value)
+      await uploadSiteFile(
+        commencementFile.value,
+        'PROJECT_COMMENCEMENT',
+        saved.id,
+        'COMMENCEMENT_BASIS',
+      )
+    commencementOpen.value = false
+    successMessage.value = commencementFile.value
+      ? '开工准入已保存，附件扫描完成后方可提交。'
+      : '开工准入已保存。'
+    await load(true)
+  } catch (error) {
+    errorMessage.value = message(error, '开工准入保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+async function submitCommencement() {
+  if (!commencement.value) return
+  saving.value = true
+  resetNotices()
+  try {
+    await submitProjectCommencement(projectId.value, commencement.value.version)
+    successMessage.value = '开工准入已提交审批。'
+    await load(true)
+  } catch (error) {
+    errorMessage.value = message(error, '开工准入提交失败')
+  } finally {
+    saving.value = false
+  }
 }
 async function saveProject(create: boolean) {
   const command = cleanProjectCommand(form)
@@ -493,6 +602,13 @@ function go(path: string) {
 }
 function goConstruction(path: string, bizId?: string) {
   void router.push({ path, query: { projectId: projectId.value, ...(bizId ? { bizId } : {}) } })
+}
+function goReadinessBlocker(code: string) {
+  if (code.startsWith('PROJECT_OWNER_CONTRACT')) return goConstruction('/contract/ledger')
+  if (code.startsWith('COST_TARGET')) return goConstruction('/cost-target/index')
+  if (code.startsWith('PROJECT_BUDGET')) return goConstruction('/cost-budget')
+  if (code.startsWith('PROJECT_WBS')) return goConstruction('/project-schedule')
+  openCommencement()
 }
 
 watch(
@@ -757,6 +873,78 @@ onBeforeUnmount(() => {
               <dd>{{ formatAmount(overview.paidAmount) }}</dd>
             </div>
           </dl>
+        </section>
+        <section v-if="activationReadiness" class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading">
+            <h3>开工准入</h3>
+            <V2Badge :tone="activationReadiness.ready ? 'success' : 'warning'">
+              {{ activationReadiness.ready ? '准入条件已满足' : '存在阻塞项' }}
+            </V2Badge>
+          </div>
+          <dl class="v2-detail-dialog__facts project-page__overview-cost-facts">
+            <div>
+              <dt>立项依据</dt>
+              <dd>{{ activationReadiness.initiationBasis || '未确认' }}</dd>
+            </div>
+            <div>
+              <dt>业主主合同</dt>
+              <dd>{{ activationReadiness.ownerContractCode || '未指定' }}</dd>
+            </div>
+            <div>
+              <dt>正式合同额</dt>
+              <dd>{{ formatAmount(activationReadiness.ownerContractAmount) }}</dd>
+            </div>
+            <div>
+              <dt>开工审批</dt>
+              <dd>{{ approvalStatusLabel(activationReadiness.commencementStatus) }}</dd>
+            </div>
+          </dl>
+          <div v-if="activationReadiness.blockers.length" class="project-page__stage-gate">
+            <p>服务端阻塞项</p>
+            <ul>
+              <li v-for="code in activationReadiness.blockers" :key="code">
+                <V2Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  @click="goReadinessBlocker(code)"
+                >
+                  {{ readinessLabel(code) }}
+                </V2Button>
+              </li>
+            </ul>
+          </div>
+          <div v-if="commencementFiles.length" class="project-page__stage-gate">
+            <p>开工依据附件</p>
+            <ul>
+              <li v-for="file in commencementFiles" :key="file.id">
+                {{ file.originalName }} · {{ file.virusScanStatus || '扫描中' }}
+              </li>
+            </ul>
+          </div>
+          <div class="project-page__actions">
+            <V2Button
+              v-if="can('project:commencement:add') || can('project:commencement:edit')"
+              type="button"
+              size="small"
+              variant="secondary"
+              :disabled="project.status !== 'PREPARING' || saving"
+              @click="openCommencement"
+              >{{ commencement ? '编辑开工准入' : '创建开工准入' }}</V2Button
+            >
+            <V2Button
+              v-if="
+                commencement &&
+                can('project:commencement:submit') &&
+                ['DRAFT', 'REJECTED'].includes(commencement.approvalStatus)
+              "
+              type="button"
+              size="small"
+              :loading="saving"
+              @click="submitCommencement"
+              >提交开工审批</V2Button
+            >
+          </div>
         </section>
         <section class="v2-detail-dialog__section">
           <div class="v2-detail-dialog__section-heading"><h3>项目态势</h3></div>
@@ -1031,6 +1219,30 @@ onBeforeUnmount(() => {
       <template #footer>
         <V2Button variant="secondary" @click="createOpen = false">取消</V2Button>
         <V2Button :loading="saving" @click="saveProject(true)">创建</V2Button>
+      </template>
+    </V2Dialog>
+    <V2Dialog
+      v-model:open="commencementOpen"
+      :title="commencement ? '编辑开工准入' : '创建开工准入'"
+      description="金额、合同、预算、WBS和阻塞项均以服务端复核结果为准。"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
+    >
+      <form
+        class="project-page__form project-page__form--dialog"
+        @submit.prevent="saveCommencement"
+      >
+        <label
+          >拟开工日期<input v-model="commencementForm.plannedStartDate" type="date" required
+        /></label>
+        <V2Input v-model="commencementForm.remark" label="备注" />
+        <label>开工依据附件<input type="file" @change="selectCommencementFile" /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="saving" @click="commencementOpen = false"
+          >取消</V2Button
+        >
+        <V2Button :loading="saving" @click="saveCommencement">保存</V2Button>
       </template>
     </V2Dialog>
     <V2Dialog

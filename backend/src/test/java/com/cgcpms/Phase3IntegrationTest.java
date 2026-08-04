@@ -171,6 +171,18 @@ class Phase3IntegrationTest {
         materialSubjectId = ensureCostSubject("5401.03.02", "材料费", "MATERIAL", 3);
         subcontractSubjectId = ensureCostSubject("5401.03.05", "专业分包费", "SUBCONTRACT", 3);
         earthworkSubjectId = ensureCostSubject("5401.03.05.01", "土方分包", "SUBCONTRACT", 4);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract
+                  (id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,
+                   contract_amount,current_amount,paid_amount,contract_status,approval_status,version,
+                   created_at,updated_at,deleted_flag)
+                SELECT 39998,0,p.id,'CT-PHASE3-OWNER','Phase3业主主合同','MAIN',20001,20002,
+                       p.contract_amount,p.contract_amount,0,'PERFORMING','APPROVED',0,
+                       CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                  FROM pm_project p
+                 WHERE p.id=? AND NOT EXISTS (SELECT 1 FROM ct_contract WHERE id=39998)
+                """, PROJECT_ID);
+        jdbcTemplate.update("UPDATE pm_project SET owner_contract_id=39998 WHERE id=?", PROJECT_ID);
     }
 
     private long ensureCostSubject(String code, String name, String type, int level) {

@@ -1,12 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { FINANCE_DECIMAL_FIELDS, FINANCE_API } from '@cgc-pms/frontend-contracts'
+import {
+  FINANCE_DECIMAL_FIELDS,
+  FINANCE_API,
+  type PaymentTraceRecord,
+} from '@cgc-pms/frontend-contracts'
+import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import {
   createFundAccount,
   loadCashForecastCycles,
   loadFinanceOperationsWorkspace,
   loadPaymentApplications,
+  loadPaymentTraceByApplication,
+  loadPaymentTraceByCashJournal,
+  loadPaymentTraceByInvoice,
+  loadPaymentTraceByVoucher,
   reversePaymentRecord,
   writebackPayment,
 } from '@/services/finance'
@@ -242,5 +252,93 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain('@click="openFundAccount"')
     expect(source).toContain("uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')")
     expect(source).toContain("can('file:upload') || can('cashbook:journal:maintain')")
+  })
+  it('opens authoritative payment traces from application, journal, invoice and voucher', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: '0', data: [] })))
+    vi.stubGlobal('fetch', fetchMock)
+    await loadPaymentTraceByApplication('APP/1')
+    await loadPaymentTraceByCashJournal('J/1')
+    await loadPaymentTraceByInvoice('INV/1')
+    await loadPaymentTraceByVoucher('V/1')
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      '/api/payment-traces/applications/APP%2F1',
+      '/api/payment-traces/cash-journals/J%2F1',
+      '/api/payment-traces/invoices/INV%2F1',
+      '/api/payment-traces/vouchers/V%2F1',
+    ])
+    vi.unstubAllGlobals()
+  })
+  it('renders trace links without client-side relationship synthesis', () => {
+    const receivables = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
+      'utf8',
+    )
+    const control = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
+      'utf8',
+    )
+    const dialog = readFileSync(
+      resolve(process.cwd(), 'src/components/finance/PaymentTraceDialog.vue'),
+      'utf8',
+    )
+    expect(receivables).toContain('loadPaymentTraceByApplication')
+    expect(receivables).toContain('loadPaymentTraceByInvoice')
+    expect(control).toContain("openTrace('journal', row.id)")
+    expect(control).toContain("openTrace('voucher', row.id)")
+    expect(dialog).toContain('缺链由接口直接拒绝，不在页面补链。')
+  })
+  it('renders the backend payment trace shape and conservation facts', () => {
+    const trace: PaymentTraceRecord = {
+      project: { id: 'P1', projectName: '项目一' },
+      contract: { id: 'C1', contractName: '合同一', currentAmount: '100.00' },
+      paymentApplication: { id: 'A1', applyCode: 'PAY-1', applyAmount: '60.00' },
+      approvalRecords: [],
+      applicationSources: [],
+      expenses: [],
+      settlements: [],
+      settlementSubMeasures: [],
+      subMeasures: [],
+      subTasks: [],
+      paymentRecords: [],
+      paymentSourceAllocations: [],
+      cashJournals: [],
+      paymentDocuments: [],
+      invoices: [],
+      invoiceAllocations: [],
+      budgetLedgers: [],
+      accountingEntries: [],
+      accountingEntryLines: [],
+      contractBudgetAllocation: { id: 'CA1' },
+      projectBudget: { id: 'B1' },
+      projectBudgetLine: { id: 'BL1' },
+      costSubject: { id: 'S1' },
+      materialReceiptItems: [{ id: 'RI1' }],
+      materialReceipts: [{ id: 'R1' }],
+      budgetConservation: {
+        netReserved: '40.00',
+        netConsumed: '20.00',
+        netPaid: '60.00',
+        netCashOutflow: '60.00',
+      },
+    }
+    const wrapper = mount(PaymentTraceDialog, {
+      props: { open: true, traces: [trace] },
+      global: { stubs: { teleport: true } },
+    })
+
+    const rendered = wrapper.text()
+    for (const expected of [
+      '合同预算1',
+      '项目预算1',
+      '项目预算行1',
+      '成本科目1',
+      '材料验收1',
+      '验收明细1',
+      '预算净占用40.00',
+      '预算净消耗20.00',
+      '来源净实付60.00',
+      '现金净流出60.00',
+    ])
+      expect(rendered).toContain(expected)
   })
 })

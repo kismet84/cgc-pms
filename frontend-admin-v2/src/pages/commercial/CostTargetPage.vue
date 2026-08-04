@@ -47,6 +47,8 @@ import { useSessionStore } from '@/stores/session'
 type PendingAction = 'delete' | 'submit' | null
 type CostBudgetEditorForm = CostTargetSaveCommand & {
   projectManagerId: string
+  sourceMainContractId: string
+  sourceMainContractCode: string
   sourceContractAmount: string
   targetCostRate: string
 }
@@ -161,6 +163,8 @@ function emptyForm(): CostBudgetEditorForm {
   return {
     projectId: '',
     projectManagerId: '',
+    sourceMainContractId: '',
+    sourceMainContractCode: '',
     versionNo: '',
     versionName: '',
     totalTargetAmount: '',
@@ -397,6 +401,8 @@ async function selectProject(projectId: string): Promise<void> {
   form.projectManagerId =
     projects.value.find((project) => project.id === projectId)?.projectManagerId ?? ''
   form.sourceContractAmount = ''
+  form.sourceMainContractId = ''
+  form.sourceMainContractCode = ''
   form.targetCostRate = ''
   form.totalTargetAmount = ''
   form.totalBidCostAmount = ''
@@ -423,6 +429,8 @@ async function selectProject(projectId: string): Promise<void> {
 function applyDefaultAllocation(allocation: CostTargetDefaultAllocation): void {
   const managerId = allocation.projectManagerId || form.projectManagerId
   form.projectManagerId = managerId || ''
+  form.sourceMainContractId = allocation.sourceMainContractId
+  form.sourceMainContractCode = allocation.sourceMainContractCode
   form.sourceContractAmount = allocation.sourceContractAmount
   form.targetCostRate = allocation.targetCostRate
   form.totalTargetAmount = allocation.totalTargetAmount
@@ -810,6 +818,12 @@ onBeforeUnmount(() => {
                   label="版本名称"
                   required
                   :disabled="actionBusy || !editable || !canSaveDraft"
+                />
+                <V2Input
+                  v-if="form.sourceMainContractCode"
+                  v-model="form.sourceMainContractCode"
+                  label="正式主合同"
+                  disabled
                 />
                 <V2Input
                   v-if="form.sourceContractAmount"

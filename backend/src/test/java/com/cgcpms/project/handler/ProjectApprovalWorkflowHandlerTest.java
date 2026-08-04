@@ -41,6 +41,7 @@ class ProjectApprovalWorkflowHandlerTest {
         handler.onApproved(context);
         assertEquals("APPROVED", projectMapper.selectById(project.getId()).getApprovalStatus());
         assertEquals("PREPARING", projectMapper.selectById(project.getId()).getStatus());
+        assertEquals("DIRECT_APPROVAL", projectMapper.selectById(project.getId()).getInitiationBasis());
     }
 
     @Test

@@ -43,6 +43,7 @@ public class WorkflowBusinessCodeResolver {
             Map.entry("OWNER_SETTLEMENT", new CodeSource("owner_settlement", "settlement_code", true)),
             Map.entry("PRODUCTION_MEASUREMENT", new CodeSource("production_measurement", "measure_code", true)),
             Map.entry("PROJECT_SCHEDULE", new CodeSource("project_schedule_plan", "plan_code", true)),
+            Map.entry("PROJECT_COMMENCEMENT", new CodeSource("project_commencement", "project_id", true)),
             Map.entry("PROJECT_PERIOD_PLAN", new CodeSource("project_period_plan", "period_code", true)),
             Map.entry("PROJECT_CORRECTIVE_ACTION", new CodeSource("project_corrective_action", "action_code", true)),
             Map.entry("COST_CORRECTIVE_ACTION", new CodeSource("cost_corrective_action", "action_code", true)),

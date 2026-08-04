@@ -224,8 +224,8 @@ class PayRecordCashJournalIntegrationTest {
         app.setContractId(CONTRACT_ID);
         app.setPartnerId(PARTY_B_ID);
         app.setApplyCode(applyCode);
-        app.setApplyAmount(new BigDecimal("1000000.00"));
-        app.setApprovedAmount(new BigDecimal("1000000.00"));
+        app.setApplyAmount(new BigDecimal("400000.00"));
+        app.setApprovedAmount(new BigDecimal("400000.00"));
         app.setActualPayAmount(BigDecimal.ZERO);
         app.setPayType("PROGRESS");
         app.setPayStatus("APPROVED");

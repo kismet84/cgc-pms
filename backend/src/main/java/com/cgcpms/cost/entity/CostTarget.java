@@ -69,6 +69,11 @@ public class CostTarget extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private BigDecimal sourceContractAmount;
 
+    /** 新建版本时的权威业主主合同。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long sourceContractId;
+
     /** 新建版本固定目标成本率快照。 */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private BigDecimal targetCostRate;

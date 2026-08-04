@@ -275,6 +275,7 @@ public class CtContractService {
         deriveContractFinancials(contract);
         validateContractReferences(contract, "编辑合同");
         validateContractCoreFinancials(contract);
+        validateProjectBudgetGate(contract);
 
         // 校验合同状态：仅允许在有效状态集合内修改
         if (contract.getContractStatus() != null
@@ -445,6 +446,7 @@ public class CtContractService {
             deriveCompositeFinancials(contract, items);
             validateContractReferences(contract, "编辑合同");
             validateCompositeFinancials(contract, items, terms);
+            validateProjectBudgetGate(contract);
             updateEditableContract(contract, existing);
         }
 
@@ -545,9 +547,18 @@ public class CtContractService {
     private void validateProjectBudgetGate(CtContract contract) {
         Long tenantId = UserContext.getCurrentTenantId();
         PmProject project = pmProjectMapper.selectById(contract.getProjectId());
-        if (project == null || !Objects.equals(project.getTenantId(), tenantId)
-                || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
-            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以创建或提交合同");
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_PROJECT_NOT_FOUND", "关联合同项目不存在");
+        }
+        if ("MAIN".equals(contract.getContractType())) {
+            if (!"APPROVED".equals(project.getApprovalStatus())
+                    || !Set.of(ProjectStatusConstants.PREPARING, ProjectStatusConstants.ACTIVE).contains(project.getStatus())) {
+                throw new BusinessException("MAIN_CONTRACT_PROJECT_NOT_READY", "MAIN合同只能在已批准的筹备或在建项目中编审");
+            }
+            return;
+        }
+        if (!ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "非MAIN合同只能在进行中的项目创建或提交");
         }
         long activeBudgetCount = projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getTenantId, tenantId)

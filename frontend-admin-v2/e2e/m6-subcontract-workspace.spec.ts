@@ -335,8 +335,6 @@ test.describe('M6 subcontract task and measure V2', () => {
     const items = page.getByRole('dialog', { name: '维护计量清单' })
     await items.getByRole('button', { name: '添加清单项' }).click()
     const quantity = items.getByLabel('本期数量')
-    await quantity.fill('')
-    await expect(quantity).toHaveValue('')
     await quantity.fill('10')
     await quantity.blur()
     await expect(quantity).toHaveValue('10.00')

@@ -13,6 +13,7 @@ import {
   V2Select,
 } from '@/components'
 import { showToast } from '@/components/toast'
+import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import { dashboardStatusLabel, formatAmount } from '@/pages/dashboard/model'
 import {
   loadBudget,
@@ -38,6 +39,9 @@ import {
   loadInvoices,
   loadFundAccounts,
   loadPaymentApplications,
+  loadPaymentTraceByApplication,
+  loadPaymentTraceByExpense,
+  loadPaymentTraceByInvoice,
   loadPaymentSourceOptions,
   loadPaymentSources as loadStoredPaymentSources,
   loadPayRecordOptions,
@@ -78,6 +82,7 @@ import type {
   PaymentApplicationRecord,
   PayRecordWritebackCommand,
   PayRecordOption,
+  PaymentTraceRecord,
   ReceivableRecord,
   SalesInvoiceCommand,
   SalesInvoiceRecord,
@@ -242,6 +247,7 @@ const canAdd = computed(() => (mode.value === 'revenue' ? can('maintain') : can(
 const canWriteback = computed(() => session.hasPermission('payment:record:writeback'))
 const canReversePayment = computed(() => session.hasPermission('payment:record:reverse'))
 const canDirectPayment = computed(() => session.hasPermission('payment:direct'))
+const canTrace = computed(() => session.hasAdminOrPermission('payment:trace:query'))
 
 const rows = ref<RecordRow[]>([])
 const revenueRows = ref<RevenueRow[]>([])
@@ -305,6 +311,10 @@ const writebackTarget = ref<PaymentApplicationRecord | null>(null)
 const writebackEditor = ref<WritebackEditor | null>(null)
 const reversalTarget = ref<PayRecordOption | null>(null)
 const reversalEditor = ref<ReversalEditor | null>(null)
+const traceOpen = ref(false)
+const traceRows = ref<PaymentTraceRecord[]>([])
+const traceLoading = ref(false)
+const traceError = ref('')
 let controller: AbortController | null = null
 let dictionariesLoaded = false
 
@@ -355,6 +365,25 @@ const canVerify = (row: RecordRow) =>
   'verifyStatus' in row && row.verifyStatus !== 'VERIFIED' && can('verify')
 const paymentRecord = (row: PaymentApplicationRecord) =>
   payRecords.value.find((record) => record.payApplicationId === row.id)
+
+async function openTrace(row: RecordRow): Promise<void> {
+  traceOpen.value = true
+  traceRows.value = []
+  traceError.value = ''
+  traceLoading.value = true
+  try {
+    traceRows.value =
+      'applyCode' in row
+        ? [await loadPaymentTraceByApplication(row.id)]
+        : 'expenseCode' in row
+          ? await loadPaymentTraceByExpense(row.id)
+          : await loadPaymentTraceByInvoice(row.id)
+  } catch (cause) {
+    traceError.value = cause instanceof Error ? cause.message : 'Trace 读取失败'
+  } finally {
+    traceLoading.value = false
+  }
+}
 
 async function load(preservePage = false): Promise<void> {
   if (!canQuery.value) return
@@ -1319,7 +1348,17 @@ onBeforeUnmount(() => controller?.abort())
             </thead>
             <tbody>
               <tr v-for="(row, index) in rows" :key="row.id">
-                <td>{{ text(row) }}</td>
+                <td>
+                  <button
+                    v-if="canTrace"
+                    type="button"
+                    class="v2-table__record-link"
+                    @click="openTrace(row)"
+                  >
+                    {{ text(row) }}
+                  </button>
+                  <span v-else>{{ text(row) }}</span>
+                </td>
                 <td>{{ project(row) }}</td>
                 <td>{{ status(row) }}</td>
                 <td>{{ money(row) }}</td>
@@ -1847,6 +1886,13 @@ onBeforeUnmount(() => controller?.abort())
         :loading="busy"
         @confirm="confirmAction"
         @close="pending = null"
+      />
+      <PaymentTraceDialog
+        :open="traceOpen"
+        :traces="traceRows"
+        :loading="traceLoading"
+        :error="traceError"
+        @close="traceOpen = false"
       />
     </template>
   </section>

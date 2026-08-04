@@ -29,6 +29,7 @@ export interface ProjectRecord extends ProjectListItem {
   actualEndDate?: string | null;
   projectManagerId: string;
   approvalStatus: string;
+  ownerContractId?: string | null;
   sourceBidCostId?: string | null;
   initiationBasis?: string | null;
   createdBy: string;
@@ -94,10 +95,43 @@ export interface ProjectUpsertCommand {
   ownerUnit?: string;
   supervisorUnit?: string;
   designUnit?: string;
-  contractAmount?: string;
-  targetCost?: string;
   plannedStartDate?: string;
   plannedEndDate?: string;
+  remark?: string;
+}
+
+export interface ProjectActivationReadiness {
+  projectId: string;
+  initiationBasis?: string | null;
+  ownerContractId?: string | null;
+  ownerContractCode?: string | null;
+  ownerContractAmount?: string | null;
+  costTargetId?: string | null;
+  budgetId?: string | null;
+  scheduleId?: string | null;
+  commencementId?: string | null;
+  commencementStatus?: string | null;
+  ready: boolean;
+  blockers: string[];
+}
+
+export interface ProjectCommencementRecord {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  plannedStartDate: string;
+  actualStartDate?: string | null;
+  basisType: string;
+  approvalStatus: string;
+  approvalInstanceId?: string | null;
+  version: number;
+  remark?: string | null;
+}
+
+export interface ProjectCommencementCommand {
+  version?: number;
+  plannedStartDate: string;
+  basisType: string;
   remark?: string;
 }
 
@@ -147,6 +181,12 @@ export const PROJECT_API = {
     `/projects/${encodeURIComponent(projectId)}/submit`,
   status: (projectId: string) =>
     `/projects/${encodeURIComponent(projectId)}/status`,
+  activationReadiness: (projectId: string) =>
+    `/projects/${encodeURIComponent(projectId)}/activation-readiness`,
+  commencement: (projectId: string) =>
+    `/projects/${encodeURIComponent(projectId)}/commencement`,
+  commencementSubmit: (projectId: string) =>
+    `/projects/${encodeURIComponent(projectId)}/commencement/submit`,
   dictionary: (code: string) =>
     `/system/dict/data/by-code/${encodeURIComponent(code)}`,
   users: "/system/users",

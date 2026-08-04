@@ -6,6 +6,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
+import com.cgcpms.project.service.OwnerContractFactService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -26,6 +27,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
     private final CtContractMapper contractMapper;
     private final CostGenerationService costGenerationService;
     private final ContractBudgetAllocationService contractBudgetAllocationService;
+    private final OwnerContractFactService ownerContractFactService;
 
     @Override
     public String supportBusinessType() {
@@ -60,7 +62,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
     public void onApproved(WorkflowContext context) {
         WfInstance instance = context.getInstance();
         Long contractId = resolveContractId(instance);
-        log.info("合同审批通过，更新状态并生成锁定成本 contractId={}", contractId);
+        log.info("合同审批通过，更新状态 contractId={}", contractId);
 
         int updated = contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
                 .eq(CtContract::getId, contractId)
@@ -70,7 +72,15 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
                 .set(CtContract::getContractStatus, ContractStatusConstants.STATUS_PERFORMING));
         requireSingleStatusTransition(updated, contractId, "审批通过");
 
-        costGenerationService.generateLockedCost(contractId);
+        CtContract approved = contractMapper.selectById(contractId);
+        if (approved == null || !instance.getTenantId().equals(approved.getTenantId())) {
+            throw new IllegalStateException("合同审批写后回读失败 contractId=" + contractId);
+        }
+        if ("MAIN".equals(approved.getContractType())) {
+            ownerContractFactService.synchronizeApprovedMainContract(contractId, instance.getTenantId());
+        } else {
+            costGenerationService.generateLockedCost(contractId);
+        }
     }
 
     @Override

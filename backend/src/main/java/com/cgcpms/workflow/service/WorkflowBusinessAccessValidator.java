@@ -181,6 +181,10 @@ public class WorkflowBusinessAccessValidator {
             case WorkflowBusinessTypes.PROJECT_SCHEDULE -> {
                 return validateJdbc("project_schedule_plan", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_SCHEDULE_NOT_FOUND");
             }
+            case WorkflowBusinessTypes.PROJECT_COMMENCEMENT -> {
+                return validateJdbc("project_commencement", "approval_status", businessId, tenantId,
+                        requestProjectId, requestContractId, "PROJECT_COMMENCEMENT_NOT_FOUND", "DRAFT", "REJECTED");
+            }
             case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> {
                 return validateJdbc("project_period_plan", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_PERIOD_NOT_FOUND");
             }
@@ -284,6 +288,7 @@ public class WorkflowBusinessAccessValidator {
             case WorkflowBusinessTypes.OWNER_SETTLEMENT -> "revenue:settlement:submit";
             case WorkflowBusinessTypes.PRODUCTION_MEASUREMENT -> "measurement:submit";
             case WorkflowBusinessTypes.PROJECT_SCHEDULE -> "schedule:submit";
+            case WorkflowBusinessTypes.PROJECT_COMMENCEMENT -> "project:commencement:submit";
             case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> "schedule:submit";
             case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
             case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
@@ -313,7 +318,7 @@ public class WorkflowBusinessAccessValidator {
     }
 
     private boolean hasNoContractColumn(String table) {
-        return Set.of("project_budget", "project_schedule_plan", "project_period_plan", "project_corrective_action",
+        return Set.of("project_budget", "project_schedule_plan", "project_commencement", "project_period_plan", "project_corrective_action",
                 "cost_corrective_action", "technical_scheme", "closeout_final_acceptance").contains(table);
     }
 

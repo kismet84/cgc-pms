@@ -23,6 +23,8 @@ public class PmProjectVO {
     private String actualEndDate;
     private String projectManagerId;
     private String sourceBidCostId;
+    private String ownerContractId;
+    private String finalBidPrice;
     private String initiationBasis;
     private String status;
     private String approvalStatus;

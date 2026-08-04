@@ -64,16 +64,57 @@ class BaselineMySqlUpgradeTest {
                 """,
                 "SET FOREIGN_KEY_CHECKS=1");
 
+        Flyway beforePaymentTrace = Flyway.configure()
+                .dataSource(url, username, password)
+                .locations(ACTIVE, LEGACY)
+                .target(MigrationVersion.fromVersion("275"))
+                .load();
+        beforePaymentTrace.migrate();
+        execute(beforePaymentTrace,
+                "SET FOREIGN_KEY_CHECKS=0",
+                """
+                INSERT INTO wf_instance
+                    (id, tenant_id, template_id, business_type, business_id, title,
+                     instance_status, initiator_id, deleted_flag)
+                VALUES (9276004, 7, 9276005, 'PAY_REQUEST', 9276001, 'MySQL V276 approval',
+                        'COMPLETED', 9276006, 0)
+                """,
+                """
+                INSERT INTO pay_application
+                    (id, tenant_id, project_id, apply_code, apply_amount, approved_amount,
+                     actual_pay_amount, pay_type, pay_status, approval_status, approval_instance_id, deleted_flag)
+                VALUES (9276001, 7, 9276010, 'PAY-MYSQL-V276', 100, 100, 100,
+                        'DIRECT', 'PAID', 'APPROVED', 9276004, 0)
+                """,
+                """
+                INSERT INTO pay_record
+                    (id, tenant_id, project_id, pay_application_id, pay_amount, pay_date, pay_status, deleted_flag)
+                VALUES (9276002, 7, 9276010, 9276001, 100, CURRENT_DATE, 'SUCCESS', 0)
+                """,
+                """
+                INSERT INTO cash_journal_entry
+                    (id, tenant_id, entry_no, direction, amount, business_date, summary, source_type,
+                     source_id, status, closure_due_at, pay_record_id, deleted_flag)
+                VALUES (9276003, 7, 'CJ-MYSQL-V276', 'OUT', 100, CURRENT_DATE, 'V276', 'PAY_RECORD',
+                        9276002, 'PENDING_ARCHIVE', CURRENT_TIMESTAMP, 9276002, 0)
+                """,
+                "SET FOREIGN_KEY_CHECKS=1");
+
         Flyway current = Flyway.configure()
                 .dataSource(url, username, password)
                 .locations(ACTIVE, LEGACY)
                 .load();
         current.migrate();
 
-        assertEquals("273", current.info().current().getVersion().getVersion());
+        assertEquals("276", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, """
                 SELECT COUNT(*) FROM ct_contract
                 WHERE id=9251001 AND current_amount=120 AND paid_amount=30
+                """));
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM cash_journal_entry
+                WHERE id=9276003 AND tenant_id=7
+                  AND pay_application_id=9276001 AND approval_instance_id=9276004
                 """));
         assertEquals(5, count(current, """
                 SELECT COUNT(*) FROM sys_role_menu rm

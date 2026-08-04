@@ -81,6 +81,7 @@ if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 2) { throw
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
 
 Assert-Contains $backendTest @(
+  'Install CJK font for PDF tests','fonts-arphic-gbsn00lp','test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
   './mvnw -C -Ptest-order-independence test','./mvnw -C verify',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: backend/target/cgc-pms-backend.jar',
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'
@@ -88,7 +89,8 @@ Assert-Contains $backendTest @(
 Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0','redis:','image: redis:7-alpine',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
-  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: ''true'''
+  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,PaymentMySqlConcurrencyTest',
+  'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true'''
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'

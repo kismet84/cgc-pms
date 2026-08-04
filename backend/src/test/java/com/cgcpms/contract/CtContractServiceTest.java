@@ -245,6 +245,23 @@ class CtContractServiceTest {
         assertEquals("CONTRACT_BUDGET_NOT_APPLICABLE", rejected.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("已批准PREPARING项目可创建MAIN合同")
+    void preparingProjectCanCreateMainContract() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setStatus("PREPARING");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.updateById(project);
+        CtContract contract = buildDraftContract("筹备期业主主合同");
+        contract.setContractType("MAIN");
+
+        Long contractId = assertDoesNotThrow(() -> contractService.create(contract));
+
+        assertEquals("MAIN", contractMapper.selectById(contractId).getContractType());
+        assertEquals("DRAFT", contractMapper.selectById(contractId).getApprovalStatus());
+    }
+
     /** Ensure project 10001 + partners 20001/20002 + admin user exist for foreign-key references. */
     private void seedReferenceData() {
         if (projectMapper.selectById(PROJECT_ID) == null) {

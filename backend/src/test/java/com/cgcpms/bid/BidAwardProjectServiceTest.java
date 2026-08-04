@@ -69,7 +69,8 @@ class BidAwardProjectServiceTest {
         verify(projectMapper).insert(project.capture());
         assertEquals("招标人", project.getValue().getOwnerUnit());
         assertEquals("建设地点", project.getValue().getProjectAddress());
-        assertEquals(new BigDecimal("123.45"), project.getValue().getContractAmount());
+        assertEquals(0, BigDecimal.ZERO.compareTo(project.getValue().getContractAmount()));
+        assertEquals("BID_AWARD", project.getValue().getInitiationBasis());
         assertEquals(LocalDate.of(2026, 8, 1), project.getValue().getPlannedStartDate());
         assertEquals(LocalDate.of(2027, 7, 31), project.getValue().getPlannedEndDate());
     }

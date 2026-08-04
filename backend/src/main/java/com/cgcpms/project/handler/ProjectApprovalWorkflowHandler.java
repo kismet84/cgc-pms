@@ -3,7 +3,6 @@ package com.cgcpms.project.handler;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
-import com.cgcpms.project.service.ProjectLifecycleService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -17,7 +16,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProjectApprovalWorkflowHandler implements WorkflowBusinessHandler {
     private final PmProjectMapper projectMapper;
-    private final ProjectLifecycleService projectLifecycleService;
 
     @Override
     public String supportBusinessType() {
@@ -37,8 +35,17 @@ public class ProjectApprovalWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public void onApproved(WorkflowContext context) {
         WfInstance instance = context.getInstance();
-        update(instance, approvalStates(instance), "APPROVED", "PREPARING");
-        projectLifecycleService.activateIfReady(instance.getBusinessId(), instance.getTenantId());
+        int rows = projectMapper.update(null, new LambdaUpdateWrapper<PmProject>()
+                .eq(PmProject::getId, instance.getBusinessId())
+                .eq(PmProject::getTenantId, instance.getTenantId())
+                .in(PmProject::getApprovalStatus, approvalStates(instance))
+                .isNull(PmProject::getSourceBidCostId)
+                .set(PmProject::getApprovalStatus, "APPROVED")
+                .set(PmProject::getStatus, "PREPARING")
+                .set(PmProject::getInitiationBasis, "DIRECT_APPROVAL"));
+        if (rows != 1) {
+            throw new IllegalStateException("项目审批状态或来源冲突，projectId=" + instance.getBusinessId());
+        }
     }
 
     @Override

@@ -13,6 +13,7 @@ import com.cgcpms.cost.service.CostTargetService;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.OwnerContractFactService;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.entity.WfInstance;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -33,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +49,7 @@ class CostTargetServiceConcurrencyTest {
     @Mock ProjectAccessChecker accessChecker;
     @Mock JdbcTemplate jdbc;
     @Mock ObjectProvider<WorkflowEngine> workflowEngine;
+    @Mock OwnerContractFactService ownerContractFactService;
 
     private CostTargetService service;
 
@@ -54,8 +58,8 @@ class CostTargetServiceConcurrencyTest {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         initTableInfo(CostTarget.class);
         initTableInfo(PmProject.class);
-        service = new CostTargetService(targetMapper, summaryMapper, itemMapper, projectMapper,
-                accessChecker, jdbc, workflowEngine);
+        service = spy(new CostTargetService(targetMapper, summaryMapper, itemMapper, projectMapper,
+                accessChecker, jdbc, workflowEngine, ownerContractFactService));
     }
 
     @AfterEach
@@ -110,14 +114,11 @@ class CostTargetServiceConcurrencyTest {
         resubmitted.setId(9001L);
         WorkflowEngine engine = org.mockito.Mockito.mock(WorkflowEngine.class);
         when(targetMapper.selectOne(any())).thenReturn(target);
-        when(targetMapper.selectById(3L)).thenReturn(target);
         when(projectMapper.selectById(10001L)).thenReturn(project);
-        when(itemMapper.selectList(any())).thenReturn(List.of(item));
-        when(jdbc.queryForObject(any(String.class), org.mockito.ArgumentMatchers.eq(Integer.class), any(Object[].class)))
-                .thenReturn(1);
         when(workflowEngine.getObject()).thenReturn(engine);
         when(engine.resubmitCostTarget(9001L, TestUserContext.USER_ADMIN, "admin")).thenReturn(resubmitted);
         when(targetMapper.update(isNull(), any())).thenReturn(1);
+        doNothing().when(service).validateForSubmit(target);
 
         service.submitForApproval(3L, 5);
 

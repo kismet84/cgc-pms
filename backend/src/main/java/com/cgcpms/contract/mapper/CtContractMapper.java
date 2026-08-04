@@ -10,7 +10,13 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface CtContractMapper extends BaseMapper<CtContract>, DeletedCodeSource {
 
-    @Select("SELECT * FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    String COLUMNS = "id, tenant_id, org_id, project_id, contract_code, contract_name, contract_type, "
+            + "party_a_id, party_b_id, contract_amount, current_amount, paid_amount, payable_amount, "
+            + "pricing_mode, tax_rate, tax_amount, amount_without_tax, signed_date, start_date, end_date, "
+            + "payment_method, settlement_method, contract_status, approval_status, settlement_amount, "
+            + "cost_generated_flag, version, created_by, created_at, updated_by, updated_at, deleted_flag, remark";
+
+    @Select("SELECT " + COLUMNS + " FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE") // SQL-SAFETY: fixed-sql-fragment
     CtContract selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /**

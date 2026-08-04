@@ -75,7 +75,7 @@ public class BusinessObjectAuthorizer {
     private final JdbcTemplate jdbcTemplate;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
-            "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
+            "PROJECT", "PROJECT_COMMENCEMENT", "CONTRACT", "INVOICE", "RECEIPT",
             "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
@@ -215,6 +215,7 @@ public class BusinessObjectAuthorizer {
             case "CASH_JOURNAL" -> cashJournalAuthority;
             case "BID_COST" -> write ? "bid:file:manage" : "bid:query";
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
+            case "PROJECT_COMMENCEMENT" -> write ? "project:commencement:edit" : "project:commencement:query";
             case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
             case "SETTLEMENT" -> write ? "settlement:edit" : "settlement:query";
             case "EXPENSE" -> write ? "expense:edit" : "expense:query";
@@ -242,6 +243,17 @@ public class BusinessObjectAuthorizer {
             case "PROJECT":
                 projectAccessChecker.checkAccess(businessId, action + "项目文件");
                 break;
+            case "PROJECT_COMMENCEMENT": {
+                List<Long> projectIds = jdbcTemplate.queryForList("""
+                        SELECT project_id FROM project_commencement
+                        WHERE id=? AND tenant_id=? AND deleted_flag=0
+                        """, Long.class, businessId, UserContext.getCurrentTenantId());
+                if (projectIds.size() != 1) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "开工准入单不存在: " + businessId);
+                }
+                projectAccessChecker.checkAccess(projectIds.get(0), action + "开工准入文件");
+                break;
+            }
             case "CONTRACT": {
                 CtContract contract = contractMapper.selectById(businessId);
                 if (contract == null) {

@@ -44,6 +44,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -238,11 +239,24 @@ public class InvoiceService {
 
         if ("VERIFIED".equals(targetStatus)) {
             if ("CLOSED_LOOP_V1".equals(invoice.getIntegrityVersion())) {
-                List<InvoicePaymentAllocation> allocations = listAllocations(id);
+                List<InvoicePaymentAllocation> allocations = listAllocations(id).stream()
+                        .sorted(Comparator.comparing(InvoicePaymentAllocation::getPayRecordId))
+                        .toList();
                 BigDecimal allocated = allocations.stream().map(InvoicePaymentAllocation::getAllocatedAmount)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
                 if (money(invoice.getInvoiceAmount()).compareTo(money(allocated)) != 0) {
                     throw new BusinessException("INVOICE_ALLOCATION_INCOMPLETE", "发票分配金额合计必须等于发票金额");
+                }
+                for (InvoicePaymentAllocation allocation : allocations) {
+                    PayRecord record = payRecordMapper.selectByIdForUpdate(
+                            allocation.getPayRecordId(), invoice.getTenantId());
+                    if (record == null || !"SUCCESS".equals(record.getPayStatus())
+                            || !Objects.equals(record.getPayApplicationId(), invoice.getPayApplicationId())
+                            || !Objects.equals(record.getProjectId(), invoice.getProjectId())
+                            || !Objects.equals(record.getContractId(), invoice.getContractId())) {
+                        throw new BusinessException("INVOICE_PAY_RECORD_INVALID",
+                                "发票核验时付款已失效或与发票业务关系不一致");
+                    }
                 }
             }
             if (sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
@@ -299,13 +313,17 @@ public class InvoiceService {
         if (inputs == null || inputs.isEmpty()) {
             throw new BusinessException("INVOICE_ALLOCATION_REQUIRED", "发票必须至少分配到一笔成功付款");
         }
-        BigDecimal total = BigDecimal.ZERO;
         Set<Long> recordIds = new HashSet<>();
         for (InvoicePaymentAllocation input : inputs) {
             if (input.getPayRecordId() == null || !recordIds.add(input.getPayRecordId())
                     || money(input.getAllocatedAmount()).compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BusinessException("INVOICE_ALLOCATION_INVALID", "付款记录不可重复且分配金额必须大于0");
             }
+        }
+        List<InvoicePaymentAllocation> orderedInputs = inputs.stream()
+                .sorted(java.util.Comparator.comparing(InvoicePaymentAllocation::getPayRecordId)).toList();
+        BigDecimal total = BigDecimal.ZERO;
+        for (InvoicePaymentAllocation input : orderedInputs) {
             PayRecord record = payRecordMapper.selectByIdForUpdate(input.getPayRecordId(), invoice.getTenantId());
             if (record == null || !"SUCCESS".equals(record.getPayStatus())) {
                 throw new BusinessException("INVOICE_PAY_RECORD_INVALID", "发票只能分配到当前租户的成功付款记录");
@@ -317,8 +335,12 @@ public class InvoiceService {
                 throw new BusinessException("INVOICE_PAYMENT_CONTEXT_MISMATCH", "发票与付款记录的申请、项目、合同或付款对象不一致");
             }
             BigDecimal amount = money(input.getAllocatedAmount());
-            BigDecimal otherAllocated = money(allocationMapper.sumAllocatedToRecord(
-                    invoice.getTenantId(), record.getId(), invoice.getId()));
+            BigDecimal otherAllocated = allocationMapper.selectByPayRecordForUpdate(
+                            invoice.getTenantId(), record.getId()).stream()
+                    .filter(allocation -> !Objects.equals(allocation.getInvoiceId(), invoice.getId()))
+                    .map(InvoicePaymentAllocation::getAllocatedAmount)
+                    .map(InvoiceService::money)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             if (otherAllocated.add(amount).compareTo(money(record.getPayAmount())) > 0) {
                 throw new BusinessException("PAY_RECORD_INVOICE_OVER_ALLOCATED", "付款记录的发票分配金额超过实付金额");
             }
@@ -330,7 +352,7 @@ public class InvoiceService {
             throw new BusinessException("INVOICE_ALLOCATION_AMOUNT_MISMATCH", "发票分配金额合计必须等于发票金额");
         }
         allocationMapper.hardDeletePending(invoiceId, invoice.getTenantId());
-        for (InvoicePaymentAllocation input : inputs) {
+        for (InvoicePaymentAllocation input : orderedInputs) {
             input.setId(IdWorker.getId());
             input.setTenantId(invoice.getTenantId());
             input.setInvoiceId(invoiceId);

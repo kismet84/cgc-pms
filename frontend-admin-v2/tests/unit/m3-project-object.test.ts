@@ -14,8 +14,12 @@ import {
   deleteProject,
   deleteProjectMember,
   loadProjectDictionary,
+  loadProjectActivationReadiness,
+  loadProjectCommencement,
   loadProjectUsers,
   submitProject,
+  saveProjectCommencement,
+  submitProjectCommencement,
   updateProject,
   updateProjectMember,
 } from '@/services/projects'
@@ -78,10 +82,28 @@ describe('M3 project object service', () => {
       '/api/system/users?pageNo=1&pageSize=200',
     ])
   })
+
+  it('uses the project-scoped commencement contract', async () => {
+    fetchMock.mockImplementation(async () => ok({ version: 2 }))
+    await loadProjectActivationReadiness('P/1')
+    await loadProjectCommencement('P/1')
+    await saveProjectCommencement('P/1', {
+      version: 2,
+      plannedStartDate: '2026-08-05',
+      basisType: 'COMMENCEMENT_BASIS',
+    })
+    await submitProjectCommencement('P/1', 2)
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
+      ['/api/projects/P%2F1/activation-readiness', 'GET'],
+      ['/api/projects/P%2F1/commencement', 'GET'],
+      ['/api/projects/P%2F1/commencement', 'POST'],
+      ['/api/projects/P%2F1/commencement/submit?version=2', 'POST'],
+    ])
+  })
 })
 
 describe('M3 project object model', () => {
-  it('trims required values and drops empty optional values without converting amounts', () => {
+  it('trims required values and never submits server-authoritative amounts', () => {
     expect(
       cleanProjectCommand({
         projectName: ' A ',
@@ -89,7 +111,7 @@ describe('M3 project object model', () => {
         contractAmount: '9007199254740993.01',
         targetCost: '  ',
       }),
-    ).toEqual({ projectName: 'A', projectType: 'BUILDING', contractAmount: '9007199254740993.01' })
+    ).toEqual({ projectName: 'A', projectType: 'BUILDING' })
     expect(cleanMemberCommand({ userId: ' 9 ', roleCode: ' PM ', positionName: ' ' })).toEqual({
       userId: '9',
       roleCode: 'PM',
@@ -119,11 +141,9 @@ describe('M3 project object model', () => {
       createdAt: '',
       updatedAt: '',
     } satisfies ProjectRecord
-    expect(projectCommand(record)).toMatchObject({
-      projectName: 'A',
-      contractAmount: '1.00',
-      targetCost: '2.00',
-    })
+    expect(projectCommand(record)).toMatchObject({ projectName: 'A' })
+    expect(projectCommand(record)).not.toHaveProperty('contractAmount')
+    expect(projectCommand(record)).not.toHaveProperty('targetCost')
     expect(projectCommand(record)).not.toHaveProperty('projectCode')
     expect(isSuperAdmin(['ADMIN'])).toBe(false)
     expect(isSuperAdmin(['super_admin'])).toBe(true)

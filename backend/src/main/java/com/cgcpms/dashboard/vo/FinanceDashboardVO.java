@@ -26,8 +26,10 @@ public class FinanceDashboardVO {
     private String budgetExecutionRate;
     private String cashOutflowAmount;
     private String cashBalance;
+    private Boolean cashBalanceAvailable;
     private String projectProfit;
     private String metricFormulaVersion;
+    private List<String> unavailableMetrics;
     /** Monthly payment trend points, sorted by month ASC, max 12. */
     private List<TrendPoint> trendPoints;
     /** Detail lists */

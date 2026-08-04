@@ -8,9 +8,12 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Mapper
 public interface InvoicePaymentAllocationMapper extends BaseMapper<InvoicePaymentAllocation> {
+    String COLUMNS = "id, tenant_id, invoice_id, pay_record_id, pay_application_id, allocated_amount, created_by, created_at";
+
     @Delete("DELETE FROM invoice_payment_allocation WHERE invoice_id = #{invoiceId} AND tenant_id = #{tenantId}")
     int hardDeletePending(@Param("invoiceId") Long invoiceId, @Param("tenantId") Long tenantId);
 
@@ -23,4 +26,9 @@ public interface InvoicePaymentAllocationMapper extends BaseMapper<InvoicePaymen
     BigDecimal sumAllocatedToRecord(@Param("tenantId") Long tenantId,
                                     @Param("payRecordId") Long payRecordId,
                                     @Param("excludeInvoiceId") Long excludeInvoiceId);
+
+    @Select("SELECT " + COLUMNS + " FROM invoice_payment_allocation " // SQL-SAFETY: fixed-sql-fragment
+            + "WHERE tenant_id = #{tenantId} AND pay_record_id = #{payRecordId} FOR UPDATE")
+    List<InvoicePaymentAllocation> selectByPayRecordForUpdate(@Param("tenantId") Long tenantId,
+                                                              @Param("payRecordId") Long payRecordId);
 }

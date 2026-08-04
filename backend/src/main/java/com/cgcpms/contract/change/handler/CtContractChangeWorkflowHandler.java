@@ -12,6 +12,7 @@ import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
+import com.cgcpms.project.service.OwnerContractFactService;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
     private final CostSummaryService costSummaryService;
     private final VarOrderMapper varOrderMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final OwnerContractFactService ownerContractFactService;
 
     @Override
     public String supportBusinessType() {
@@ -98,8 +100,20 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
                     change.getContractId(), changeAmount, contract.getCurrentAmount());
         }
 
-        // 3. Generate cost record
-        costGenerationService.generateCost("CT_CHANGE", changeId);
+        CtContract updatedContract = contractMapper.selectById(change.getContractId());
+        if (updatedContract == null || !change.getTenantId().equals(updatedContract.getTenantId())) {
+            throw new IllegalStateException("合同变更写后回读失败，contractId=" + change.getContractId());
+        }
+        if ("MAIN".equals(updatedContract.getContractType())) {
+            ownerContractFactService.synchronizeApprovedMainContract(updatedContract.getId(), change.getTenantId());
+            changeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
+                    .eq(CtContractChange::getId, changeId)
+                    .eq(CtContractChange::getTenantId, change.getTenantId())
+                    .set(CtContractChange::getCostGeneratedFlag, 1));
+        } else {
+            // 3. Generate cost record
+            costGenerationService.generateCost("CT_CHANGE", changeId);
+        }
 
         // 4. Refresh cost_summary for the project
         if (change.getProjectId() != null) {

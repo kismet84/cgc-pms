@@ -67,6 +67,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -118,6 +119,7 @@ abstract class DashboardServiceTestSupport {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
     }
 

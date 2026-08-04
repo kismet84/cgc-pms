@@ -71,6 +71,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,6 +95,7 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
     @Autowired private ProjectBudgetLineMapper projectBudgetLineMapper;
     @Autowired private CashJournalEntryMapper cashJournalEntryMapper;
     @Autowired private CostSummaryService costSummaryService;
+    @Autowired private JdbcTemplate jdbc;
 
     @Test
     @Transactional
@@ -107,10 +109,13 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
                 .getTotalPaidAmount());
         assertEquals("100000.00", dashboardService.getFinanceView(sr.projectId, current.toString())
                 .getTotalPaidAmount());
-        assertEquals(0L, dashboardService.getManagementView(sr.projectId, previous.toString())
-                .getActiveProjectCount());
-        assertEquals(1L, dashboardService.getManagementView(sr.projectId, current.toString())
-                .getActiveProjectCount());
+        ManagementDashboardVO previousManagement = dashboardService.getManagementView(
+                sr.projectId, previous.toString());
+        ManagementDashboardVO currentManagement = dashboardService.getManagementView(
+                sr.projectId, current.toString());
+        assertNull(previousManagement.getActiveProjectCount());
+        assertNull(currentManagement.getActiveProjectCount());
+        assertTrue(currentManagement.getUnavailableMetrics().contains("activeProjectCount"));
     }
 
     @Test
@@ -132,6 +137,8 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getApprovedUnpaidAmount());
         assertNotNull(vo.getOverRatioAmount());
         assertNotNull(vo.getWarrantyExpiringAmount());
+        assertNull(vo.getCashBalance());
+        assertFalse(vo.getCashBalanceAvailable());
         assertNotNull(vo.getTrendPoints());
         assertNotNull(vo.getPendingPayments());
         assertEquals("1000000.00", vo.getOverRatioAmount());
@@ -157,6 +164,8 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNull(vo.getProjectId());
         assertEquals("全部项目", vo.getProjectName());
         assertNotNull(vo.getPendingPaymentAmount());
+        assertNotNull(vo.getCashBalance());
+        assertTrue(vo.getCashBalanceAvailable());
         assertNotNull(vo.getTrendPoints());
         assertFalse(vo.getContractFundBreakdowns().isEmpty());
     }
@@ -255,9 +264,62 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertEquals(Set.of(visible.projectId.toString()), vo.getContractFundBreakdowns().stream()
                 .map(FinanceDashboardVO.ContractFundBreakdown::getProjectId)
                 .collect(Collectors.toSet()));
+        assertNull(vo.getCashBalance());
+        assertFalse(vo.getCashBalanceAvailable());
         BusinessException denied = assertThrows(BusinessException.class,
                 () -> dashboardService.getFinanceView(hidden.projectId));
         assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史付款按不可变付款与冲销时间重算，当前合同状态不改写历史")
+    void historicalPaymentSurvivesCurrentStatusDrift() {
+        SeedResult sr = seed("FIN_HISTORY_DRIFT");
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        PayRecord payment = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, sr.projectId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        payment.setPayDate(previous.atDay(10));
+        payment.setPaidAt(previous.atDay(10).atTime(10, 0));
+        payment.setPayStatus("REVERSED");
+        payment.setReversedAt(YearMonth.now().atDay(1).atStartOfDay());
+        payRecordMapper.updateById(payment);
+        CtContract contract = ctContractMapper.selectById(payment.getContractId());
+        contract.setContractStatus("SETTLED");
+        ctContractMapper.updateById(contract);
+
+        FinanceDashboardVO historical = dashboardService.getFinanceView(sr.projectId, previous.toString());
+
+        assertEquals("100000.00", historical.getTotalPaidAmount());
+        assertNull(historical.getTotalContractAmount());
+        assertTrue(historical.getUnavailableMetrics().contains("totalContractAmount"));
+        assertNull(historical.getPendingPaymentAmount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史全项目财务不受项目当前状态和可变计划日期影响")
+    void historicalAllProjectsSurvivesCurrentProjectStatusDrift() {
+        SeedResult sr = seed("FIN_HISTORY_ALL");
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        PayRecord payment = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, sr.projectId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        payment.setPayDate(previous.atDay(10));
+        payment.setPaidAt(previous.atDay(10).atTime(10, 0));
+        payRecordMapper.updateById(payment);
+        PmProject project = projectMapper.selectById(sr.projectId);
+        project.setStatus("CLOSED");
+        project.setPlannedStartDate(YearMonth.now().plusMonths(2).atDay(1));
+        projectMapper.updateById(project);
+        jdbc.update("UPDATE pm_project SET created_at=? WHERE id=?", previous.atDay(1).atStartOfDay(), sr.projectId);
+
+        FinanceDashboardVO historical = dashboardService.getFinanceView(null, previous.toString());
+
+        assertEquals("100000.00", historical.getTotalPaidAmount());
+        assertTrue(historical.getContractFundBreakdowns().isEmpty());
+        assertTrue(historical.getUnavailableMetrics().contains("contractFundBreakdowns"));
     }
 
     // ========================================================================

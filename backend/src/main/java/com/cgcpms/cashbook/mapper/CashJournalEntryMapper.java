@@ -21,6 +21,11 @@ public interface CashJournalEntryMapper extends BaseMapper<CashJournalEntry> {
     @Select("SELECT * FROM cash_journal_entry WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     CashJournalEntry selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM cash_journal_entry WHERE tenant_id = #{tenantId} AND pay_record_id = #{payRecordId} AND deleted_flag = 0 FOR UPDATE")
+    CashJournalEntry selectByPayRecordForUpdate(@Param("tenantId") Long tenantId,
+                                                @Param("payRecordId") Long payRecordId);
+
     @Select("SELECT * FROM cash_journal_entry WHERE tenant_id = #{tenantId} AND entry_no = #{entryNo} AND deleted_flag = 0 FOR UPDATE")
     CashJournalEntry selectByEntryNoForUpdate(@Param("tenantId") Long tenantId, @Param("entryNo") String entryNo);
 

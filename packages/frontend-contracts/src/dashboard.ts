@@ -350,9 +350,11 @@ export interface FinanceDashboardVO {
   budgetConsumedAmount: string;
   budgetExecutionRate: string;
   cashOutflowAmount: string;
-  cashBalance: string;
+  cashBalance: string | null;
+  cashBalanceAvailable?: boolean;
   projectProfit: string;
   metricFormulaVersion: string;
+  unavailableMetrics?: string[];
   trendPoints: FinanceDashboardTrendPoint[];
   pendingPayments: DashboardPaymentItemVO[];
   overRatioPayments: DashboardPaymentItemVO[];
@@ -400,6 +402,7 @@ export interface ManagementDashboardVO {
   totalPaidAmount: string;
   totalPendingTaskCount: number;
   totalRiskCount: number;
+  unavailableMetrics?: string[];
   projectRankings: DashboardProjectSummaryVO[];
   metricSources: ManagementMetricSourceVO[];
   majorRisks: DashboardAlertItemVO[];

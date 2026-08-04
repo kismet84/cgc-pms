@@ -168,8 +168,7 @@ class OpenHtmlToPdfRendererSpikeTest {
                 configured == null ? "" : configured,
                 "C:/Windows/Fonts/simhei.ttf",
                 "C:/Windows/Fonts/Deng.ttf",
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc");
+                "/usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf");
         return candidates.stream()
                 .filter(path -> !path.isBlank())
                 .map(Path::of)

@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("273", flyway.info().current().getVersion().getVersion());
+        assertEquals("276", flyway.info().current().getVersion().getVersion());
         assertEquals(10, count(flyway, "cost_subject", "parent_id=(SELECT id FROM cost_subject WHERE subject_code='5401.03')"));
         assertEquals(0, count(flyway, "cost_subject", "subject_code='5401.02' OR subject_code LIKE '5401.02.%'"));
         assertEquals(21, count(flyway, "cost_subject", """
@@ -105,6 +105,11 @@ class BaselineFlywayCompatibilityTest {
                 role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
                 AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:resubmit')
                 """));
+        assertEquals(2, count(flyway, "sys_role_menu", """
+                role_id IN (SELECT id FROM sys_role WHERE role_code IN
+                    ('DEPARTMENT_MANAGER','GENERAL_MANAGER'))
+                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:commencement:query')
+                """));
     }
 
     @Test
@@ -123,7 +128,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("273", current.info().current().getVersion().getVersion());
+        assertEquals("276", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
@@ -137,8 +142,58 @@ class BaselineFlywayCompatibilityTest {
                 role_id=(SELECT id FROM sys_role WHERE role_code='SUPER_ADMIN')
                 AND menu_id=(SELECT id FROM sys_menu WHERE perms='audit:query')
                 """));
+        assertEquals(2, count(current, "sys_role_menu", """
+                role_id IN (SELECT id FROM sys_role WHERE role_code IN
+                    ('DEPARTMENT_MANAGER','GENERAL_MANAGER'))
+                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:commencement:query')
+                """));
         assertFalse(Arrays.stream(current.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
+    }
+
+    @Test
+    void v276BackfillsLegacyPaymentCashJournalTrace() {
+        Flyway old = Flyway.configure()
+                .dataSource(url("payment_cash_trace"), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("275"))
+                .cleanDisabled(false)
+                .load();
+        old.migrate();
+        execute(old, "SET REFERENTIAL_INTEGRITY FALSE");
+        execute(old, """
+                INSERT INTO wf_instance
+                    (id, tenant_id, template_id, business_type, business_id, title,
+                     instance_status, initiator_id, deleted_flag)
+                VALUES (276004, 276, 276005, 'PAY_REQUEST', 276001, 'V276 approval',
+                        'COMPLETED', 276006, 0)
+                """);
+        execute(old, """
+                INSERT INTO pay_application
+                    (id, tenant_id, project_id, apply_code, apply_amount, approved_amount,
+                     actual_pay_amount, pay_type, pay_status, approval_status, approval_instance_id, deleted_flag)
+                VALUES (276001, 276, 276010, 'PAY-V276', 100, 100, 100,
+                        'DIRECT', 'PAID', 'APPROVED', 276004, 0)
+                """);
+        execute(old, """
+                INSERT INTO pay_record
+                    (id, tenant_id, project_id, pay_application_id, pay_amount, pay_date, pay_status, deleted_flag)
+                VALUES (276002, 276, 276010, 276001, 100, CURRENT_DATE, 'SUCCESS', 0)
+                """);
+        execute(old, """
+                INSERT INTO cash_journal_entry
+                    (id, tenant_id, entry_no, direction, amount, business_date, summary, source_type,
+                     source_id, status, closure_due_at, pay_record_id, deleted_flag)
+                VALUES (276003, 276, 'CJ-V276', 'OUT', 100, CURRENT_DATE, 'V276', 'PAY_RECORD',
+                        276002, 'PENDING_ARCHIVE', CURRENT_TIMESTAMP, 276002, 0)
+                """);
+        execute(old, "SET REFERENTIAL_INTEGRITY TRUE");
+
+        Flyway current = flyway("payment_cash_trace", ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals(1, count(current, "cash_journal_entry",
+                "id=276003 AND tenant_id=276 AND pay_application_id=276001 AND approval_instance_id=276004"));
     }
 
     @Test
@@ -253,7 +308,8 @@ class BaselineFlywayCompatibilityTest {
         List<String> roleMenus = rows(old, """
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
-                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113)
+                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                                                           27401,27402,27403,27404)
                 ORDER BY tenant_id, role_id, menu_id
                 """);
         List<String> rolePermissions = rows(old, """
@@ -261,7 +317,8 @@ class BaselineFlywayCompatibilityTest {
                 FROM sys_role_menu rm
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
-                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113)
+                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                                                                 27401,27402,27403,27404)
                 ORDER BY 1
                 """);
 
@@ -271,7 +328,8 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(roleMenus, rows(current, """
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
-                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113)
+                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                                                           27401,27402,27403,27404)
                 ORDER BY tenant_id, role_id, menu_id
                 """));
         assertEquals(rolePermissions, rows(current, """
@@ -279,7 +337,8 @@ class BaselineFlywayCompatibilityTest {
                 FROM sys_role_menu rm
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
-                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113)
+                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                                                                 27401,27402,27403,27404)
                 ORDER BY 1
                 """));
         assertEquals(2, count(current, "sys_menu",

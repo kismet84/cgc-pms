@@ -74,7 +74,8 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'COST-CTRL-IT','动态利润闭环测试项目',9411.76,0,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
         jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(99187006,0,?,1,'COST_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'CTRL-P','业主单位','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PARTNER);
-        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'CTRL-MAIN','业主总包合同','MAIN',?,?,12000,12000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", MAIN_CONTRACT, PROJECT, PARTNER, PARTNER);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'CTRL-MAIN','业主总包合同','MAIN',?,?,9411.76,9411.76,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", MAIN_CONTRACT, PROJECT, PARTNER, PARTNER);
+        jdbc.update("UPDATE pm_project SET owner_contract_id=? WHERE id=?", MAIN_CONTRACT, PROJECT);
     }
 
     @AfterEach
@@ -123,8 +124,8 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertMoney("5500.00", confirmed.get("actual_cost_amount"));
         assertMoney("9000.00", confirmed.get("forecast_at_completion_amount"));
         assertMoney("1000.00", confirmed.get("cost_variance_amount"));
-        assertMoney("3000.00", confirmed.get("forecast_profit_amount"));
-        assertEquals(new BigDecimal("0.25"), new BigDecimal(String.valueOf(confirmed.get("profit_margin"))));
+        assertMoney("411.76", confirmed.get("forecast_profit_amount"));
+        assertEquals(new BigDecimal("0.04"), new BigDecimal(String.valueOf(confirmed.get("profit_margin"))));
         assertEquals(forecastId, jdbc.queryForObject("SELECT cost_forecast_id FROM cost_summary WHERE project_id=? LIMIT 1", Long.class, PROJECT));
 
         BusinessException duplicateConfirm = assertThrows(BusinessException.class, () -> controlService.confirmForecast(forecastId, 3));
@@ -372,6 +373,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM wf_node_instance WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('COST_TARGET','COST_CORRECTIVE_ACTION'))", PROJECT);
         jdbc.update("DELETE FROM wf_cc WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('COST_TARGET','COST_CORRECTIVE_ACTION'))", PROJECT);
         jdbc.update("DELETE FROM wf_instance WHERE project_id=? AND business_type IN('COST_TARGET','COST_CORRECTIVE_ACTION')", PROJECT);
+        jdbc.update("UPDATE pm_project SET owner_contract_id=NULL WHERE id=?", PROJECT);
         jdbc.update("DELETE FROM ct_contract WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
         jdbc.update("DELETE FROM pm_project_member WHERE project_id=?", PROJECT);

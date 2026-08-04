@@ -68,8 +68,9 @@ class PurchaseContractPaymentLimitTest {
         contract.setPayableAmount(new BigDecimal("100.00"));
         when(contractMapper.selectByIdForUpdate(1L, 7L)).thenReturn(contract);
         PayRecord paid = new PayRecord();
+        paid.setPayApplicationId(2L);
         paid.setPayAmount(new BigDecimal("80.00"));
-        when(payRecordMapper.selectList(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(paid));
+        when(payRecordMapper.selectSuccessByContractForUpdate(7L, 1L)).thenReturn(List.of(paid));
 
         PayApplication app = new PayApplication();
         app.setContractId(1L);

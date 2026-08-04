@@ -727,4 +727,16 @@ describe('M2 dashboard page', () => {
     expect(breakdown.text()).toContain('PMT-20260718-0012026-07-18')
     expect(breakdown.text()).toContain('已完成')
   })
+
+  it('hides company cash balance when backend marks project-scoped view unavailable', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue({
+      ...financeData,
+      cashBalance: null,
+      cashBalanceAvailable: false,
+      unavailableMetrics: ['cashBalance'],
+    })
+    const { wrapper } = await mountDashboard(['dashboard:finance:view'])
+
+    expect(wrapper.text()).not.toContain('公司资金余额')
+  })
 })

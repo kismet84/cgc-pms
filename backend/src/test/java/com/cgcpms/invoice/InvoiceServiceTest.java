@@ -705,6 +705,22 @@ class InvoiceServiceTest {
         }
     }
 
+    @Test
+    @Order(24)
+    @DisplayName("VERIFY: 锁定后复核付款状态，已冲销付款不能核验")
+    void verifyRejectsAllocationWhosePaymentIsNoLongerSuccessful() {
+        Long id = createPreparedInvoice("INV-PAYMENT-STATE-DRIFT", "1500.00");
+        PayRecord payment = payRecordMapper.selectById(SEED_PAY_RECORD_ID);
+        payment.setPayStatus("REVERSED");
+        payRecordMapper.updateById(payment);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> invoiceService.verify(id, "VERIFIED"));
+
+        assertEquals("INVOICE_PAY_RECORD_INVALID", error.getCode());
+        assertEquals("PENDING", invoiceService.getById(id).getVerifyStatus());
+    }
+
     private Long createPreparedInvoice(String invoiceNo, String amount) {
         PayInvoice invoice = new PayInvoice();
         invoice.setInvoiceNo(invoiceNo);
