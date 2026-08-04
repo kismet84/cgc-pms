@@ -15,7 +15,8 @@ if (specs.length === 0) {
 }
 
 console.log(`Running ${specs.length} deterministic V2 migration browser specs`)
-const result = spawnSync('pnpm', ['exec', 'playwright', 'test', ...specs], {
+const workers = process.env.PLAYWRIGHT_MIGRATION_WORKERS || (process.env.CI ? '2' : '4')
+const result = spawnSync('pnpm', ['exec', 'playwright', 'test', '--workers', workers, ...specs], {
   shell: process.platform === 'win32',
   stdio: 'inherit',
 })

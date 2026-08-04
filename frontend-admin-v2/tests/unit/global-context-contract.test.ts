@@ -70,5 +70,7 @@ describe('full V2 public context contract', () => {
     expect(browserGate).toContain("await select(page, '#global-project', '')")
     expect(browserGate).toContain("await select(page, '#global-report-period', '')")
     expect(migrationGate).toContain('/^m\\d.*\\.spec\\.ts$/')
+    expect(migrationGate).toContain('PLAYWRIGHT_MIGRATION_WORKERS')
+    expect(migrationGate).toContain("'--workers', workers")
   })
 })
