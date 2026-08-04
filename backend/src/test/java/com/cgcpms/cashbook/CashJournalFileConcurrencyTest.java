@@ -162,9 +162,13 @@ class CashJournalFileConcurrencyTest {
         config.setBucket("test");
         @SuppressWarnings("unchecked")
         ObjectProvider<MeterRegistry> meterRegistryProvider = mock(ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<FileObjectTaskService> taskServiceProvider = mock(ObjectProvider.class);
         VirusScanner virusScanner = mock(VirusScanner.class);
+        FileObjectTaskService objectTaskService = new FileObjectTaskService(
+                jdbcTemplate, minioClient, taskServiceProvider);
         return new FileService(fileMapper, minioClient, config, authorizer,
-                new RetryTemplate(), meterRegistryProvider, virusScanner, mock(FileObjectTaskService.class));
+                new RetryTemplate(), meterRegistryProvider, virusScanner, objectTaskService);
     }
 
     private void inAdminTransaction(Runnable action) {
@@ -240,6 +244,7 @@ class CashJournalFileConcurrencyTest {
     }
 
     private void cleanup() {
+        jdbcTemplate.update("DELETE FROM sys_file_object_task WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM sys_file WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cash_journal_change_log WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cash_journal_entry WHERE tenant_id = ?", TENANT_ID);

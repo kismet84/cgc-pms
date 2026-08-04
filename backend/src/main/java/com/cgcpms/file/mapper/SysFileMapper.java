@@ -13,7 +13,12 @@ import java.util.List;
 public interface SysFileMapper extends BaseMapper<SysFile> {
 
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM sys_file WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    @Select("""
+            SELECT id,tenant_id,business_type,document_type,business_id,file_name,original_name,
+                   file_size,content_type,storage_path,bucket_name,virus_scan_status,virus_scan_detail,
+                   virus_scanned_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark
+            FROM sys_file WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE
+            """)
     SysFile selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     @InterceptorIgnore(tenantLine = "true")
