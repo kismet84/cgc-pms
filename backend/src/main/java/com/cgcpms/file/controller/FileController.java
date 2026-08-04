@@ -47,6 +47,8 @@ public class FileController {
             + " and hasAuthority('receipt:edit'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('OWNER_SETTLEMENT')"
             + " and hasAuthority('revenue:operations:maintain'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('BID_COST')"
+            + " and hasAuthority('bid:file:manage'))"
             + " or (#businessType != null and #businessType.toUpperCase().startsWith('TECH_') and ("
             + " hasAuthority('technical:scheme:maintain') or hasAuthority('technical:scheme:submit')"
             + " or hasAuthority('technical:drawing:receive') or hasAuthority('technical:drawing:review')"
@@ -82,6 +84,7 @@ public class FileController {
             + " or hasAuthority('invoice:query')"
             + " or hasAuthority('purchase:request:list') or hasAuthority('purchase:order:query')"
             + " or hasAuthority('receipt:query')"
+            + " or hasAuthority('bid:query')"
             + " or hasAuthority('technical:query')"
             + " or hasAuthority('variation:order:query') or hasAuthority('variation:trace')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
@@ -98,6 +101,7 @@ public class FileController {
             + " or hasAuthority('invoice:edit')"
             + " or hasAuthority('purchase:request:edit') or hasAuthority('purchase:order:edit')"
             + " or hasAuthority('receipt:edit')"
+            + " or hasAuthority('bid:file:manage')"
             + " or hasAuthority('technical:scheme:maintain') or hasAuthority('technical:scheme:submit')"
             + " or hasAuthority('technical:drawing:receive') or hasAuthority('technical:drawing:review')"
             + " or hasAuthority('technical:rfi:raise') or hasAuthority('technical:rfi:respond')"
@@ -134,6 +138,8 @@ public class FileController {
             + " and hasAuthority('purchase:order:query'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('MATERIAL_RECEIPT')"
             + " and hasAuthority('receipt:query'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('BID_COST')"
+            + " and hasAuthority('bid:query'))"
             + " or (#businessType != null and #businessType.toUpperCase().startsWith('TECH_')"
             + " and hasAuthority('technical:query'))"
             + " or (#businessType != null and (#businessType.equalsIgnoreCase('PRODUCTION_MEASUREMENT')"

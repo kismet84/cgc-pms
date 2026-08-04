@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import {
   V2Badge,
   V2ActionMenu,
@@ -12,6 +11,7 @@ import {
   V2PageState,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import {
@@ -30,11 +30,13 @@ import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/syste
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
-const router = useRouter()
 const loading = ref(false)
+const detailLoading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
+const changingStatus = ref(false)
 const error = ref('')
+const detailError = ref('')
 const riskError = ref('')
 const records = ref<PartnerRecord[]>([])
 const partnerTypes = ref<DictOption[]>([])
@@ -43,10 +45,14 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
 const dialogOpen = ref(false)
+const detailOpen = ref(false)
+const detailRecord = ref<PartnerRecord | null>(null)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<PartnerRecord | null>(null)
+const statusTarget = ref<PartnerRecord | null>(null)
 let loadController: AbortController | null = null
 let riskLevelsLoaded = false
+let detailRequest = 0
 
 const filters = reactive({ partnerCode: '', partnerName: '', partnerType: '', status: '' })
 const form = reactive({
@@ -87,6 +93,10 @@ const riskOptions = computed(() =>
 
 function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
+}
+
+function text(value: unknown): string {
+  return value === null || value === undefined || value === '' ? '—' : String(value)
 }
 
 function typeLabel(value: string): string {
@@ -201,8 +211,25 @@ function openCreate(): void {
   dialogOpen.value = true
 }
 
-function openDetail(record: PartnerRecord): void {
-  void router.push({ name: 'V2ShellPartnerDetail', params: { id: record.id } })
+async function openDetail(record: PartnerRecord): Promise<void> {
+  const request = ++detailRequest
+  detailOpen.value = true
+  detailLoading.value = true
+  detailError.value = ''
+  detailRecord.value = null
+  try {
+    const detail = await loadPartner(record.id)
+    if (request === detailRequest) detailRecord.value = detail
+  } catch (value) {
+    if (request === detailRequest) detailError.value = messageOf(value)
+  } finally {
+    if (request === detailRequest) detailLoading.value = false
+  }
+}
+
+function closeDetail(): void {
+  detailRequest++
+  detailOpen.value = false
 }
 
 async function openEdit(record: PartnerRecord): Promise<void> {
@@ -245,7 +272,7 @@ function command(): PartnerCommand | null {
     return null
   }
   return {
-    partnerCode: form.partnerCode.trim(),
+    ...(editingId.value ? { partnerCode: form.partnerCode.trim() } : {}),
     partnerName: name,
     partnerType: type,
     creditCode: form.creditCode.trim(),
@@ -296,13 +323,35 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
+async function confirmStatus(): Promise<void> {
+  if (!statusTarget.value) return
+  changingStatus.value = true
+  try {
+    const detail = await loadPartner(statusTarget.value.id)
+    const { id, ...current } = detail
+    await updatePartner(id, {
+      ...current,
+      defaultLeadDays: current.defaultLeadDays ?? null,
+      status: current.status === 'ENABLE' ? 'DISABLE' : 'ENABLE',
+    })
+    await loadPartner(id)
+    statusTarget.value = null
+    await load()
+    showToast('success', '合作方状态已更新', '最新状态已刷新。')
+  } catch (value) {
+    showToast('error', '状态更新失败', messageOf(value))
+  } finally {
+    changingStatus.value = false
+  }
+}
+
 onMounted(load)
 onBeforeUnmount(() => loadController?.abort())
 </script>
 
 <template>
   <V2Stack class="master-page" :gap="4">
-    <V2Card title="合作方管理" :heading-level="1">
+    <V2Card title="客户管理" :heading-level="1">
       <template #actions>
         <form class="v2-page-heading__filters" @submit.prevent="search">
           <V2Input
@@ -399,9 +448,12 @@ onBeforeUnmount(() => loadController?.abort())
                 </V2Badge>
               </td>
               <td>
-                <V2Badge :tone="record.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ record.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
+                <V2StatusToggle
+                  :enabled="record.status === 'ENABLE'"
+                  :disabled="!canEdit || changingStatus"
+                  :aria-label="`${record.status === 'ENABLE' ? '停用' : '启用'}合作方 ${record.partnerName}`"
+                  @toggle="statusTarget = record"
+                />
               </td>
               <td class="v2-table-cell--actions">
                 <V2ActionMenu
@@ -450,6 +502,85 @@ onBeforeUnmount(() => loadController?.abort())
     </V2Card>
 
     <V2Dialog
+      :open="detailOpen"
+      title="合作方详情"
+      panel-class="v2-detail-dialog v2-dialog-wide"
+      close-label="关闭合作方详情"
+      @close="closeDetail"
+    >
+      <V2PageState
+        v-if="detailLoading"
+        kind="loading"
+        title="正在读取合作方详情"
+        description="请稍候。"
+      />
+      <V2PageState
+        v-else-if="detailError"
+        kind="error"
+        title="合作方详情加载失败"
+        :description="detailError"
+      />
+      <dl v-else-if="detailRecord" class="v2-detail-dialog__facts">
+        <div>
+          <dt>合作方编号</dt>
+          <dd>{{ detailRecord.partnerCode }}</dd>
+        </div>
+        <div>
+          <dt>合作方类型</dt>
+          <dd>{{ typeLabel(detailRecord.partnerType) }}</dd>
+        </div>
+        <div>
+          <dt>统一社会信用代码</dt>
+          <dd>{{ text(detailRecord.creditCode) }}</dd>
+        </div>
+        <div>
+          <dt>法定代表人</dt>
+          <dd>{{ text(detailRecord.legalPerson) }}</dd>
+        </div>
+        <div>
+          <dt>联系人</dt>
+          <dd>{{ text(detailRecord.contactName) }}</dd>
+        </div>
+        <div>
+          <dt>联系电话</dt>
+          <dd>{{ text(detailRecord.contactPhone) }}</dd>
+        </div>
+        <div>
+          <dt>开户银行</dt>
+          <dd>{{ text(detailRecord.bankName) }}</dd>
+        </div>
+        <div>
+          <dt>银行账号</dt>
+          <dd>{{ text(detailRecord.bankAccount) }}</dd>
+        </div>
+        <div>
+          <dt>资质等级</dt>
+          <dd>{{ text(detailRecord.qualificationLevel) }}</dd>
+        </div>
+        <div>
+          <dt>默认提前期</dt>
+          <dd>{{ text(detailRecord.defaultLeadDays) }}</dd>
+        </div>
+        <div>
+          <dt>风险等级</dt>
+          <dd>{{ riskLabel(detailRecord.riskLevel) }}</dd>
+        </div>
+        <div>
+          <dt>状态</dt>
+          <dd>
+            <V2Badge :tone="detailRecord.status === 'ENABLE' ? 'success' : 'neutral'">
+              {{ detailRecord.status === 'ENABLE' ? '启用' : '停用' }}
+            </V2Badge>
+          </dd>
+        </div>
+        <div>
+          <dt>黑名单</dt>
+          <dd>{{ detailRecord.blacklistFlag ? '是' : '否' }}</dd>
+        </div>
+      </dl>
+    </V2Dialog>
+
+    <V2Dialog
       :open="dialogOpen"
       :title="editingId ? '编辑合作方' : '新增合作方'"
       description="保存后自动刷新；关闭即清空敏感字段。"
@@ -458,12 +589,7 @@ onBeforeUnmount(() => loadController?.abort())
       @close="closeDialog"
     >
       <form id="partner-form" class="master-page__form" @submit.prevent="save">
-        <V2Input
-          v-model="form.partnerCode"
-          label="合作方编号"
-          :disabled="Boolean(editingId)"
-          hint="新建时留空由服务端生成"
-        />
+        <V2Input v-model="form.partnerCode" label="合作方编号" disabled />
         <V2Input v-model="form.partnerName" label="合作方名称" required />
         <V2Select v-model="form.partnerType" :options="typeOptions" label="合作方类型" required />
         <V2Input v-model="form.creditCode" label="统一社会信用代码" />
@@ -479,7 +605,13 @@ onBeforeUnmount(() => loadController?.abort())
           v-model="form.defaultLeadDays"
           label="默认提前期（天）"
         />
-        <V2Select v-model="form.status" :options="statusOptions" label="状态" required />
+        <V2Select
+          v-model="form.status"
+          :options="statusOptions"
+          label="状态"
+          required
+          :disabled="Boolean(editingId)"
+        />
         <label class="master-page__check">
           <input v-model="form.blacklistFlag" type="checkbox" />
           标记为黑名单
@@ -490,6 +622,20 @@ onBeforeUnmount(() => loadController?.abort())
         <V2Button type="submit" form="partner-form" :loading="saving">保存</V2Button>
       </template>
     </V2Dialog>
+
+    <V2ConfirmDialog
+      :open="Boolean(statusTarget)"
+      title="更新合作方状态"
+      :description="
+        statusTarget
+          ? `确认${statusTarget.status === 'ENABLE' ? '停用' : '启用'}“${statusTarget.partnerName}”？`
+          : ''
+      "
+      :danger="statusTarget?.status === 'ENABLE'"
+      :loading="changingStatus"
+      @close="statusTarget = null"
+      @confirm="confirmStatus"
+    />
 
     <V2ConfirmDialog
       :open="Boolean(deleteTarget)"

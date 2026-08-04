@@ -8,6 +8,10 @@ spring:
     name: cgc-pms-backend
   profiles:
     active: dev
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
 
 # MyBatis-Plus
 mybatis-plus:

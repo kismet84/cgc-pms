@@ -125,27 +125,19 @@ class MdPartnerServiceTest {
     @Test
     @Order(2)
     @Transactional
-    @DisplayName("创建合作方 — 编码重复校验抛出 PARTNER_CODE_EXISTS")
-    void testCreate_DuplicateCode() {
-        // 第一个，手动指定编码
-        MdPartner p1 = new MdPartner();
-        p1.setPartnerCode("PTN-DUP-001");
-        p1.setPartnerName("重复测试1");
-        p1.setPartnerType("SUPPLIER");
-        partnerService.create(p1);
+    @DisplayName("创建合作方 — 忽略手工编号并由服务端生成")
+    void testCreate_IgnoreManualCode() {
+        MdPartner partner = new MdPartner();
+        partner.setPartnerCode("MANUAL-CODE");
+        partner.setPartnerName("服务端编号测试");
+        partner.setPartnerType("SUPPLIER");
 
-        // 第二个，相同编码
-        MdPartner p2 = new MdPartner();
-        p2.setPartnerCode("PTN-DUP-001");
-        p2.setPartnerName("重复测试2");
-        p2.setPartnerType("SUPPLIER");
+        Long id = partnerService.create(partner);
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> partnerService.create(p2),
-                "重复编码应抛出BusinessException");
-        assertEquals("PARTNER_CODE_EXISTS", ex.getCode());
-
-        System.out.println("✅ testCreate_DuplicateCode 通过: code=" + ex.getCode());
+        MdPartner saved = partnerMapper.selectById(id);
+        assertNotNull(saved);
+        assertNotEquals("MANUAL-CODE", saved.getPartnerCode());
+        assertTrue(saved.getPartnerCode().startsWith("PTN-"));
     }
 
     @Test
@@ -482,13 +474,15 @@ class MdPartnerServiceTest {
     @DisplayName("分页查询 — 按编码模糊搜索")
     void testGetPage_FilterByCode() {
         MdPartner p1 = new MdPartner();
-        p1.setPartnerCode("FLT-CODE-ABC");
         p1.setPartnerName("编码过滤测试");
         p1.setPartnerType("SUPPLIER");
         partnerService.create(p1);
 
-        IPage<MdPartnerVO> page = partnerService.getPage(1, 10, "FLT-CODE", null, null, null);
+        IPage<MdPartnerVO> page = partnerService.getPage(1, 10, p1.getPartnerCode(), null, null, null);
         assertTrue(page.getTotal() >= 1, "按编码模糊搜索应有结果");
+        assertTrue(page.getRecords().stream()
+                .anyMatch(v -> p1.getPartnerCode().equals(v.getPartnerCode())),
+                "搜索结果应包含服务端生成的编号");
 
         System.out.println("✅ testGetPage_FilterByCode 通过: total=" + page.getTotal());
     }

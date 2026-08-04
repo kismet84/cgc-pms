@@ -10,7 +10,21 @@
         <if test="query.status != null and query.status != ''">AND e.status = #{query.status}</if>
         <if test="query.sourceType != null and query.sourceType != ''">AND e.source_type = #{query.sourceType}</if>
         <if test="query.sourceId != null">AND e.source_id = #{query.sourceId}</if>
-        <if test="query.projectId != null">AND e.project_id = #{query.projectId}</if>
+        <if test="query.projectId != null">
+            AND (
+                e.project_id = #{query.projectId}
+                OR (
+                    e.project_id IS NULL
+                    AND EXISTS (
+                        SELECT 1 FROM bid_cost b
+                        WHERE b.tenant_id=e.tenant_id
+                          AND b.id=e.bid_cost_id
+                          AND b.project_id=#{query.projectId}
+                          AND b.deleted_flag=0
+                    )
+                )
+            )
+        </if>
         <if test="query.projectId == null">
             AND (
                 e.project_id IS NULL

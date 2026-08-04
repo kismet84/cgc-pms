@@ -21,6 +21,16 @@ class FileControllerAuthorizationTest {
     }
 
     @Test
+    void bidAuthoritiesCanEnterGenericFileEndpoints() throws Exception {
+        assertAuthorizationContains("upload",
+                new Class<?>[]{MultipartFile.class, String.class, Long.class, String.class},
+                "bid:file:manage");
+        assertAuthorizationContains("listByBusiness", new Class<?>[]{String.class, Long.class}, "bid:query");
+        assertAuthorizationContains("getUrl", new Class<?>[]{Long.class}, "bid:query");
+        assertAuthorizationContains("delete", new Class<?>[]{Long.class}, "bid:file:manage");
+    }
+
+    @Test
     void variationAuthoritiesAreScopedByReadAndDocumentAction() throws Exception {
         Class<?>[] uploadParameters = {MultipartFile.class, String.class, Long.class, String.class};
         assertAuthorizationContains("upload", uploadParameters, "variation:order:edit");

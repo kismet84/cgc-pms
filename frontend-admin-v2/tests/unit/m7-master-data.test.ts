@@ -2,20 +2,12 @@ import type { UserInfo } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { V2Input, V2Select } from '@/components'
+import { V2Input, V2Select, V2StatusToggle } from '@/components'
 import MaterialDictionaryPage from '@/pages/master-data/MaterialDictionaryPage.vue'
 import OrganizationPage from '@/pages/master-data/OrganizationPage.vue'
-import PartnerDetailPage from '@/pages/master-data/PartnerDetailPage.vue'
 import PartnerPage from '@/pages/master-data/PartnerPage.vue'
 import * as masterData from '@/services/master-data'
 import { useSessionStore } from '@/stores/session'
-
-const routerPush = vi.hoisted(() => vi.fn())
-
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: '101' } }),
-  useRouter: () => ({ push: routerPush }),
-}))
 
 vi.mock('@/services/master-data', () => ({
   loadPartnerTypes: vi.fn(),
@@ -45,6 +37,14 @@ vi.mock('@/services/master-data', () => ({
 
 function user(permissions: string[], roles = ['USER']): UserInfo {
   return { userId: '7', username: 'master.user', roles, permissions }
+}
+
+function confirmOpenDialog(): void {
+  const confirm = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent?.trim() === '确认',
+  )
+  if (!confirm) throw new Error('确认按钮不存在')
+  confirm.click()
 }
 
 beforeEach(() => {
@@ -210,7 +210,7 @@ describe('M7 master-data pages', () => {
     expect(document.body.textContent).toContain('联系电话')
   })
 
-  it('navigates from the record code to the partner detail page', async () => {
+  it('opens server facts in a partner detail dialog', async () => {
     useSessionStore().replaceUserInfo(user(['partner:query']))
     const wrapper = mount(PartnerPage, { attachTo: document.body })
     await flushPromises()
@@ -220,21 +220,11 @@ describe('M7 master-data pages', () => {
     await recordLink.trigger('click')
     await flushPromises()
 
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'V2ShellPartnerDetail',
-      params: { id: '101' },
-    })
-    expect(masterData.loadPartner).not.toHaveBeenCalled()
-  })
-
-  it('loads server facts on the partner detail page', async () => {
-    const wrapper = mount(PartnerDetailPage)
-    await flushPromises()
-
     expect(masterData.loadPartner).toHaveBeenCalledWith('101')
-    expect(wrapper.text()).toContain('合作方详情')
-    expect(wrapper.text()).toContain('PTN-101')
-    expect(wrapper.text()).toContain('13800000000')
+    const dialog = document.body.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('合作方详情')
+    expect(dialog.textContent).toContain('PTN-101')
+    expect(dialog.textContent).toContain('13800000000')
   })
 
   it('normalizes a numeric partner id before the required post-create read', async () => {
@@ -261,8 +251,26 @@ describe('M7 master-data pages', () => {
     await flushPromises()
 
     expect(masterData.createPartner).toHaveBeenCalledOnce()
+    expect(vi.mocked(masterData.createPartner).mock.calls[0]![0]).not.toHaveProperty('partnerCode')
     expect(masterData.loadPartner).toHaveBeenCalledWith('101')
     expect(masterData.loadPartners).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the server-generated partner code read-only', async () => {
+    useSessionStore().replaceUserInfo(user(['partner:query', 'partner:add']))
+    const wrapper = mount(PartnerPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增合作方')!
+      .trigger('click')
+    const code = wrapper
+      .findAllComponents(V2Input)
+      .find((input) => input.props('label') === '合作方编号' && input.props('disabled'))!
+
+    expect(code.props('disabled')).toBe(true)
+    expect(code.props('hint')).toBeUndefined()
   })
 
   it('shows backend-authorized master-data writes to administrator roles', async () => {
@@ -270,6 +278,7 @@ describe('M7 master-data pages', () => {
 
     const partner = mount(PartnerPage)
     await flushPromises()
+    expect(partner.get('h1').text()).toBe('客户管理')
     expect(partner.text()).toContain('新增合作方')
     partner.unmount()
 
@@ -281,6 +290,32 @@ describe('M7 master-data pages', () => {
     const material = mount(MaterialDictionaryPage)
     await flushPromises()
     expect(material.text()).toContain('新增材料')
+  })
+
+  it('confirms partner status, sends the complete server detail and rereads it', async () => {
+    useSessionStore().replaceUserInfo(user(['partner:query', 'partner:edit']))
+    const wrapper = mount(PartnerPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.findComponent('[aria-label="停用合作方 服务端合作方"]').trigger('click')
+    expect(masterData.updatePartner).not.toHaveBeenCalled()
+    confirmOpenDialog()
+    await flushPromises()
+
+    expect(masterData.updatePartner).toHaveBeenCalledWith(
+      '101',
+      expect.objectContaining({
+        partnerCode: 'PTN-101',
+        partnerName: '服务端合作方',
+        partnerType: 'SUPPLIER',
+        contactPhone: '13800000000',
+        bankAccount: '6222000000000000',
+        defaultLeadDays: null,
+        status: 'DISABLE',
+      }),
+    )
+    expect(masterData.loadPartner).toHaveBeenCalledTimes(2)
+    expect(masterData.loadPartners).toHaveBeenCalledTimes(2)
   })
 
   it('loads company, department and position facts together and hides writes without permissions', async () => {
@@ -320,6 +355,55 @@ describe('M7 master-data pages', () => {
       expect.objectContaining({ companyId: '10', departmentId: '4' }),
       undefined,
     )
+    expect(
+      wrapper.findAllComponents(V2StatusToggle).every((toggle) => toggle.props('disabled')),
+    ).toBe(true)
+  })
+
+  it('confirms and rereads company, department and position status updates', async () => {
+    useSessionStore().replaceUserInfo(user(['org:list', 'org:edit']))
+    const wrapper = mount(OrganizationPage, { attachTo: document.body })
+    await flushPromises()
+
+    for (const [label, save] of [
+      ['停用公司 一公司', masterData.saveCompany],
+      ['停用部门 工程部', masterData.saveDepartment],
+      ['停用岗位 经理', masterData.savePosition],
+    ] as const) {
+      await wrapper.find(`[aria-label="${label}"]`).trigger('click')
+      expect(save).not.toHaveBeenCalled()
+      confirmOpenDialog()
+      await flushPromises()
+      expect(save).toHaveBeenCalledOnce()
+    }
+
+    expect(masterData.saveCompany).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({ companyCode: 'C1', companyName: '一公司', status: 'DISABLE' }),
+    )
+    expect(masterData.saveDepartment).toHaveBeenCalledWith(
+      '2',
+      expect.objectContaining({
+        companyId: '1',
+        parentId: '0',
+        deptCode: 'D1',
+        deptName: '工程部',
+        orderNum: 0,
+        status: 'DISABLE',
+      }),
+    )
+    expect(masterData.savePosition).toHaveBeenCalledWith(
+      '3',
+      expect.objectContaining({
+        companyId: '1',
+        departmentId: '2',
+        positionCode: 'P1',
+        positionName: '经理',
+        status: 'DISABLE',
+      }),
+    )
+    expect(masterData.loadCompanies).toHaveBeenCalledTimes(4)
+    expect(masterData.loadDepartmentTree).toHaveBeenCalledTimes(4)
   })
 
   it('uses server material totals and strings, without local KPI calculations', async () => {
@@ -341,6 +425,21 @@ describe('M7 master-data pages', () => {
     expect(wrapper.text()).not.toContain('导入资料')
     expect(wrapper.text()).not.toMatch(/单位分布|启用材料|已维护税率/)
     expect(wrapper.text()).not.toContain('新增材料')
+  })
+
+  it('confirms material status through the dedicated API and rereads server facts', async () => {
+    useSessionStore().replaceUserInfo(user(['material:dict:list', 'material:dict:edit']))
+    const wrapper = mount(MaterialDictionaryPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.find('[aria-label="停用材料 钢筋"]').trigger('click')
+    expect(masterData.updateMaterialStatus).not.toHaveBeenCalled()
+    confirmOpenDialog()
+    await flushPromises()
+
+    expect(masterData.updateMaterialStatus).toHaveBeenCalledWith('8', 'DISABLE')
+    expect(masterData.loadMaterial).toHaveBeenCalledWith('8')
+    expect(masterData.loadMaterials).toHaveBeenCalledTimes(2)
   })
 
   it('imports a standard workbook with FormData service and shows all row errors', async () => {

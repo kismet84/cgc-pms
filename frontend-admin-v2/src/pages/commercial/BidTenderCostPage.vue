@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { CashJournalPage, CashJournalSummary } from '@cgc-pms/frontend-contracts'
+import type { CashJournalPage } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { V2Alert, V2Badge, V2Button, V2Card, V2Input, V2PageState, V2Select } from '@/components'
 import {
   loadBidCostOptions,
+  loadBidCostPage,
   loadBidCostSubjectOptions,
   type BidCostOption,
   type CostSubjectOption,
@@ -11,46 +12,47 @@ import {
 import {
   archiveCashJournal,
   createCashJournal,
-  exportCashJournal,
   loadBidFundAccountOptions,
   loadCashJournal,
-  loadCashJournalSummary,
   reverseCashJournal,
   type BidFundAccountOption,
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
+import {
+  loadEnabledDictDataByCode,
+  type DictDataRecord,
+} from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { dashboardStatusLabel } from '@/pages/dashboard/model'
 
 const session = useSessionStore()
+const workspace = useWorkspaceStore()
 const bids = ref<BidCostOption[]>([])
 const subjects = ref<CostSubjectOption[]>([])
 const accounts = ref<BidFundAccountOption[]>([])
+const cashDirections = ref<DictDataRecord[]>([])
 const page = ref<CashJournalPage>({ pageNo: 1, pageSize: 20, total: 0, records: [] })
-const summary = ref<CashJournalSummary | null>(null)
 const loading = ref(true)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
-const selectedBidId = ref('')
 const evidence = ref<Record<string, File | null>>({})
 const form = reactive({
+  bidCostId: '',
   direction: 'OUT' as 'IN' | 'OUT',
   amount: '',
   businessDate: new Date().toISOString().slice(0, 10),
   accountId: '',
   costSubjectId: '',
-  counterpartyName: '',
   summary: '',
 })
 let controller: AbortController | null = null
 
 const canMaintain = computed(() => session.hasPermission('bid:cost:maintain'))
-const canExport = computed(() => session.hasPermission('bid:cost:export'))
-const selectedBid = computed(
-  () => bids.value.find((item) => item.id === selectedBidId.value) ?? null,
-)
+const selectedBidId = computed(() => form.bidCostId)
+const bidById = computed(() => new Map(bids.value.map((item) => [item.id, item])))
 const bidOptions = computed(() =>
   bids.value.map((item) => ({ value: item.id, label: `${item.bidCode} · ${item.bidProjectName}` })),
 )
@@ -64,17 +66,12 @@ const accountOptions = computed(() =>
     .filter((item) => item.enabledFlag === 1)
     .map((item) => ({ value: item.id, label: `${item.accountName}（${item.accountType}）` })),
 )
-const metrics = computed(() =>
-  summary.value
-    ? [
-        ['累计现金支出', summary.value.cumulativeCashOut],
-        ['累计现金收回', summary.value.cumulativeCashIn],
-        ['未退保证金', summary.value.outstandingDeposit],
-        ['实际投标费用', summary.value.actualBidExpense],
-        ['现金净流出', summary.value.cashNetOutflow],
-      ]
-    : [],
+const directionOptions = computed(() =>
+  cashDirections.value.map((item) => ({ value: item.dictValue, label: item.dictLabel })),
 )
+function directionLabel(value: string): string {
+  return cashDirections.value.find((item) => item.dictValue === value)?.dictLabel ?? value
+}
 function message(value: unknown, fallback: string) {
   return isApiClientError(value) ? value.message : fallback
 }
@@ -84,15 +81,24 @@ async function loadBase() {
   loading.value = true
   error.value = ''
   try {
-    const [bidRows, subjectRows, accountRows] = await Promise.all([
+    const [bidRows, subjectRows, accountRows, directionRows] = await Promise.all([
       loadBidCostOptions(controller.signal),
       loadBidCostSubjectOptions(controller.signal),
       loadBidFundAccountOptions(controller.signal),
+      loadEnabledDictDataByCode('cash_direction', controller.signal),
     ])
     bids.value = bidRows
     subjects.value = subjectRows
     accounts.value = accountRows
-    if (!selectedBidId.value) selectedBidId.value = bids.value[0]?.id ?? ''
+    cashDirections.value = directionRows
+    form.bidCostId = ''
+    if (workspace.selectedProjectId) {
+      const bidPage = await loadBidCostPage(
+        { pageNo: 1, pageSize: 2, projectId: workspace.selectedProjectId },
+        controller.signal,
+      )
+      form.bidCostId = bidPage.records.length === 1 ? bidPage.records[0]!.id : ''
+    }
     await loadLedger()
   } catch (value) {
     if (!controller.signal.aborted) error.value = message(value, '投标成本加载失败')
@@ -101,21 +107,13 @@ async function loadBase() {
   }
 }
 async function loadLedger() {
-  if (!selectedBidId.value) {
-    page.value = { pageNo: 1, pageSize: 20, total: 0, records: [] }
-    summary.value = null
-    return
-  }
   const query = {
-    bidCostId: selectedBidId.value,
+    projectId: workspace.selectedProjectId || undefined,
     costSubjectRootCode: '5401.01',
     pageNo: 1,
     pageSize: 50,
   }
-  ;[page.value, summary.value] = await Promise.all([
-    loadCashJournal(query, controller?.signal),
-    loadCashJournalSummary(query, controller?.signal),
-  ])
+  page.value = await loadCashJournal(query, controller?.signal)
 }
 async function create() {
   if (
@@ -134,13 +132,13 @@ async function create() {
       ...form,
       accountId: form.accountId || null,
       bidCostId: selectedBidId.value,
+      projectId: null,
       costSubjectId: form.costSubjectId,
-      counterpartyName: form.counterpartyName.trim() || null,
+      counterpartyName: null,
       summary: form.summary.trim(),
     })
     notice.value = '投标现金流水草稿已登记。'
     form.amount = ''
-    form.counterpartyName = ''
     form.summary = ''
     await loadLedger()
   } catch (value) {
@@ -178,27 +176,6 @@ async function reverse(row: CashJournalPage['records'][number]) {
     busy.value = false
   }
 }
-async function exportLedger() {
-  if (!selectedBidId.value || busy.value) return
-  busy.value = true
-  error.value = ''
-  try {
-    const blob = await exportCashJournal({
-      bidCostId: selectedBidId.value,
-      costSubjectRootCode: '5401.01',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `投标成本-${selectedBid.value?.bidCode ?? selectedBidId.value}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  } catch (value) {
-    error.value = message(value, '投标成本导出失败')
-  } finally {
-    busy.value = false
-  }
-}
 function chooseEvidence(id: string, event: Event) {
   evidence.value[id] = (event.target as HTMLInputElement).files?.[0] ?? null
 }
@@ -207,9 +184,10 @@ function reversalLinkLabel(row: CashJournalPage['records'][number]): string {
   if (row.reversalEntryId) return '红冲流水'
   return '—'
 }
-watch(selectedBidId, () => {
-  if (!loading.value) void loadLedger()
-})
+watch(
+  () => workspace.selectedProjectId,
+  () => void loadBase(),
+)
 void loadBase()
 onBeforeUnmount(() => controller?.abort())
 </script>
@@ -219,18 +197,6 @@ onBeforeUnmount(() => controller?.abort())
     <V2Alert v-if="error" tone="danger" title="操作未完成">{{ error }}</V2Alert>
     <V2Alert v-if="notice" tone="success" title="已完成">{{ notice }}</V2Alert>
     <V2Card title="投标成本" :heading-level="1"></V2Card>
-    <V2Card title="投标现金概览">
-      <V2Select v-model="selectedBidId" label="投标记录" :options="bidOptions" />
-      <V2Button v-if="canExport && selectedBidId" size="small" :loading="busy" @click="exportLedger"
-        >导出当前投标</V2Button
-      >
-      <div class="bid-cost-ledger__metrics">
-        <div v-for="item in metrics" :key="item[0]">
-          <span>{{ item[0] }}</span
-          ><strong>{{ item[1] }}</strong>
-        </div>
-      </div>
-    </V2Card>
     <V2PageState
       v-if="loading"
       title="正在加载投标成本"
@@ -238,15 +204,13 @@ onBeforeUnmount(() => controller?.abort())
       kind="loading"
     />
     <template v-else>
-      <V2Card v-if="canMaintain && selectedBidId" title="登记现金流水">
+      <V2Card v-if="canMaintain" title="登记现金流水">
         <div class="bid-cost-ledger__form">
+          <V2Select v-model="form.bidCostId" label="关联投标" :options="bidOptions" />
           <V2Select
             v-model="form.direction"
             label="收支方向"
-            :options="[
-              { value: 'OUT', label: '支出' },
-              { value: 'IN', label: '收回' },
-            ]"
+            :options="directionOptions"
           />
           <V2Input v-model="form.amount" label="金额" type="number" />
           <label>业务日期<input v-model="form.businessDate" type="date" /></label>
@@ -257,11 +221,12 @@ onBeforeUnmount(() => controller?.abort())
             allow-empty
           />
           <V2Select v-model="form.costSubjectId" label="成本科目" :options="subjectOptions" />
-          <V2Input v-model="form.counterpartyName" label="对方单位" />
           <V2Input v-model="form.summary" label="摘要" />
           <V2Button
             :loading="busy"
-            :disabled="!form.amount || !form.costSubjectId || !form.summary.trim()"
+            :disabled="
+              !selectedBidId || !form.amount || !form.costSubjectId || !form.summary.trim()
+            "
             @click="create"
             >保存草稿</V2Button
           >
@@ -294,10 +259,10 @@ onBeforeUnmount(() => controller?.abort())
               <tr v-for="row in page.records" :key="row.id">
                 <td>{{ row.businessDate }}</td>
                 <td>{{ row.entryNo }}</td>
-                <td>{{ selectedBid?.bidCode || '—' }}</td>
-                <td>{{ selectedBid?.bidProjectName || '—' }}</td>
-                <td>{{ row.direction }}</td>
-                <td>{{ row.costSubjectCode }} {{ row.costSubjectName }}</td>
+                <td>{{ (row.bidCostId && bidById.get(row.bidCostId)?.bidCode) || '—' }}</td>
+                <td>{{ (row.bidCostId && bidById.get(row.bidCostId)?.bidProjectName) || '—' }}</td>
+                <td>{{ directionLabel(row.direction) }}</td>
+                <td>{{ row.costSubjectName }}</td>
                 <td>{{ row.summary }}</td>
                 <td>{{ row.counterpartyName || '—' }}</td>
                 <td>{{ row.amount }}</td>
@@ -343,20 +308,12 @@ onBeforeUnmount(() => controller?.abort())
   display: grid;
   gap: var(--v2-space-4);
 }
-.bid-cost-ledger__metrics,
 .bid-cost-ledger__form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--v2-space-3);
   margin-top: var(--v2-space-4);
   align-items: end;
-}
-.bid-cost-ledger__metrics div {
-  display: grid;
-  gap: 4px;
-  padding: 12px;
-  background: var(--v2-color-surface-subtle);
-  border-radius: var(--v2-radius-sm);
 }
 label {
   display: grid;

@@ -50,4 +50,18 @@ describe('business dictionary consumer contract', () => {
     expect(page).not.toMatch(/const workflowInstanceStatusOptions = \[/)
     expect(page).not.toMatch(/\{ value: '(?:RUNNING|APPROVED|REJECTED|WITHDRAWN|VOIDED)', label:/)
   })
+
+  it('loads engineering tender display labels from protected dictionaries', () => {
+    const detail = source('src/pages/commercial/BidTenderDetailPage.vue')
+    const ledger = source('src/pages/commercial/BidTenderCostPage.vue')
+    const migration = source(
+      '../backend/src/main/resources/db/migration/V273__add_engineering_tender_display_dictionaries.sql',
+    )
+
+    expect(detail).toContain("loadEnabledDictDataByCode('bid_status', controller.signal)")
+    expect(detail).toContain("loadEnabledDictDataByCode('bid_document_type', controller.signal)")
+    expect(ledger).toContain("loadEnabledDictDataByCode('cash_direction', controller.signal)")
+    for (const code of ['bid_status', 'bid_document_type', 'cash_direction'])
+      expect(migration).toContain(`'${code}'`)
+  })
 })

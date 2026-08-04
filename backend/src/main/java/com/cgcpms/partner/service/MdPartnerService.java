@@ -60,9 +60,7 @@ public class MdPartnerService {
     /**
      * 创建合作伙伴。
      *
-     * <p>编号策略：当 {@code partnerCode} 为 {@code null} 或空时自动生成 "PTN-yyyyMMdd-NNN" 前缀编号；
-     * 当手动指定 {@code partnerCode} 时不自动添加前缀，调用方负责保证编码格式和唯一性。
-     * 此设计允许外部系统导入时保留原始编码。
+     * <p>编号由服务端统一生成，忽略调用方传入值。
      */
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdPartner partner) {
@@ -71,27 +69,11 @@ public class MdPartnerService {
                 "PARTNER_TYPE_INVALID", "合作方类型不合法"));
         normalizeRiskLevel(partner);
         normalizeDefaultLeadDays(partner, partner.getPartnerType());
-        // Auto-generate partner code: PTN-yyyyMMdd-NNN
-        boolean autoGenerateCode = !StringUtils.hasText(partner.getPartnerCode());
-        String prefix = null;
         Long tenantId = UserContext.getCurrentTenantId();
-        if (autoGenerateCode) {
-            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            prefix = "PTN-" + today + "-";
-        }
-
-        if (StringUtils.hasText(partner.getPartnerCode()) &&
-                mdPartnerMapper.selectCount(new LambdaQueryWrapper<MdPartner>()
-                        .eq(MdPartner::getPartnerCode, partner.getPartnerCode())
-                        .eq(MdPartner::getTenantId, UserContext.getCurrentTenantId())) > 0) {
-            throw new BusinessException("PARTNER_CODE_EXISTS", "合作伙伴编码已存在");
-        }
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+        String prefix = "PTN-" + today + "-";
+        partner.setPartnerCode(null);
         if (partner.getStatus() == null) partner.setStatus("ENABLE");
-        if (!autoGenerateCode) {
-            mdPartnerMapper.insert(partner);
-            log.info("Creating partner: {}", partner.getPartnerName());
-            return partner.getId();
-        }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             partner.setPartnerCode(nextPartnerCode(tenantId, prefix, attempt));

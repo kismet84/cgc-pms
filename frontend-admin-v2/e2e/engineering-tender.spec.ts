@@ -73,6 +73,27 @@ async function installMocks(page: Page, identity: () => Identity) {
       body: JSON.stringify(envelope([])),
     }),
   )
+  await page.route('**/api/system/dict/data/by-code/*', (route) => {
+    const code = new URL(route.request().url()).pathname.split('/').at(-1)
+    const rows = {
+      bid_status: [
+        { id: '1', dictTypeId: '11', dictLabel: '注册', dictValue: 'PREPARING', status: 'ENABLE' },
+        { id: '2', dictTypeId: '11', dictLabel: '投标', dictValue: 'SUBMITTED', status: 'ENABLE' },
+      ],
+      bid_document_type: [
+        { id: '3', dictTypeId: '12', dictLabel: '招标文件', dictValue: 'TENDER_DOCUMENT', status: 'ENABLE' },
+      ],
+      cash_direction: [
+        { id: '4', dictTypeId: '13', dictLabel: '收入', dictValue: 'IN', status: 'ENABLE' },
+        { id: '5', dictTypeId: '13', dictLabel: '支出', dictValue: 'OUT', status: 'ENABLE' },
+      ],
+    }[code ?? ''] ?? []
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(envelope(rows)),
+    })
+  })
   await page.route('**/api/bid-cost/owners', (route) =>
     route.fulfill({
       status: 200,
@@ -213,29 +234,39 @@ test('管理层完成投标记录、四页签与投标成本主链，普通角�
   await page.goto('/bid-cost')
   await expect(page).toHaveURL(/\/engineering-tender\/records$/)
   await expect(page.getByRole('heading', { name: '投标记录', exact: true })).toBeVisible()
-  await expect(page.locator('.bid-cost-page table thead th')).toHaveCount(13)
-  await expect(page.getByText('施工总承包一标段')).toBeVisible()
+  await expect(page.locator('.bid-cost-page table thead th')).toHaveCount(12)
+  await expect(page.locator('.bid-cost-page table thead')).not.toContainText('标段名称')
   await page.locator('.bid-cost-page table tbody tr').first().press('Enter')
   await expect(page).toHaveURL(/\/engineering-tender\/records\/71\?tab=basic$/)
+  await expect(page.getByText('状态变更', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('外部平台')).toHaveCount(0)
+  await expect(page.getByLabel('外部编号')).toHaveCount(0)
+  await expect(page.getByLabel('外部链接')).toHaveCount(0)
+  await expect(page.getByLabel('投标负责人ID')).toHaveCount(0)
   for (const tab of ['基本信息', '招标文件', '投标文件', '中标文件']) {
     await expect(page.getByRole('tab', { name: new RegExp(tab) })).toBeVisible()
   }
   await page.getByRole('tab', { name: /招标文件/ }).click()
+  await expect(page.getByLabel('逻辑文件名')).toHaveCount(0)
+  await expect(page.getByLabel('来源名称')).toHaveCount(0)
+  await expect(page.getByLabel('来源链接')).toHaveCount(0)
   await expect(page.getByText('公共资源交易平台')).toBeVisible()
-  await expect(page.getByText(`a`.repeat(64))).toBeVisible()
+  await expect(page.locator('table')).not.toContainText('SHA-256')
+  await expect(page.locator('table')).not.toContainText(`a`.repeat(64))
+  await expect(page.locator('table')).not.toContainText('TENDER_DOCUMENT')
 
   await page.goto('/engineering-tender/costs')
   await expect(page.getByRole('heading', { name: '投标成本', exact: true })).toBeVisible()
-  for (const metric of [
-    '累计现金支出',
-    '累计现金收回',
-    '未退保证金',
-    '实际投标费用',
-    '现金净流出',
-  ]) {
-    await expect(page.getByText(metric, { exact: true })).toBeVisible()
-  }
+  await expect(page.getByRole('heading', { name: '登记现金流水', exact: true })).toBeVisible()
+  await expect(page.getByLabel('关联投标')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '投标现金概览' })).toHaveCount(0)
+  await expect(page.getByText('累计现金支出', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('投标记录')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '新建资金账户' })).toHaveCount(0)
+  await expect(page.getByLabel('对方单位')).toHaveCount(0)
   await expect(page.getByText('CJ-20260803-001')).toBeVisible()
+  await expect(page.getByRole('cell', { name: '支出', exact: true })).toBeVisible()
+  await expect(page.locator('.bid-cost-ledger__table')).not.toContainText('5401.01.03')
   await expect(page.getByRole('button', { name: '红冲' })).toBeVisible()
   expect(
     (await new AxeBuilder({ page }).include('.bid-cost-ledger').analyze()).violations.filter(
@@ -248,7 +279,7 @@ test('管理层完成投标记录、四页签与投标成本主链，普通角�
   await installMocks(narrow, () => identity)
   await narrow.goto('/engineering-tender/costs')
   await expect(narrow.getByRole('heading', { name: '投标成本', exact: true })).toBeVisible()
-  await expect(narrow.getByText('现金净流出', { exact: true })).toBeVisible()
+  await expect(narrow.getByText('CJ-20260803-001')).toBeVisible()
   await narrow.close()
 
   const denied = await browser.newPage()

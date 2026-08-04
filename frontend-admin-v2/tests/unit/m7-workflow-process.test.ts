@@ -1,9 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import WorkflowProcessPage from '@/pages/system/WorkflowProcessPage.vue'
 import * as processService from '@/services/workflow-process'
 import * as systemService from '@/services/system-management'
 import * as masterDataService from '@/services/master-data'
+import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/workflow-process', () => ({
   createWorkflowTemplateNode: vi.fn(),
@@ -125,6 +127,15 @@ function selectByLabel(text: string): HTMLSelectElement {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setActivePinia(createPinia())
+  useSessionStore().replaceUserInfo({
+    userId: '1',
+    username: 'admin',
+    realName: '管理员',
+    tenantId: '0',
+    roles: ['ADMIN'],
+    permissions: [],
+  })
   document.body.innerHTML = ''
   vi.mocked(processService.loadWorkflowTemplates).mockResolvedValue({
     pageNo: 1,
@@ -250,6 +261,35 @@ describe('M7 workflow process page', () => {
     expect(processService.loadWorkflowTemplates).toHaveBeenCalledTimes(2)
     expect(document.body.querySelectorAll('.v2-dialog__backdrop')).toHaveLength(0)
     expect(document.body.textContent).toContain('3. 流程配置')
+  })
+
+  it('toggles template status through confirmation and complete server reread', async () => {
+    const wrapper = mount(WorkflowProcessPage, { attachTo: document.body })
+    await flushPromises()
+
+    const statusSwitch = wrapper.get(
+      '[aria-labelledby="workflow-templates-title"] button[role="switch"]',
+    )
+    expect(statusSwitch.attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
+    await statusSwitch.trigger('click')
+    await flushPromises()
+    const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
+    ;[...confirmDialog.querySelectorAll('button')]
+      .find((candidate) => candidate.textContent?.trim() === '停用')!
+      .click()
+    await flushPromises()
+
+    expect(processService.updateWorkflowTemplate).toHaveBeenCalledWith('10', {
+      templateName: '合同审批',
+      enabled: 0,
+      amountMin: '100.2300',
+      amountMax: '900.4500',
+      remark: '',
+    })
+    expect(processService.loadWorkflowTemplate).toHaveBeenCalledTimes(3)
+    expect(processService.loadWorkflowTemplates).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 
   it('reorders complete node ids then rereads server detail', async () => {

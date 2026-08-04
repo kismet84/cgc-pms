@@ -6,7 +6,11 @@ import CostBudgetPage from '@/pages/commercial/CostBudgetPage.vue'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/pages/commercial/CostTargetPage.vue', () => ({
-  default: { props: ['embedded'], template: '<section data-form="cost-budget">统一表单</section>' },
+  default: {
+    props: { embedded: Boolean },
+    template:
+      '<section data-form="cost-budget"><h1 v-if="embedded">项目成本预算</h1><form data-actions="filters">筛选与新建</form></section>',
+  },
 }))
 
 async function mountPage(permissions: string[], path = '/cost-budget') {
@@ -29,6 +33,9 @@ describe('cost budget workspace', () => {
     const { wrapper } = await mountPage(['cost:target:query'], '/cost-budget?projectId=P1')
 
     expect(wrapper.get('h1').text()).toBe('项目成本预算')
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.find('h2').exists()).toBe(false)
+    expect(wrapper.find('[data-actions="filters"]').exists()).toBe(true)
     expect(wrapper.find('[data-form="cost-budget"]').exists()).toBe(true)
     expect(wrapper.find('nav[aria-label="成本预算视图"]').exists()).toBe(false)
   })

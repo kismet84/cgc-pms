@@ -61,7 +61,7 @@ import type {
   FundAccountCommand,
 } from '@cgc-pms/frontend-contracts'
 
-type Mode = 'operations' | 'journal' | 'forecast' | 'accounting' | 'close'
+type Mode = 'operations' | 'journal' | 'accounts' | 'forecast' | 'accounting' | 'close'
 type JournalAction = 'archive' | 'reverse' | 'reopen'
 type EntryAction = 'approve' | 'reject' | 'post' | 'resubmit' | 'reverse'
 type PeriodAction = 'check' | 'close' | 'reopen'
@@ -81,19 +81,22 @@ const route = useRoute()
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const mode = computed<Mode>(() =>
-  route.path === '/cash-journal'
-    ? 'journal'
-    : route.path === '/cash-forecast'
-      ? 'forecast'
-      : route.path === '/accounting-entry'
-        ? 'accounting'
-        : route.path === '/financial-close'
-          ? 'close'
-          : 'operations',
+  route.path === '/fund-accounts'
+    ? 'accounts'
+    : route.path === '/cash-journal'
+      ? 'journal'
+      : route.path === '/cash-forecast'
+        ? 'forecast'
+        : route.path === '/accounting-entry'
+          ? 'accounting'
+          : route.path === '/financial-close'
+            ? 'close'
+            : 'operations',
 )
 const titles: Record<Mode, string> = {
   operations: '资金运营',
   journal: '资金日记账',
+  accounts: '资金账户',
   forecast: '资金预测',
   accounting: '会计凭证',
   close: '财务月结',
@@ -101,6 +104,7 @@ const titles: Record<Mode, string> = {
 const permissions: Record<Mode, string> = {
   operations: 'finance:operations:query',
   journal: 'cashbook:journal:query',
+  accounts: 'cashbook:journal:query',
   forecast: 'finance:forecast:query',
   accounting: 'accounting:query',
   close: 'finance:close:query',
@@ -159,7 +163,8 @@ const pagedPeriods = computed(() => pageSlice(periods.value, periodPageNo.value)
 
 const hasRows = computed(() => {
   if (mode.value === 'operations') return operations.value !== null
-  if (mode.value === 'journal') return accounts.value.length > 0 || journal.value.records.length > 0
+  if (mode.value === 'journal') return journal.value.records.length > 0
+  if (mode.value === 'accounts') return accounts.value.length > 0
   if (mode.value === 'forecast') return cycles.value.length > 0
   if (mode.value === 'accounting') return entries.value.records.length > 0
   return periods.value.length > 0
@@ -299,16 +304,13 @@ async function load(preserveServerPage = false): Promise<void> {
         projectId.value || undefined,
         request.signal,
       )
+    } else if (mode.value === 'accounts') {
+      accounts.value = await loadFundAccounts(request.signal)
     } else if (mode.value === 'journal') {
-      const [accountRows, journalPage] = await Promise.all([
-        loadFundAccounts(request.signal),
-        loadCashJournal(
-          { pageNo: journalPageNo.value, pageSize, projectId: projectId.value },
-          request.signal,
-        ),
-      ])
-      accounts.value = accountRows
-      journal.value = journalPage
+      journal.value = await loadCashJournal(
+        { pageNo: journalPageNo.value, pageSize, projectId: projectId.value },
+        request.signal,
+      )
     } else if (mode.value === 'forecast') {
       cycles.value = await loadCashForecastCycles(projectId.value || undefined, request.signal)
       if (projectId.value) {
@@ -532,7 +534,7 @@ onBeforeUnmount(() => controller?.abort())
         <template #actions><V2Button @click="load">重试</V2Button></template>
       </V2PageState>
       <V2PageState
-        v-else-if="!errorMessage && !hasRows && mode !== 'journal'"
+        v-else-if="!errorMessage && !hasRows && !['journal', 'accounts'].includes(mode)"
         :title="`暂无${title}记录`"
         description="当前范围暂无可访问记录。"
       />
@@ -727,8 +729,8 @@ onBeforeUnmount(() => controller?.abort())
         </V2Card>
       </template>
 
-      <template v-else-if="mode === 'journal'">
-        <V2Card title="资金账户" :heading-level="2">
+      <template v-else-if="mode === 'accounts'">
+        <V2Card title="资金账户清单" :heading-level="2">
           <template #actions>
             <V2Button v-if="canManageAccounts" size="small" @click="openFundAccount">
               新建资金账户
@@ -771,6 +773,9 @@ onBeforeUnmount(() => controller?.abort())
             />
           </template>
         </V2Card>
+      </template>
+
+      <template v-else-if="mode === 'journal'">
         <V2Card title="资金流水" :heading-level="2">
           <div
             class="finance-control__table-wrap"

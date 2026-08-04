@@ -16,6 +16,7 @@ import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -171,8 +172,8 @@ public class BidCostService {
         BidCost existing = requireExisting(command.getId());
         ensureBoundProjectVisible(existing, "编辑投标记录");
         String current = normalizeStatus(existing.getBidStatus());
-        if (!"PREPARING".equals(current)) {
-            throw new BusinessException("BID_STATUS_NOT_EDITABLE", "仅准备中状态可编辑");
+        if (!Set.of("PREPARING", "SUBMITTED", "EVALUATING").contains(current)) {
+            throw new BusinessException("BID_STATUS_NOT_EDITABLE", "投标结果登记后不可编辑");
         }
         LambdaUpdateWrapper<BidCost> update = identityAndStatus(command.getId(), current)
                 .set(BidCost::getBidProjectName, command.getBidProjectName())
@@ -217,6 +218,26 @@ public class BidCostService {
     @Transactional(rollbackFor = Exception.class)
     public Long changeStatus(Long id, String expectedStatus, String targetStatus, String reason) {
         return changeStatus(id, expectedStatus, targetStatus, reason, false);
+    }
+
+    @EventListener
+    public void advanceStatus(BidDocumentVersionService.BidDocumentFinalizedEvent event) {
+        BidCost bid = requireExisting(event.bidCostId());
+        String current = normalizeStatus(bid.getBidStatus());
+        if ("PREPARING".equals(current) && documentService.hasCurrentFinalGroup(bid.getId(), "TENDER")) {
+            changeStatus(bid.getId(), current, "SUBMITTED", null);
+            current = "SUBMITTED";
+        }
+        if ("SUBMITTED".equals(current) && documentService.hasSubmittedFinalBid(bid.getId())) {
+            changeStatus(bid.getId(), current, "EVALUATING", null);
+            current = "EVALUATING";
+        }
+        if (!"EVALUATING".equals(current)) return;
+        if (documentService.hasCurrentFinal(bid.getId(), "RESULT", "AWARD_NOTICE")) {
+            changeStatus(bid.getId(), current, "WON", null);
+        } else if (documentService.hasCurrentFinal(bid.getId(), "RESULT", "LOSS_NOTICE")) {
+            changeStatus(bid.getId(), current, "LOST", "上传未中标通知");
+        }
     }
 
     private Long changeStatus(Long id, String expectedStatus, String targetStatus, String reason,
@@ -276,8 +297,11 @@ public class BidCostService {
     }
 
     private void validateStatusGate(BidCost bid, String target, String reason) {
-        if ("SUBMITTED".equals(target) && !documentService.hasSubmittedFinalBid(bid.getId())) {
-            throw new BusinessException("BID_FINAL_SUBMISSION_REQUIRED", "提交投标前必须存在带递交凭证的当前有效最终投标文件");
+        if ("SUBMITTED".equals(target) && !documentService.hasCurrentFinalGroup(bid.getId(), "TENDER")) {
+            throw new BusinessException("BID_FINAL_TENDER_REQUIRED", "进入投标阶段前必须存在当前有效的最终招标文件");
+        }
+        if ("EVALUATING".equals(target) && !documentService.hasSubmittedFinalBid(bid.getId())) {
+            throw new BusinessException("BID_FINAL_SUBMISSION_REQUIRED", "进入评标阶段前必须存在带递交凭证的当前有效最终投标文件");
         }
         if ("WON".equals(target)
                 && !documentService.hasCurrentFinal(bid.getId(), "RESULT", "AWARD_NOTICE")) {

@@ -27,7 +27,7 @@ public class BidDocumentVersionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('bid:file:manage') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('bid:file:manage') and hasAuthority('bid:status')) or hasRole('SUPER_ADMIN')")
     @AuditedOperation(type = "UPLOAD", businessType = "BID_DOCUMENT", businessIdExpression = "#bidCostId")
     public ApiResponse<BidDocumentVersion> append(@PathVariable Long bidCostId,
                                                   @Valid @RequestBody BidDocumentCreateRequest request) {
@@ -35,7 +35,7 @@ public class BidDocumentVersionController {
     }
 
     @PostMapping("/{versionId}/finalize")
-    @PreAuthorize("hasAuthority('bid:file:manage') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('bid:file:manage') and hasAuthority('bid:status')) or hasRole('SUPER_ADMIN')")
     @AuditedOperation(type = "UPDATE", businessType = "BID_DOCUMENT", businessIdExpression = "#versionId")
     public ApiResponse<Void> finalizeVersion(@PathVariable Long bidCostId, @PathVariable Long versionId) {
         service.finalizeVersion(bidCostId, versionId);
@@ -43,7 +43,7 @@ public class BidDocumentVersionController {
     }
 
     @PostMapping("/{versionId}/void")
-    @PreAuthorize("hasAuthority('bid:file:manage') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('bid:file:manage') and hasAuthority('bid:status')) or hasRole('SUPER_ADMIN')")
     @AuditedOperation(type = "UPDATE", businessType = "BID_DOCUMENT", businessIdExpression = "#versionId")
     public ApiResponse<Void> voidVersion(@PathVariable Long bidCostId, @PathVariable Long versionId,
                                          @Valid @RequestBody BidDocumentVoidRequest request) {

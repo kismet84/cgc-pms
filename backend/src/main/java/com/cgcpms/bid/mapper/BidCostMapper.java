@@ -19,6 +19,10 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
             + "AND tenant_id = #{tenantId} ORDER BY bid_code DESC LIMIT 1")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 
+    @Select("SELECT id, tenant_id, project_id FROM bid_cost "
+            + "WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted_flag=0 FOR UPDATE")
+    BidCost selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     @Select("""
             <script>
             SELECT b.id,

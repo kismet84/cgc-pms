@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
-  V2Badge,
   V2ActionMenu,
   V2Button,
   V2Card,
@@ -12,6 +11,7 @@ import {
   V2Pagination,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import {
@@ -33,11 +33,16 @@ import { useSessionStore } from '@/stores/session'
 
 type Kind = 'company' | 'department' | 'position'
 type DeleteTarget = { kind: Kind; id: string; label: string }
+type StatusTarget =
+  | { kind: 'company'; record: OrgCompanyRecord }
+  | { kind: 'department'; record: OrgDepartmentRecord }
+  | { kind: 'position'; record: OrgPositionRecord }
 
 const session = useSessionStore()
 const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
+const changingStatus = ref(false)
 const error = ref('')
 const companies = ref<OrgCompanyRecord[]>([])
 const companyDirectory = ref<OrgCompanyRecord[]>([])
@@ -50,6 +55,7 @@ const selectedDepartmentId = ref('')
 const dialogKind = ref<Kind | null>(null)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<DeleteTarget | null>(null)
+const statusTarget = ref<StatusTarget | null>(null)
 const pageSize = 10
 const companyPageNo = ref(1)
 const departmentPageNo = ref(1)
@@ -122,10 +128,6 @@ function flattenDepartments(items: OrgDepartmentRecord[]): OrgDepartmentRecord[]
 
 function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
-}
-
-function statusLabel(status: string): string {
-  return status === 'ENABLE' ? '启用' : '停用'
 }
 
 function companyName(id: string): string {
@@ -420,6 +422,47 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
+async function confirmStatus(): Promise<void> {
+  if (!statusTarget.value) return
+  changingStatus.value = true
+  try {
+    const target = statusTarget.value
+    const status = target.record.status === 'ENABLE' ? 'DISABLE' : 'ENABLE'
+    if (target.kind === 'company') {
+      const { id, ...command } = target.record
+      await saveCompany(id, { ...command, status })
+    } else if (target.kind === 'department') {
+      const record = target.record
+      await saveDepartment(record.id, {
+        companyId: record.companyId,
+        parentId: record.parentId,
+        deptCode: record.deptCode,
+        deptName: record.deptName,
+        orderNum: record.orderNum,
+        status,
+        remark: record.remark,
+      })
+    } else {
+      const { id, ...command } = target.record
+      await savePosition(id, { ...command, status })
+    }
+    statusTarget.value = null
+    await load(false)
+    showToast('success', '组织资料状态已更新', '公司、部门和岗位已重新读取。')
+  } catch (value) {
+    showToast('error', '状态更新失败', messageOf(value))
+  } finally {
+    changingStatus.value = false
+  }
+}
+
+function statusTargetLabel(target: StatusTarget | null): string {
+  if (!target) return ''
+  if (target.kind === 'company') return target.record.companyName
+  if (target.kind === 'department') return target.record.deptName
+  return target.record.positionName
+}
+
 onMounted(load)
 onBeforeUnmount(() => loadController?.abort())
 </script>
@@ -464,10 +507,13 @@ onBeforeUnmount(() => loadController?.abort())
                   <strong>{{ item.companyName }}</strong>
                   <small>{{ item.companyCode }}</small>
                 </span>
-                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ statusLabel(item.status) }}
-                </V2Badge>
               </button>
+              <V2StatusToggle
+                :enabled="item.status === 'ENABLE'"
+                :disabled="!canEdit || changingStatus"
+                :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}公司 ${item.companyName}`"
+                @toggle="statusTarget = { kind: 'company', record: item }"
+              />
               <V2ActionMenu
                 :label="`${item.companyCode || item.companyName}更多操作`"
                 :placement="index >= companies.length - 3 ? 'top-end' : 'bottom-end'"
@@ -544,10 +590,13 @@ onBeforeUnmount(() => loadController?.abort())
                   <strong>{{ item.deptName }}</strong>
                   <small>{{ item.deptCode }}</small>
                 </span>
-                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ statusLabel(item.status) }}
-                </V2Badge>
               </button>
+              <V2StatusToggle
+                :enabled="item.status === 'ENABLE'"
+                :disabled="!canEdit || changingStatus"
+                :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}部门 ${item.deptName}`"
+                @toggle="statusTarget = { kind: 'department', record: item }"
+              />
               <V2ActionMenu
                 :label="`${item.deptCode || item.deptName}更多操作`"
                 :placement="index >= pagedDepartments.length - 3 ? 'top-end' : 'bottom-end'"
@@ -612,9 +661,12 @@ onBeforeUnmount(() => loadController?.abort())
                   {{ item.positionCode }}
                 </small>
               </span>
-              <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                {{ statusLabel(item.status) }}
-              </V2Badge>
+              <V2StatusToggle
+                :enabled="item.status === 'ENABLE'"
+                :disabled="!canEdit || changingStatus"
+                :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}岗位 ${item.positionName}`"
+                @toggle="statusTarget = { kind: 'position', record: item }"
+              />
               <V2ActionMenu
                 :label="`${item.positionCode || item.positionName}更多操作`"
                 :placement="index >= positions.length - 3 ? 'top-end' : 'bottom-end'"
@@ -664,7 +716,13 @@ onBeforeUnmount(() => loadController?.abort())
         <template v-if="dialogKind === 'company'">
           <V2Input v-model="companyForm.companyCode" label="公司编码" required />
           <V2Input v-model="companyForm.companyName" label="公司名称" required />
-          <V2Select v-model="companyForm.status" :options="statusOptions" label="状态" required />
+          <V2Select
+            v-model="companyForm.status"
+            :options="statusOptions"
+            label="状态"
+            required
+            :disabled="Boolean(editingId)"
+          />
           <V2Input v-model="companyForm.remark" label="备注" />
         </template>
         <template v-else-if="dialogKind === 'department'">
@@ -683,6 +741,7 @@ onBeforeUnmount(() => loadController?.abort())
             :options="statusOptions"
             label="状态"
             required
+            :disabled="Boolean(editingId)"
           />
           <V2Input v-model="departmentForm.remark" label="备注" />
         </template>
@@ -701,7 +760,13 @@ onBeforeUnmount(() => loadController?.abort())
           />
           <V2Input v-model="positionForm.positionCode" label="岗位编码" required />
           <V2Input v-model="positionForm.positionName" label="岗位名称" required />
-          <V2Select v-model="positionForm.status" :options="statusOptions" label="状态" required />
+          <V2Select
+            v-model="positionForm.status"
+            :options="statusOptions"
+            label="状态"
+            required
+            :disabled="Boolean(editingId)"
+          />
           <V2Input v-model="positionForm.remark" label="备注" />
         </template>
       </form>
@@ -710,6 +775,20 @@ onBeforeUnmount(() => loadController?.abort())
         <V2Button type="submit" form="org-form" :loading="saving">保存</V2Button>
       </template>
     </V2Dialog>
+
+    <V2ConfirmDialog
+      :open="Boolean(statusTarget)"
+      title="更新组织资料状态"
+      :description="
+        statusTarget
+          ? `确认${statusTarget.record.status === 'ENABLE' ? '停用' : '启用'}“${statusTargetLabel(statusTarget)}”？`
+          : ''
+      "
+      :danger="statusTarget?.record.status === 'ENABLE'"
+      :loading="changingStatus"
+      @close="statusTarget = null"
+      @confirm="confirmStatus"
+    />
 
     <V2ConfirmDialog
       :open="Boolean(deleteTarget)"
@@ -795,7 +874,7 @@ onBeforeUnmount(() => loadController?.abort())
 }
 
 .org-page__select {
-  grid-column: 1 / 3;
+  grid-column: 1;
   min-width: 0;
   padding: 0;
   border: 0;

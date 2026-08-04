@@ -107,7 +107,9 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain('await deletePayment(createdPaymentId)')
     expect(source).toContain('本次新建草稿已回滚')
     expect(source).not.toContain('await savePaymentBasis(paymentId')
-    expect(source).not.toContain("editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'")
+    expect(source).not.toContain(
+      "editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'",
+    )
     expect(source).not.toContain('Number(value.applyAmount)')
   })
   it('exposes writeback only through the authoritative payment endpoint', () => {
@@ -228,12 +230,15 @@ describe('M6 finance workspace contract', () => {
     expect(JSON.parse(String(request.body)).openingBalance).toBe('9007199254740993.01')
     vi.unstubAllGlobals()
   })
-  it('keeps first fund-account creation reachable when journal is empty', () => {
+  it('keeps fund-account maintenance on its own workspace tab', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
       'utf8',
     )
-    expect(source).toContain("!errorMessage && !hasRows && mode !== 'journal'")
+    expect(source).toContain("route.path === '/fund-accounts'")
+    expect(source).toContain('v-else-if="mode === \'accounts\'"')
+    expect(source).toContain('accounts.value = await loadFundAccounts(request.signal)')
+    expect(source).toContain('journal.value = await loadCashJournal(')
     expect(source).toContain('@click="openFundAccount"')
     expect(source).toContain("uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')")
     expect(source).toContain("can('file:upload') || can('cashbook:journal:maintain')")

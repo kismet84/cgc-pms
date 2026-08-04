@@ -10,7 +10,6 @@ import { V2Alert, V2Badge, V2Button, V2Card, V2PageState, V2Select } from '@/com
 import V2Tabs from '@/components/V2Tabs.vue'
 import {
   appendBidDocument,
-  changeBidStatus,
   finalizeBidDocument,
   loadBidCost,
   loadBidDocuments,
@@ -20,28 +19,20 @@ import {
 import { getSiteFileUrl, uploadSiteFile } from '@/services/delivery'
 import { dashboardStatusLabel } from '@/pages/dashboard/model'
 import { isApiClientError } from '@/services/request'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 
 type DocumentGroup = 'TENDER' | 'SUBMISSION' | 'RESULT'
 
-const STATUS_LABELS: Record<BidStatus, string> = {
-  PREPARING: '准备中',
-  SUBMITTED: '已递交',
-  EVALUATING: '评标中',
-  WON: '已中标',
+const STATUS_FALLBACKS: Record<BidStatus, string> = {
+  PREPARING: '注册',
+  SUBMITTED: '投标',
+  EVALUATING: '评标',
+  WON: '中标',
   LOST: '未中标',
   CLOSED: '已关闭',
   WITHDRAWN: '已撤回',
   TERMINATED: '已终止',
-}
-const NEXT_STATUS: Partial<Record<BidStatus, BidStatus[]>> = {
-  PREPARING: ['SUBMITTED', 'WITHDRAWN', 'TERMINATED'],
-  SUBMITTED: ['EVALUATING', 'WITHDRAWN', 'TERMINATED'],
-  EVALUATING: ['WON', 'LOST'],
-  WON: ['CLOSED'],
-  LOST: ['CLOSED'],
-  WITHDRAWN: ['CLOSED'],
-  TERMINATED: ['CLOSED'],
 }
 const DOCUMENT_TYPES: Record<DocumentGroup, Array<{ value: string; label: string }>> = {
   TENDER: [
@@ -76,6 +67,8 @@ const session = useSessionStore()
 const bidId = computed(() => String(route.params.id ?? ''))
 const record = ref<BidCostRecord | null>(null)
 const documents = ref<BidDocumentVersionRecord[]>([])
+const bidStatuses = ref<DictDataRecord[]>([])
+const documentTypes = ref<DictDataRecord[]>([])
 const loading = ref(true)
 const busy = ref(false)
 const error = ref('')
@@ -84,21 +77,22 @@ const activeTab = ref('basic')
 const file = ref<File | null>(null)
 const documentForm = reactive({
   documentType: 'TENDER_DOCUMENT',
-  logicalName: '',
-  sourceName: '',
-  sourceUrl: '',
   publishedAt: '',
   receivedAt: '',
   submittedAt: '',
-  externalReceiptNo: '',
 })
-const statusForm = reactive({ targetStatus: '' as BidStatus | '', reason: '' })
 const edit = reactive<Record<string, string>>({})
 let controller: AbortController | null = null
 
 const canEdit = computed(() => session.hasPermission('bid:edit'))
-const canManageFiles = computed(() => session.hasPermission('bid:file:manage'))
-const canChangeStatus = computed(() => session.hasPermission('bid:status'))
+const canManageFiles = computed(
+  () => session.hasPermission('bid:file:manage') && session.hasPermission('bid:status'),
+)
+const canEditBasic = computed(
+  () =>
+    canEdit.value &&
+    ['PREPARING', 'SUBMITTED', 'EVALUATING'].includes(record.value?.bidStatus ?? ''),
+)
 const activeGroup = computed<DocumentGroup | null>(() =>
   activeTab.value === 'tender'
     ? 'TENDER'
@@ -111,13 +105,14 @@ const activeGroup = computed<DocumentGroup | null>(() =>
 const visibleDocuments = computed(() =>
   documents.value.filter((item) => item.documentGroup === activeGroup.value),
 )
-const nextStatusOptions = computed(() =>
-  record.value
-    ? (NEXT_STATUS[record.value.bidStatus] ?? []).map((value) => ({
-        value,
-        label: STATUS_LABELS[value],
-      }))
-    : [],
+const documentTypeOptions = computed(
+  () =>
+    Object.fromEntries(
+      Object.entries(DOCUMENT_TYPES).map(([group, options]) => [
+        group,
+        options.map((option) => ({ ...option, label: documentTypeLabel(option.value) })),
+      ]),
+    ) as Record<DocumentGroup, Array<{ value: string; label: string }>>,
 )
 const tabs = computed(() => [
   { value: 'basic', label: '基本信息' },
@@ -147,6 +142,18 @@ function text(value: unknown) {
 function documentStatusLabel(value: string): string {
   return DOCUMENT_STATUS_LABELS[value] ?? dashboardStatusLabel(value)
 }
+function dictionaryLabel(rows: DictDataRecord[], value: string, fallback: string): string {
+  return rows.find((item) => item.dictValue === value)?.dictLabel ?? fallback
+}
+function bidStatusLabel(value: BidStatus): string {
+  return dictionaryLabel(bidStatuses.value, value, STATUS_FALLBACKS[value])
+}
+function documentTypeLabel(value: string): string {
+  const fallback = Object.values(DOCUMENT_TYPES)
+    .flat()
+    .find((item) => item.value === value)?.label
+  return dictionaryLabel(documentTypes.value, value, fallback ?? value)
+}
 function hydrate(value: BidCostRecord) {
   for (const key of [
     'bidProjectName',
@@ -163,6 +170,8 @@ function hydrate(value: BidCostRecord) {
     'bidDeadlineAt',
     'openingAt',
     'bidValidUntil',
+    'plannedStartDate',
+    'plannedEndDate',
     'ceilingPrice',
     'finalBidPrice',
     'remark',
@@ -175,12 +184,16 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [bid, docs] = await Promise.all([
+    const [bid, docs, nextBidStatuses, nextDocumentTypes] = await Promise.all([
       loadBidCost(bidId.value, controller.signal),
       loadBidDocuments(bidId.value, controller.signal),
+      loadEnabledDictDataByCode('bid_status', controller.signal),
+      loadEnabledDictDataByCode('bid_document_type', controller.signal),
     ])
     record.value = bid
     documents.value = docs
+    bidStatuses.value = nextBidStatuses
+    documentTypes.value = nextDocumentTypes
     hydrate(bid)
   } catch (value) {
     if (!controller.signal.aborted) error.value = message(value, '投标详情加载失败')
@@ -211,8 +224,12 @@ async function saveBasic() {
 function chooseFile(event: Event) {
   file.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
+function currentLocalDateTime(): string {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
 async function uploadDocument() {
-  if (!activeGroup.value || !file.value || !documentForm.logicalName.trim() || busy.value) return
+  if (!activeGroup.value || !file.value || busy.value) return
   busy.value = true
   error.value = ''
   notice.value = ''
@@ -223,21 +240,21 @@ async function uploadDocument() {
       bidId.value,
       documentForm.documentType,
     )
-    await appendBidDocument(bidId.value, {
+    const version = await appendBidDocument(bidId.value, {
       documentGroup: activeGroup.value,
       documentType: documentForm.documentType,
-      logicalName: documentForm.logicalName.trim(),
+      logicalName: file.value.name.slice(0, 200),
       sysFileId: uploaded.id,
-      sourceName: documentForm.sourceName.trim() || null,
-      sourceUrl: documentForm.sourceUrl.trim() || null,
-      publishedAt: documentForm.publishedAt || null,
-      receivedAt: documentForm.receivedAt || null,
-      submittedAt: documentForm.submittedAt || null,
-      externalReceiptNo: documentForm.externalReceiptNo.trim() || null,
+      publishedAt: activeGroup.value === 'TENDER' ? null : documentForm.publishedAt || null,
+      receivedAt: activeGroup.value === 'TENDER' ? null : documentForm.receivedAt || null,
+      submittedAt:
+        activeGroup.value === 'SUBMISSION'
+          ? documentForm.submittedAt || currentLocalDateTime()
+          : null,
     })
+    await finalizeBidDocument(bidId.value, version.id)
     file.value = null
-    documentForm.logicalName = ''
-    notice.value = '新文件版本已追加。'
+    notice.value = '文件已上传，投标状态已自动更新。'
     await load()
   } catch (value) {
     error.value = message(value, '文件版本追加失败')
@@ -274,27 +291,6 @@ async function voidVersion(item: BidDocumentVersionRecord) {
 async function download(item: BidDocumentVersionRecord) {
   window.open(await getSiteFileUrl(item.sysFileId), '_blank', 'noopener')
 }
-async function transition() {
-  if (!record.value || !statusForm.targetStatus || busy.value) return
-  busy.value = true
-  error.value = ''
-  try {
-    await changeBidStatus(
-      record.value.id,
-      record.value.bidStatus,
-      statusForm.targetStatus,
-      statusForm.reason.trim() || null,
-    )
-    notice.value = '投标状态已更新。'
-    statusForm.targetStatus = ''
-    statusForm.reason = ''
-    await load()
-  } catch (value) {
-    error.value = message(value, '状态更新失败')
-  } finally {
-    busy.value = false
-  }
-}
 watch(activeGroup, (group) => {
   if (group) documentForm.documentType = DOCUMENT_TYPES[group][0]!.value
 })
@@ -304,9 +300,6 @@ onBeforeUnmount(() => controller?.abort())
 
 <template>
   <div class="bid-detail">
-    <V2Button variant="ghost" @click="router.push('/engineering-tender/records')"
-      >← 返回投标记录</V2Button
-    >
     <V2Alert v-if="error" tone="danger" title="操作未完成">{{ error }}</V2Alert>
     <V2Alert v-if="notice" tone="success" title="已完成">{{ notice }}</V2Alert>
     <V2PageState
@@ -316,23 +309,16 @@ onBeforeUnmount(() => controller?.abort())
       kind="loading"
     />
     <template v-else-if="record">
-      <V2Card :title="`${record.bidCode} · ${record.bidProjectName}`" :heading-level="1">
-        <template #actions
-          ><V2Badge tone="info">{{ STATUS_LABELS[record.bidStatus] }}</V2Badge></template
-        >
-      </V2Card>
-      <V2Card v-if="canChangeStatus && nextStatusOptions.length" title="状态变更">
-        <div v-if="canChangeStatus && nextStatusOptions.length" class="bid-detail__status">
-          <V2Select
-            v-model="statusForm.targetStatus"
-            label="下一状态"
-            :options="nextStatusOptions"
-          />
-          <label>原因/说明<input v-model="statusForm.reason" /></label>
-          <V2Button :disabled="!statusForm.targetStatus" :loading="busy" @click="transition"
-            >更新状态</V2Button
-          >
-        </div>
+      <V2Card
+        class="bid-detail__heading"
+        :title="`${record.bidCode} · ${record.bidProjectName}`"
+        :heading-level="1"
+        leading-action-label="返回"
+        @leading-action="router.push('/engineering-tender/records')"
+      >
+        <template #actions>
+          <V2Badge tone="info">{{ bidStatusLabel(record.bidStatus) }}</V2Badge>
+        </template>
       </V2Card>
       <V2Tabs v-model="activeTab" :tabs="tabs" id-prefix="bid-detail" aria-label="投标详情分区" />
       <V2Card>
@@ -345,31 +331,28 @@ onBeforeUnmount(() => controller?.abort())
           <label
             v-for="field in [
               ['bidProjectName', '工程名称'],
-              ['bidSectionName', '标段名称'],
               ['tendereeName', '招标人'],
               ['agencyName', '招标代理'],
               ['projectLocation', '建设地点'],
               ['tenderMethod', '招标方式'],
-              ['sourcePlatform', '外部平台'],
-              ['externalBidNo', '外部编号'],
-              ['sourceUrl', '外部链接'],
-              ['ownerId', '投标负责人ID'],
-              ['documentReceivedDate', '获取文件日期'],
-              ['bidDeadlineAt', '投标截止时间'],
-              ['openingAt', '开标时间'],
-              ['bidValidUntil', '投标有效期'],
+              ['documentReceivedDate', '获取文件日期', 'date'],
+              ['bidDeadlineAt', '投标截止时间', 'datetime-local'],
+              ['openingAt', '开标时间', 'datetime-local'],
+              ['bidValidUntil', '投标有效期', 'date'],
+              ['plannedStartDate', '计划开始日期', 'date'],
+              ['plannedEndDate', '计划结束日期', 'date'],
               ['ceilingPrice', '招标控制价'],
               ['finalBidPrice', '最终投标价'],
               ['remark', '备注'],
             ]"
             :key="field[0]"
             >{{ field[1]
-            }}<input
-              v-model="edit[field[0]!]"
-              :disabled="!canEdit || record.bidStatus !== 'PREPARING'"
+            }}<input v-model="edit[field[0]!]" :type="field[2] || 'text'" :disabled="!canEditBasic"
           /></label>
           <V2Button
-            v-if="canEdit && record.bidStatus === 'PREPARING'"
+            v-if="canEditBasic"
+            class="bid-detail__save"
+            size="small"
             :loading="busy"
             @click="saveBasic"
             >保存基本信息</V2Button
@@ -380,28 +363,19 @@ onBeforeUnmount(() => controller?.abort())
             <V2Select
               v-model="documentForm.documentType"
               label="文件分类"
-              :options="DOCUMENT_TYPES[activeGroup!]"
+              :options="documentTypeOptions[activeGroup!]"
             />
-            <label>逻辑文件名<input v-model="documentForm.logicalName" /></label>
-            <label>来源名称<input v-model="documentForm.sourceName" /></label>
-            <label>来源链接<input v-model="documentForm.sourceUrl" type="url" /></label>
-            <label
+            <label v-if="activeGroup !== 'TENDER'"
               >发布时间<input v-model="documentForm.publishedAt" type="datetime-local"
             /></label>
-            <label>接收时间<input v-model="documentForm.receivedAt" type="datetime-local" /></label>
+            <label v-if="activeGroup !== 'TENDER'"
+              >接收时间<input v-model="documentForm.receivedAt" type="datetime-local"
+            /></label>
             <label v-if="activeGroup === 'SUBMISSION'"
               >递交时间<input v-model="documentForm.submittedAt" type="datetime-local"
             /></label>
-            <label v-if="activeGroup === 'SUBMISSION'"
-              >外部回执号<input v-model="documentForm.externalReceiptNo"
-            /></label>
             <label>选择文件<input type="file" @change="chooseFile" /></label>
-            <V2Button
-              :disabled="!file || !documentForm.logicalName.trim()"
-              :loading="busy"
-              @click="uploadDocument"
-              >追加版本</V2Button
-            >
+            <V2Button :disabled="!file" :loading="busy" @click="uploadDocument">追加版本</V2Button>
           </div>
           <div class="bid-detail__table-wrap">
             <table>
@@ -416,7 +390,6 @@ onBeforeUnmount(() => controller?.abort())
                   <th>接收/递交时间</th>
                   <th>上传人</th>
                   <th>上传时间</th>
-                  <th>SHA-256</th>
                   <th>替代版本</th>
                   <th>操作</th>
                 </tr>
@@ -424,7 +397,7 @@ onBeforeUnmount(() => controller?.abort())
               <tbody>
                 <tr v-for="item in visibleDocuments" :key="item.id">
                   <td>{{ item.logicalName }}</td>
-                  <td>{{ item.documentType }}</td>
+                  <td>{{ documentTypeLabel(item.documentType) }}</td>
                   <td>V{{ item.versionNo }}</td>
                   <td>{{ documentStatusLabel(item.status) }}</td>
                   <td>{{ item.sourceName || item.sourceUrl || '—' }}</td>
@@ -432,9 +405,6 @@ onBeforeUnmount(() => controller?.abort())
                   <td>{{ item.submittedAt || item.receivedAt || '—' }}</td>
                   <td>{{ item.createdBy || '—' }}</td>
                   <td>{{ item.createdAt || '—' }}</td>
-                  <td>
-                    <code>{{ item.contentSha256 }}</code>
-                  </td>
                   <td>{{ item.supersedesId || '—' }}</td>
                   <td class="bid-detail__actions">
                     <V2Button size="small" variant="ghost" @click="download(item)">下载</V2Button
@@ -444,7 +414,7 @@ onBeforeUnmount(() => controller?.abort())
                       @click="finalize(item)"
                       >定版</V2Button
                     ><V2Button
-                      v-if="canManageFiles && ['DRAFT', 'FINAL'].includes(item.status)"
+                      v-if="canManageFiles && item.status === 'DRAFT'"
                       size="small"
                       variant="danger"
                       @click="voidVersion(item)"
@@ -453,7 +423,7 @@ onBeforeUnmount(() => controller?.abort())
                   </td>
                 </tr>
                 <tr v-if="!visibleDocuments.length">
-                  <td colspan="12">暂无文件版本</td>
+                  <td colspan="11">暂无文件版本</td>
                 </tr>
               </tbody>
             </table>
@@ -469,7 +439,13 @@ onBeforeUnmount(() => controller?.abort())
   display: grid;
   gap: var(--v2-space-4);
 }
-.bid-detail__status,
+.bid-detail__heading {
+  min-width: 0;
+}
+.bid-detail__heading :deep(.v2-card__title-row) {
+  gap: 50px;
+  align-items: center;
+}
 .bid-detail__upload {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -480,6 +456,10 @@ onBeforeUnmount(() => controller?.abort())
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--v2-space-3);
+}
+.bid-detail__save {
+  align-self: end;
+  justify-self: start;
 }
 label {
   display: grid;
@@ -510,11 +490,13 @@ td {
   text-align: left;
   white-space: nowrap;
 }
-code {
-  font-size: 11px;
-}
 .bid-detail__actions {
   display: flex;
   gap: 4px;
+}
+@media (max-width: 40rem) {
+  .bid-detail__heading :deep(.v2-card__title-row) {
+    gap: var(--v2-space-3);
+  }
 }
 </style>

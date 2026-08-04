@@ -333,6 +333,26 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("upload accepts all bid document types")
+    void testUploadAcceptsAllBidDocumentTypes() throws Exception {
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/BID_COST/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        for (String documentType : new String[]{
+                "TENDER_DOCUMENT", "BILL_OF_QUANTITIES", "TENDER_DRAWING",
+                "BID_PRICE", "TECHNICAL_DOCUMENT", "BID_DRAWING",
+                "CANDIDATE_NOTICE", "AWARD_NOTICE", "LOSS_NOTICE",
+                "OBJECTION_REPLY", "AWARD_CLARIFICATION", "OTHER_RESULT"}) {
+            long businessId = Math.abs(System.nanoTime());
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", documentType + ".pdf", "application/pdf", "%PDF-1.4 bid document".getBytes());
+
+            assertDoesNotThrow(() -> fileService.upload(file, "BID_COST", businessId, documentType));
+            verify(authorizer).checkUploadAccess("BID_COST", businessId, documentType);
+        }
+    }
+
+    @Test
     @DisplayName("upload accepts production measurement header and line evidence types")
     void testUploadAcceptsProductionMeasurementEvidenceTypes() throws Exception {
         long businessId = Math.abs(System.nanoTime());

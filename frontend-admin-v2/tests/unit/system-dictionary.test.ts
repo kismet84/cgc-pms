@@ -131,6 +131,42 @@ describe('系统字典三级管理', () => {
 
     expect(wrapper.text()).not.toContain('新增分组')
     expect(wrapper.find('.v2-action-menu').exists()).toBe(false)
+    expect(wrapper.get('button[role="switch"]').attributes('disabled')).toBe('')
+  })
+
+  it('使用无选择框状态标签确认更新完整字典项并回读字典树', async () => {
+    const wrapper = mount(DictionaryPage, { attachTo: document.body })
+    await flushPromises()
+
+    const statusSwitch = wrapper.get('tbody button[role="switch"]')
+    expect(statusSwitch.attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
+    await statusSwitch.trigger('click')
+    await flushPromises()
+    const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
+    ;[...confirmDialog.querySelectorAll('button')]
+      .find((candidate) => candidate.textContent?.trim() === '停用')!
+      .click()
+    await flushPromises()
+
+    expect(apiRequest).toHaveBeenCalledWith('/system/dict/data/100', {
+      method: 'PUT',
+      body: {
+        dictTypeId: '20',
+        dictLabel: '项目状态1',
+        dictValue: 'STATUS_1',
+        cssClass: '',
+        listClass: '',
+        orderNum: 1,
+        status: 'DISABLE',
+      },
+    })
+    expect(
+      vi
+        .mocked(apiRequest)
+        .mock.calls.filter(([path]) => String(path).startsWith('/system/dict/tree')),
+    ).toHaveLength(2)
+    wrapper.unmount()
   })
 
   it('搜索命中后自动定位必要父链并保留选中态', async () => {

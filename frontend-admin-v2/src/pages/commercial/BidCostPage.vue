@@ -22,8 +22,6 @@ import {
   loadBidCost,
   loadBidOwnerOptions,
   loadBidCostPage,
-  markBidCostLost,
-  markBidCostWon,
   updateBidCost,
 } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
@@ -32,14 +30,14 @@ import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 
 type PanelMode = 'closed' | 'detail' | 'create' | 'edit'
-type PendingAction = 'delete' | 'won' | 'lost' | null
+type PendingAction = 'delete' | null
 
 const STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
-  { value: 'PREPARING', label: '准备中' },
-  { value: 'SUBMITTED', label: '已递交' },
-  { value: 'EVALUATING', label: '评标中' },
-  { value: 'WON', label: '已中标' },
+  { value: 'PREPARING', label: '注册' },
+  { value: 'SUBMITTED', label: '投标' },
+  { value: 'EVALUATING', label: '评标' },
+  { value: 'WON', label: '中标' },
   { value: 'LOST', label: '未中标' },
 ]
 const RESULT_OPTIONS = [
@@ -113,7 +111,6 @@ const canQuery = computed(() => session.hasPermission('bid:query'))
 const canAdd = computed(() => session.hasPermission('bid:add'))
 const canEdit = computed(() => session.hasPermission('bid:edit'))
 const canDelete = computed(() => session.hasPermission('bid:delete'))
-const canChangeStatus = computed(() => session.hasPermission('bid:status'))
 const selectedIsBidding = computed(() => selected.value?.bidStatus === 'PREPARING')
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / filter.pageSize)))
 
@@ -364,16 +361,6 @@ function requestDelete(record: BidCostRecord): void {
   pendingAction.value = 'delete'
 }
 
-function requestWon(record: BidCostRecord): void {
-  selected.value = record
-  pendingAction.value = 'won'
-}
-
-function requestLost(record: BidCostRecord): void {
-  selected.value = record
-  pendingAction.value = 'lost'
-}
-
 function closeConfirmation(): void {
   pendingAction.value = null
 }
@@ -386,16 +373,13 @@ async function confirmAction(): Promise<void> {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    if (action === 'delete') await deleteBidCost(record.id)
-    if (action === 'won') await markBidCostWon(record.id)
-    if (action === 'lost') await markBidCostLost(record.id)
+    await deleteBidCost(record.id)
     pendingAction.value = null
     closePanel()
     await loadList(true)
-    successMessage.value =
-      action === 'delete' ? '投标记录已删除。' : '投标状态已更新，并已刷新最新数据。'
+    successMessage.value = '投标记录已删除。'
   } catch (error) {
-    errorMessage.value = errorText(error, action === 'delete' ? '投标记录删除失败' : '状态更新失败')
+    errorMessage.value = errorText(error, '投标记录删除失败')
     pendingAction.value = null
     await loadList(true)
     if (panelMode.value !== 'closed') await openDetail(record.id, 'detail', true)
@@ -406,10 +390,10 @@ async function confirmAction(): Promise<void> {
 
 function statusLabel(status: BidStatus): string {
   return {
-    PREPARING: '准备中',
-    SUBMITTED: '已递交',
-    EVALUATING: '评标中',
-    WON: '已中标',
+    PREPARING: '注册',
+    SUBMITTED: '投标',
+    EVALUATING: '评标',
+    WON: '中标',
     LOST: '未中标',
     CLOSED: '已关闭',
     WITHDRAWN: '已撤回',
@@ -451,42 +435,44 @@ onBeforeUnmount(() => {
     <template v-else>
       <V2Card title="投标记录" :heading-level="1">
         <template #actions>
-          <div class="bid-cost-page__filters">
-            <V2Input
-              v-model="filter.keyword"
-              type="search"
-              label="关键词"
-              hide-label
-              placeholder="输入投标项目名称"
-              @keyup.enter="query"
-            />
-            <V2Select
-              :model-value="filter.bidStatus"
-              label="状态"
-              hide-label
-              :options="STATUS_OPTIONS"
-              allow-empty
-              placeholder="全部状态"
-              @update:model-value="changeStatus"
-            />
-            <V2Select
-              v-model="filter.result"
-              label="投标结果"
-              :options="RESULT_OPTIONS"
-              allow-empty
-            />
-            <V2Select
-              v-model="filter.ownerId"
-              label="投标负责人"
-              :options="ownerOptions"
-              allow-empty
-            />
-            <V2Input v-model="filter.deadlineFrom" type="date" label="截止日期起" />
-            <V2Input v-model="filter.deadlineTo" type="date" label="截止日期止" />
-            <V2Button size="small" :loading="loading" @click="query">查询</V2Button>
-          </div>
           <V2Button v-if="canAdd" size="small" @click="openCreate">新建投标记录</V2Button>
         </template>
+      </V2Card>
+      <V2Card>
+        <div class="bid-cost-page__filters">
+          <V2Input
+            v-model="filter.keyword"
+            type="search"
+            label="关键词"
+            hide-label
+            placeholder="输入投标项目名称"
+            @keyup.enter="query"
+          />
+          <V2Select
+            :model-value="filter.bidStatus"
+            label="状态"
+            hide-label
+            :options="STATUS_OPTIONS"
+            allow-empty
+            placeholder="全部状态"
+            @update:model-value="changeStatus"
+          />
+          <V2Select
+            v-model="filter.result"
+            label="投标结果"
+            :options="RESULT_OPTIONS"
+            allow-empty
+          />
+          <V2Select
+            v-model="filter.ownerId"
+            label="投标负责人"
+            :options="ownerOptions"
+            allow-empty
+          />
+          <V2Input v-model="filter.deadlineFrom" type="date" label="截止日期起" />
+          <V2Input v-model="filter.deadlineTo" type="date" label="截止日期止" />
+          <V2Button size="small" :loading="loading" @click="query">查询</V2Button>
+        </div>
       </V2Card>
 
       <V2PageState
@@ -520,7 +506,6 @@ onBeforeUnmount(() => {
               <tr>
                 <th scope="col">投标编号</th>
                 <th scope="col">工程名称</th>
-                <th scope="col">标段名称</th>
                 <th scope="col">招标人</th>
                 <th scope="col">招标代理</th>
                 <th scope="col">投标负责人</th>
@@ -552,7 +537,6 @@ onBeforeUnmount(() => {
                   </V2Button>
                 </td>
                 <td>{{ record.bidProjectName }}</td>
-                <td>{{ record.bidSectionName || '—' }}</td>
                 <td>{{ record.tendereeName || '—' }}</td>
                 <td>{{ record.agencyName || '—' }}</td>
                 <td>{{ record.ownerName || '—' }}</td>
@@ -576,17 +560,6 @@ onBeforeUnmount(() => {
                       variant="ghost"
                       @click="openDetail(record.id, 'edit')"
                       >编辑</V2Button
-                    >
-                    <V2Button
-                      v-if="canChangeStatus && record.bidStatus === 'EVALUATING'"
-                      @click="requestWon(record)"
-                      >标记中标</V2Button
-                    >
-                    <V2Button
-                      v-if="canChangeStatus && record.bidStatus === 'EVALUATING'"
-                      variant="secondary"
-                      @click="requestLost(record)"
-                      >标记未中标</V2Button
                     >
                     <V2Button
                       v-if="canDelete && record.bidStatus === 'PREPARING'"
@@ -690,14 +663,10 @@ onBeforeUnmount(() => {
             :disabled="actionBusy"
             :error="bidProjectNameError"
           />
-          <V2Input v-model="form.bidSectionName" label="标段名称" :disabled="actionBusy" />
           <V2Input v-model="form.tendereeName" label="招标人" :disabled="actionBusy" />
           <V2Input v-model="form.agencyName" label="招标代理" :disabled="actionBusy" />
           <V2Input v-model="form.projectLocation" label="建设地点" :disabled="actionBusy" />
           <V2Input v-model="form.tenderMethod" label="招标方式" :disabled="actionBusy" />
-          <V2Input v-model="form.sourcePlatform" label="外部平台" :disabled="actionBusy" />
-          <V2Input v-model="form.externalBidNo" label="外部编号" :disabled="actionBusy" />
-          <V2Input v-model="form.sourceUrl" type="url" label="外部链接" :disabled="actionBusy" />
           <V2Select
             v-model="form.ownerId"
             label="投标负责人"
@@ -785,20 +754,10 @@ onBeforeUnmount(() => {
 
     <V2ConfirmDialog
       :open="pendingAction !== null"
-      :title="
-        pendingAction === 'delete'
-          ? '删除投标记录'
-          : pendingAction === 'won'
-            ? '确认中标'
-            : '确认未中标'
-      "
-      :description="
-        pendingAction === 'delete'
-          ? '仅准备中记录可删除，此操作不可撤销。'
-          : '状态更新后不可在此页面回退。'
-      "
-      :confirm-text="pendingAction === 'delete' ? '确认删除' : '确认更新'"
-      :danger="pendingAction === 'delete' || pendingAction === 'lost'"
+      title="删除投标记录"
+      description="仅注册状态记录可删除，此操作不可撤销。"
+      confirm-text="确认删除"
+      danger
       :loading="actionBusy"
       @close="closeConfirmation"
       @confirm="confirmAction"
@@ -820,6 +779,14 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 16rem) auto;
   gap: var(--v2-space-3);
   align-items: end;
+}
+
+@media (min-width: 75rem) {
+  .bid-cost-page__filters {
+    grid-template-columns:
+      minmax(10rem, 1.4fr) repeat(3, minmax(8rem, 1fr)) repeat(2, minmax(9rem, 1fr))
+      auto;
+  }
 }
 
 .bid-cost-page__actions,

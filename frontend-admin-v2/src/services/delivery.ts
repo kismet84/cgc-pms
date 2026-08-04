@@ -21,7 +21,9 @@ import {
   type WbsTaskCommand,
   type WbsTaskRecord,
 } from '@cgc-pms/frontend-contracts'
-import { apiRequest } from '@/services/request'
+import { ApiClientError, apiRequest } from '@/services/request'
+
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 export function loadSchedules(projectId?: string, signal?: AbortSignal): Promise<ScheduleRecord[]> {
   const normalizedProjectId = projectId?.trim()
@@ -208,6 +210,9 @@ export function uploadSiteFile(
   businessId: string,
   documentType?: string,
 ): Promise<SiteFileRecord> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new ApiClientError({ code: 'FILE_TOO_LARGE', message: '文件大小不能超过 20MB' })
+  }
   const formData = new FormData()
   formData.append('file', file)
   const params = new URLSearchParams({

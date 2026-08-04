@@ -655,6 +655,11 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="quality-page" aria-label="质量安全整改闭环">
+    <V2Card
+      v-if="!loading && !scopeProjectIds.length && !errorMessage"
+      title="质量安全整改闭环"
+      :heading-level="1"
+    ></V2Card>
     <V2PageState
       v-if="loading"
       kind="loading"

@@ -25,7 +25,8 @@ export interface PartnerRecord {
   status: string
 }
 
-export type PartnerCommand = Omit<PartnerRecord, 'id'> & {
+export type PartnerCommand = Omit<PartnerRecord, 'id' | 'partnerCode'> & {
+  partnerCode?: string
   defaultLeadDays: number | null
 }
 

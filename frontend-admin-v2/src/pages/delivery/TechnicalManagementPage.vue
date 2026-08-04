@@ -592,6 +592,11 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="technical-page" aria-label="图纸 RFI 技术闭环">
+    <V2Card
+      v-if="!loading && !scopeProjectIds.length && !errorMessage"
+      title="图纸 RFI 技术闭环"
+      :heading-level="1"
+    />
     <V2PageState
       v-if="loading"
       kind="loading"

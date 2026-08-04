@@ -6,6 +6,7 @@ const props = withDefaults(
     interactive?: boolean
     headingLevel?: 1 | 2 | 3
     titleId?: string
+    leadingActionLabel?: string
   }>(),
   {
     title: undefined,
@@ -13,8 +14,10 @@ const props = withDefaults(
     interactive: false,
     headingLevel: 2,
     titleId: undefined,
+    leadingActionLabel: undefined,
   },
 )
+const emit = defineEmits<{ leadingAction: [] }>()
 </script>
 
 <template>
@@ -26,11 +29,22 @@ const props = withDefaults(
     }"
   >
     <header
-      v-if="title || subtitle || $slots.actions || $slots['title-extra']"
+      v-if="title || subtitle || leadingActionLabel || $slots.actions || $slots['title-extra']"
       class="v2-card__header"
     >
-      <div v-if="title || subtitle || $slots['title-extra']" class="v2-card__heading">
+      <div
+        v-if="title || subtitle || leadingActionLabel || $slots['title-extra']"
+        class="v2-card__heading"
+      >
         <div class="v2-card__title-row">
+          <button
+            v-if="leadingActionLabel"
+            type="button"
+            class="v2-button v2-button--primary v2-button--small"
+            @click="emit('leadingAction')"
+          >
+            <span>{{ leadingActionLabel }}</span>
+          </button>
           <component
             :is="`h${props.headingLevel}`"
             v-if="title"

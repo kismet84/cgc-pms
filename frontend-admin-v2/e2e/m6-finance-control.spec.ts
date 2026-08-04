@@ -332,6 +332,7 @@ test('five finance-control routes render real-shaped facts and write then reread
   const routes = [
     ['/finance-operations?projectId=P1', '资金运营'],
     ['/cash-journal?projectId=P1', '资金日记账'],
+    ['/fund-accounts?projectId=P1', '资金账户'],
     ['/cash-forecast?projectId=P1', '资金预测'],
     ['/accounting-entry?projectId=P1', '会计凭证'],
     ['/financial-close?projectId=P1', '财务月结'],
