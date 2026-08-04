@@ -76,11 +76,12 @@
 
 现行公共出口：
 
-`V2ActionMenu`、`V2Alert`、`V2Badge`、`V2Button`、`V2Card`、`V2Cluster`、`V2ConfirmDialog`、`V2Dialog`、`V2ErrorBoundary`、`V2Input`、`V2PageState`、`V2Pagination`、`V2Select`、`V2Skeleton`、`V2Stack`、`V2ToastHost`、`showToast`、`useToastMessage`。
+`V2ActionMenu`、`V2Alert`、`V2Badge`、`V2Button`、`V2Card`、`V2Cluster`、`V2ConfirmDialog`、`V2Dialog`、`V2ErrorBoundary`、`V2Input`、`V2PageState`、`V2Pagination`、`V2Select`、`V2Skeleton`、`V2Stack`、`V2StatusToggle`、`V2ToastHost`、`showToast`、`useToastMessage`。
 
 使用边界：
 
 - `V2ConfirmDialog` 使用普通或危险语义按钮，不改成玻璃材质。
+- `V2StatusToggle` 用于确认后写入并回读的启停操作，必须保留 `switch` 语义、禁用态和文字状态，不使用选择框模拟。
 - `V2Dialog` 自动提供标准壳；页面只追加已登记的 `v2-dialog-standard`、`v2-detail-dialog`、`v2-dialog-wide`、`v2-dialog-bottom-sheet`。
 - 顶层列表分页复用 `V2Pagination`，默认且固定每页 10 条；即使只有一页，也保留总数和禁用态翻页控件。
 - 详情统一复用 `v2-detail-dialog__section`、`__facts`、`__table`、`__actions`、`__form-row`；禁止嵌套 `V2Card`。
