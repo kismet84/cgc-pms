@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class BidDocumentVersionServiceTest {
@@ -36,6 +38,7 @@ class BidDocumentVersionServiceTest {
     @Mock BidCostMapper bidCostMapper;
     @Mock SysFileMapper sysFileMapper;
     @Mock ProjectAccessChecker projectAccessChecker;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     private BidDocumentVersionService service;
 
@@ -47,7 +50,8 @@ class BidDocumentVersionServiceTest {
             assistant.setCurrentNamespace("BidDocumentVersionServiceTest");
             TableInfoHelper.initTableInfo(assistant, BidDocumentVersion.class);
         }
-        service = new BidDocumentVersionService(mapper, bidCostMapper, sysFileMapper, projectAccessChecker);
+        service = new BidDocumentVersionService(
+                mapper, bidCostMapper, sysFileMapper, projectAccessChecker, eventPublisher);
     }
 
     @AfterEach
@@ -57,7 +61,8 @@ class BidDocumentVersionServiceTest {
 
     @Test
     void finalizedVersionCannotBeFinalizedInPlaceAgain() {
-        when(bidCostMapper.selectById(1L)).thenReturn(bid(1L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(1L, TestUserContext.TENANT_0))
+                .thenReturn(bid(1L, TestUserContext.TENANT_0));
         BidDocumentVersion version = new BidDocumentVersion();
         version.setId(10L);
         version.setTenantId(TestUserContext.TENANT_0);
@@ -96,7 +101,8 @@ class BidDocumentVersionServiceTest {
 
     @Test
     void firstAppendUsesServerHashAndStartsAtVersionOne() {
-        when(bidCostMapper.selectById(4L)).thenReturn(bid(4L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(4L, TestUserContext.TENANT_0))
+                .thenReturn(bid(4L, TestUserContext.TENANT_0));
         when(sysFileMapper.selectById(40L)).thenReturn(cleanFile(40L, 4L));
 
         BidDocumentVersion version = service.append(4L, request(40L));
@@ -108,8 +114,9 @@ class BidDocumentVersionServiceTest {
     }
 
     @Test
-    void nextAppendSupersedesCurrentVersion() {
-        when(bidCostMapper.selectById(5L)).thenReturn(bid(5L, TestUserContext.TENANT_0));
+    void finalVersionCannotBeReplacedByDraft() {
+        when(bidCostMapper.selectByIdForUpdate(5L, TestUserContext.TENANT_0))
+                .thenReturn(bid(5L, TestUserContext.TENANT_0));
         when(sysFileMapper.selectById(50L)).thenReturn(cleanFile(50L, 5L));
         BidDocumentVersion previous = new BidDocumentVersion();
         previous.setId(500L);
@@ -117,35 +124,41 @@ class BidDocumentVersionServiceTest {
         previous.setStatus("FINAL");
         when(mapper.selectCurrentForUpdate(TestUserContext.TENANT_0, 5L, "中标通知书"))
                 .thenReturn(previous);
-        when(mapper.update(isNull(), any())).thenReturn(1);
 
-        BidDocumentVersion version = service.append(5L, request(50L));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.append(5L, request(50L)));
 
-        assertEquals(3, version.getVersionNo());
-        assertEquals(500L, version.getSupersedesId());
+        assertEquals("BID_DOCUMENT_FINAL_IMMUTABLE", error.getCode());
     }
 
     @Test
     void currentDraftCanBeFinalizedWithCas() {
-        when(bidCostMapper.selectById(6L)).thenReturn(bid(6L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(6L, TestUserContext.TENANT_0))
+                .thenReturn(bid(6L, TestUserContext.TENANT_0));
         when(mapper.selectById(60L)).thenReturn(version(60L, 6L, "DRAFT", 0L));
         when(mapper.update(isNull(), any())).thenReturn(1);
 
         service.finalizeVersion(6L, 60L);
+
+        verify(eventPublisher).publishEvent(
+                new BidDocumentVersionService.BidDocumentFinalizedEvent(6L));
     }
 
     @Test
-    void currentFinalCanBeVoidedWithCas() {
-        when(bidCostMapper.selectById(7L)).thenReturn(bid(7L, TestUserContext.TENANT_0));
+    void currentFinalCannotBeVoidedAfterItMayHaveAdvancedStatus() {
+        when(bidCostMapper.selectByIdForUpdate(7L, TestUserContext.TENANT_0))
+                .thenReturn(bid(7L, TestUserContext.TENANT_0));
         when(mapper.selectById(70L)).thenReturn(version(70L, 7L, "FINAL", 0L));
-        when(mapper.update(isNull(), any())).thenReturn(1);
 
-        service.voidVersion(7L, 70L, "重复上传");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.voidVersion(7L, 70L, "重复上传"));
+
+        assertEquals("BID_DOCUMENT_IMMUTABLE", error.getCode());
     }
 
     @Test
     void unsafeFileIsRejectedBeforeVersionCreation() {
-        when(bidCostMapper.selectById(8L)).thenReturn(bid(8L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(8L, TestUserContext.TENANT_0))
+                .thenReturn(bid(8L, TestUserContext.TENANT_0));
         SysFile file = cleanFile(80L, 8L);
         file.setVirusScanStatus("PENDING");
         when(sysFileMapper.selectById(80L)).thenReturn(file);
@@ -158,7 +171,8 @@ class BidDocumentVersionServiceTest {
 
     @Test
     void fileWithoutServerHashIsRejected() {
-        when(bidCostMapper.selectById(9L)).thenReturn(bid(9L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(9L, TestUserContext.TENANT_0))
+                .thenReturn(bid(9L, TestUserContext.TENANT_0));
         SysFile file = cleanFile(90L, 9L);
         file.setFileName("award-notice.pdf");
         when(sysFileMapper.selectById(90L)).thenReturn(file);
@@ -171,7 +185,8 @@ class BidDocumentVersionServiceTest {
 
     @Test
     void crossTenantSysFileIsHidden() {
-        when(bidCostMapper.selectById(3L)).thenReturn(bid(3L, TestUserContext.TENANT_0));
+        when(bidCostMapper.selectByIdForUpdate(3L, TestUserContext.TENANT_0))
+                .thenReturn(bid(3L, TestUserContext.TENANT_0));
         SysFile file = new SysFile();
         file.setId(30L);
         file.setTenantId(999L);

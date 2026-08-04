@@ -2,7 +2,7 @@ import type { UserInfo } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { V2Input } from '@/components'
+import { V2Input, V2StatusToggle } from '@/components'
 import CostSubjectPage from '@/pages/master-data/CostSubjectPage.vue'
 import * as costSubject from '@/services/cost-subject'
 import { useSessionStore } from '@/stores/session'
@@ -32,7 +32,6 @@ vi.mock('@/services/cost-subject', () => ({
   saveProjectScope: vi.fn(),
   toggleCostSubjectStatus: vi.fn(),
   updateCostSubject: vi.fn(),
-  updateTargetCostRatios: vi.fn(),
 }))
 
 function user(permissions: string[]): UserInfo {
@@ -206,10 +205,9 @@ describe('M7 cost-subject center', () => {
     expect(wrapper.text()).toContain('新增一级科目')
   })
 
-  it('accepts four-decimal ratios whose numeric sum only differs by floating-point noise', async () => {
+  it('keeps fixed target-cost subjects read-only and removes the default-ratio card', async () => {
     route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit']))
-    const ratios = [...Array(9).fill('10.1'), '9.1']
     vi.mocked(costSubject.loadCostSubjectTree).mockResolvedValue([
       {
         id: '1',
@@ -232,19 +230,21 @@ describe('M7 cost-subject center', () => {
             level: 2,
             sortOrder: 3,
             status: 'ENABLE',
-            children: ratios.map((ratio, index) => ({
-              id: String(901001 + index),
-              parentId: '13',
-              subjectCode: `5401.03.${String(index + 1).padStart(2, '0')}`,
-              subjectName: `目标成本${index + 1}`,
-              subjectType: 'TARGET_COST',
-              accountCategory: 'COST',
-              level: 3,
-              sortOrder: index + 1,
-              status: 'ENABLE',
-              defaultTargetRatio: ratio,
-              children: [],
-            })),
+            children: [
+              {
+                id: '901001',
+                parentId: '13',
+                subjectCode: '5401.03.01',
+                subjectName: '人工成本',
+                subjectType: 'LABOR',
+                accountCategory: 'COST',
+                level: 3,
+                sortOrder: 1,
+                status: 'ENABLE',
+                defaultTargetRatio: '25',
+                children: [],
+              },
+            ],
           },
         ],
       },
@@ -252,12 +252,39 @@ describe('M7 cost-subject center', () => {
 
     const wrapper = mount(CostSubjectPage)
     await flushPromises()
-    const saveButton = wrapper.findAll('button').find((button) => button.text() === '保存10类比例')!
-
-    expect(saveButton.attributes('disabled')).toBeUndefined()
-    await saveButton.trigger('click')
-    await flushPromises()
-    expect(costSubject.updateTargetCostRatios).toHaveBeenCalledOnce()
+    expect(wrapper.text()).not.toContain('项目目标成本默认比例')
+    expect(wrapper.text()).not.toContain('保存10类比例')
+    expect(wrapper.text()).not.toContain(
+      '固定十类，系统维护；仅允许编辑名称和排序，不支持新增、停用或删除',
+    )
+    expect(wrapper.findAll('button').some((button) => button.text() === '新增子科目')).toBe(false)
+    const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')!
+    expect(editButton.exists()).toBe(true)
+    expect(wrapper.findAll('button').some((button) => button.text() === '停用')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === '删除')).toBe(false)
+    expect(
+      wrapper
+        .findAllComponents(V2StatusToggle)
+        .filter((toggle) => toggle.props('ariaLabel')?.includes('人工成本'))
+        .every((toggle) => toggle.props('disabled')),
+    ).toBe(true)
+    await editButton.trigger('click')
+    const fields = wrapper.findAllComponents(V2Input)
+    expect(fields.find((field) => field.props('label') === '科目编码')?.props('disabled')).toBe(
+      true,
+    )
+    expect(
+      fields.find((field) => field.props('label') === '科目名称')?.props('disabled'),
+    ).toBeFalsy()
+    expect(fields.find((field) => field.props('label') === '科目类型')?.props('disabled')).toBe(
+      true,
+    )
+    expect(fields.find((field) => field.props('label') === '父科目标识')?.props('disabled')).toBe(
+      true,
+    )
+    expect(fields.find((field) => field.props('label') === '排序')?.props('disabled')).toBeFalsy()
+    expect(costSubject.updateCostSubject).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('links first-level selection to second-level subjects and detail', async () => {
@@ -274,6 +301,25 @@ describe('M7 cost-subject center', () => {
     expect(purchase.classes()).toContain('is-selected')
     expect(wrapper.text()).toContain('5401.02.01')
     expect(wrapper.text()).not.toContain('5401.01.01')
+  })
+
+  it('confirms ordinary cost-subject status through the dedicated API and rereads facts', async () => {
+    route.path = '/cost/subject/taxonomy'
+    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit']))
+    const wrapper = mount(CostSubjectPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.find('[aria-label="停用成本科目 投标费用"]').trigger('click')
+    expect(costSubject.toggleCostSubjectStatus).not.toHaveBeenCalled()
+    const confirm = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.trim() === '确认',
+    )!
+    confirm.click()
+    await flushPromises()
+
+    expect(costSubject.toggleCostSubjectStatus).toHaveBeenCalledWith('111')
+    expect(costSubject.loadCostSubject).toHaveBeenCalledWith('111')
+    expect(costSubject.loadCostSubjectTree).toHaveBeenCalledTimes(2)
   })
 
   it('loads mapping and rule facts without touching other tabs', async () => {

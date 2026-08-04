@@ -25,15 +25,28 @@ describe('M4 bid-cost compatibility', () => {
     expect(page).toContain('/engineering-tender/records/${record.id}')
     expect(page).toContain("record.bidStatus === 'PREPARING'")
     expect(page).not.toContain("record.bidStatus === 'BIDDING'")
+    expect(page).not.toMatch(/<th scope="col">标段名称<\/th>/)
   })
 
   it('retains backend-authoritative CRUD and permission gates', () => {
     const page = read('src/pages/commercial/BidCostPage.vue')
-    for (const permission of ['bid:query', 'bid:add', 'bid:edit', 'bid:delete', 'bid:status']) {
+    for (const permission of ['bid:query', 'bid:add', 'bid:edit', 'bid:delete']) {
       expect(page).toContain(permission)
     }
+    expect(page).not.toContain("session.hasPermission('bid:status')")
     for (const call of ['loadBidCostPage', 'createBidCost', 'updateBidCost', 'deleteBidCost']) {
       expect(page).toContain(call)
+    }
+  })
+
+  it('hides retired bid fields while preserving loaded values in update commands', () => {
+    const page = read('src/pages/commercial/BidCostPage.vue')
+    for (const label of ['标段名称', '外部平台', '外部编号', '外部链接']) {
+      expect(page).not.toContain(`label="${label}"`)
+    }
+    for (const field of ['bidSectionName', 'sourcePlatform', 'externalBidNo', 'sourceUrl']) {
+      expect(page).toContain(`${field}: value?.${field} ?? ''`)
+      expect(page).toContain(`${field}: nullable(form.${field})`)
     }
   })
 })

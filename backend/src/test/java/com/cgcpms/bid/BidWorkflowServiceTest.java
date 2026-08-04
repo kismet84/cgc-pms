@@ -190,11 +190,35 @@ class BidWorkflowServiceTest {
     @Test
     void legacyBiddingInputNormalizesBeforeCas() {
         when(mapper.selectById(4L)).thenReturn(bid(4L, "BIDDING"));
-        when(documentService.hasSubmittedFinalBid(4L)).thenReturn(true);
+        when(documentService.hasCurrentFinalGroup(4L, "TENDER")).thenReturn(true);
         when(mapper.update(isNull(), any())).thenReturn(1);
 
         service.changeStatus(4L, "BIDDING", "SUBMITTED", null);
 
+        verify(mapper).update(isNull(), any());
+    }
+
+    @Test
+    void finalizedTenderAutomaticallyAdvancesRegisteredBid() {
+        when(mapper.selectById(41L)).thenReturn(bid(41L, "PREPARING"));
+        when(documentService.hasCurrentFinalGroup(41L, "TENDER")).thenReturn(true);
+        when(mapper.update(isNull(), any())).thenReturn(1);
+
+        service.advanceStatus(new BidDocumentVersionService.BidDocumentFinalizedEvent(41L));
+
+        verify(mapper).update(isNull(), any());
+    }
+
+    @Test
+    void finalizedAwardNoticeAutomaticallyCreatesProjectAndWins() {
+        when(mapper.selectById(42L)).thenReturn(bid(42L, "EVALUATING"));
+        when(documentService.hasCurrentFinal(42L, "RESULT", "AWARD_NOTICE")).thenReturn(true);
+        when(projectCreator.createOrGet(any())).thenReturn(420L);
+        when(mapper.update(isNull(), any())).thenReturn(1);
+
+        service.advanceStatus(new BidDocumentVersionService.BidDocumentFinalizedEvent(42L));
+
+        verify(projectCreator).createOrGet(any());
         verify(mapper).update(isNull(), any());
     }
 

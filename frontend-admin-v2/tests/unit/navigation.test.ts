@@ -13,9 +13,8 @@ describe('V2 navigation contract', () => {
       '工作台',
       '项目履约',
       '施工管理',
-      '工程投标',
       '商务合约',
-      '供应链与物资',
+      '物资管理',
       '分包与结算',
       '资金财务',
       '基础资料',
@@ -28,7 +27,7 @@ describe('V2 navigation contract', () => {
   })
 
   it('shows all domains to wildcard permission and only matching domains to ordinary users', () => {
-    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(10)
+    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(9)
     expect(
       visibleNavigation(['USER'], ['dashboard:view', 'project:query']).map(
         (domain) => domain.label,
@@ -50,6 +49,10 @@ describe('V2 navigation contract', () => {
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
     expect(findWorkspace('/project-schedule/11')?.domain.label).toBe('施工管理')
+    expect(findWorkspace('/engineering-tender/records')?.domain.label).toBe('项目履约')
+    expect(navigationDomains.find((domain) => domain.id === 'delivery')?.workspaces[0]?.id).toBe(
+      'engineering-tender-workspace',
+    )
     expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('项目计划与施工履约')
     expect(findWorkspace('/quality-safety')?.workspace.label).toBe('质量安全整改闭环')
     expect(
@@ -77,13 +80,28 @@ describe('V2 navigation contract', () => {
         .flatMap((domain) => domain.workspaces)
         .some((workspace) => workspace.id === 'cost-budget'),
     ).toBe(true)
-    expect(findWorkspace('/partner/101')?.workspace.label).toBe('合作方管理')
-    expect(permissionForPath('/supplier-sourcing')).toBe('supplier:sourcing:query')
-    expect(findWorkspace('/supplier-sourcing')?.workspace.label).toBe('供应商管理')
+    expect(findWorkspace('/partner/101')?.workspace.label).toBe('客户管理')
+    expect(permissionForPath('/supplier-sourcing')).toBeUndefined()
+    expect(findWorkspace('/supplier-sourcing')).toBeUndefined()
+    expect(navigationDomains.find((domain) => domain.id === 'supply')?.workspaces[0]?.id).toBe(
+      'procurement',
+    )
     expect(permissionForPath('/inventory/purchase-request')).toBe('purchase:request:list')
     expect(permissionForPath('/purchase/order')).toBe('purchase:order:query')
     expect(permissionForPath('/purchase/receipt')).toBe('receipt:query')
     expect(findWorkspace('/purchase/order')?.workspace.label).toBe('采购执行')
+    expect(permissionForPath('/fund-accounts')).toBe('cashbook:journal:query')
+    expect(
+      navigationDomains
+        .find((domain) => domain.id === 'finance')
+        ?.workspaces.find((workspace) => workspace.id === 'cash')
+        ?.tabs.map((tab) => tab.path),
+    ).toEqual(['/cash-journal', '/fund-accounts', '/finance-operations', '/cash-forecast'])
+    expect(
+      navigationDomains
+        .find((domain) => domain.id === 'master-data')
+        ?.workspaces.map((item) => item.label),
+    ).toEqual(['客户管理', '组织架构', '物资数据', '成本科目'])
   })
 
   it('uses the API-aligned admin gate for workflow configuration navigation', () => {

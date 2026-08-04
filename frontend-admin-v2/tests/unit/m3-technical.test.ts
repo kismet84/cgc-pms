@@ -130,6 +130,10 @@ describe('M3 technical management closed loop', () => {
     expect(pageSource).not.toContain('state="empty"')
     expect(pageSource).toContain('description="正在加载方案、图纸、RFI、交底和归档状态。"')
     expect(pageSource).toContain('aria-label="图纸 RFI 技术闭环"')
+    expect(pageSource).toContain('v-if="!loading && !scopeProjectIds.length && !errorMessage"')
+    expect(pageSource.indexOf('title="图纸 RFI 技术闭环"')).toBeLessThan(
+      pageSource.indexOf('title="暂无可访问项目"'),
+    )
     expect(pageSource).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
     expect(pageSource).toContain('label="前版图纸"')
     expect(pageSource).toContain(':options="userOptions(form.responsibleUserId)"')

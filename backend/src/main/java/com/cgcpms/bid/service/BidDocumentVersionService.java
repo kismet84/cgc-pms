@@ -14,6 +14,7 @@ import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +37,9 @@ public class BidDocumentVersionService {
     private final BidCostMapper bidCostMapper;
     private final SysFileMapper sysFileMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public record BidDocumentFinalizedEvent(Long bidCostId) {}
 
     public List<BidDocumentVersion> list(Long bidCostId) {
         Long tenantId = tenant();
@@ -50,11 +54,14 @@ public class BidDocumentVersionService {
     @Transactional(rollbackFor = Exception.class)
     public BidDocumentVersion append(Long bidCostId, BidDocumentCreateRequest request) {
         Long tenantId = tenant();
-        requireBid(bidCostId, tenantId);
+        requireBidForUpdate(bidCostId, tenantId);
         validateType(request.documentGroup(), request.documentType());
         SysFile file = requireFile(request.sysFileId(), bidCostId, tenantId);
 
         BidDocumentVersion previous = mapper.selectCurrentForUpdate(tenantId, bidCostId, request.logicalName());
+        if (previous != null && "FINAL".equals(previous.getStatus())) {
+            throw new BusinessException("BID_DOCUMENT_FINAL_IMMUTABLE", "正式版本不可直接替换，请保留原文件并追加新逻辑文件");
+        }
         int versionNo = previous == null ? 1 : previous.getVersionNo() + 1;
         if (previous != null) supersede(previous, tenantId);
 
@@ -85,7 +92,7 @@ public class BidDocumentVersionService {
 
     @Transactional(rollbackFor = Exception.class)
     public void finalizeVersion(Long bidCostId, Long versionId) {
-        BidDocumentVersion version = requireVersion(bidCostId, versionId);
+        BidDocumentVersion version = requireVersionForUpdate(bidCostId, versionId);
         if (!"DRAFT".equals(version.getStatus()) || !Objects.equals(CURRENT, version.getCurrentToken())) {
             throw new BusinessException("BID_DOCUMENT_IMMUTABLE", "仅当前草稿版本可定版");
         }
@@ -97,13 +104,14 @@ public class BidDocumentVersionService {
                 .eq(BidDocumentVersion::getCurrentToken, CURRENT)
                 .set(BidDocumentVersion::getStatus, "FINAL"));
         requireCas(updated);
+        eventPublisher.publishEvent(new BidDocumentFinalizedEvent(bidCostId));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void voidVersion(Long bidCostId, Long versionId, String reason) {
-        BidDocumentVersion version = requireVersion(bidCostId, versionId);
-        if (!Set.of("DRAFT", "FINAL").contains(version.getStatus()) || !Objects.equals(CURRENT, version.getCurrentToken())) {
-            throw new BusinessException("BID_DOCUMENT_IMMUTABLE", "仅当前有效版本可作废");
+        BidDocumentVersion version = requireVersionForUpdate(bidCostId, versionId);
+        if (!"DRAFT".equals(version.getStatus()) || !Objects.equals(CURRENT, version.getCurrentToken())) {
+            throw new BusinessException("BID_DOCUMENT_IMMUTABLE", "仅当前草稿版本可作废");
         }
         int updated = mapper.update(null, new LambdaUpdateWrapper<BidDocumentVersion>()
                 .eq(BidDocumentVersion::getId, versionId)
@@ -135,6 +143,15 @@ public class BidDocumentVersionService {
                 .eq(BidDocumentVersion::getCurrentToken, CURRENT)) > 0;
     }
 
+    public boolean hasCurrentFinalGroup(Long bidCostId, String documentGroup) {
+        return mapper.selectCount(new LambdaQueryWrapper<BidDocumentVersion>()
+                .eq(BidDocumentVersion::getTenantId, tenant())
+                .eq(BidDocumentVersion::getBidCostId, bidCostId)
+                .eq(BidDocumentVersion::getDocumentGroup, documentGroup)
+                .eq(BidDocumentVersion::getStatus, "FINAL")
+                .eq(BidDocumentVersion::getCurrentToken, CURRENT)) > 0;
+    }
+
     public boolean hasSubmittedFinalBid(Long bidCostId) {
         return mapper.selectCount(new LambdaQueryWrapper<BidDocumentVersion>()
                 .eq(BidDocumentVersion::getTenantId, tenant())
@@ -158,6 +175,15 @@ public class BidDocumentVersionService {
 
     private BidDocumentVersion requireVersion(Long bidCostId, Long versionId) {
         requireBid(bidCostId, tenant());
+        return requireVersionRecord(bidCostId, versionId);
+    }
+
+    private BidDocumentVersion requireVersionForUpdate(Long bidCostId, Long versionId) {
+        requireBidForUpdate(bidCostId, tenant());
+        return requireVersionRecord(bidCostId, versionId);
+    }
+
+    private BidDocumentVersion requireVersionRecord(Long bidCostId, Long versionId) {
         BidDocumentVersion version = mapper.selectById(versionId);
         if (version == null || !Objects.equals(version.getTenantId(), tenant())
                 || !Objects.equals(version.getBidCostId(), bidCostId)) {
@@ -168,6 +194,15 @@ public class BidDocumentVersionService {
 
     private void requireBid(Long bidCostId, Long tenantId) {
         BidCost bid = bidCostMapper.selectById(bidCostId);
+        requireVisibleBid(bid, tenantId);
+    }
+
+    private void requireBidForUpdate(Long bidCostId, Long tenantId) {
+        BidCost bid = bidCostMapper.selectByIdForUpdate(bidCostId, tenantId);
+        requireVisibleBid(bid, tenantId);
+    }
+
+    private void requireVisibleBid(BidCost bid, Long tenantId) {
         if (bid == null || !Objects.equals(bid.getTenantId(), tenantId)) {
             throw new BusinessException("BID_COST_NOT_FOUND", "投标记录不存在");
         }

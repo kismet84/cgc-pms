@@ -356,7 +356,12 @@ describe('M7 system management contracts', () => {
   })
 
   it('uses one role-user workspace without losing memberships', async () => {
-    vi.mocked(apiRequest).mockImplementation(async (path) => {
+    let dualStatus = 'ENABLE'
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/system/users/2/status' && options?.method === 'PATCH') {
+        dualStatus = String(options.body?.status)
+        return undefined
+      }
       if (path.startsWith('/system/users?')) {
         const roleId = new URLSearchParams(path.split('?')[1]).get('roleId')
         const records =
@@ -366,7 +371,7 @@ describe('M7 system management contracts', () => {
                   id: 2,
                   username: 'dual.user',
                   realName: '双岗成员',
-                  status: 'ENABLE',
+                  status: dualStatus,
                   roleIds: [1, 2],
                   roleNames: ['超级管理员', '项目经理'],
                 },
@@ -384,7 +389,7 @@ describe('M7 system management contracts', () => {
                   id: 2,
                   username: 'dual.user',
                   realName: '双岗成员',
-                  status: 'ENABLE',
+                  status: dualStatus,
                   roleIds: [1, 2],
                   roleNames: ['超级管理员', '项目经理'],
                 },
@@ -468,6 +473,47 @@ describe('M7 system management contracts', () => {
     expect(apiRequest).toHaveBeenCalledWith('/system/users?pageNo=1&pageSize=10&roleId=2', {
       signal: expect.any(AbortSignal),
     })
+    const statusSwitch = projectManagerTable.get('button[role="switch"]')
+    expect(statusSwitch.attributes('aria-checked')).toBe('true')
+    expect(statusSwitch.attributes('disabled')).toBeUndefined()
+    expect(statusSwitch.classes()).toContain('is-enabled')
+    expect(projectManagerTable.find('input[role="switch"]').exists()).toBe(false)
+    expect(
+      projectManagerTable
+        .findAll('.access-control-page__actions button')
+        .some((candidate) => ['启用', '停用'].includes(candidate.text())),
+    ).toBe(false)
+
+    await statusSwitch.trigger('click')
+    await flushPromises()
+    const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
+    expect(confirmDialog.textContent).toContain('确认更新用户状态')
+    ;[...confirmDialog.querySelectorAll('button')]
+      .find((candidate) => candidate.textContent?.trim() === '停用')!
+      .click()
+    await flushPromises()
+
+    expect(apiRequest).toHaveBeenCalledWith('/system/users/2/status', {
+      method: 'PATCH',
+      body: { status: 'DISABLE' },
+    })
+    expect(
+      wrapper.get('.user-workspace__table button[role="switch"]').attributes('aria-checked'),
+    ).toBe('false')
+    expect(wrapper.get('.user-workspace__table button[role="switch"]').classes()).toContain(
+      'is-disabled',
+    )
+
+    useSessionStore().replaceUserInfo({
+      userId: '3',
+      username: 'viewer',
+      roles: ['USER'],
+      permissions: ['system:user:query'],
+    })
+    await flushPromises()
+    expect(wrapper.get('.user-workspace__table button[role="switch"]').attributes('disabled')).toBe(
+      '',
+    )
   })
 
   it('keeps role editing separate from permission assignment', async () => {
@@ -549,6 +595,79 @@ describe('M7 system management contracts', () => {
         ),
     ).toBe(false)
     expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path === '/system/menus')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('updates an editable role through the shared status pill and rereads the list', async () => {
+    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+      if (path === '/system/roles') {
+        return [
+          {
+            id: 2,
+            roleCode: 'PROJECT_MANAGER',
+            roleName: '项目经理',
+            roleType: 'CUSTOM',
+            status: 'ENABLE',
+            dataScope: 'SELF',
+            menuIds: [],
+          },
+        ]
+      }
+      if (path === '/system/roles/2') {
+        if (options?.method === 'PUT') return undefined
+        return {
+          id: 2,
+          roleCode: 'PROJECT_MANAGER',
+          roleName: '项目经理',
+          roleType: 'CUSTOM',
+          status: 'ENABLE',
+          dataScope: 'SELF',
+          menuIds: [],
+        }
+      }
+      throw new Error(`unexpected request: ${path}`)
+    })
+    useSessionStore().replaceUserInfo({
+      userId: '1',
+      username: 'admin',
+      roles: ['SUPER_ADMIN'],
+      permissions: [],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/system/roles', component: AccessControlPage }],
+    })
+    await router.push('/system/roles')
+    await router.isReady()
+    const wrapper = mount(AccessControlPage, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    })
+    await flushPromises()
+
+    const statusSwitch = wrapper.get('button[role="switch"]')
+    expect(statusSwitch.attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
+    await statusSwitch.trigger('click')
+    await flushPromises()
+    const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
+    ;[...confirmDialog.querySelectorAll('button')]
+      .find((candidate) => candidate.textContent?.trim() === '停用')!
+      .click()
+    await flushPromises()
+
+    expect(apiRequest).toHaveBeenCalledWith('/system/roles/2', {
+      method: 'PUT',
+      body: {
+        roleCode: 'PROJECT_MANAGER',
+        roleName: '项目经理',
+        status: 'DISABLE',
+        dataScope: 'SELF',
+      },
+    })
+    expect(
+      vi.mocked(apiRequest).mock.calls.filter(([path]) => path === '/system/roles'),
+    ).toHaveLength(2)
     wrapper.unmount()
   })
 })

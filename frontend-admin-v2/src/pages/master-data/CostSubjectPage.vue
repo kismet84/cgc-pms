@@ -14,6 +14,7 @@ import {
   V2Pagination,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import {
@@ -38,7 +39,6 @@ import {
   saveProjectScope,
   toggleCostSubjectStatus,
   updateCostSubject,
-  updateTargetCostRatios,
   type AssignmentRuleRecord,
   type CostSubjectAuditRow,
   type CostSubjectCommand,
@@ -98,17 +98,9 @@ const secondLevelSubjects = computed(() => selectedFirstLevel.value?.children ??
 const selectedSubject = computed(
   () => secondLevelSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
 )
-const targetCostSubjects = computed(
-  () => firstLevelSubjects.value.find((item) => item.subjectCode === '5401.03')?.children ?? [],
+const editingGovernedSubject = computed(
+  () => subjectMode.value === 'edit' && isGovernedSubject(selectedSubject.value),
 )
-const ratioDraft = reactive<Record<string, string>>({})
-const ratioTotal = computed(() =>
-  targetCostSubjects.value.reduce(
-    (sum, subject) => sum + Number(ratioDraft[subject.subjectCode] || 0),
-    0,
-  ),
-)
-const ratioTotalIsValid = computed(() => Math.abs(ratioTotal.value - 100) < 1e-9)
 const subjectDialog = ref(false)
 const subjectMode = ref<'create' | 'edit'>('create')
 const subjectDeleteTarget = ref<CostSubjectRecord | null>(null)
@@ -361,7 +353,7 @@ async function saveSubject(): Promise<void> {
 }
 
 async function confirmSubjectStatus(): Promise<void> {
-  if (!subjectStatusTarget.value) return
+  if (!subjectStatusTarget.value || isGovernedSubject(subjectStatusTarget.value)) return
   saving.value = true
   try {
     const id = subjectStatusTarget.value.id
@@ -395,31 +387,7 @@ async function confirmSubjectDelete(): Promise<void> {
 
 async function loadTaxonomy(signal?: AbortSignal): Promise<void> {
   subjects.value = await loadCostSubjectTree(signal)
-  for (const subject of targetCostSubjects.value)
-    ratioDraft[subject.subjectCode] = subject.defaultTargetRatio ?? ''
   normalizeTaxonomySelection()
-}
-
-async function saveTargetRatios(): Promise<void> {
-  if (targetCostSubjects.value.length !== 10 || !ratioTotalIsValid.value) {
-    showToast('warning', '比例无效', '必须完整包含10类科目且合计100%。')
-    return
-  }
-  saving.value = true
-  try {
-    await updateTargetCostRatios(
-      targetCostSubjects.value.map((subject) => ({
-        subjectCode: subject.subjectCode,
-        ratio: ratioDraft[subject.subjectCode] || '',
-      })),
-    )
-    await loadTaxonomy()
-    showToast('success', '默认比例已保存', '10类比例已由服务端原子校验并回读。')
-  } catch (value) {
-    showToast('error', '默认比例保存失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
 }
 
 async function loadRules(signal?: AbortSignal): Promise<void> {
@@ -859,23 +827,31 @@ onBeforeUnmount(() => controller?.abort())
               description="未读取到 5401 标准成本体系。"
             />
             <div class="cost-subject-page__list">
-              <button
+              <div
                 v-for="subject in firstLevelSubjects"
                 :key="subject.id"
-                type="button"
                 class="cost-subject-page__list-item"
                 :class="{ 'is-selected': selectedFirstLevelId === subject.id }"
-                :aria-pressed="selectedFirstLevelId === subject.id"
                 @click="selectFirstLevel(subject)"
               >
-                <span>
-                  <strong>{{ subject.subjectName }}</strong>
-                  <small>{{ subject.subjectCode }}</small>
-                </span>
-                <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
-              </button>
+                <button
+                  type="button"
+                  class="cost-subject-page__select"
+                  :aria-pressed="selectedFirstLevelId === subject.id"
+                  @click="selectFirstLevel(subject)"
+                >
+                  <span>
+                    <strong>{{ subject.subjectName }}</strong>
+                    <small>{{ subject.subjectCode }}</small>
+                  </span>
+                </button>
+                <V2StatusToggle
+                  :enabled="subject.status === 'ENABLE'"
+                  :disabled="!canSubjectEdit || saving || isGovernedSubject(subject)"
+                  :aria-label="`${subject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${subject.subjectName}`"
+                  @toggle="subjectStatusTarget = subject"
+                />
+              </div>
             </div>
           </section>
 
@@ -910,59 +886,72 @@ onBeforeUnmount(() => controller?.abort())
               description="可在当前一级科目下新增。"
             />
             <div v-else class="cost-subject-page__list">
-              <button
+              <div
                 v-for="subject in secondLevelSubjects"
                 :key="subject.id"
-                type="button"
                 class="cost-subject-page__list-item"
                 :class="{ 'is-selected': selectedSubjectId === subject.id }"
-                :aria-pressed="selectedSubjectId === subject.id"
                 @click="selectedSubjectId = subject.id"
               >
-                <span>
-                  <strong>{{ subject.subjectName }}</strong>
-                  <small>
-                    {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType)
-                    }}<template v-if="subject.defaultTargetRatio != null">
-                      · {{ formatDecimal(subject.defaultTargetRatio) }}%</template
-                    >
-                  </small>
-                </span>
-                <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
-              </button>
+                <button
+                  type="button"
+                  class="cost-subject-page__select"
+                  :aria-pressed="selectedSubjectId === subject.id"
+                  @click="selectedSubjectId = subject.id"
+                >
+                  <span>
+                    <strong>{{ subject.subjectName }}</strong>
+                    <small>
+                      {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType)
+                      }}<template v-if="subject.defaultTargetRatio != null">
+                        · {{ formatDecimal(subject.defaultTargetRatio) }}%</template
+                      >
+                    </small>
+                  </span>
+                </button>
+                <V2StatusToggle
+                  :enabled="subject.status === 'ENABLE'"
+                  :disabled="!canSubjectEdit || saving || isGovernedSubject(subject)"
+                  :aria-label="`${subject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${subject.subjectName}`"
+                  @toggle="subjectStatusTarget = subject"
+                />
+              </div>
             </div>
           </section>
 
           <section aria-labelledby="cost-subject-detail-title">
             <div class="cost-subject-page__section-heading">
               <h3 id="cost-subject-detail-title">3. 科目详情</h3>
-              <V2Cluster v-if="selectedSubject">
+              <template v-if="isGovernedSubject(selectedSubject)">
+                <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit"
+                  >编辑</V2Button
+                >
+                <V2StatusToggle
+                  :enabled="selectedSubject.status === 'ENABLE'"
+                  disabled
+                  :aria-label="`成本科目 ${selectedSubject.subjectName} 状态由系统维护`"
+                />
+              </template>
+              <V2Cluster v-else-if="selectedSubject">
                 <V2Button
-                  v-if="canSubjectAdd && !isGovernedSubject(selectedSubject)"
+                  v-if="canSubjectAdd"
                   size="small"
                   variant="secondary"
                   @click="openSubjectCreate(selectedSubject)"
                 >
                   新增子科目
                 </V2Button>
-                <V2Button
-                  v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)"
-                  size="small"
-                  @click="openSubjectEdit"
+                <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit"
                   >编辑</V2Button
                 >
+                <V2StatusToggle
+                  :enabled="selectedSubject.status === 'ENABLE'"
+                  :disabled="!canSubjectEdit || saving"
+                  :aria-label="`${selectedSubject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${selectedSubject.subjectName}`"
+                  @toggle="subjectStatusTarget = selectedSubject"
+                />
                 <V2Button
-                  v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)"
-                  size="small"
-                  variant="secondary"
-                  @click="subjectStatusTarget = selectedSubject"
-                >
-                  {{ selectedSubject.status === 'ENABLE' ? '停用' : '启用' }}
-                </V2Button>
-                <V2Button
-                  v-if="canSubjectDelete && !isGovernedSubject(selectedSubject)"
+                  v-if="canSubjectDelete"
                   size="small"
                   variant="danger"
                   @click="subjectDeleteTarget = selectedSubject"
@@ -1010,44 +999,6 @@ onBeforeUnmount(() => controller?.abort())
               description="选择科目后查看详情。"
             />
           </section>
-        </div>
-      </V2Card>
-      <V2Card v-if="targetCostSubjects.length" title="项目目标成本默认比例">
-        <template #actions>
-          <span>合计 {{ ratioTotal }}%</span>
-          <V2Button
-            v-if="canSubjectEdit"
-            size="small"
-            :disabled="saving || !ratioTotalIsValid"
-            @click="saveTargetRatios"
-            >保存10类比例</V2Button
-          >
-        </template>
-        <div class="cost-subject-page__table-wrap">
-          <table aria-label="项目目标成本默认比例">
-            <thead>
-              <tr>
-                <th>编码</th>
-                <th>科目</th>
-                <th>默认比例（%）</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="subject in targetCostSubjects" :key="subject.id">
-                <td>{{ subject.subjectCode }}</td>
-                <td>{{ subject.subjectName }}</td>
-                <td>
-                  <V2Input
-                    v-model="ratioDraft[subject.subjectCode]"
-                    label="默认比例"
-                    :decimal-scale="2"
-                    hide-label
-                    :disabled="!canSubjectEdit || saving"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </V2Card>
     </template>
@@ -1383,12 +1334,32 @@ onBeforeUnmount(() => controller?.abort())
       @close="subjectDialog = false"
     >
       <form id="cost-subject-form" class="cost-subject-page__form" @submit.prevent="saveSubject">
-        <V2Input v-model="subjectForm.subjectCode" label="科目编码" required />
+        <V2Input
+          v-model="subjectForm.subjectCode"
+          label="科目编码"
+          required
+          :disabled="editingGovernedSubject"
+        />
         <V2Input v-model="subjectForm.subjectName" label="科目名称" required />
-        <V2Input v-model="subjectForm.subjectType" label="科目类型" required />
-        <V2Input v-model="subjectForm.parentId" label="父科目标识" />
+        <V2Input
+          v-model="subjectForm.subjectType"
+          label="科目类型"
+          required
+          :disabled="editingGovernedSubject"
+        />
+        <V2Input
+          v-model="subjectForm.parentId"
+          label="父科目标识"
+          :disabled="editingGovernedSubject"
+        />
         <V2Input v-model="subjectForm.sortOrder" label="排序" />
-        <V2Select v-model="subjectForm.status" :options="statusOptions" label="状态" required />
+        <V2Select
+          v-model="subjectForm.status"
+          :options="statusOptions"
+          label="状态"
+          required
+          :disabled="subjectMode === 'edit'"
+        />
       </form>
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="subjectDialog = false"
@@ -1645,7 +1616,8 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 .cost-subject-page__section-heading,
-.cost-subject-page__list-item {
+.cost-subject-page__list-item,
+.cost-subject-page__select {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1677,6 +1649,14 @@ onBeforeUnmount(() => controller?.abort())
   border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
   background: var(--v2-color-surface);
+}
+
+.cost-subject-page__select {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -1688,14 +1668,14 @@ onBeforeUnmount(() => controller?.abort())
   background: var(--v2-color-primary-soft);
 }
 
-.cost-subject-page__list-item > span {
+.cost-subject-page__select > span {
   display: grid;
   min-width: 0;
   gap: var(--v2-space-1);
 }
 
-.cost-subject-page__list-item strong,
-.cost-subject-page__list-item small {
+.cost-subject-page__select strong,
+.cost-subject-page__select small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

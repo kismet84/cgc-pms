@@ -138,6 +138,10 @@ describe('M3 quality safety closed loop', () => {
     ])
       expect(pageSource).toContain(stage)
     expect(pageSource).toContain('aria-label="质量安全整改闭环"')
+    expect(pageSource).toContain('v-if="!loading && !scopeProjectIds.length && !errorMessage"')
+    expect(pageSource.indexOf('title="质量安全整改闭环"')).toBeLessThan(
+      pageSource.indexOf('title="暂无可访问项目"'),
+    )
     expect(pageSource).toContain("showToast('error', '操作未完成', value)")
     expect(pageSource).toContain('@media (max-width: 64rem)')
     expect(pageSource).toContain('@media (max-width: 40rem)')

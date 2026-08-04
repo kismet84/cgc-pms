@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
-  V2Badge,
   V2ActionMenu,
   V2Button,
   V2Card,
@@ -12,6 +11,7 @@ import {
   V2PageState,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import {
@@ -393,9 +393,12 @@ onBeforeUnmount(() => loadController?.abort())
               <td>{{ formatAmount(record.purchasePrice) }}</td>
               <td>{{ formatDecimal(record.defaultTaxRate) }}</td>
               <td>
-                <V2Badge :tone="record.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ record.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
+                <V2StatusToggle
+                  :enabled="record.status === 'ENABLE'"
+                  :disabled="!canEdit || changingStatus"
+                  :aria-label="`${record.status === 'ENABLE' ? '停用' : '启用'}材料 ${record.materialName}`"
+                  @toggle="statusTarget = record"
+                />
               </td>
               <td class="v2-table-cell--actions">
                 <V2ActionMenu
@@ -406,9 +409,6 @@ onBeforeUnmount(() => loadController?.abort())
                   <V2Button size="small" variant="secondary" @click="openEdit(record)"
                     >编辑</V2Button
                   >
-                  <V2Button size="small" variant="secondary" @click="statusTarget = record">
-                    {{ record.status === 'ENABLE' ? '停用' : '启用' }}
-                  </V2Button>
                 </V2ActionMenu>
               </td>
             </tr>
@@ -459,7 +459,13 @@ onBeforeUnmount(() => loadController?.abort())
         <V2Input v-model="form.unit" label="计量单位" />
         <V2Input v-model="form.brand" label="品牌" />
         <V2Input v-model="form.defaultTaxRate" label="默认税率（%）" :decimal-scale="2" />
-        <V2Select v-model="form.status" :options="statusOptions" label="状态" required />
+        <V2Select
+          v-model="form.status"
+          :options="statusOptions"
+          label="状态"
+          required
+          :disabled="Boolean(editingId)"
+        />
         <V2Input v-model="form.remark" label="备注" />
         <section v-if="editingDetail" class="material-page__price-facts" aria-label="价格来源">
           <h3>价格来源</h3>

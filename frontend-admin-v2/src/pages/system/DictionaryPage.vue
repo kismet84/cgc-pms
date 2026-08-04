@@ -12,6 +12,7 @@ import {
   V2Pagination,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
@@ -35,6 +36,10 @@ import { useSessionStore } from '@/stores/session'
 
 type DeleteKind = 'group' | 'type' | 'data'
 type ActiveLevel = 'group' | 'type' | 'data'
+type StatusTarget =
+  | { kind: 'group'; item: DictGroupTreeRecord }
+  | { kind: 'type'; item: DictTreeType }
+  | { kind: 'data'; item: DictDataRecord }
 
 const session = useSessionStore()
 const loading = ref(false)
@@ -55,6 +60,7 @@ const editingGroup = ref<DictGroupRecord | null>(null)
 const editingType = ref<DictTreeType | null>(null)
 const editingData = ref<DictDataRecord | null>(null)
 const deleteTarget = ref<{ kind: DeleteKind; id: string; label: string } | null>(null)
+const statusTarget = ref<StatusTarget | null>(null)
 let controller: AbortController | null = null
 
 const groupForm = reactive({ groupCode: '', groupName: '', orderNum: '0', status: 'ENABLE' })
@@ -345,6 +351,65 @@ async function saveData(): Promise<void> {
   }
 }
 
+function requestStatusChange(target: StatusTarget): void {
+  if (!canEdit.value || saving.value) return
+  if (target.kind === 'type' && protectedType(target.item)) return
+  if (target.kind === 'data' && protectedData(target.item)) return
+  statusTarget.value = target
+}
+
+function statusTargetLabel(target: StatusTarget): string {
+  if (target.kind === 'group') return target.item.groupName
+  if (target.kind === 'type') return target.item.dictName
+  return target.item.dictLabel
+}
+
+function statusTargetStatus(target: StatusTarget): string {
+  return target.item.status
+}
+
+async function toggleStatus(): Promise<void> {
+  if (!statusTarget.value) return
+  const target = statusTarget.value
+  const next = statusTargetStatus(target) === 'ENABLE' ? 'DISABLE' : 'ENABLE'
+  saving.value = true
+  try {
+    if (target.kind === 'group') {
+      await updateDictGroup(target.item.id, {
+        groupCode: target.item.groupCode,
+        groupName: target.item.groupName,
+        orderNum: target.item.orderNum,
+        status: next,
+      })
+    } else if (target.kind === 'type') {
+      await updateDictType(target.item.id, {
+        groupId: target.item.groupId,
+        dictCode: target.item.dictCode,
+        dictName: target.item.dictName,
+        dictClass: target.item.dictClass,
+        status: next,
+      })
+    } else {
+      await updateDictData(target.item.id, {
+        dictTypeId: target.item.dictTypeId,
+        dictLabel: target.item.dictLabel,
+        dictValue: target.item.dictValue,
+        cssClass: target.item.cssClass ?? '',
+        listClass: target.item.listClass ?? '',
+        orderNum: target.item.orderNum,
+        status: next,
+      })
+    }
+    statusTarget.value = null
+    await refresh()
+    showToast('success', '字典状态已更新', '字典树已按服务端最新事实刷新。')
+  } catch (value) {
+    showToast('error', '字典状态更新失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
 async function confirmDelete(): Promise<void> {
   if (!deleteTarget.value) return
   saving.value = true
@@ -444,20 +509,28 @@ onBeforeUnmount(() => controller?.abort())
             description="当前搜索或状态条件没有数据。"
           />
           <div v-else class="dictionary-page__list">
-            <button
+            <div
               v-for="group in pagedGroups"
               :key="group.id"
-              type="button"
               class="dictionary-page__list-item"
               :class="{ 'is-selected': selectedGroupId === group.id }"
-              :aria-pressed="selectedGroupId === group.id"
-              @click="selectGroup(group.id)"
             >
-              <strong>{{ group.groupName }}</strong>
-              <V2Badge :tone="group.status === 'ENABLE' ? 'success' : 'neutral'">
-                {{ group.types.length }} 个类型
-              </V2Badge>
-            </button>
+              <button
+                type="button"
+                class="dictionary-page__list-item-main"
+                :aria-pressed="selectedGroupId === group.id"
+                @click="selectGroup(group.id)"
+              >
+                <strong>{{ group.groupName }}</strong>
+                <V2Badge tone="neutral">{{ group.types.length }} 个类型</V2Badge>
+              </button>
+              <V2StatusToggle
+                :enabled="group.status === 'ENABLE'"
+                :disabled="!canEdit || saving"
+                :aria-label="`${group.status === 'ENABLE' ? '停用' : '启用'}字典分组${group.groupName}`"
+                @toggle="requestStatusChange({ kind: 'group', item: group })"
+              />
+            </div>
           </div>
         </section>
 
@@ -510,20 +583,28 @@ onBeforeUnmount(() => controller?.abort())
             description="当前分组或状态条件没有数据。"
           />
           <div v-else class="dictionary-page__list">
-            <button
+            <div
               v-for="type in pagedTypes"
               :key="type.id"
-              type="button"
               class="dictionary-page__list-item"
               :class="{ 'is-selected': selectedTypeId === type.id }"
-              :aria-pressed="selectedTypeId === type.id"
-              @click="selectType(type.id)"
             >
-              <strong>{{ type.dictName }}</strong>
-              <V2Badge :tone="type.status === 'ENABLE' ? 'success' : 'neutral'">
-                {{ type.data.length }} 个字典项
-              </V2Badge>
-            </button>
+              <button
+                type="button"
+                class="dictionary-page__list-item-main"
+                :aria-pressed="selectedTypeId === type.id"
+                @click="selectType(type.id)"
+              >
+                <strong>{{ type.dictName }}</strong>
+                <V2Badge tone="neutral">{{ type.data.length }} 个字典项</V2Badge>
+              </button>
+              <V2StatusToggle
+                :enabled="type.status === 'ENABLE'"
+                :disabled="!canEdit || saving || protectedType(type)"
+                :aria-label="`${type.status === 'ENABLE' ? '停用' : '启用'}字典类型${type.dictName}`"
+                @toggle="requestStatusChange({ kind: 'type', item: type })"
+              />
+            </div>
           </div>
         </section>
 
@@ -574,7 +655,14 @@ onBeforeUnmount(() => controller?.abort())
                   </th>
                   <td>{{ item.dictValue }}</td>
                   <td>{{ item.orderNum }}</td>
-                  <td>{{ item.status === 'ENABLE' ? '启用' : '停用' }}</td>
+                  <td>
+                    <V2StatusToggle
+                      :enabled="item.status === 'ENABLE'"
+                      :disabled="!canEdit || saving || protectedData(item)"
+                      :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}字典项${item.dictLabel}`"
+                      @toggle="requestStatusChange({ kind: 'data', item })"
+                    />
+                  </td>
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       v-if="canEdit || (canDelete && !protectedData(item))"
@@ -699,6 +787,23 @@ onBeforeUnmount(() => controller?.abort())
     </V2Dialog>
 
     <V2ConfirmDialog
+      :open="Boolean(statusTarget)"
+      title="确认更新字典状态"
+      :description="
+        statusTarget
+          ? `${statusTargetStatus(statusTarget) === 'ENABLE' ? '停用' : '启用'}“${statusTargetLabel(statusTarget)}”？`
+          : ''
+      "
+      :confirm-text="
+        statusTarget && statusTargetStatus(statusTarget) === 'ENABLE' ? '停用' : '启用'
+      "
+      :danger="Boolean(statusTarget && statusTargetStatus(statusTarget) === 'ENABLE')"
+      :loading="saving"
+      @close="statusTarget = null"
+      @confirm="toggleStatus"
+    />
+
+    <V2ConfirmDialog
       :open="Boolean(deleteTarget)"
       title="确认删除"
       :description="deleteTarget ? `删除“${deleteTarget.label}”前，服务端会检查保护项和引用。` : ''"
@@ -767,11 +872,25 @@ onBeforeUnmount(() => controller?.abort())
 
 .dictionary-page__list-item {
   font: inherit;
-  cursor: pointer;
 }
 
 .dictionary-page__list-item:hover {
   border-color: var(--v2-color-primary);
+}
+
+.dictionary-page__list-item-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .dictionary-page__list-item span,

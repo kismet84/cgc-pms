@@ -12,6 +12,7 @@ import {
   V2PageState,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import { navigationDomains } from '@/navigation/catalog'
@@ -103,6 +104,7 @@ const roleForm = reactive({
 
 const deleteTarget = ref<DeleteTarget | null>(null)
 const statusTarget = ref<UserRecord | null>(null)
+const roleStatusTarget = ref<RoleRecord | null>(null)
 const userRoleSearch = ref('')
 const selectedUserRoleId = ref('')
 const roleSearch = ref('')
@@ -700,6 +702,11 @@ function toggleValue(values: string[], value: string, checked: boolean): void {
   if (!checked && index >= 0) values.splice(index, 1)
 }
 
+function requestUserStatusChange(user: UserRecord): void {
+  if (!canUserEdit.value || saving.value || user.id === session.userInfo?.userId) return
+  statusTarget.value = user
+}
+
 async function toggleUserStatus(): Promise<void> {
   if (!statusTarget.value) return
   saving.value = true
@@ -711,6 +718,32 @@ async function toggleUserStatus(): Promise<void> {
     showToast('success', '用户状态已更新', '用户清单已刷新。')
   } catch (value) {
     showToast('error', '用户状态更新失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
+function requestRoleStatusChange(role: RoleRecord): void {
+  if (!canRoleEdit.value || saving.value || isProtectedRole(role)) return
+  roleStatusTarget.value = role
+}
+
+async function toggleRoleStatus(): Promise<void> {
+  if (!roleStatusTarget.value) return
+  saving.value = true
+  try {
+    const detail = await loadRole(roleStatusTarget.value.id)
+    await updateRole(detail.id, {
+      roleCode: detail.roleCode,
+      roleName: detail.roleName,
+      status: detail.status === 'ENABLE' ? 'DISABLE' : 'ENABLE',
+      dataScope: detail.dataScope,
+    })
+    roleStatusTarget.value = null
+    await refreshRoles()
+    showToast('success', '角色状态已更新', '角色清单已按服务端最新事实刷新。')
+  } catch (value) {
+    showToast('error', '角色状态更新失败', messageOf(value))
   } finally {
     saving.value = false
   }
@@ -880,9 +913,14 @@ onBeforeUnmount(() => controller?.abort())
                   <td>{{ item.realName || '—' }}</td>
                   <td>{{ item.phone || item.email || '—' }}</td>
                   <td>
-                    <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                      {{ item.status === 'ENABLE' ? '启用' : '停用' }}
-                    </V2Badge>
+                    <V2StatusToggle
+                      :enabled="item.status === 'ENABLE'"
+                      :disabled="
+                        !canUserEdit || saving || item.id === String(session.userInfo?.userId ?? '')
+                      "
+                      :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}用户${item.username}`"
+                      @toggle="requestUserStatusChange(item)"
+                    />
                   </td>
                   <td class="v2-table-cell--actions">
                     <div class="access-control-page__actions">
@@ -898,14 +936,6 @@ onBeforeUnmount(() => controller?.abort())
                           @click="openUserEditor(item)"
                         >
                           编辑
-                        </V2Button>
-                        <V2Button
-                          v-if="canUserEdit"
-                          size="small"
-                          variant="secondary"
-                          @click="statusTarget = item"
-                        >
-                          {{ item.status === 'ENABLE' ? '停用' : '启用' }}
                         </V2Button>
                         <V2Button
                           v-if="canUserDelete"
@@ -973,7 +1003,14 @@ onBeforeUnmount(() => controller?.abort())
               <td>{{ item.roleName }}</td>
               <td>{{ roleTypeLabel(item.roleType) }}</td>
               <td>{{ dataScopeLabel(item.dataScope) }}</td>
-              <td>{{ item.status === 'ENABLE' ? '启用' : '停用' }}</td>
+              <td>
+                <V2StatusToggle
+                  :enabled="item.status === 'ENABLE'"
+                  :disabled="!canRoleEdit || saving || isProtectedRole(item)"
+                  :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}角色${item.roleName}`"
+                  @toggle="requestRoleStatusChange(item)"
+                />
+              </td>
               <td class="v2-table-cell--actions">
                 <div class="access-control-page__actions">
                   <V2ActionMenu
@@ -1278,6 +1315,21 @@ onBeforeUnmount(() => controller?.abort())
       :loading="saving"
       @close="statusTarget = null"
       @confirm="toggleUserStatus"
+    />
+
+    <V2ConfirmDialog
+      :open="Boolean(roleStatusTarget)"
+      title="确认更新角色状态"
+      :description="
+        roleStatusTarget
+          ? `${roleStatusTarget.status === 'ENABLE' ? '停用' : '启用'}“${roleStatusTarget.roleName}”？`
+          : ''
+      "
+      :confirm-text="roleStatusTarget?.status === 'ENABLE' ? '停用' : '启用'"
+      :danger="roleStatusTarget?.status === 'ENABLE'"
+      :loading="saving"
+      @close="roleStatusTarget = null"
+      @confirm="toggleRoleStatus"
     />
 
     <V2ConfirmDialog

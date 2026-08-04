@@ -779,10 +779,16 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("固定目标成本科目禁止通过通用CRUD改结构")
-    void governedTargetSubjectRejectsGenericUpdate() {
+    @DisplayName("固定目标成本科目允许编辑名称排序但禁止改结构")
+    void governedTargetSubjectAllowsMetadataUpdateOnly() {
         CostSubject subject = findSubjectByCode("5401.03.01");
         assertNotNull(subject);
+        subject.setSubjectName("人工费");
+        subject.setSortOrder(subject.getSortOrder() + 1);
+        costSubjectService.update(subject);
+        assertEquals("人工费", findSubjectByCode("5401.03.01").getSubjectName());
+
+        subject.setSubjectCode("5401.03.99");
         BusinessException error = assertThrows(BusinessException.class,
                 () -> costSubjectService.update(subject));
         assertEquals("TARGET_COST_SUBJECT_GOVERNED", error.getCode());

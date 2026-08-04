@@ -30,6 +30,7 @@ public class MdPartner extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String partnerCode;
 
     @NotBlank

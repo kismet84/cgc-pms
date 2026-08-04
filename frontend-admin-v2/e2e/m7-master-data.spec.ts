@@ -40,6 +40,16 @@ test('master-data deep links render server facts and preserve material redirect 
         pageSize: 20,
       })
     }
+    if (path.endsWith('/api/partners/101')) {
+      return success(route, {
+        id: '101',
+        partnerCode: 'PTN-101',
+        partnerName: '服务端合作方',
+        partnerType: 'SUPPLIER',
+        contactPhone: '13800000000',
+        status: 'ENABLE',
+      })
+    }
     if (path.endsWith('/api/org/companies')) {
       return success(route, {
         records: [{ id: '1', companyCode: 'C1', companyName: '一公司', status: 'ENABLE' }],
@@ -117,9 +127,13 @@ test('master-data deep links render server facts and preserve material redirect 
 
   await page.goto('/partner?source=e2e#list')
   await expect(page).toHaveURL(/\/partner\?source=e2e#list$/)
-  await expect(page.getByRole('heading', { level: 1, name: '合作方管理' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '客户管理' })).toBeVisible()
   await expect(page.getByText('服务端合作方')).toBeVisible()
   await expect(page.getByText('13800000000')).toHaveCount(0)
+  await page.getByRole('button', { name: '打开合作方 PTN-101' }).click()
+  const partnerDetail = page.getByRole('dialog', { name: '合作方详情' })
+  await expect(partnerDetail).toContainText('13800000000')
+  await expect(page).toHaveURL(/\/partner\?source=e2e#list$/)
 
   await page.goto('/org?view=tree')
   await expect(page.getByRole('heading', { level: 1, name: '组织架构' })).toBeVisible()

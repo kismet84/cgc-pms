@@ -40,7 +40,7 @@ class ProcurementMigrationH2Test {
         Flyway current = current("multi_tenant");
         current.migrate();
 
-        assertEquals("272", current.info().current().getVersion().getVersion());
+        assertEquals("273", current.info().current().getVersion().getVersion());
         assertEquals(21, count(current, """
                 SELECT COUNT(*) FROM cost_subject
                 WHERE tenant_id=0 AND (subject_code='5401.01' OR subject_code LIKE '5401.01.%'

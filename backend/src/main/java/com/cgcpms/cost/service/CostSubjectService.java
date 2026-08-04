@@ -174,8 +174,7 @@ public class CostSubjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
-        assertGenericStructureEditable(existing.getSubjectCode());
-        assertGenericStructureEditable(subject.getSubjectCode());
+        assertGovernedMetadataUpdate(existing, subject);
 
         validateParentForSave(subject, existing.getId());
 
@@ -294,6 +293,25 @@ public class CostSubjectService {
                 || subjectCode.startsWith(TargetCostSubjectCatalog.PARENT_CODE + "."))) {
             throw new BusinessException("TARGET_COST_SUBJECT_GOVERNED", "项目目标成本固定科目只能通过专用比例接口维护");
         }
+    }
+
+    private static void assertGovernedMetadataUpdate(CostSubject existing, CostSubject requested) {
+        boolean existingGoverned = isGovernedSubject(existing.getSubjectCode());
+        boolean requestedGoverned = isGovernedSubject(requested.getSubjectCode());
+        if (!existingGoverned && !requestedGoverned) return;
+        if (!existingGoverned || !requestedGoverned
+                || !Objects.equals(existing.getSubjectCode(), requested.getSubjectCode())
+                || !Objects.equals(existing.getParentId(), requested.getParentId())
+                || !Objects.equals(existing.getSubjectType(), requested.getSubjectType())
+                || !Objects.equals(existing.getAccountCategory(), requested.getAccountCategory())
+                || !Objects.equals(existing.getStatus(), requested.getStatus())) {
+            throw new BusinessException("TARGET_COST_SUBJECT_GOVERNED", "项目目标成本固定科目仅允许编辑名称和排序");
+        }
+    }
+
+    private static boolean isGovernedSubject(String subjectCode) {
+        return subjectCode != null && (subjectCode.equals(TargetCostSubjectCatalog.PARENT_CODE)
+                || subjectCode.startsWith(TargetCostSubjectCatalog.PARENT_CODE + "."));
     }
 
     private void assertNoActiveReferences(Long subjectId, Long tenantId, String action) {

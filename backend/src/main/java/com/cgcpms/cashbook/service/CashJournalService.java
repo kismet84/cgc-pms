@@ -89,9 +89,10 @@ public class CashJournalService {
         if (request.getAccountId() != null) {
             validateAccountOpeningDate(lockEnabledAccount(request.getAccountId()), request.getBusinessDate());
         }
-        validateDimensions(request.getProjectId(), request.getContractId());
         BidContext bid = validateBidContext(request.getBidCostId(), request.getCostSubjectId(),
                 request.getBidDepositId(), request.getDirection(), request.getAmount());
+        Long projectId = resolveBidProjectId(request.getProjectId(), bid);
+        validateDimensions(projectId, request.getContractId());
 
         CashJournalEntry entry = new CashJournalEntry();
         entry.setTenantId(tenantId());
@@ -101,7 +102,7 @@ public class CashJournalService {
         entry.setBusinessDate(request.getBusinessDate());
         entry.setCounterpartyName(trimToNull(request.getCounterpartyName()));
         entry.setSummary(request.getSummary().trim());
-        entry.setProjectId(request.getProjectId());
+        entry.setProjectId(projectId);
         entry.setContractId(request.getContractId());
         applyBidContext(entry, bid);
         entry.setSourceType(CashbookConstants.SourceType.MANUAL);
@@ -194,13 +195,14 @@ public class CashJournalService {
         FundAccount account = accountId == null ? null : lockEnabledAccount(accountId);
         Long projectId = request.getProjectId() != null ? request.getProjectId() : entry.getProjectId();
         Long contractId = request.getContractId() != null ? request.getContractId() : entry.getContractId();
-        validateDimensions(projectId, contractId);
         Long bidCostId = request.getBidCostId() != null ? request.getBidCostId() : entry.getBidCostId();
         Long costSubjectId = request.getCostSubjectId() != null ? request.getCostSubjectId() : entry.getCostSubjectId();
         Long bidDepositId = request.getBidDepositId() != null ? request.getBidDepositId() : entry.getBidDepositId();
         String direction = request.getDirection() != null ? request.getDirection() : entry.getDirection();
         BigDecimal amount = request.getAmount() != null ? request.getAmount() : entry.getAmount();
         BidContext bid = validateBidContext(bidCostId, costSubjectId, bidDepositId, direction, amount);
+        projectId = resolveBidProjectId(projectId, bid);
+        validateDimensions(projectId, contractId);
 
         entry.setAccountId(accountId);
         entry.setCounterpartyName(request.getCounterpartyName() != null
@@ -413,7 +415,7 @@ public class CashJournalService {
 
     public IPage<CashJournalEntryVO> page(CashJournalQuery query) {
         normalizeQuery(query);
-        boolean bidOnly = requireBidQueryScope(query.getBidCostId());
+        boolean bidOnly = requireBidQueryScope(query);
         IPage<CashJournalEntryVO> page = entryMapper.selectPageWithBalance(
                 new Page<>(query.getPageNo(), query.getPageSize()), tenantId(), query,
                 query.getProjectId() == null ? projectAccessChecker.accessibleProjectIds() : List.of(query.getProjectId()));
@@ -423,7 +425,7 @@ public class CashJournalService {
 
     public CashJournalSummaryVO summary(CashJournalQuery query) {
         normalizeQuery(query);
-        boolean bidOnly = requireBidQueryScope(query.getBidCostId());
+        boolean bidOnly = requireBidQueryScope(query);
         List<CashJournalEntry> effective = entryMapper.selectList(baseWrapper(query)
                 .in(CashJournalEntry::getStatus, CashbookConstants.Status.ARCHIVED, CashbookConstants.Status.REVERSED));
         BigDecimal cashOut = effective.stream()
@@ -604,6 +606,15 @@ public class CashJournalService {
         entry.setCostSubjectNameSnapshot(context.subject().getSubjectName());
     }
 
+    private Long resolveBidProjectId(Long requestedProjectId, BidContext context) {
+        if (context == null) return requestedProjectId;
+        Long bidProjectId = context.bid().getProjectId();
+        if (requestedProjectId != null && !Objects.equals(requestedProjectId, bidProjectId)) {
+            throw new BusinessException("BID_COST_PROJECT_MISMATCH", "投标记录不属于所选项目");
+        }
+        return bidProjectId;
+    }
+
     private void applyDepositArchive(CashJournalEntry entry) {
         if (entry.getBidDepositId() == null) return;
         BidDeposit deposit = bidDepositMapper.selectById(entry.getBidDepositId());
@@ -687,6 +698,17 @@ public class CashJournalService {
         return bidOnly;
     }
 
+    private boolean requireBidQueryScope(CashJournalQuery query) {
+        boolean bidOnly = isLimitedToBid("bid:cost:query", "cashbook:journal:query");
+        Long bidCostId = query.getBidCostId();
+        boolean bidLedger = "5401.01".equals(query.getCostSubjectRootCode());
+        if (bidOnly && bidCostId == null && !bidLedger) {
+            throw new BusinessException("BID_COST_QUERY_SCOPE_REQUIRED", "投标成本权限只能查询投标成本日记账");
+        }
+        if (bidCostId != null) requireBidCost(bidCostId);
+        return bidOnly;
+    }
+
     private void requireBidExportScope(Long bidCostId) {
         if (bidCostId != null) {
             requireBidAuthority("bid:cost:export");
@@ -743,7 +765,13 @@ public class CashJournalService {
         if (StringUtils.hasText(query.getStatus())) wrapper.eq(CashJournalEntry::getStatus, query.getStatus());
         if (StringUtils.hasText(query.getSourceType())) wrapper.eq(CashJournalEntry::getSourceType, query.getSourceType());
         if (query.getSourceId() != null) wrapper.eq(CashJournalEntry::getSourceId, query.getSourceId());
-        if (query.getProjectId() != null) wrapper.eq(CashJournalEntry::getProjectId, query.getProjectId());
+        if (query.getProjectId() != null) {
+            wrapper.and(scope -> scope.eq(CashJournalEntry::getProjectId, query.getProjectId())
+                    .or(linked -> linked.isNull(CashJournalEntry::getProjectId)
+                            .exists("SELECT 1 FROM bid_cost b WHERE b.tenant_id=cash_journal_entry.tenant_id "
+                                    + "AND b.id=cash_journal_entry.bid_cost_id AND b.project_id={0} "
+                                    + "AND b.deleted_flag=0", query.getProjectId())));
+        }
         else {
             List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
             wrapper.and(scope -> {

@@ -595,7 +595,7 @@ onBeforeUnmount(() => {
     />
     <template v-else>
       <template v-if="mode === 'list' || (mode === 'create' && canQuery)">
-        <V2Card title="项目成本预算版本" :heading-level="embedded ? 2 : 1">
+        <V2Card :title="embedded ? '项目成本预算' : '项目成本预算版本'" :heading-level="1">
           <template #actions>
             <form class="cost-target-page__filters" @submit.prevent="query">
               <V2Input
@@ -893,9 +893,6 @@ onBeforeUnmount(() => {
                       <th>目标金额<span aria-hidden="true">*</span></th>
                       <th>投标金额<span aria-hidden="true">*</span></th>
                       <th>责任金额<span aria-hidden="true">*</span></th>
-                      <th>责任单位</th>
-                      <th>责任人<span aria-hidden="true">*</span></th>
-                      <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -943,37 +940,6 @@ onBeforeUnmount(() => {
                           :disabled="!canSaveDraft || !editable"
                           @update:model-value="updateItem(index, 'responsibilityAmount', $event)"
                         />
-                      </td>
-                      <td>
-                        <V2Input
-                          :model-value="item.responsibilityUnit ?? ''"
-                          label="责任单位"
-                          hide-label
-                          :disabled="!canSaveDraft || !editable"
-                          @update:model-value="updateItem(index, 'responsibilityUnit', $event)"
-                        />
-                      </td>
-                      <td>
-                        <V2Select
-                          :model-value="item.responsibleUserId ?? ''"
-                          label="责任人"
-                          hide-label
-                          :options="responsibleUsers"
-                          required
-                          :disabled="!canSaveDraft || !editable"
-                          @update:model-value="updateItem(index, 'responsibleUserId', $event)"
-                        />
-                      </td>
-                      <td>
-                        <V2Button
-                          v-if="canSaveDraft && editable && !fixedTargetVersion"
-                          size="small"
-                          variant="danger"
-                          :disabled="actionBusy"
-                          @click="items = items.filter((_, itemIndex) => itemIndex !== index)"
-                          >移除</V2Button
-                        >
-                        <span v-else>—</span>
                       </td>
                     </tr>
                   </tbody>
@@ -1188,14 +1154,11 @@ onBeforeUnmount(() => {
 }
 .cost-target-page__editor-table {
   width: 100%;
-  min-width: 56rem;
+  min-width: 42rem;
   table-layout: fixed;
 }
 .cost-target-page__editor-table th:first-child {
-  width: 22%;
-}
-.cost-target-page__editor-table th:last-child {
-  width: 6%;
+  width: 34%;
 }
 .cost-target-page__editor-table th span {
   color: var(--v2-color-danger);

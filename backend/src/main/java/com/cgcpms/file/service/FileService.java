@@ -54,6 +54,11 @@ public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
     private static final int MAX_GENERATED_PDF_BYTES = 20 * 1024 * 1024;
+    private static final Set<String> BID_DOCUMENT_TYPES = Set.of(
+            "TENDER_DOCUMENT", "BILL_OF_QUANTITIES", "TENDER_DRAWING",
+            "BID_PRICE", "TECHNICAL_DOCUMENT", "BID_DRAWING",
+            "CANDIDATE_NOTICE", "AWARD_NOTICE", "LOSS_NOTICE",
+            "OBJECTION_REPLY", "AWARD_CLARIFICATION", "OTHER_RESULT");
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
@@ -618,7 +623,8 @@ public class FileService {
         }
         boolean productionMeasurementEvidence = "PRODUCTION_MEASUREMENT".equals(business)
                 && ("MEASUREMENT_GENERAL".equals(type) || type.matches("ML_\\d+"));
-        if (!productionMeasurementEvidence && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
+        boolean bidDocument = "BID_COST".equals(business) && BID_DOCUMENT_TYPES.contains(type);
+        if (!productionMeasurementEvidence && !bidDocument && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
                 "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER", "SITE_EVIDENCE",
                 "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION",
                 "INSPECTION_EVIDENCE", "ISSUE_EVIDENCE", "RECTIFICATION_EVIDENCE",
@@ -638,6 +644,9 @@ public class FileService {
         if ("MATERIAL_RECEIPT".equals(business)
                 && !Set.of("DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "材料验收仅允许送货单或签字验收单");
+        }
+        if ("BID_COST".equals(business) && !BID_DOCUMENT_TYPES.contains(type)) {
+            throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "投标记录仅允许上传投标业务文件");
         }
         return type;
     }

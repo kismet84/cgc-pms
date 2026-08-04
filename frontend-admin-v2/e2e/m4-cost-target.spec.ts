@@ -179,7 +179,7 @@ test.describe('M4 cost target routes', () => {
       await page.goto('/cost-target/index?projectId=P1')
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(
-        page.getByRole('heading', { name: '项目成本预算版本', exact: true }),
+        page.getByRole('heading', { name: '项目成本预算', exact: true }),
       ).toBeVisible()
       await expect(page.getByText('首版目标成本', { exact: true })).toBeVisible()
       await expect(page.getByText('¥9,007,199,254,740,993.12').first()).toBeVisible()

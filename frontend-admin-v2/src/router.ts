@@ -123,6 +123,7 @@ const navigationComponents = {
   '/invoice': ReceivablesWorkspacePage,
   '/finance-operations': FinanceControlWorkspacePage,
   '/cash-journal': FinanceControlWorkspacePage,
+  '/fund-accounts': FinanceControlWorkspacePage,
   '/cash-forecast': FinanceControlWorkspacePage,
   '/accounting-entry': FinanceControlWorkspacePage,
   '/financial-close': FinanceControlWorkspacePage,
@@ -179,6 +180,12 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/supplier-sourcing',
+    name: 'LegacySupplierSourcing',
+    component: SupplierSourcingPage,
+    meta: { shell: true, permission: 'supplier:sourcing:query' },
+  },
   {
     path: '/bid-cost',
     name: 'LegacyBidCostRedirect',

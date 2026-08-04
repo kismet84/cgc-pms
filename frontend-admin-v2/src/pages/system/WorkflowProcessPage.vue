@@ -11,6 +11,7 @@ import {
   V2PageState,
   V2Select,
   V2Stack,
+  V2StatusToggle,
   showToast,
 } from '@/components'
 import {
@@ -34,6 +35,7 @@ import {
   type UserRecord,
 } from '@/services/system-management'
 import { workflowBusinessTypeLabel } from '@/pages/workbench/model'
+import { useSessionStore } from '@/stores/session'
 
 type ApproverType = 'USER' | 'ROLE' | 'POSITION' | 'PROJECT_ROLE'
 
@@ -45,7 +47,10 @@ const templates = ref<WorkflowTemplateRecord[]>([])
 const total = ref(0)
 const selectedModule = ref('')
 const current = ref<WorkflowTemplateRecord | null>(null)
+const statusTarget = ref<WorkflowTemplateRecord | null>(null)
 let controller: AbortController | null = null
+const session = useSessionStore()
+const canEdit = computed(() => session.isAdmin)
 
 const filter = reactive({ enabled: '', keyword: '' })
 const templateDialog = ref(false)
@@ -295,6 +300,33 @@ async function saveTemplate(): Promise<void> {
   }
 }
 
+function requestStatusChange(template: WorkflowTemplateRecord): void {
+  if (!canEdit.value || saving.value) return
+  statusTarget.value = template
+}
+
+async function toggleTemplateStatus(): Promise<void> {
+  if (!statusTarget.value) return
+  saving.value = true
+  try {
+    const detail = await loadWorkflowTemplate(statusTarget.value.id)
+    await updateWorkflowTemplate(detail.id, {
+      templateName: detail.templateName,
+      enabled: detail.enabled === 1 ? 0 : 1,
+      amountMin: detail.amountMin ?? null,
+      amountMax: detail.amountMax ?? null,
+      remark: detail.remark ?? '',
+    })
+    statusTarget.value = null
+    await refresh()
+    showToast('success', '流程状态已更新', '流程列表与详情已按服务端最新事实刷新。')
+  } catch (value) {
+    showToast('error', '流程状态更新失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
 function openNodeEditor(node?: WorkflowTemplateNodeRecord): void {
   editingNode.value = node ?? null
   const approver = parseApproverConfig(node?.approverConfig)
@@ -475,10 +507,6 @@ function messageOf(value: unknown): string {
   return isApiClientError(value) || value instanceof Error ? value.message : '请求失败，请稍后重试'
 }
 
-function statusLabel(enabled: number): string {
-  return enabled === 1 ? '启用' : '停用'
-}
-
 function modeLabel(mode: string): string {
   return approveModeOptions.find((item) => item.value === mode)?.label ?? mode
 }
@@ -560,23 +588,30 @@ onBeforeUnmount(() => controller?.abort())
             <span>共 {{ moduleTemplates.length }} 条</span>
           </div>
           <div class="workflow-process-page__list">
-            <button
+            <div
               v-for="template in moduleTemplates"
               :key="template.id"
-              type="button"
               class="workflow-process-page__list-item"
               :class="{ 'is-selected': current?.id === template.id }"
-              :aria-pressed="current?.id === template.id"
-              @click="selectTemplate(template.id)"
             >
-              <span>
-                <strong>{{ template.templateName }}</strong>
-                <small>{{ template.templateCode }}</small>
-              </span>
-              <V2Badge :tone="template.enabled === 1 ? 'success' : 'neutral'">
-                {{ statusLabel(template.enabled) }}
-              </V2Badge>
-            </button>
+              <button
+                type="button"
+                class="workflow-process-page__list-item-main"
+                :aria-pressed="current?.id === template.id"
+                @click="selectTemplate(template.id)"
+              >
+                <span>
+                  <strong>{{ template.templateName }}</strong>
+                  <small>{{ template.templateCode }}</small>
+                </span>
+              </button>
+              <V2StatusToggle
+                :enabled="template.enabled === 1"
+                :disabled="!canEdit || saving"
+                :aria-label="`${template.enabled === 1 ? '停用' : '启用'}流程模板${template.templateName}`"
+                @toggle="requestStatusChange(template)"
+              />
+            </div>
           </div>
         </section>
 
@@ -628,7 +663,14 @@ onBeforeUnmount(() => controller?.abort())
                 </div>
                 <div>
                   <dt>状态</dt>
-                  <dd>{{ statusLabel(current.enabled) }}</dd>
+                  <dd>
+                    <V2StatusToggle
+                      :enabled="current.enabled === 1"
+                      :disabled="!canEdit || saving"
+                      :aria-label="`${current.enabled === 1 ? '停用' : '启用'}流程模板${current.templateName}`"
+                      @toggle="requestStatusChange(current)"
+                    />
+                  </dd>
                 </div>
                 <div>
                   <dt>备注</dt>
@@ -789,6 +831,21 @@ onBeforeUnmount(() => controller?.abort())
     </V2Dialog>
 
     <V2ConfirmDialog
+      :open="Boolean(statusTarget)"
+      title="确认更新流程状态"
+      :description="
+        statusTarget
+          ? `${statusTarget.enabled === 1 ? '停用' : '启用'}“${statusTarget.templateName}”？`
+          : ''
+      "
+      :confirm-text="statusTarget?.enabled === 1 ? '停用' : '启用'"
+      :danger="statusTarget?.enabled === 1"
+      :loading="saving"
+      @close="statusTarget = null"
+      @confirm="toggleTemplateStatus"
+    />
+
+    <V2ConfirmDialog
       :open="Boolean(deleteTarget)"
       title="删除审批节点"
       :description="deleteTarget ? `确定删除“${deleteTarget.nodeName}”吗？至少保留一个节点。` : ''"
@@ -824,6 +881,20 @@ onBeforeUnmount(() => controller?.abort())
   align-items: center;
   justify-content: space-between;
   gap: var(--v2-space-2);
+}
+
+.workflow-process-page__list-item-main {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--v2-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
 .workflow-process-page__section-heading {

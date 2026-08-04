@@ -93,6 +93,17 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
       }),
     }),
   )
+  await page.route(/\/api\/purchase-requests(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: { records: [], total: 0, pageNo: 1, pageSize: 10 },
+      }),
+    }),
+  )
   await page.route(/\/api\/dashboard\/project-manager(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -238,7 +249,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
     if (viewport.name === 'compact') {
       await expect(page.locator('.app-shell__sidebar')).toHaveCSS('width', '200px')
       await expect(page.locator('.app-shell__domain--active .app-shell__workspaces')).toBeVisible()
-      await expect(page.getByRole('link', { name: '供应链与物资' })).toBeVisible()
+      await expect(page.getByRole('link', { name: '物资管理' })).toBeVisible()
     }
     if (viewport.name === 'mobile') {
       const menuTop = await page
@@ -264,8 +275,8 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
       await page.keyboard.press('Escape')
       await expect(menu).toBeFocused()
       await menu.click()
-      await page.getByRole('link', { name: '供应链与物资' }).click()
-      await expect(page).toHaveURL(/\/supplier-sourcing$/)
+      await page.getByRole('link', { name: '物资管理' }).click()
+      await expect(page).toHaveURL(/\/inventory\/purchase-request$/)
       await expect(page.getByRole('main')).toBeFocused()
       await expect(page.getByRole('main')).not.toHaveCSS('outline-style', 'none')
     }

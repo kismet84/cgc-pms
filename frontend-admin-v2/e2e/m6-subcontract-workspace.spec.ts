@@ -334,7 +334,12 @@ test.describe('M6 subcontract task and measure V2', () => {
     await page.getByRole('button', { name: '维护计量清单' }).click()
     const items = page.getByRole('dialog', { name: '维护计量清单' })
     await items.getByRole('button', { name: '添加清单项' }).click()
-    await items.getByLabel('本期数量').fill('10.0000')
+    const quantity = items.getByLabel('本期数量')
+    await quantity.fill('')
+    await expect(quantity).toHaveValue('')
+    await quantity.fill('10')
+    await quantity.blur()
+    await expect(quantity).toHaveValue('10.00')
     await items.getByRole('button', { name: '保存清单' }).click()
     await expect(page.getByText('¥8,000.00', { exact: true }).last()).toBeVisible()
 
@@ -360,7 +365,7 @@ test.describe('M6 subcontract task and measure V2', () => {
     expect(state.writes.filter((item) => item.endsWith('/submit'))).toHaveLength(1)
     expect(state.items.M2).toEqual([
       expect.objectContaining({
-        currentQuantity: '10.0000',
+        currentQuantity: '10.00',
         unitPrice: '800.00',
         amount: '8000.00',
       }),

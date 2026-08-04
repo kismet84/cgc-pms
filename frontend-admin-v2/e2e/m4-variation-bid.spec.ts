@@ -105,6 +105,13 @@ async function installCommercialMock(page: Page, readIdentity: () => Identity): 
       }),
     }),
   )
+  await page.route('**/api/system/dict/data/by-code/*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: [] }),
+    }),
+  )
   await page.route(/\/api\/var-orders(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,

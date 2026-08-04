@@ -14,4 +14,11 @@ class ApplicationConfigUnitTest {
         var content = Files.readString(Path.of("src/main/resources/application.yml"));
         assertTrue(content.contains("  port: ${SERVER_PORT:8080}"));
     }
+
+    @Test
+    void multipartLimitShouldMatchFileValidationContract() throws Exception {
+        var content = Files.readString(Path.of("src/main/resources/application.yml"));
+        assertTrue(content.contains("      max-file-size: 20MB"));
+        assertTrue(content.contains("      max-request-size: 21MB"));
+    }
 }

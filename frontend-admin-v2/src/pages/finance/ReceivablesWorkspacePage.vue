@@ -1408,7 +1408,10 @@ onBeforeUnmount(() => controller?.abort())
         <form
           v-if="editor"
           id="finance-workspace-editor-form"
-          class="finance-workspace__form"
+          :class="[
+            'finance-workspace__form',
+            { 'finance-workspace__form--payment': editorKind === 'payment' },
+          ]"
           @submit.prevent="save"
         >
           <template v-if="editorKind !== 'invoice'">
@@ -1872,7 +1875,13 @@ onBeforeUnmount(() => controller?.abort())
   display: grid;
   gap: var(--v2-space-3);
 }
+.finance-workspace__form--payment {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 @media (max-width: 32.5rem) {
+  .finance-workspace__form--payment {
+    grid-template-columns: 1fr;
+  }
   .finance-workspace__actions > * {
     flex: 1 1 100%;
   }

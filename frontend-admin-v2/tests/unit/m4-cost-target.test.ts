@@ -75,7 +75,7 @@ function apiError(message: string, status: number) {
   return Object.assign(new Error(message), { name: 'ApiClientError', code: 'TEST_ERROR', status })
 }
 
-async function mountPage(permissions: string[], path = '/cost-target/index') {
+async function mountPage(permissions: string[], path = '/cost-target/index', embedded = false) {
   setActivePinia(createPinia())
   const session = useSessionStore()
   session.userInfo = { userId: '1', username: 'tester', roles: ['USER'], permissions }
@@ -91,6 +91,7 @@ async function mountPage(permissions: string[], path = '/cost-target/index') {
   await router.push(path)
   await router.isReady()
   const wrapper = mount(CostTargetPageView, {
+    props: { embedded },
     global: { plugins: [router], stubs: { teleport: true } },
   })
   await flushPromises()
@@ -182,6 +183,21 @@ describe('M4 cost target page', () => {
     expect(button(wrapper, '删除')).toBeUndefined()
   })
 
+  it('puts embedded filters and create action on the unique project-budget h1 card', async () => {
+    const { wrapper } = await mountPage(
+      ['cost:target:query', 'cost:target:add'],
+      '/cost-target/index?projectId=P1',
+      true,
+    )
+
+    expect(wrapper.findAll('h1')).toHaveLength(1)
+    expect(wrapper.get('h1').text()).toBe('项目成本预算')
+    expect(wrapper.find('h2').exists()).toBe(false)
+    const heading = wrapper.get('.v2-card--page-heading')
+    expect(heading.find('.cost-target-page__filters').exists()).toBe(true)
+    expect(heading.text()).toContain('新建版本')
+  })
+
   it('opens new project cost budget in one-card dialog', async () => {
     const { wrapper, router } = await mountPage(['cost:target:query', 'cost:target:add'])
 
@@ -199,15 +215,9 @@ describe('M4 cost target page', () => {
     expect(dialog.get('[aria-label="成本预算明细编辑表格"]')).toBeTruthy()
     expect(
       dialog.findAll('.cost-target-page__editor-table thead th').map((header) => header.text()),
-    ).toEqual([
-      '成本科目编码/名称*',
-      '目标金额*',
-      '投标金额*',
-      '责任金额*',
-      '责任单位',
-      '责任人*',
-      '操作',
-    ])
+    ).toEqual(['成本科目编码/名称*', '目标金额*', '投标金额*', '责任金额*'])
+    expect(dialog.find('input[aria-label="责任单位"]').exists()).toBe(false)
+    expect(dialog.find('select[aria-label="责任人"]').exists()).toBe(false)
   })
 
   it('loads header and items for detail with abort signals', async () => {
@@ -302,10 +312,12 @@ describe('M4 cost target page', () => {
             targetAmount: '9007199254740993.12',
             bidCostAmount: '8800.10',
             responsibleUserId: 'U1',
+            responsibilityUnit: '项目成本责任人',
           }),
         ]),
       }),
     )
+    expect(vi.mocked(saveCostBudgetDraft).mock.calls[0]?.[1].items).toHaveLength(10)
     pending.resolve('81')
     await flushPromises()
   })

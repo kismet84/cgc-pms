@@ -83,6 +83,20 @@ describe('M3 delivery request and service contracts', () => {
     expect(new Headers(init?.headers).get('X-XSRF-TOKEN')).toBe('csrf-value')
   })
 
+  it('rejects files larger than the backend 20MB contract before sending', async () => {
+    const file = new File([], '超大文件.pdf', { type: 'application/pdf' })
+    Object.defineProperty(file, 'size', { value: 20 * 1024 * 1024 + 1 })
+
+    let error: unknown
+    try {
+      uploadSiteFile(file, 'BID_COST', '99', 'CANDIDATE_NOTICE')
+    } catch (value) {
+      error = value
+    }
+    expect(error).toMatchObject({ code: 'FILE_TOO_LARGE', message: '文件大小不能超过 20MB' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('sends expectedVersion and expectedUpdatedAt on controlled writes', async () => {
     fetchMock
       .mockResolvedValueOnce(

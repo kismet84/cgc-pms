@@ -85,6 +85,16 @@ export const navigationDomains: NavigationDomain[] = [
     badge: '项',
     workspaces: [
       {
+        id: 'engineering-tender-workspace',
+        label: '工程投标',
+        defaultPath: '/engineering-tender/records',
+        matchPrefixes: ['/engineering-tender'],
+        tabs: [
+          { path: '/engineering-tender/records', label: '投标记录', permission: 'bid:query' },
+          { path: '/engineering-tender/costs', label: '投标成本', permission: 'bid:cost:query' },
+        ],
+      },
+      {
         id: 'projects',
         label: '项目管理',
         defaultPath: '/project/list',
@@ -161,23 +171,6 @@ export const navigationDomains: NavigationDomain[] = [
     ],
   },
   {
-    id: 'engineering-tender',
-    label: '工程投标',
-    badge: '投',
-    workspaces: [
-      {
-        id: 'engineering-tender-workspace',
-        label: '工程投标',
-        defaultPath: '/engineering-tender/records',
-        matchPrefixes: ['/engineering-tender'],
-        tabs: [
-          { path: '/engineering-tender/records', label: '投标记录', permission: 'bid:query' },
-          { path: '/engineering-tender/costs', label: '投标成本', permission: 'bid:cost:query' },
-        ],
-      },
-    ],
-  },
-  {
     id: 'commercial',
     label: '商务合约',
     badge: '商',
@@ -245,21 +238,9 @@ export const navigationDomains: NavigationDomain[] = [
   },
   {
     id: 'supply',
-    label: '供应链与物资',
-    badge: '供',
+    label: '物资管理',
+    badge: '物',
     workspaces: [
-      {
-        id: 'suppliers',
-        label: '供应商管理',
-        defaultPath: '/supplier-sourcing',
-        tabs: [
-          {
-            path: '/supplier-sourcing',
-            label: '供应商招采履约',
-            permission: 'supplier:sourcing:query',
-          },
-        ],
-      },
       {
         id: 'procurement',
         label: '采购执行',
@@ -373,17 +354,22 @@ export const navigationDomains: NavigationDomain[] = [
       {
         id: 'cash',
         label: '资金运营',
-        defaultPath: '/finance-operations',
+        defaultPath: '/cash-journal',
         tabs: [
-          {
-            path: '/finance-operations',
-            label: '资金运营',
-            permission: 'finance:operations:query',
-          },
           {
             path: '/cash-journal',
             label: '资金日记账',
             permission: 'cashbook:journal:query',
+          },
+          {
+            path: '/fund-accounts',
+            label: '资金账户',
+            permission: 'cashbook:journal:query',
+          },
+          {
+            path: '/finance-operations',
+            label: '资金运营',
+            permission: 'finance:operations:query',
           },
           {
             path: '/cash-forecast',
@@ -418,13 +404,13 @@ export const navigationDomains: NavigationDomain[] = [
     workspaces: [
       {
         id: 'partners',
-        label: '合作方管理',
+        label: '客户管理',
         defaultPath: '/partner',
         matchPrefixes: ['/partner'],
         tabs: [
           {
             path: '/partner',
-            label: '合作方管理',
+            label: '客户管理',
             permission: 'partner:query',
           },
         ],
@@ -437,7 +423,7 @@ export const navigationDomains: NavigationDomain[] = [
       },
       {
         id: 'materials',
-        label: '物资主数据',
+        label: '物资数据',
         defaultPath: '/material/dictionary',
         tabs: [
           {
@@ -449,7 +435,7 @@ export const navigationDomains: NavigationDomain[] = [
       },
       {
         id: 'finance-data',
-        label: '成本科目中心',
+        label: '成本科目',
         defaultPath: '/cost/subject/taxonomy',
         matchPrefixes: ['/cost/subject'],
         tabs: [

@@ -1,5 +1,7 @@
 package com.cgcpms.bid;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -42,6 +46,11 @@ class BidCostServiceTest {
     @BeforeEach
     void setUp() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        if (TableInfoHelper.getTableInfo(BidCost.class) == null) {
+            MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+            assistant.setCurrentNamespace("BidCostServiceTest");
+            TableInfoHelper.initTableInfo(assistant, BidCost.class);
+        }
         service = new BidCostService(mapper, costItemMapper, projectAccessChecker, codeGenerationService,
                 documentService, Optional.empty());
     }
@@ -76,5 +85,21 @@ class BidCostServiceTest {
         assertNull(bid.getProjectId());
         assertEquals("一标段", bid.getBidSectionName());
         assertEquals(new BigDecimal("1000000.00"), bid.getFinalBidPrice());
+    }
+
+    @Test
+    void evaluationBidRemainsEditableUntilResult() {
+        BidCost existing = new BidCost();
+        existing.setId(11L);
+        existing.setTenantId(TestUserContext.TENANT_0);
+        existing.setBidStatus("EVALUATING");
+        when(mapper.selectById(11L)).thenReturn(existing);
+        when(mapper.update(any(), any())).thenReturn(1);
+
+        BidCost command = new BidCost();
+        command.setId(11L);
+        command.setBidProjectName("待中标工程");
+
+        assertDoesNotThrow(() -> service.update(command));
     }
 }

@@ -7,6 +7,7 @@ import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.mapper.BidDepositMapper;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.cashbook.constant.CashbookConstants;
+import com.cgcpms.cashbook.dto.CashJournalCreateRequest;
 import com.cgcpms.cashbook.dto.CashJournalQuery;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.entity.FundAccount;
@@ -20,6 +21,7 @@ import com.cgcpms.cashbook.service.PaymentArchiveEvidenceService;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
@@ -39,6 +41,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -99,6 +102,20 @@ class CashJournalPrivacyTest {
     }
 
     @Test
+    void bidOnlyQueryAllowsServerScopedBidLedger() {
+        authenticate("bid:cost:query");
+        CashJournalQuery query = new CashJournalQuery();
+        query.setCostSubjectRootCode("5401.01");
+        Page<CashJournalEntryVO> selected = new Page<>(1, 20);
+        when(entryMapper.selectPageWithBalance(any(), eq(TENANT_ID), same(query), any()))
+                .thenReturn(selected);
+
+        service.page(query);
+
+        verify(entryMapper).selectPageWithBalance(any(), eq(TENANT_ID), same(query), any());
+    }
+
+    @Test
     void bidOnlySummaryReturnsOnlyBidMetrics() {
         authenticate("bid:cost:query");
         CashJournalQuery query = bidQuery();
@@ -154,6 +171,30 @@ class CashJournalPrivacyTest {
         assertEquals("321.00", service.page(query).getRecords().getFirst().getRunningBalance());
     }
 
+    @Test
+    void bidEntryRejectsClientProjectThatDoesNotMatchBidFact() {
+        authenticate("bid:cost:maintain");
+        BidCost bid = bidCost();
+        bid.setProjectId(9L);
+        when(bidCostMapper.selectById(BID_COST_ID)).thenReturn(bid);
+        CostSubject subject = subject(101L, 100L, "5401.01.01", "COST");
+        when(costSubjectMapper.selectById(101L)).thenReturn(subject);
+        when(costSubjectMapper.selectById(100L)).thenReturn(subject(100L, null, "5401.01", "COST"));
+        CashJournalCreateRequest request = new CashJournalCreateRequest();
+        request.setDirection(CashbookConstants.Direction.OUT);
+        request.setAmount(new BigDecimal("1.00"));
+        request.setBusinessDate(LocalDate.now());
+        request.setSummary("投标费");
+        request.setProjectId(8L);
+        request.setBidCostId(BID_COST_ID);
+        request.setCostSubjectId(101L);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.createManual(request));
+
+        assertEquals("BID_COST_PROJECT_MISMATCH", error.getCode());
+        verify(entryMapper, never()).insert(any(CashJournalEntry.class));
+    }
+
     private void authenticate(String... authorities) {
         TestUserContext.setUser(TENANT_ID, 7L, "privacy-test", List.of());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
@@ -171,6 +212,18 @@ class CashJournalPrivacyTest {
         bid.setId(BID_COST_ID);
         bid.setTenantId(TENANT_ID);
         return bid;
+    }
+
+    private CostSubject subject(Long id, Long parentId, String code, String category) {
+        CostSubject subject = new CostSubject();
+        subject.setId(id);
+        subject.setTenantId(TENANT_ID);
+        subject.setParentId(parentId);
+        subject.setSubjectCode(code);
+        subject.setSubjectName(code);
+        subject.setAccountCategory(category);
+        subject.setStatus("ENABLE");
+        return subject;
     }
 
     private CashJournalEntry entry(String direction, String amount) {

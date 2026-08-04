@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { V2Card } from '@/components'
 import CostTargetPage from './CostTargetPage.vue'
 </script>
 
 <template>
   <div class="cost-budget-page">
-    <V2Card title="项目成本预算" :heading-level="1" />
     <CostTargetPage embedded />
   </div>
 </template>
