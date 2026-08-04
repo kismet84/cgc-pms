@@ -2,7 +2,11 @@ package com.cgcpms.file.service;
 
 import com.cgcpms.common.exception.BusinessException;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * 文件类型联合校验器 — 扩展名、MIME、魔术字节三元校验。
@@ -15,6 +19,14 @@ import java.util.Set;
 public final class FileTypeValidator {
 
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20 MB
+    private static final long MAX_OFFICE_EXPANDED_BYTES = 64 * 1024 * 1024L;
+    private static final int MAX_OFFICE_ENTRIES = 2048;
+    private static final String DOCX_MIME =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private static final String XLSX_MIME =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final String PPTX_MIME =
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp",
@@ -118,7 +130,7 @@ public final class FileTypeValidator {
         StringBuilder sb = new StringBuilder(name.length());
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
+            if (Character.isISOControl(c)) {
                 sb.append('_');
             } else {
                 sb.append(c);
@@ -168,13 +180,9 @@ public final class FileTypeValidator {
             }
         }
 
-        // ZIP-based (DOCX/XLSX/PPTX): PK\x03\x04 + search [Content_Types].xml
+        // ZIP-based Office Open XML: validate container structure and distinguish Word/Excel/PowerPoint.
         if (startsWith(content, ZIP_SIG)) {
-            if (containsBytes(content, "Content_Types]".getBytes())) {
-                return "application/vnd.openxmlformats-officedocument";
-            }
-            // It's a ZIP but not an Office Open XML file — reject
-            return null;
+            return detectOfficeMime(content);
         }
 
         // TXT/CSV: no null bytes (non-binary heuristic)
@@ -193,20 +201,36 @@ public final class FileTypeValidator {
         return true;
     }
 
-    /**
-     * 在 content 中搜索 pattern 字节序列。
-     */
-    private static boolean containsBytes(byte[] content, byte[] pattern) {
-        outer:
-        for (int i = 0; i <= content.length - pattern.length; i++) {
-            for (int j = 0; j < pattern.length; j++) {
-                if (content[i + j] != pattern[j]) {
-                    continue outer;
+    private static String detectOfficeMime(byte[] content) {
+        boolean contentTypes = false;
+        boolean word = false;
+        boolean excel = false;
+        boolean powerpoint = false;
+        int entries = 0;
+        long expandedBytes = 0;
+        byte[] buffer = new byte[8192];
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(content))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (++entries > MAX_OFFICE_ENTRIES) return null;
+                String name = entry.getName().replace('\\', '/');
+                contentTypes |= "[Content_Types].xml".equals(name);
+                word |= "word/document.xml".equals(name);
+                excel |= "xl/workbook.xml".equals(name);
+                powerpoint |= "ppt/presentation.xml".equals(name);
+                int read;
+                while ((read = zip.read(buffer)) != -1) {
+                    expandedBytes += read;
+                    if (expandedBytes > MAX_OFFICE_EXPANDED_BYTES) return null;
                 }
             }
-            return true;
+        } catch (IOException invalidZip) {
+            return null;
         }
-        return false;
+        if (!contentTypes || (word ? 1 : 0) + (excel ? 1 : 0) + (powerpoint ? 1 : 0) != 1) return null;
+        if (word) return DOCX_MIME;
+        if (excel) return XLSX_MIME;
+        return PPTX_MIME;
     }
 
     /**
@@ -269,9 +293,9 @@ public final class FileTypeValidator {
             case ".png" -> detectedMime.equals("image/png");
             case ".gif" -> detectedMime.equals("image/gif");
             case ".webp" -> detectedMime.equals("image/webp");
-            case ".docx" -> detectedMime.startsWith("application/vnd.openxmlformats-officedocument");
-            case ".xlsx" -> detectedMime.startsWith("application/vnd.openxmlformats-officedocument");
-            case ".pptx" -> detectedMime.startsWith("application/vnd.openxmlformats-officedocument");
+            case ".docx" -> detectedMime.equals(DOCX_MIME);
+            case ".xlsx" -> detectedMime.equals(XLSX_MIME);
+            case ".pptx" -> detectedMime.equals(PPTX_MIME);
             case ".txt", ".csv" -> detectedMime.equals("text/plain");
             default -> false;
         };

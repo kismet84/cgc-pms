@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -214,7 +215,8 @@ class OperationAuditAspectTest {
     void testFileDownloadPublishesSuccessAuditEvent() throws Exception {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         setFileAuthority("file:query");
-        when(fileService.getPresignedUrl(71003L)).thenReturn("http://download.local/file");
+        when(fileService.getPresignedFileUrl(71003L)).thenReturn(new FileService.PresignedFileUrl(
+                "http://download.local/file", "CONTRACT", 88003L, 71003L));
 
         mockMvc.perform(get("/files/{id}/url", 71003L))
                 .andExpect(status().isOk());
@@ -224,12 +226,36 @@ class OperationAuditAspectTest {
         assertEquals(TestUserContext.TENANT_0, event.tenantId());
         assertEquals(TestUserContext.USER_ADMIN, event.userId());
         assertEquals("DOWNLOAD", event.operationType());
-        assertEquals("FILE", event.businessType());
-        assertEquals("71003", event.businessId());
+        assertEquals("CONTRACT", event.businessType());
+        assertEquals("88003", event.businessId());
+        assertEquals(71003L, event.fileId());
         assertEquals("GET", event.httpMethod());
         assertEquals("/files/71003/url", event.requestPath());
         assertTrue(event.successFlag());
         assertNull(event.errorCode());
+    }
+
+    @Test
+    @DisplayName("附件下载失败保留真实业务绑定和稳定错误码")
+    void testFileDownloadFailureKeepsBusinessBinding() throws Exception {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setFileAuthority("file:query");
+        when(fileService.getPresignedFileUrl(71004L))
+                .thenThrow(new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务不可用"));
+        when(fileService.findAuditBinding(71004L))
+                .thenReturn(Optional.of(new FileService.FileAuditBinding("CONTRACT", 88004L)));
+
+        mockMvc.perform(get("/files/{id}/url", 71004L))
+                .andExpect(status().isBadRequest());
+
+        OperationAuditEvent event = TestListenerConfig.captured.get();
+        assertNotNull(event);
+        assertEquals("DOWNLOAD", event.operationType());
+        assertEquals("CONTRACT", event.businessType());
+        assertEquals("88004", event.businessId());
+        assertEquals(71004L, event.fileId());
+        assertFalse(event.successFlag());
+        assertEquals("FILE_STORAGE_UNAVAILABLE", event.errorCode());
     }
 
     @Test
@@ -273,7 +299,7 @@ class OperationAuditAspectTest {
         assertEquals("DELETE", event.httpMethod());
         assertEquals("/files/71002", event.requestPath());
         assertFalse(event.successFlag());
-        assertEquals("BusinessException", event.errorCode());
+        assertEquals("FILE_ACCESS_DENIED", event.errorCode());
     }
 
     private void setFileAuthority(String authority) {

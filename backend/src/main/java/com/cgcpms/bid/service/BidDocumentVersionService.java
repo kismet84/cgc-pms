@@ -212,7 +212,7 @@ public class BidDocumentVersionService {
     }
 
     private SysFile requireFile(Long sysFileId, Long bidCostId, Long tenantId) {
-        SysFile file = sysFileMapper.selectById(sysFileId);
+        SysFile file = sysFileMapper.selectByIdForUpdate(sysFileId, tenantId);
         if (file == null || !Objects.equals(file.getTenantId(), tenantId)
                 || !"BID_COST".equals(file.getBusinessType())
                 || !Objects.equals(file.getBusinessId(), bidCostId)) {

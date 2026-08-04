@@ -16,8 +16,8 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.file.mapper.SysFileMapper;
-import com.cgcpms.file.service.FileService;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -31,7 +31,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.math.BigDecimal;
 
@@ -70,9 +69,8 @@ class StlSettlementWriteServiceAmountTest {
     @Mock private SubMeasureMapper subMeasureMapper;
     @Mock private SubMeasureItemMapper subMeasureItemMapper;
     @Mock private CtContractItemMapper contractItemMapper;
+    @Mock private FileLifecycleGateway fileLifecycleGateway;
     @Mock private SysFileMapper fileMapper;
-    @Mock private FileService fileService;
-    @Mock private ObjectProvider<FileService> fileServiceProvider;
     @Mock private PmProjectMapper projectMapper;
     @Mock private ProjectAccessChecker projectAccessChecker;
     @Mock private WfInstanceMapper wfInstanceMapper;
@@ -325,7 +323,7 @@ class StlSettlementWriteServiceAmountTest {
         return new StlSettlementWriteService(
                 settlementMapper, settlementItemMapper, contractMapper, workflowEngine, queryService,
                 settlementSubMeasureMapper, subMeasureMapper, subMeasureItemMapper, contractItemMapper,
-                fileMapper, fileServiceProvider, projectMapper,
+                fileLifecycleGateway, fileMapper, projectMapper,
                 projectAccessChecker, wfInstanceMapper, varOrderMapper, payRecordMapper);
     }
 }

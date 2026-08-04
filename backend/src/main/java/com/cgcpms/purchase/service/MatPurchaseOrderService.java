@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -69,6 +70,7 @@ public class MatPurchaseOrderService {
     private final MatPurchaseRequestMapper purchaseRequestMapper;
     private final WfInstanceMapper wfInstanceMapper;
     private final PurchaseOrderPricingService pricingService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
@@ -492,13 +494,15 @@ public class MatPurchaseOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        MatPurchaseOrder order = matPurchaseOrderMapper.selectById(id);
+        MatPurchaseOrder order = matPurchaseOrderMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
         checkProjectAccess(order.getProjectId(), "删除采购订单");
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可删除");
+
+        fileLifecycleGateway.deleteAllForBusinessCascade("PURCHASE_ORDER", id);
 
         // @TableLogic on BaseEntity handles soft-delete automatically
         matPurchaseOrderMapper.deleteById(id);

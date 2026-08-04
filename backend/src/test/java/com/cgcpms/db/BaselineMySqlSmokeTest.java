@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -40,10 +41,10 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("276", flyway.info().current().getVersion().getVersion());
+        assertEquals("280", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(202, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(203, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
         assertEquals(0, count("SELECT COUNT(*) FROM information_schema.columns "
@@ -98,6 +99,46 @@ class BaselineMySqlSmokeTest {
                 String.class);
         assertTrue(stored != null && stored.startsWith("$2"));
         assertNotEquals(BOOTSTRAP_TEST_PASSWORD, stored);
+
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbcTemplate.update("""
+                INSERT INTO sys_file(
+                    id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                    content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (278001,278,'contract',278010,?, 'lower.txt',1,
+                    'text/plain','tenants/278/contract/278010/files/278001/lower.txt','files',0)
+                """, "a".repeat(64) + ".txt"));
+
+        jdbcTemplate.update("""
+                INSERT INTO sys_file(
+                    id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                    content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (279001,279,'CONTRACT',279010,'legacy-generated.pdf','legacy.pdf',1,
+                    'application/pdf','legacy/generated.pdf','files',0),
+                   (279002,279,'CONTRACT',279010,'legacy-generated.pdf','legacy-2.pdf',1,
+                    'application/pdf','legacy/generated-2.pdf','files',0)
+                """);
+        assertEquals(2, count("SELECT COUNT(*) FROM sys_file WHERE id IN (279001,279002) "
+                + "AND active_content_sha256 IS NULL"));
+        jdbcTemplate.update("""
+                INSERT INTO sys_file(
+                    id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                    content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (279003,277,'CONTRACT',277010,?, 'upper.pdf',1,
+                    'application/pdf','legacy/upper.pdf','files',0)
+                """, "A".repeat(64) + ".pdf");
+        assertEquals(1, count("SELECT COUNT(*) FROM sys_file WHERE id=279003 "
+                + "AND active_content_sha256 IS NULL"));
+
+        jdbcTemplate.update("""
+                INSERT INTO sys_file_object_task(
+                    id,tenant_id,operation,source_bucket,source_path,idempotency_key,status,
+                    attempt_count,next_retry_at,created_at,updated_at)
+                VALUES (278101,278,'DELETE','files','Legacy/Foo','DELETE:files:Legacy/Foo',
+                    'PENDING',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+                   (278102,278,'DELETE','files','legacy/foo','DELETE:files:legacy/foo',
+                    'PENDING',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """);
+        assertEquals(2, count("SELECT COUNT(*) FROM sys_file_object_task WHERE tenant_id=278"));
     }
 
     private int count(String sql) {

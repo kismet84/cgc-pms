@@ -10,9 +10,9 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
-import com.cgcpms.file.service.FileService;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -41,7 +41,6 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,8 +78,8 @@ public class StlSettlementWriteService {
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
     private final CtContractItemMapper ctContractItemMapper;
+    private final FileLifecycleGateway fileLifecycleGateway;
     private final SysFileMapper fileMapper;
-    private final ObjectProvider<FileService> fileServiceProvider;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final WfInstanceMapper wfInstanceMapper;
@@ -217,17 +216,7 @@ public class StlSettlementWriteService {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可删除");
         }
 
-        FileService fileService = fileServiceProvider.getIfAvailable();
-        for (SysFile file : fileMapper.selectList(new LambdaQueryWrapper<SysFile>()
-                .eq(SysFile::getTenantId, tenantId)
-                .eq(SysFile::getBusinessType, "SETTLEMENT")
-                .eq(SysFile::getBusinessId, id))) {
-            if (fileService != null) {
-                fileService.deleteForBusinessCascade(file.getId(), "SETTLEMENT", id);
-            } else if (fileMapper.deleteById(file.getId()) != 1) {
-                throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
-            }
-        }
+        fileLifecycleGateway.deleteAllForBusinessCascade("SETTLEMENT", id);
         stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
                 .eq(StlSettlementItem::getTenantId, tenantId)
                 .eq(StlSettlementItem::getSettlementId, id));

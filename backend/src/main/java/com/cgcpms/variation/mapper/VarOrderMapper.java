@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface VarOrderMapper extends BaseMapper<VarOrder> {
 
+    @Select("SELECT * FROM var_order WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted_flag=0 FOR UPDATE")
+    VarOrder selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     /**
      * 查询最新签证编号（含软删除记录，避免编号冲突）
      */

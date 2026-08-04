@@ -25,7 +25,47 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("276", flyway.info().current().getVersion().getVersion());
+        assertEquals("280", flyway.info().current().getVersion().getVersion());
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='sys_file_object_task'"));
+        execute(flyway, """
+                INSERT INTO sys_file
+                    (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                     content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (277001,277,'CONTRACT',277010,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf','a.pdf',1,
+                        'application/pdf','tenants/277/CONTRACT/277010/files/277001/same.pdf','files',0)
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO sys_file
+                    (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                     content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (277002,277,'contract',277010,'other.pdf','b.pdf',1,
+                        'application/pdf','legacy/lowercase.pdf','files',0)
+                """));
+        execute(flyway, """
+                INSERT INTO sys_file
+                    (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                     content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (277004,277,'CONTRACT',277010,'legacy-generated.pdf','legacy.pdf',1,
+                        'application/pdf','legacy/generated.pdf','files',0),
+                       (277005,277,'CONTRACT',277010,'legacy-generated.pdf','legacy-2.pdf',1,
+                        'application/pdf','legacy/generated-2.pdf','files',0)
+                """);
+        assertEquals(2, count(flyway, "sys_file", "id IN (277004,277005) AND active_content_sha256 IS NULL"));
+        execute(flyway, """
+                INSERT INTO sys_file
+                    (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                     content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (277006,277,'CONTRACT',277010,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.pdf','upper.pdf',1,
+                        'application/pdf','legacy/upper.pdf','files',0)
+                """);
+        assertEquals(1, count(flyway, "sys_file", "id=277006 AND active_content_sha256 IS NULL"));
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO sys_file
+                    (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                     content_type,storage_path,bucket_name,deleted_flag)
+                VALUES (277003,277,'CONTRACT',277010,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt','c.txt',1,
+                        'application/pdf','tenants/277/CONTRACT/277010/files/277003/same.pdf','files',0)
+                """));
         assertEquals(10, count(flyway, "cost_subject", "parent_id=(SELECT id FROM cost_subject WHERE subject_code='5401.03')"));
         assertEquals(0, count(flyway, "cost_subject", "subject_code='5401.02' OR subject_code LIKE '5401.02.%'"));
         assertEquals(21, count(flyway, "cost_subject", """
@@ -128,7 +168,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("276", current.info().current().getVersion().getVersion());
+        assertEquals("280", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))

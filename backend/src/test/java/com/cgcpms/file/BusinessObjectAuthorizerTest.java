@@ -23,6 +23,8 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
@@ -76,6 +78,7 @@ class BusinessObjectAuthorizerTest {
     @Mock CashJournalEntryMapper cashJournalEntryMapper;
     @Mock SiteDailyLogMapper siteDailyLogMapper;
     @Mock ExpenseApplicationMapper expenseApplicationMapper;
+    @Mock PmProjectMapper projectMapper;
     @Mock JdbcTemplate jdbcTemplate;
 
     private BusinessObjectAuthorizer authorizer;
@@ -87,7 +90,7 @@ class BusinessObjectAuthorizerTest {
         authorizer = new BusinessObjectAuthorizer(projectAccessChecker, contractMapper, invoiceMapper,
                 receiptMapper, paymentMapper, payRecordMapper, subcontractMapper, settlementMapper,
                 variationMapper, bidCostMapper, partnerMapper, materialMapper, cashJournalEntryMapper,
-                siteDailyLogMapper, expenseApplicationMapper, jdbcTemplate);
+                siteDailyLogMapper, expenseApplicationMapper, projectMapper, jdbcTemplate);
     }
 
     @AfterEach
@@ -119,6 +122,29 @@ class BusinessObjectAuthorizerTest {
         authorizer.checkUploadAccess("PAYMENT", 40001L);
 
         verify(projectAccessChecker).checkAccess(10002L, "写入付款申请文件");
+    }
+
+    @Test
+    void projectPartnerAndVariationMutationsLockTheirParentRows() {
+        PmProject project = new PmProject();
+        project.setTenantId(TestUserContext.TENANT_0);
+        when(projectMapper.selectByIdForUpdate(10040L, TestUserContext.TENANT_0)).thenReturn(project);
+        authorizer.checkUploadAccess("PROJECT", 10040L);
+
+        MdPartner partner = new MdPartner();
+        partner.setTenantId(TestUserContext.TENANT_0);
+        when(partnerMapper.selectByIdForUpdate(20040L, TestUserContext.TENANT_0)).thenReturn(partner);
+        authorizer.checkUploadAccess("PARTNER", 20040L);
+
+        VarOrder variation = new VarOrder();
+        variation.setTenantId(TestUserContext.TENANT_0);
+        variation.setProjectId(10040L);
+        when(variationMapper.selectByIdForUpdate(30040L, TestUserContext.TENANT_0)).thenReturn(variation);
+        authorizer.checkUploadAccess("VARIATION", 30040L);
+
+        verify(projectMapper).selectByIdForUpdate(10040L, TestUserContext.TENANT_0);
+        verify(partnerMapper).selectByIdForUpdate(20040L, TestUserContext.TENANT_0);
+        verify(variationMapper).selectByIdForUpdate(30040L, TestUserContext.TENANT_0);
     }
 
     @Test
@@ -155,7 +181,9 @@ class BusinessObjectAuthorizerTest {
         ExpenseApplication expense = new ExpenseApplication();
         expense.setTenantId(TestUserContext.TENANT_0);
         expense.setProjectId(10021L);
-        when(expenseApplicationMapper.selectById(40021L)).thenReturn(expense);
+        expense.setApprovalStatus("DRAFT");
+        when(expenseApplicationMapper.selectByIdForUpdate(40021L, TestUserContext.TENANT_0))
+                .thenReturn(expense);
         setAuthentication("expense:edit");
         authorizer.checkUploadAccess("EXPENSE", 40021L);
 
@@ -191,6 +219,82 @@ class BusinessObjectAuthorizerTest {
                     () -> authorizer.checkDeleteAccess("PAYMENT", 40030L));
             assertEquals("PAYMENT_DOCUMENT_IMMUTABLE", delete.getCode());
         }
+    }
+
+    @Test
+    void commencementContractAndExpenseEvidenceLockAfterSubmission() {
+        setAuthentication("project:commencement:edit");
+        when(jdbcTemplate.queryForList(anyString(), eq(43001L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 13001L,
+                        "commencement_status", "APPROVED",
+                        "project_status", "PREPARING",
+                        "project_approval_status", "APPROVED",
+                        "initiation_basis", "BID_AWARD")));
+        BusinessException commencement = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess(
+                        "PROJECT_COMMENCEMENT", 43001L, "COMMENCEMENT_BASIS"));
+        assertEquals("PROJECT_COMMENCEMENT_DOCUMENT_IMMUTABLE", commencement.getCode());
+        verify(jdbcTemplate).queryForList(
+                argThat(sql -> sql.contains("project_commencement") && sql.contains("FOR UPDATE")),
+                eq(43001L), eq(TestUserContext.TENANT_0));
+
+        CtContract contract = new CtContract();
+        contract.setTenantId(TestUserContext.TENANT_0);
+        contract.setProjectId(13002L);
+        contract.setApprovalStatus("APPROVING");
+        when(contractMapper.selectByIdForUpdate(43002L, TestUserContext.TENANT_0))
+                .thenReturn(contract);
+        setAuthentication("file:delete");
+        BusinessException contractError = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("CONTRACT", 43002L, "CONTRACT_ATTACHMENT"));
+        assertEquals("CONTRACT_DOCUMENT_IMMUTABLE", contractError.getCode());
+
+        ExpenseApplication expense = new ExpenseApplication();
+        expense.setTenantId(TestUserContext.TENANT_0);
+        expense.setProjectId(13003L);
+        expense.setApprovalStatus("APPROVED");
+        when(expenseApplicationMapper.selectByIdForUpdate(43003L, TestUserContext.TENANT_0))
+                .thenReturn(expense);
+        setAuthentication("expense:edit");
+        BusinessException expenseError = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("EXPENSE", 43003L, "EXPENSE_ATTACHMENT"));
+        assertEquals("EXPENSE_DOCUMENT_IMMUTABLE", expenseError.getCode());
+    }
+
+    @Test
+    void commencementEvidenceRequiresPreparingApprovedProject() {
+        setAuthentication("project:commencement:edit");
+        when(jdbcTemplate.queryForList(anyString(), eq(43004L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 13004L,
+                        "commencement_status", "DRAFT",
+                        "project_status", "ACTIVE",
+                        "project_approval_status", "APPROVED",
+                        "initiation_basis", "BID_AWARD")));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess(
+                        "PROJECT_COMMENCEMENT", 43004L, "COMMENCEMENT_BASIS"));
+
+        assertEquals("PROJECT_COMMENCEMENT_PROJECT_NOT_READY", error.getCode());
+    }
+
+    @Test
+    void receiptEvidenceUsesTenantLockAndRejectsSubmittedStatus() {
+        com.cgcpms.receipt.entity.MatReceipt receipt = new com.cgcpms.receipt.entity.MatReceipt();
+        receipt.setTenantId(TestUserContext.TENANT_0);
+        receipt.setProjectId(13005L);
+        receipt.setApprovalStatus("APPROVING");
+        when(receiptMapper.selectByIdForUpdate(43005L, TestUserContext.TENANT_0))
+                .thenReturn(receipt);
+        setAuthentication("receipt:edit");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("MATERIAL_RECEIPT", 43005L));
+
+        assertEquals("PROCUREMENT_DOCUMENT_IMMUTABLE", error.getCode());
+        verify(receiptMapper).selectByIdForUpdate(43005L, TestUserContext.TENANT_0);
     }
 
     @Test
@@ -354,6 +458,7 @@ class BusinessObjectAuthorizerTest {
         setAuthentication("variation:trace");
         VarOrder variation = variation("DRAFT", "NOT_SUBMITTED", 10010L);
         when(variationMapper.selectById(60010L)).thenReturn(variation);
+        when(variationMapper.selectByIdForUpdate(60010L, TestUserContext.TENANT_0)).thenReturn(variation);
 
         authorizer.checkReadAccess("VARIATION", 60010L);
         BusinessException denied = assertThrows(BusinessException.class,
@@ -366,7 +471,7 @@ class BusinessObjectAuthorizerTest {
     @Test
     void variationDocumentStagesRequireExactActionAuthorityAndState() {
         VarOrder draft = variation("DRAFT", "NOT_SUBMITTED", 10011L);
-        when(variationMapper.selectById(60011L)).thenReturn(draft);
+        when(variationMapper.selectByIdForUpdate(60011L, TestUserContext.TENANT_0)).thenReturn(draft);
         setAuthentication("variation:order:edit");
         authorizer.checkVariationDocumentStage("VARIATION", 60011L, "SITE_EVIDENCE");
 
@@ -376,7 +481,7 @@ class BusinessObjectAuthorizerTest {
         assertEquals("VARIATION_DOCUMENT_STAGE_INVALID", wrongStage.getCode());
 
         VarOrder ownerApproved = variation("APPROVED", "INTERNAL_APPROVED", 10011L);
-        when(variationMapper.selectById(60011L)).thenReturn(ownerApproved);
+        when(variationMapper.selectByIdForUpdate(60011L, TestUserContext.TENANT_0)).thenReturn(ownerApproved);
         authorizer.checkVariationDocumentStage("VARIATION", 60011L, "OWNER_SUBMISSION");
 
         BusinessException unsupported = assertThrows(BusinessException.class,
@@ -387,11 +492,11 @@ class BusinessObjectAuthorizerTest {
     @Test
     void variationOwnerConfirmationRequiresSubmittedState() {
         setAuthentication("variation:owner:review");
-        when(variationMapper.selectById(60012L))
+        when(variationMapper.selectByIdForUpdate(60012L, TestUserContext.TENANT_0))
                 .thenReturn(variation("APPROVED", "OWNER_SUBMITTED", 10012L));
         authorizer.checkVariationDocumentStage("VARIATION", 60012L, "OWNER_CONFIRMATION");
 
-        when(variationMapper.selectById(60012L))
+        when(variationMapper.selectByIdForUpdate(60012L, TestUserContext.TENANT_0))
                 .thenReturn(variation("APPROVED", "OWNER_RETURNED", 10012L));
         BusinessException wrongStage = assertThrows(BusinessException.class,
                 () -> authorizer.checkVariationDocumentStage("VARIATION", 60012L, "OWNER_CONFIRMATION"));
@@ -449,6 +554,8 @@ class BusinessObjectAuthorizerTest {
         measure.setProjectId(10016L);
         measure.setApprovalStatus("DRAFT");
         when(subcontractMapper.selectById(71001L)).thenReturn(measure);
+        when(subcontractMapper.selectByIdForUpdate(71001L, TestUserContext.TENANT_0))
+                .thenReturn(measure);
 
         setAuthentication("subcontract:measure:query");
         authorizer.checkReadAccess("SUBCONTRACT", 71001L);
@@ -568,9 +675,10 @@ class BusinessObjectAuthorizerTest {
         setAuthentication("file:delete");
         MdPartner partner = new MdPartner();
         partner.setTenantId(TestUserContext.TENANT_0);
-        when(partnerMapper.selectById(84002L)).thenReturn(partner);
+        when(partnerMapper.selectByIdForUpdate(84002L, TestUserContext.TENANT_0)).thenReturn(partner);
 
         authorizer.checkDeleteAccess("PARTNER", 84002L);
+        verify(partnerMapper).selectByIdForUpdate(84002L, TestUserContext.TENANT_0);
     }
 
     @Test

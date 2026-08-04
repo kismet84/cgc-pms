@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.material.entity.MdMaterial;
@@ -57,6 +58,7 @@ public class MatPurchaseRequestService {
     private final ProjectAccessChecker projectAccessChecker;
     private final JdbcTemplate jdbcTemplate;
     private final ProcurementIntegrityService integrityService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     // ================================================================
     // 分页查询
@@ -299,13 +301,15 @@ public class MatPurchaseRequestService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        MatPurchaseRequest existing = requestMapper.selectById(id);
+        MatPurchaseRequest existing = requestMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
         projectAccessChecker.checkAccess(existing.getProjectId(), "删除采购申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可删除");
+
+        fileLifecycleGateway.deleteAllForBusinessCascade("PURCHASE_REQUEST", id);
 
         // Delete items first
         LambdaQueryWrapper<MatPurchaseRequestItem> itemWrapper = new LambdaQueryWrapper<>();

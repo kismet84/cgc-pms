@@ -346,7 +346,6 @@ test.describe('M6 subcontract task and measure V2', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('safe evidence'),
     })
-    await page.getByRole('button', { name: '上传附件' }).click()
     await expect(page.getByText('计量依据.pdf', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: '提交审批' }).click()
     await page

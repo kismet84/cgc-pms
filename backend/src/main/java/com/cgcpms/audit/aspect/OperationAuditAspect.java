@@ -4,6 +4,7 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -47,7 +48,8 @@ public class OperationAuditAspect {
             successFlag = isSuccess(result);
             return result;
         } catch (Throwable t) {
-            errorCode = t.getClass().getSimpleName();
+            errorCode = t instanceof BusinessException businessException
+                    ? businessException.getCode() : t.getClass().getSimpleName();
             successFlag = false;
             throw t;
         } finally {

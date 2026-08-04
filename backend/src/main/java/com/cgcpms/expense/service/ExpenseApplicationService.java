@@ -23,6 +23,7 @@ import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.expense.vo.ExpenseApplicationVO;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -61,6 +62,7 @@ public class ExpenseApplicationService {
     private final BudgetLedgerService ledgerService;
     private final WorkflowEngine workflowEngine;
     private final SysDictDataService sysDictDataService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<ExpenseApplicationVO> getPage(long pageNo, long pageSize, Long projectId,
                                                 Long contractId, String approvalStatus) {
@@ -138,11 +140,13 @@ public class ExpenseApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        ExpenseApplication expense = requireExpense(id);
+        ExpenseApplication expense = expenseMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
+        if (expense == null) throw new BusinessException("EXPENSE_NOT_FOUND", "费用申请不存在");
         projectAccessChecker.checkAccess(expense.getProjectId(), "删除费用申请");
         if (!"DRAFT".equals(expense.getApprovalStatus())) {
             throw new BusinessException("EXPENSE_NOT_DELETABLE", "只有未提交的草稿费用申请可以删除");
         }
+        fileLifecycleGateway.deleteAllForBusinessCascade("EXPENSE", id);
         expenseMapper.deleteById(id);
     }
 

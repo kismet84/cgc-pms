@@ -319,6 +319,13 @@ async function installContractMock(page: Page, readIdentity: () => Identity): Pr
       body: JSON.stringify({ code: '0', message: 'success', data: null }),
     }),
   )
+  await page.route('**/api/files?**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: [] }),
+    }),
+  )
 }
 
 test.describe('M4 contract routes', () => {

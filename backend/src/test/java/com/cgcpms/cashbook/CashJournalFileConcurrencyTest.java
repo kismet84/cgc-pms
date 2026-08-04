@@ -14,6 +14,7 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.FileObjectTaskService;
 import com.cgcpms.file.scan.VirusScanner;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.MinioClient;
@@ -163,7 +164,7 @@ class CashJournalFileConcurrencyTest {
         ObjectProvider<MeterRegistry> meterRegistryProvider = mock(ObjectProvider.class);
         VirusScanner virusScanner = mock(VirusScanner.class);
         return new FileService(fileMapper, minioClient, config, authorizer,
-                new RetryTemplate(), meterRegistryProvider, virusScanner);
+                new RetryTemplate(), meterRegistryProvider, virusScanner, mock(FileObjectTaskService.class));
     }
 
     private void inAdminTransaction(Runnable action) {

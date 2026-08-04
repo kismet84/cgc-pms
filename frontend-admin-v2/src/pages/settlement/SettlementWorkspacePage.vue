@@ -2,7 +2,6 @@
 import type {
   ContractRecord,
   SettlementApprovalRecord,
-  SettlementAttachmentRecord,
   SettlementCommand,
   SettlementCompute,
   SettlementCostRecord,
@@ -15,6 +14,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  BusinessAttachmentPanel,
   V2Badge,
   V2Button,
   V2Card,
@@ -27,7 +27,6 @@ import {
 } from '@/components'
 import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import { loadContractPage } from '@/services/commercial'
-import { deleteSiteFile, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import {
@@ -36,7 +35,6 @@ import {
   deleteSettlement,
   loadSettlement,
   loadSettlementApprovalRecords,
-  loadSettlementAttachments,
   loadSettlementCosts,
   loadSettlementPayments,
   loadSettlements,
@@ -49,7 +47,7 @@ import {
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
-type PendingAction = 'delete' | 'submit' | 'delete-file'
+type PendingAction = 'delete' | 'submit'
 
 const emptySources: SettlementSources = {
   contractItems: [],
@@ -68,7 +66,6 @@ const sources = ref<SettlementSources>({ ...emptySources })
 const variations = ref<SettlementVariationRecord[]>([])
 const payments = ref<SettlementPaymentRecord[]>([])
 const costs = ref<SettlementCostRecord[]>([])
-const attachments = ref<SettlementAttachmentRecord[]>([])
 const approvals = ref<SettlementApprovalRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const settlementStatuses = ref<DictDataRecord[]>([])
@@ -89,8 +86,6 @@ const detailErrorMessage = ref('')
 const formOpen = ref(false)
 const itemsOpen = ref(false)
 const pendingAction = ref<PendingAction | null>(null)
-const pendingFile = ref<SettlementAttachmentRecord | null>(null)
-const uploadFile = ref<File | null>(null)
 const form = reactive({ projectId: '', contractId: '', deductionAmount: '0', remark: '' })
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
@@ -135,15 +130,9 @@ const contractOptions = computed(() =>
   })),
 )
 const confirmationTitle = computed(() =>
-  pendingAction.value === 'submit'
-    ? '提交结算审批'
-    : pendingAction.value === 'delete-file'
-      ? '删除附件'
-      : '删除结算草稿',
+  pendingAction.value === 'submit' ? '提交结算审批' : '删除结算草稿',
 )
 const confirmationDescription = computed(() => {
-  if (pendingAction.value === 'delete-file')
-    return pendingFile.value ? `确认删除附件“${pendingFile.value.originalName}”？` : ''
   return selected.value ? `确认操作结算“${selected.value.settlementCode}”？` : ''
 })
 const settlementStatusOptions = computed(() =>
@@ -248,30 +237,21 @@ async function loadDetail(id: string): Promise<boolean> {
   detailErrorMessage.value = ''
   try {
     await loadSettlementDictionaries(controller.signal)
-    const [
-      record,
-      nextSources,
-      nextVariations,
-      nextPayments,
-      nextCosts,
-      nextAttachments,
-      nextApprovals,
-    ] = await Promise.all([
-      loadSettlement(id, controller.signal),
-      loadSettlementSources(id, controller.signal),
-      loadSettlementVariations(id, controller.signal),
-      loadSettlementPayments(id, controller.signal),
-      loadSettlementCosts(id, controller.signal),
-      loadSettlementAttachments(id, controller.signal),
-      loadSettlementApprovalRecords(id, controller.signal),
-    ])
+    const [record, nextSources, nextVariations, nextPayments, nextCosts, nextApprovals] =
+      await Promise.all([
+        loadSettlement(id, controller.signal),
+        loadSettlementSources(id, controller.signal),
+        loadSettlementVariations(id, controller.signal),
+        loadSettlementPayments(id, controller.signal),
+        loadSettlementCosts(id, controller.signal),
+        loadSettlementApprovalRecords(id, controller.signal),
+      ])
     if (generation !== detailGeneration) return false
     selected.value = record
     sources.value = nextSources
     variations.value = nextVariations
     payments.value = nextPayments
     costs.value = nextCosts
-    attachments.value = nextAttachments
     approvals.value = nextApprovals
     return true
   } catch (error) {
@@ -426,47 +406,17 @@ async function confirmAction(): Promise<void> {
       selected.value = null
       await router.push({ path: '/settlement/list', query: route.query })
       showToast('success', '结算草稿已删除', '结算台账已刷新。')
-    } else if (pendingFile.value) {
-      await deleteSiteFile(pendingFile.value.id)
-      await loadDetail(record.id)
-      showToast('success', '附件已删除', '附件列表已刷新。')
     }
   } catch (error) {
     showToast('error', '操作失败', errorText(error, '操作失败'))
   } finally {
     busy.value = false
     pendingAction.value = null
-    pendingFile.value = null
   }
-}
-
-function requestAttachmentDelete(file: SettlementAttachmentRecord): void {
-  pendingFile.value = file
-  pendingAction.value = 'delete-file'
 }
 
 function closeConfirmation(): void {
   pendingAction.value = null
-  pendingFile.value = null
-}
-
-function chooseFile(event: Event): void {
-  uploadFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
-}
-
-async function uploadAttachment(): Promise<void> {
-  if (!selected.value || !uploadFile.value || busy.value) return
-  busy.value = true
-  try {
-    await uploadSiteFile(uploadFile.value, 'SETTLEMENT', selected.value.id, 'OTHER')
-    uploadFile.value = null
-    await loadDetail(selected.value.id)
-    showToast('success', '附件已上传', '附件列表已刷新。')
-  } catch (error) {
-    showToast('error', '附件上传失败', errorText(error, '上传失败'))
-  } finally {
-    busy.value = false
-  }
 }
 
 function search(): void {
@@ -816,37 +766,14 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading"><h3>结算附件</h3></div>
-          <div v-if="editable" class="settlement-workspace__upload">
-            <input
-              id="settlement-file"
-              class="v2-file-input"
-              type="file"
-              aria-label="选择结算附件"
-              @change="chooseFile"
-            />
-            <V2Button
-              type="button"
-              size="small"
-              :disabled="!uploadFile || busy"
-              @click="uploadAttachment"
-              >上传</V2Button
-            >
-          </div>
-          <ul>
-            <li v-for="file in attachments" :key="file.id">
-              <span>{{ file.originalName }} · {{ file.uploadedAt || '—' }}</span>
-              <V2Button
-                type="button"
-                v-if="editable"
-                size="small"
-                variant="ghost"
-                @click="requestAttachmentDelete(file)"
-                >删除</V2Button
-              >
-            </li>
-            <li v-if="!attachments.length">暂无附件</li>
-          </ul>
+          <BusinessAttachmentPanel
+            title="结算附件"
+            business-type="SETTLEMENT"
+            :business-id="selected.id"
+            document-type="OTHER"
+            :can-upload="editable"
+            :can-delete="editable"
+          />
         </section>
       </template>
       <template #footer>

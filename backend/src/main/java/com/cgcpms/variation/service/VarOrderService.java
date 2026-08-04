@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.service.BusinessMatterRegistryService;
@@ -63,6 +64,7 @@ public class VarOrderService {
     private final BusinessMatterRegistryService businessMatterRegistryService;
     private final CtContractChangeService ctContractChangeService;
     private final JdbcTemplate jdbcTemplate;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<VarOrderVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                       Long partnerId, String varType, String direction, String varCode,
@@ -327,8 +329,8 @@ public class VarOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id, Integer version) {
-        VarOrder existing = varOrderMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        VarOrder existing = varOrderMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
+        if (existing == null)
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
         checkProjectAccess(existing.getProjectId(), "删除变更签证");
 
@@ -336,6 +338,8 @@ public class VarOrderService {
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可删除");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
+
+        fileLifecycleGateway.deleteAllForBusinessCascade("VARIATION", id);
 
         int deleted = varOrderMapper.delete(new LambdaQueryWrapper<VarOrder>()
                 .eq(VarOrder::getId, id)

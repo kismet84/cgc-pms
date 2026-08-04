@@ -28,6 +28,8 @@ public class OperationAuditLog {
 
     private String businessId;
 
+    private Long fileId;
+
     private String httpMethod;
 
     private String requestPath;

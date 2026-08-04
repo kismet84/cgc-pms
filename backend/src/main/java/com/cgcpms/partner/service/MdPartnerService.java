@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.system.dict.service.SysDictDataService;
@@ -34,6 +35,7 @@ public class MdPartnerService {
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractMapper ctContractMapper;
     private final SysDictDataService sysDictDataService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<MdPartnerVO> getPage(long pageNo, long pageSize, String partnerCode, String partnerName, String partnerType, String status) {
         LambdaQueryWrapper<MdPartner> wrapper = new LambdaQueryWrapper<>();
@@ -159,7 +161,7 @@ public class MdPartnerService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        MdPartner existing = mdPartnerMapper.selectById(id);
+        MdPartner existing = mdPartnerMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (existing == null)
             throw new BusinessException("PARTNER_NOT_FOUND", "合作伙伴不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
@@ -170,6 +172,7 @@ public class MdPartnerService {
         if (contractCount > 0) {
             throw new BusinessException("PARTNER_HAS_CONTRACTS", "该合作方存在关联合同，无法删除");
         }
+        fileLifecycleGateway.deleteAllForBusinessCascade("PARTNER", id);
         mdPartnerMapper.deleteById(id);
     }
 

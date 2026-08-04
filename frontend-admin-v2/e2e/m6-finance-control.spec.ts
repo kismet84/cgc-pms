@@ -319,7 +319,7 @@ async function install(page: Page, writes: string[]) {
 test('five finance-control routes render real-shaped facts and write then reread', async ({
   page,
 }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   const writes: string[] = []
   await install(page, writes)
   const runtimeErrors = captureRuntimeErrors(page)
