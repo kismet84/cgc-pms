@@ -27,7 +27,7 @@ public interface InvoicePaymentAllocationMapper extends BaseMapper<InvoicePaymen
                                     @Param("payRecordId") Long payRecordId,
                                     @Param("excludeInvoiceId") Long excludeInvoiceId);
 
-    @Select("SELECT " + COLUMNS + " FROM invoice_payment_allocation "
+    @Select("SELECT " + COLUMNS + " FROM invoice_payment_allocation " // SQL-SAFETY: fixed-sql-fragment
             + "WHERE tenant_id = #{tenantId} AND pay_record_id = #{payRecordId} FOR UPDATE")
     List<InvoicePaymentAllocation> selectByPayRecordForUpdate(@Param("tenantId") Long tenantId,
                                                               @Param("payRecordId") Long payRecordId);

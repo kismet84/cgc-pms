@@ -17,22 +17,22 @@ public interface PayRecordMapper extends BaseMapper<PayRecord>, DeletedCodeSourc
             + "external_txn_no, failure_reason, reversed_record_id, reversed_at, reversal_type, version, "
             + "created_by, created_at, updated_by, updated_at, deleted_flag, remark";
 
-    @Select("SELECT " + COLUMNS + " FROM pay_record WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    @Select("SELECT " + COLUMNS + " FROM pay_record WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE") // SQL-SAFETY: fixed-sql-fragment
     PayRecord selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    @Select("SELECT " + COLUMNS + " FROM pay_record "
+    @Select("SELECT " + COLUMNS + " FROM pay_record " // SQL-SAFETY: fixed-sql-fragment
             + "WHERE tenant_id = #{tenantId} AND external_txn_no = #{externalTxnNo} "
             + "AND deleted_flag = 0 FOR UPDATE")
     PayRecord selectByExternalTxnNoForUpdate(@Param("tenantId") Long tenantId,
                                              @Param("externalTxnNo") String externalTxnNo);
 
-    @Select("SELECT " + COLUMNS + " FROM pay_record "
+    @Select("SELECT " + COLUMNS + " FROM pay_record " // SQL-SAFETY: fixed-sql-fragment
             + "WHERE tenant_id = #{tenantId} AND contract_id = #{contractId} "
             + "AND pay_status = 'SUCCESS' AND deleted_flag = 0 FOR UPDATE")
     List<PayRecord> selectSuccessByContractForUpdate(@Param("tenantId") Long tenantId,
                                                      @Param("contractId") Long contractId);
 
-    @Select("SELECT " + COLUMNS + " FROM pay_record "
+    @Select("SELECT " + COLUMNS + " FROM pay_record " // SQL-SAFETY: fixed-sql-fragment
             + "WHERE tenant_id = #{tenantId} AND pay_application_id = #{applicationId} "
             + "AND pay_status = 'SUCCESS' AND deleted_flag = 0 FOR UPDATE")
     List<PayRecord> selectSuccessByApplicationForUpdate(@Param("tenantId") Long tenantId,

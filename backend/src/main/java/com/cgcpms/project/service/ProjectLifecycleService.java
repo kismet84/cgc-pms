@@ -185,7 +185,7 @@ public class ProjectLifecycleService {
     private PmProject ownedProject(Long projectId, Long tenantId, boolean lock) {
         PmProject project = lock ? projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
                 .eq(PmProject::getId, projectId).eq(PmProject::getTenantId, tenantId)
-                .last("FOR UPDATE")) : projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
+                .last("FOR UPDATE")) : projectMapper.selectOne(new LambdaQueryWrapper<PmProject>() // SQL-SAFETY: fixed-sql-fragment
                 .eq(PmProject::getId, projectId).eq(PmProject::getTenantId, tenantId));
         if (project == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         return project;

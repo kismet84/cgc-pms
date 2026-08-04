@@ -16,7 +16,7 @@ public interface CtContractMapper extends BaseMapper<CtContract>, DeletedCodeSou
             + "payment_method, settlement_method, contract_status, approval_status, settlement_amount, "
             + "cost_generated_flag, version, created_by, created_at, updated_by, updated_at, deleted_flag, remark";
 
-    @Select("SELECT " + COLUMNS + " FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    @Select("SELECT " + COLUMNS + " FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE") // SQL-SAFETY: fixed-sql-fragment
     CtContract selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /**

@@ -128,7 +128,7 @@ public class ProjectCommencementService {
         Long tenantId = UserContext.getCurrentTenantId();
         PmProject project = lock ? projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
                 .eq(PmProject::getId, projectId).eq(PmProject::getTenantId, tenantId)
-                .last("FOR UPDATE")) : projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
+                .last("FOR UPDATE")) : projectMapper.selectOne(new LambdaQueryWrapper<PmProject>() // SQL-SAFETY: fixed-sql-fragment
                 .eq(PmProject::getId, projectId).eq(PmProject::getTenantId, tenantId));
         projectAccessChecker.checkAccess(project, action);
         return project;
@@ -146,7 +146,7 @@ public class ProjectCommencementService {
         LambdaQueryWrapper<ProjectCommencement> query = new LambdaQueryWrapper<ProjectCommencement>()
                 .eq(ProjectCommencement::getTenantId, tenantId)
                 .eq(ProjectCommencement::getProjectId, projectId);
-        if (lock) query.last("FOR UPDATE");
+        if (lock) query.last("FOR UPDATE"); // SQL-SAFETY: fixed-sql-fragment
         return commencementMapper.selectOne(query);
     }
 

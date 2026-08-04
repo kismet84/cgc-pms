@@ -17,13 +17,13 @@ public interface PayApplicationMapper extends BaseMapper<PayApplication> {
             + "approval_status, apply_reason, version, created_by, created_at, updated_by, updated_at, "
             + "deleted_flag, remark";
 
-    @Select("SELECT " + COLUMNS + " FROM pay_application WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    @Select("SELECT " + COLUMNS + " FROM pay_application WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE") // SQL-SAFETY: fixed-sql-fragment
     PayApplication selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     @Select("SELECT contract_id FROM pay_application WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0")
     Long selectContractId(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    @Select("SELECT " + COLUMNS + " FROM pay_application "
+    @Select("SELECT " + COLUMNS + " FROM pay_application " // SQL-SAFETY: fixed-sql-fragment
             + "WHERE tenant_id = #{tenantId} AND contract_id = #{contractId} AND deleted_flag = 0 "
             + "AND approval_status IN ('APPROVING', 'APPROVED') "
             + "AND (#{excludeId} IS NULL OR id <> #{excludeId}) FOR UPDATE")
