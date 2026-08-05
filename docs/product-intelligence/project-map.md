@@ -1,12 +1,12 @@
 # CGC-PMS 项目地图
 
-## 2026-08-05 主线72：本地实施完成，G4本地通过、G5交付中
+## 2026-08-05 主线72：认证授权与治理整改已合并
 
-- 问题源：`ISSUE-072-001`；状态`LOCAL_IMPLEMENTED / G0-G4_LOCAL_PASSED / G5_IN_PROGRESS`，不进入AutoPilot Ready。
+- 问题源：`ISSUE-072-001`已关闭；状态`IMPLEMENTED / G0-G5_LOCAL_PASSED / MERGED`。
 - 目标链：`显式租户登录 → tenant/user凭据与授权快照 → refresh轮换`；`投标对象 → 项目范围 → 选项/汇总/导出/维护`；`prod配置 → 启动前校验`；`CI输入 → SHA/digest → 等价CI证据`。
 - 最小方案：复用显式租户Mapper、`ProjectAccessChecker`、Spring Boot启动生命周期和现有CI契约；不新增租户表、权限中台、部署平台或默认分支全量CI。
 - 计划：[`第72条主线`](../plans/第72条主线-全量审计认证授权与生产治理整改任务计划书.md)。
-- 证据边界：本地后端、前端、浏览器、prod失败关闭、真实双租户、Trivy 0漏洞和CI静态契约通过；G5仅缺source commit及同SHA远端CI。项目仅有本地开发环境，非本地环境验收不适用且不得发起；三个既有REL已冻结、非阻塞。
+- 证据边界：本地后端、前端、浏览器、prod失败关闭、真实双租户、Trivy 0漏洞和CI静态契约通过；修复HEAD `08eed68c` 的push/PR CI均13/13，PR #391合并为`master@cd0c3a2e7`且post-merge成功。项目仅有本地开发环境，非本地环境验收不适用且不得发起；三个既有REL已冻结、非阻塞。
 
 ## 2026-08-05 主线71：附件与文件系统整改已合并
 
