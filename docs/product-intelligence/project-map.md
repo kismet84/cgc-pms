@@ -7,7 +7,7 @@
 - 第75条目标链：`同租户启用用户 → 会话成员边界 → 幂等草稿/附件/发送 → SSE提示 → 完整历史补拉/未读 → 群治理`；不复用系统通知表保存聊天。
 - 数据与调用：V282/V283/V284 写 MySQL；文件中心与通讯复用认证、项目范围、FileService、ClamAV、MinIO和下载审计；Office转换仅接收字节并返回PDF，无业务凭据。V284为所有已有启用租户补齐通讯RBAC。
 - 计划：[`第73条`](../plans/第73条主线-项目级统一文件中心与受控Office在线预览任务计划书.md)、[`第74条`](../plans/第74条主线-业务单据模板三栏布局调整任务计划书.md)、[`第75条`](../plans/第75条主线-站内即时通讯系统任务计划书.md)。
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_IN_PROGRESS`；`ISSUE-073-001`、`ISSUE-075-001`已关闭，质量报告位于 `docs/quality/`。仅本地环境，非本地发布不适用。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；`ISSUE-073-001`、`ISSUE-075-001`已关闭。PR #393合并SHA为`7d5acd9c8d8491abc3ab7755fe8d8d5bb479e49a`，post-merge run `31035822391`成功；质量报告位于 `docs/quality/`。仅本地环境，非本地发布不适用。
 
 ## 2026-08-05 主线72：认证授权与治理整改已合并
 

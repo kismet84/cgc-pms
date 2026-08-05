@@ -4,7 +4,7 @@
 
 > 日期：2026-08-05
 > 实施基线：`origin/master@b718e50dfda0c0f5d682b85f4df3ec528e50aaf7`
-> 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_IN_PROGRESS`
+> 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`
 > 唯一问题源：`ISSUE-073-001`（已关闭；本计划为唯一实施载体）
 > 优先级：`P2 / blocking:false`
 > 工作区：原67个未提交文件已完整隔离到可恢复stash；73～75在独立任务分支实施
@@ -338,3 +338,5 @@ pwsh -NoProfile -File scripts/codex-autopilot/test-mainline-owner-flow.ps1 -Plan
 实施证据：V282 MySQL/H2、目录/版本/权限/历史投影、真实Office转换和V2页面均已落地；后端全量324份报告、2540项测试、0失败/错误、15跳过、JaCoCo分支60.237%，前端70文件469项测试及完整构建门通过。最新JAR容器`UP/healthy`，本地MySQL已到V284。
 
 零悬空统计：计划周期新增1、关闭1、净变化0；独立复核发现并关闭历史统一排序、部分投标链补投影、删除与转换竞争孤儿清理3项，净变化0；无重复或无载体遗留项。
+
+Git收口证据：功能分支HEAD `3ca130e7fe465618a535bf503a579225a0360a22`的push CI `31033877944`和PR CI `31034857618`均全绿；PR #393已受保护squash合并为`7d5acd9c8d8491abc3ab7755fe8d8d5bb479e49a`，该merge SHA的post-merge run `31035822391`成功。
