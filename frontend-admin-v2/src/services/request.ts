@@ -4,6 +4,7 @@ import {
   CSRF_CONTRACT,
   isLoginResult,
   type ApiResponse,
+  type UserInfo,
 } from '@cgc-pms/frontend-contracts'
 
 const API_PREFIX = '/api'
@@ -20,6 +21,7 @@ export interface RequestNotice {
 export interface RequestLifecycle {
   onError?: (notice: RequestNotice) => void
   onSessionExpired?: (notice: RequestNotice) => void | Promise<void>
+  onSessionRefreshed?: (userInfo: UserInfo) => void | Promise<void>
 }
 
 export interface ApiRequestOptions<TBody = unknown> {
@@ -161,6 +163,7 @@ async function performRefresh(): Promise<void> {
       message: '认证响应格式无效',
     })
   }
+  await lifecycle.onSessionRefreshed?.(result.userInfo)
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {

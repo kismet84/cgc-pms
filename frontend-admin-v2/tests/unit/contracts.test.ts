@@ -7,9 +7,15 @@ import {
   isLoginResult,
   normalizeDashboardMonth,
   resolveDashboardRoles,
+  type LoginParams,
 } from '@cgc-pms/frontend-contracts'
 
 describe('shared no-UI contracts', () => {
+  it('requires an explicit tenant for login', () => {
+    const login: LoginParams = { tenantId: 0, username: 'admin', password: 'secret' }
+    expect(login.tenantId).toBe(0)
+  })
+
   it('freezes the four cookie-session endpoints', () => {
     expect(AUTH_API).toEqual({
       login: '/auth/login',

@@ -3,6 +3,7 @@ package com.cgcpms;
 import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.bootstrap.config.PlatformBootstrapProperties;
 import com.cgcpms.common.ratelimit.GlobalWriteRateLimitProperties;
+import com.cgcpms.config.ProductionEnvironmentValidator;
 import com.cgcpms.document.config.DocumentGenerationProperties;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
@@ -26,6 +27,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class CgcPmsApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(CgcPmsApplication.class, args);
+        var application = new SpringApplication(CgcPmsApplication.class);
+        application.addInitializers(new ProductionEnvironmentValidator());
+        application.run(args);
     }
 }

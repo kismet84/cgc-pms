@@ -88,6 +88,8 @@ describe('V2 same-origin request core', () => {
   })
 
   it('coalesces concurrent 401 responses into one refresh and retries each request once', async () => {
+    const onSessionRefreshed = vi.fn()
+    configureRequestLifecycle({ onSessionRefreshed })
     let protectedCalls = 0
     let refreshCalls = 0
     fetchMock.mockImplementation(async (input) => {
@@ -118,6 +120,10 @@ describe('V2 same-origin request core', () => {
     expect(protectedCalls).toBe(4)
     expect(first.value).toBeGreaterThan(2)
     expect(second.value).toBeGreaterThan(2)
+    expect(onSessionRefreshed).toHaveBeenCalledOnce()
+    expect(onSessionRefreshed).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: '1', roles: ['SUPER_ADMIN'], permissions: ['*'] }),
+    )
   })
 
   it('fails closed after one refresh failure and emits one expiration notice', async () => {

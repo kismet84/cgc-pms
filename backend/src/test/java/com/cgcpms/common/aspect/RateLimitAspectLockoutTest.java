@@ -104,6 +104,20 @@ class RateLimitAspectLockoutTest {
     }
 
     @Test
+    @DisplayName("同一出口IP和同名账号按租户隔离锁定键")
+    void separatesSameAccountAcrossTenants() throws Throwable {
+        bindRequest("10.0.0.10");
+        when(counterStore.increment(anyString(), anyInt())).thenReturn(1L);
+
+        aspect.around(loginJoinPoint(ApiResponse.success("ok"), 0L, "admin"), loginRateLimit());
+        aspect.around(loginJoinPoint(ApiResponse.success("ok"), 1001L, "admin"), loginRateLimit());
+
+        var keys = ArgumentCaptor.forClass(String.class);
+        verify(lockoutStore, times(2)).clear(keys.capture());
+        assertNotEquals(keys.getAllValues().get(0), keys.getAllValues().get(1));
+    }
+
+    @Test
     @DisplayName("登录技术异常不计入凭据失败次数")
     void technicalFailureDoesNotCountAsCredentialFailure() throws Throwable {
         bindRequest("10.0.0.12");
@@ -163,9 +177,14 @@ class RateLimitAspectLockoutTest {
     }
 
     private ProceedingJoinPoint loginJoinPoint(Object result, String username) throws Throwable {
+        return loginJoinPoint(result, 0L, username);
+    }
+
+    private ProceedingJoinPoint loginJoinPoint(Object result, Long tenantId, String username) throws Throwable {
         ProceedingJoinPoint joinPoint = mock(ProceedingJoinPoint.class);
         Signature signature = mock(Signature.class);
         LoginRequest request = new LoginRequest();
+        request.setTenantId(tenantId);
         request.setUsername(username);
         request.setPassword("unused");
         when(signature.toShortString()).thenReturn("AuthController.login(..)");

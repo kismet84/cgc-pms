@@ -21,6 +21,7 @@ configureRequestLifecycle({
   onError: (notice) => showToast('error', '请求未完成', notice.message),
   onSessionExpired: (notice) =>
     session.clearSession(session.status === 'authenticated' ? notice : undefined),
+  onSessionRefreshed: (userInfo) => session.replaceUserInfo(userInfo),
 })
 
 installGlobalErrorReporting()

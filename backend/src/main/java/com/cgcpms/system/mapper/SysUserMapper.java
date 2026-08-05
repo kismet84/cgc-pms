@@ -14,6 +14,28 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
+            SELECT id, tenant_id, username, password, real_name, phone, email, org_id, avatar, status, is_admin
+            FROM sys_user
+            WHERE tenant_id = #{tenantId}
+              AND username = #{username}
+              AND deleted_flag = 0
+            """)
+    SysUser selectByTenantAndUsername(@Param("tenantId") Long tenantId,
+                                      @Param("username") String username);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT id, tenant_id, username, password, real_name, phone, email, org_id, avatar, status, is_admin
+            FROM sys_user
+            WHERE tenant_id = #{tenantId}
+              AND id = #{userId}
+              AND deleted_flag = 0
+            """)
+    SysUser selectByTenantAndId(@Param("tenantId") Long tenantId,
+                                @Param("userId") Long userId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
             SELECT id, tenant_id, password, status
             FROM sys_user
             WHERE id = #{userId}
@@ -22,6 +44,65 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     SysUser selectCredentialByTenantAndId(@Param("tenantId") Long tenantId,
                                           @Param("userId") Long userId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT DISTINCT r.role_code
+            FROM sys_user_role ur
+            JOIN sys_role r
+              ON r.tenant_id = ur.tenant_id
+             AND r.id = ur.role_id
+             AND r.deleted_flag = 0
+             AND r.status = 'ENABLE'
+            WHERE ur.tenant_id = #{tenantId}
+              AND ur.user_id = #{userId}
+            ORDER BY r.role_code
+            """)
+    List<String> selectEnabledRoleCodesByTenantAndUserId(@Param("tenantId") Long tenantId,
+                                                          @Param("userId") Long userId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT DISTINCT m.perms
+            FROM sys_menu m
+            WHERE m.tenant_id = #{tenantId}
+              AND m.deleted_flag = 0
+              AND m.status = 'ENABLE'
+              AND m.perms IS NOT NULL
+              AND m.perms <> ''
+              AND (
+                  EXISTS (
+                      SELECT 1
+                      FROM sys_user_role ur
+                      JOIN sys_role r
+                        ON r.tenant_id = ur.tenant_id
+                       AND r.id = ur.role_id
+                       AND r.deleted_flag = 0
+                       AND r.status = 'ENABLE'
+                      WHERE ur.tenant_id = #{tenantId}
+                        AND ur.user_id = #{userId}
+                        AND UPPER(r.role_code) IN ('ADMIN', 'SUPER_ADMIN')
+                  )
+                  OR EXISTS (
+                      SELECT 1
+                      FROM sys_user_role ur
+                      JOIN sys_role r
+                        ON r.tenant_id = ur.tenant_id
+                       AND r.id = ur.role_id
+                       AND r.deleted_flag = 0
+                       AND r.status = 'ENABLE'
+                      JOIN sys_role_menu rm
+                        ON rm.tenant_id = r.tenant_id
+                       AND rm.role_id = r.id
+                       AND rm.menu_id = m.id
+                      WHERE ur.tenant_id = #{tenantId}
+                        AND ur.user_id = #{userId}
+                  )
+              )
+            ORDER BY m.perms
+            """)
+    List<String> selectEnabledPermissionCodesByTenantAndUserId(@Param("tenantId") Long tenantId,
+                                                                @Param("userId") Long userId);
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("""

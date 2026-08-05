@@ -38,9 +38,9 @@ class WorkflowPermissionMatrixDemoSeedTest {
     void v110WorkflowOnlySeedCreatesIsolatedWorkflowSamples() {
         long userId = findUserId("demo_workflow_only");
 
-        assertFalse(authService.getPermissionCodes(userId).contains("contract:query"));
-        assertFalse(authService.getPermissionCodes(userId).contains("purchase:request:list"));
-        assertFalse(authService.getPermissionCodes(userId).contains("subcontract:measure:query"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("contract:query"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("purchase:request:list"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("subcontract:measure:query"));
 
         assertEquals(3L, count("""
                 SELECT COUNT(*)
@@ -70,9 +70,9 @@ class WorkflowPermissionMatrixDemoSeedTest {
     void v110CcReadonlySeedCreatesReadonlyCcSamples() {
         long userId = findUserId("demo_cc_readonly");
 
-        assertFalse(authService.getPermissionCodes(userId).contains("contract:query"));
-        assertFalse(authService.getPermissionCodes(userId).contains("purchase:request:list"));
-        assertFalse(authService.getPermissionCodes(userId).contains("subcontract:measure:query"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("contract:query"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("purchase:request:list"));
+        assertFalse(authService.getPermissionCodes(TENANT_ID, userId).contains("subcontract:measure:query"));
 
         assertEquals(2L, count("""
                 SELECT COUNT(*)

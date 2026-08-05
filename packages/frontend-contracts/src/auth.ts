@@ -1,4 +1,5 @@
 export interface LoginParams {
+  tenantId: number;
   username: string;
   password: string;
 }

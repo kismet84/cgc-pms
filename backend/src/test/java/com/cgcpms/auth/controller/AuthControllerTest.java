@@ -103,7 +103,7 @@ class AuthControllerTest {
                         .contextPath("/api")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"admin","password":"admin123"}"""))
+                                {"tenantId":0,"username":"admin","password":"admin123"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.userInfo.username").value("admin"))
@@ -127,7 +127,7 @@ class AuthControllerTest {
     void authenticatedGetDoesNotClearExistingCsrfCookie() throws Exception {
         var userInfo = new UserInfo();
         userInfo.setUsername("demo_dev_super_admin");
-        when(authService.getUserInfo(1L)).thenReturn(userInfo);
+        when(authService.getUserInfo(0L, 1L)).thenReturn(userInfo);
 
         String token = jwtHttpTestTokenFactory.generateToken(1L, "demo_dev_super_admin", 0L,
                 List.of("SUPER_ADMIN"), List.of("inventory:transaction:add"));
@@ -152,11 +152,27 @@ class AuthControllerTest {
                         .contextPath("/api")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"admin","password":"wrongpassword"}"""))
+                                {"tenantId":0,"username":"admin","password":"wrongpassword"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AUTH_FAILED"));
         org.junit.jupiter.api.Assertions.assertEquals(before + 1,
                 loginFailureCount("AUTH_FAILED"), 0.001);
+    }
+
+    @Test
+    @DisplayName("POST /auth/login 缺失或负数租户ID → 400")
+    void loginRequiresNonNegativeTenantId() throws Exception {
+        for (String body : List.of(
+                "{\"username\":\"admin\",\"password\":\"admin123\"}",
+                "{\"tenantId\":-1,\"username\":\"admin\",\"password\":\"admin123\"}")) {
+            mockMvc.perform(post("/api/auth/login")
+                            .servletPath("/auth/login")
+                            .contextPath("/api")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(authService, never()).login(any(LoginRequest.class));
     }
 
     @Test
@@ -328,7 +344,7 @@ class AuthControllerTest {
                         .header("X-Real-IP", "10.0.0.88")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"admin","password":"admin123"}"""))
+                                {"tenantId":0,"username":"admin","password":"admin123"}"""))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("登录失败次数过多")));
@@ -439,6 +455,32 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("POST /auth/refresh 使用已验签 tenantId + userId 轮换令牌")
+    void refreshPropagatesTenantAndUserClaims() {
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        when(blacklistService.isBlacklisted(any())).thenReturn(false);
+        when(blacklistService.blacklist(any(), anyLong())).thenReturn(true);
+        AuthController controller = authControllerInProd(blacklistService);
+        UserInfo userInfo = new UserInfo();
+        userInfo.setUserId("44");
+        userInfo.setUsername("tenant-admin");
+        when(authService.loginById(1001L, 44L))
+                .thenReturn(new LoginResponse("new-access", "new-refresh", userInfo));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE,
+                jwtUtils.generateRefreshToken(44L, 1001L, "credential-version")));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        var result = controller.refresh(request, response, null);
+
+        org.junit.jupiter.api.Assertions.assertEquals("0", result.getCode());
+        org.junit.jupiter.api.Assertions.assertEquals("44", result.getData().getUserInfo().getUserId());
+        verify(authService).loginById(1001L, 44L);
+        org.junit.jupiter.api.Assertions.assertTrue(response.getHeaders("Set-Cookie").stream()
+                .anyMatch(value -> value.contains("refresh_token=new-refresh")));
+    }
+
+    @Test
     @DisplayName("POST /auth/refresh 密码版本失效 → 不轮换令牌")
     void refreshRejectsStaleCredentialBeforeRotation() {
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
@@ -446,13 +488,32 @@ class AuthControllerTest {
         AuthController controller = authControllerInProd(blacklistService);
         when(authService.isCurrentCredential(any())).thenReturn(false);
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE,
+                jwtUtils.generateRefreshToken(1L, 1001L, "credential-version")));
 
         var result = controller.refresh(request, new MockHttpServletResponse(), null);
 
         org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
         verify(blacklistService, never()).blacklist(any(), anyLong());
-        verify(authService, never()).loginById(any());
+        verify(authService, never()).loginById(any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /auth/refresh 精确命中旧 refresh token 黑名单 → 拒绝重放")
+    void refreshRejectsBlacklistedTokenReplay() {
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        String refreshToken = jwtUtils.generateRefreshToken(1L, 1001L, "credential-version");
+        when(blacklistService.isBlacklisted(refreshToken)).thenReturn(true);
+        AuthController controller = authControllerInProd(blacklistService);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, refreshToken));
+
+        var result = controller.refresh(request, new MockHttpServletResponse(), null);
+
+        org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        verify(blacklistService).isBlacklisted(refreshToken);
+        verify(blacklistService, never()).blacklist(any(), anyLong());
+        verify(authService, never()).loginById(any(), any());
     }
 
     @Test
@@ -460,7 +521,8 @@ class AuthControllerTest {
     void refreshFailsClosedWhenBlacklistMissingInProd(CapturedOutput output) {
         AuthController controller = authControllerWithoutBlacklistInProd();
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE,
+                jwtUtils.generateRefreshToken(1L, 1001L, "credential-version")));
 
         var result = controller.refresh(request, new MockHttpServletResponse(), null);
 
@@ -468,7 +530,7 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("BLACKLIST_UNAVAILABLE"));
         org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("redis://"));
         org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("REDIS_PASSWORD"));
-        verify(authService, never()).loginById(any());
+        verify(authService, never()).loginById(any(), any());
     }
 
     @Test
@@ -492,7 +554,8 @@ class AuthControllerTest {
         when(blacklistService.blacklist(any(), anyLong())).thenReturn(false);
         AuthController controller = authControllerInProd(blacklistService);
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE,
+                jwtUtils.generateRefreshToken(1L, 1001L, "credential-version")));
 
         var result = controller.refresh(request, new MockHttpServletResponse(), null);
 
@@ -500,7 +563,7 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("TOKEN_BLACKLIST_WRITE_FAILED"));
         org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("redis://"));
         org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("REDIS_PASSWORD"));
-        verify(authService, never()).loginById(any());
+        verify(authService, never()).loginById(any(), any());
     }
 
     private AuthController authControllerWithoutBlacklistInProd() {

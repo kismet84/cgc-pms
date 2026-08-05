@@ -195,17 +195,19 @@ public class RateLimitAspect {
 
     private String buildLoginLockoutKey(ProceedingJoinPoint joinPoint, String ip) {
         String account = "unknown";
+        String tenant = "unknown";
         for (Object argument : joinPoint.getArgs()) {
             if (argument instanceof LoginRequest request
                     && request.getUsername() != null
                     && !request.getUsername().isBlank()) {
                 account = request.getUsername().trim().toLowerCase(Locale.ROOT);
+                tenant = String.valueOf(request.getTenantId());
                 break;
             }
         }
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest((ip + '\0' + account).getBytes(StandardCharsets.UTF_8));
+                    .digest((ip + '\0' + tenant + '\0' + account).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);

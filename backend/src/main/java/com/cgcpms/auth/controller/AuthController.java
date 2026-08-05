@@ -78,7 +78,8 @@ public class AuthController {
     @GetMapping("/userinfo")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<UserInfo> userInfo() {
-        return ApiResponse.success(authService.getUserInfo(UserContext.getCurrentUserId()));
+        return ApiResponse.success(authService.getUserInfo(
+                UserContext.getCurrentTenantId(), UserContext.getCurrentUserId()));
     }
 
     @AuditedOperation(type = "LOGOUT")
@@ -107,7 +108,6 @@ public class AuthController {
             }
         }
         cookieUtils.clearAuthCookies(response);
-        UserContext.clear();
         return ApiResponse.success();
     }
 
@@ -140,6 +140,7 @@ public class AuthController {
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token已失效");
         }
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
         if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
             log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects refresh because refresh token blacklist write failed");
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
@@ -152,7 +153,7 @@ public class AuthController {
                 return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
             }
         }
-        LoginResponse result = authService.loginById(userId);
+        LoginResponse result = authService.loginById(tenantId, userId);
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
         // Strip tokens from JSON body — they are now HttpOnly cookies only.
         // This is a security best practice: HttpOnly cookies are inaccessible to

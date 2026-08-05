@@ -3,8 +3,10 @@ package com.cgcpms.audit.aspect;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.auth.context.UserContext;
-import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.auth.dto.LoginRequest;
+import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.result.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -16,6 +18,7 @@ import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Component;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -43,8 +46,9 @@ public class OperationAuditAspect {
         long start = System.currentTimeMillis();
         String errorCode = null;
         boolean successFlag = false;
+        Object result = null;
         try {
-            Object result = joinPoint.proceed();
+            result = joinPoint.proceed();
             successFlag = isSuccess(result);
             return result;
         } catch (Throwable t) {
@@ -54,7 +58,7 @@ public class OperationAuditAspect {
             throw t;
         } finally {
             int durationMs = (int) (System.currentTimeMillis() - start);
-            publishEvent(joinPoint, auditedOperation, successFlag, errorCode, durationMs);
+            publishEvent(joinPoint, auditedOperation, result, successFlag, errorCode, durationMs);
         }
     }
 
@@ -65,18 +69,19 @@ public class OperationAuditAspect {
         return true;
     }
 
-    private void publishEvent(ProceedingJoinPoint joinPoint, AuditedOperation annotation,
-                               boolean successFlag, String errorCode, int durationMs) {
+    private void publishEvent(ProceedingJoinPoint joinPoint, AuditedOperation annotation, Object result,
+                              boolean successFlag, String errorCode, int durationMs) {
         try {
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
             Method method = signature.getMethod();
             HttpServletRequest request = resolveRequest();
 
             String businessId = resolveBusinessId(joinPoint, method, annotation.businessIdExpression());
+            AuditSubject subject = resolveAuditSubject(joinPoint, annotation, result);
 
             OperationAuditEvent event = OperationAuditEvent.builder()
-                    .tenantId(UserContext.getCurrentTenantId())
-                    .userId(UserContext.getCurrentUserId())
+                    .tenantId(subject.tenantId())
+                    .userId(subject.userId())
                     .operationType(annotation.type())
                     .businessType(annotation.businessType().isEmpty() ? null : annotation.businessType())
                     .businessId(businessId)
@@ -94,6 +99,47 @@ public class OperationAuditAspect {
             log.warn("Operation audit publish failed: type={}, businessType={}, errorCode={}",
                     annotation.type(), annotation.businessType(), errorCode, e);
         }
+    }
+
+    private AuditSubject resolveAuditSubject(ProceedingJoinPoint joinPoint,
+                                             AuditedOperation annotation,
+                                             Object result) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long userId = UserContext.getCurrentUserId();
+        if (!"LOGIN".equals(annotation.type())) {
+            return new AuditSubject(tenantId, userId);
+        }
+
+        for (Object argument : joinPoint.getArgs()) {
+            if (argument instanceof LoginRequest request) {
+                tenantId = request.getTenantId();
+                break;
+            }
+        }
+        if (tenantId == null) {
+            tenantId = 0L; // dev-login is restricted to the local tenant-0 path
+        }
+
+        LoginResponse loginResponse = unwrapLoginResponse(result);
+        if (loginResponse != null && loginResponse.getUserInfo() != null) {
+            try {
+                userId = Long.valueOf(loginResponse.getUserInfo().getUserId());
+            } catch (NumberFormatException ignored) {
+                userId = null;
+            }
+        }
+        return new AuditSubject(tenantId, userId);
+    }
+
+    private LoginResponse unwrapLoginResponse(Object result) {
+        Object value = result instanceof ResponseEntity<?> responseEntity ? responseEntity.getBody() : result;
+        if (value instanceof ApiResponse<?> response && response.getData() instanceof LoginResponse loginResponse) {
+            return loginResponse;
+        }
+        return null;
+    }
+
+    private record AuditSubject(Long tenantId, Long userId) {
     }
 
     private String resolveBusinessId(ProceedingJoinPoint joinPoint, Method method, String expr) {

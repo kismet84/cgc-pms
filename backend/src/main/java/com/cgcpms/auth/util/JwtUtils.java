@@ -19,6 +19,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import javax.crypto.Mac;
@@ -67,6 +68,7 @@ public class JwtUtils {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtProperties.getExpiration());
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim(CLAIM_USER_ID, userId)
                 .claim(CLAIM_USERNAME, username)
@@ -162,6 +164,7 @@ public class JwtUtils {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtProperties.getRefreshExpiration());
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(String.valueOf(userId))
                 .claim(CLAIM_USER_ID, userId)
                 .claim(CLAIM_TENANT_ID, tenantId)

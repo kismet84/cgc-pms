@@ -30,12 +30,13 @@ describe('V2 in-memory session store', () => {
     vi.mocked(login).mockResolvedValue({ userInfo: currentUser })
     const session = useSessionStore()
 
-    await session.login({ username: 'admin', password: 'local-password' })
+    await session.login({ tenantId: 1001, username: 'admin', password: 'local-password' })
 
     expect(session.isAuthenticated).toBe(true)
     expect(session.userInfo).toEqual(currentUser)
     const serializedState = JSON.stringify(session.$state)
     expect(serializedState).not.toContain('local-password')
+    expect(serializedState).not.toContain('tenantId')
     expect(serializedState.toLowerCase()).not.toContain('token')
   })
 
@@ -56,7 +57,7 @@ describe('V2 in-memory session store', () => {
     })
     const session = useSessionStore()
 
-    await session.login({ username: 'admin', password: 'local-password' })
+    await session.login({ tenantId: 1001, username: 'admin', password: 'local-password' })
 
     expect(session.hasPermission('system:user:add')).toBe(false)
     expect(session.hasAdminOrPermission('system:user:add')).toBe(true)
@@ -68,7 +69,7 @@ describe('V2 in-memory session store', () => {
     const clearCache = vi.fn()
     const unregister = registerSessionCacheClearer(clearCache)
     const session = useSessionStore()
-    await session.login({ username: 'admin', password: 'local-password' })
+    await session.login({ tenantId: 1001, username: 'admin', password: 'local-password' })
 
     await expect(session.logout()).rejects.toThrow('network')
 

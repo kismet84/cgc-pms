@@ -50,9 +50,23 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
             """)
     List<BidOwnerOption> selectOwnerOptions(@Param("tenantId") Long tenantId);
 
-    @Select("SELECT id, bid_code, bid_project_name FROM bid_cost "
-            + "WHERE tenant_id=#{tenantId} AND deleted_flag=0 ORDER BY updated_at DESC, id DESC")
-    List<BidCostOption> selectCostOptions(@Param("tenantId") Long tenantId);
+    @Select("""
+            <script>
+            SELECT id, bid_code, bid_project_name FROM bid_cost
+            WHERE tenant_id=#{tenantId} AND deleted_flag=0
+              AND (project_id IS NULL
+              <if test="accessibleProjectIds != null and !accessibleProjectIds.isEmpty()">
+                OR project_id IN
+                <foreach collection="accessibleProjectIds" item="projectId" open="(" separator="," close=")">
+                  #{projectId}
+                </foreach>
+              </if>
+              )
+            ORDER BY updated_at DESC, id DESC
+            </script>
+            """)
+    List<BidCostOption> selectCostOptions(@Param("tenantId") Long tenantId,
+                                          @Param("accessibleProjectIds") List<Long> accessibleProjectIds);
 
     @Select("SELECT COUNT(*) FROM bid_document_version WHERE tenant_id=#{tenantId} AND bid_cost_id=#{bidCostId} AND deleted_flag=0")
     long countDocumentVersions(@Param("tenantId") Long tenantId, @Param("bidCostId") Long bidCostId);
