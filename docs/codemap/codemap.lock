@@ -1,7 +1,7 @@
 {
-  "current_commit": "ac6bd6c37c99888021ca0e7037a8f2a03d465df2",
+  "current_commit": "c858369cbb2a7d3b3efd0a9a089a7ae72e681de8",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-05T19:36:02+08:00",
+  "generation_time": "2026-08-05T20:15:41+08:00",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -59,9 +59,10 @@
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
+      "backend",
       "documentation"
     ],
-    "reason": "72# staged delivery scope and validation evidence regenerated into current snapshot."
+    "reason": "CI SQL-safety false-positive exemption and failed-gate evidence documented; code-map topology unchanged."
   },
   "modules": [
     {
@@ -80,7 +81,7 @@
         "backend/**"
       ],
       "file_count": 1725,
-      "fingerprint": "fe2ae208f854825927d22eaf4817795bdc70b56f54481c3dc3a38616e8edc3ce"
+      "fingerprint": "618ceea8931230578fec3c3a6e70bbfede96a35c9e84fc6f9289fa20111662bc"
     },
     {
       "id": "delivery_tooling",
@@ -100,7 +101,7 @@
         "docs/**"
       ],
       "file_count": 92,
-      "fingerprint": "ed5dcefd504553341cb1724170d2e176a60cafe3d31aee6639a2677f9b7397f6"
+      "fingerprint": "3a0f4d8afe462ec1e0aeae4b51571e644e7d08c7be0ff6cce27cf0269269641d"
     },
     {
       "id": "frontend_v2",

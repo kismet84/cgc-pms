@@ -84,8 +84,9 @@ public final class ProductionEnvironmentValidator
 
     private static boolean isPlaceholder(String value) {
         var normalized = value.toLowerCase(Locale.ROOT);
-        return normalized.contains("${") || normalized.contains("change-me")
-                || normalized.contains("__set_") || normalized.contains("your-production-domain");
+        return normalized.contains("${") // SQL-SAFETY: fixed-sql-fragment — Spring placeholder text, not SQL
+                || normalized.contains("change-me") || normalized.contains("__set_")
+                || normalized.contains("your-production-domain");
     }
 
     private static boolean unsafeEndpoint(String value) {
