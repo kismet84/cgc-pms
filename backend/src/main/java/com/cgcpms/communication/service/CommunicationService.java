@@ -425,7 +425,7 @@ public class CommunicationService {
         return count == null ? 0 : count;
     }
 
-    @Scheduled(fixedDelayString = "${communication.draft-cleanup-delay-ms:3600000}")
+    @Scheduled(fixedDelayString = "${communication.draft-cleanup-delay-ms:3600000}") // SQL-SAFETY: fixed-sql-fragment Spring property placeholder, not SQL
     public void expireDrafts() {
         List<Map<String, Object>> expired = jdbcTemplate.queryForList("""
                 SELECT id,tenant_id,sender_id FROM communication_message
