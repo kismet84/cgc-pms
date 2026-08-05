@@ -4,6 +4,7 @@ import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
+import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
@@ -223,6 +224,30 @@ class JwtAuthenticationFilterTest {
         assertEquals(401, response.getStatus());
     }
 
+    @Test
+    @DisplayName("credential snapshot lookup is bound to token tenant and user")
+    void credentialSnapshotLookupUsesExplicitTenantAndUser() {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        SysUser user = new SysUser();
+        user.setId(7L);
+        user.setTenantId(1001L);
+        user.setPassword("encoded-password");
+        user.setStatus("ENABLE");
+        var claims = Jwts.claims()
+                .add(JwtUtils.CLAIM_USER_ID, 7L)
+                .add(JwtUtils.CLAIM_TENANT_ID, 1001L)
+                .add(JwtUtils.CLAIM_CREDENTIAL_VERSION, "current-version")
+                .build();
+        when(userMapper.selectCredentialByTenantAndId(1001L, 7L)).thenReturn(user);
+        when(jwtUtils.credentialVersion("encoded-password")).thenReturn("current-version");
+
+        CredentialAwareFilter credentialFilter = new CredentialAwareFilter(jwtUtils, userMapper);
+
+        assertTrue(credentialFilter.currentCredential(claims));
+        verify(userMapper).selectCredentialByTenantAndId(1001L, 7L);
+    }
+
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {
         ExposedJwtAuthenticationFilter() {
             super(null, null, null, null, null, null, null, new MockEnvironment());
@@ -274,6 +299,22 @@ class JwtAuthenticationFilterTest {
         @Override
         protected boolean isCurrentCredential(io.jsonwebtoken.Claims claims) {
             return true;
+        }
+    }
+
+    private static class CredentialAwareFilter extends JwtAuthenticationFilter {
+        CredentialAwareFilter(JwtUtils jwtUtils, SysUserMapper userMapper) {
+            super(jwtUtils, mock(JwtProperties.class), mock(CookieUtils.class), new ObjectMapper(),
+                    mockProvider(), userMapper, authServiceProvider(mock(AuthService.class)), env("local"));
+        }
+
+        boolean currentCredential(io.jsonwebtoken.Claims claims) {
+            return isCurrentCredential(claims);
+        }
+
+        @SuppressWarnings("unchecked")
+        private static ObjectProvider<TokenBlacklistService> mockProvider() {
+            return mock(ObjectProvider.class);
         }
     }
 

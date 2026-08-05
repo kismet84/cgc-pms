@@ -57,6 +57,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -196,6 +197,7 @@ public class CashJournalService {
         Long projectId = request.getProjectId() != null ? request.getProjectId() : entry.getProjectId();
         Long contractId = request.getContractId() != null ? request.getContractId() : entry.getContractId();
         Long bidCostId = request.getBidCostId() != null ? request.getBidCostId() : entry.getBidCostId();
+        if (!Objects.equals(bidCostId, entry.getBidCostId())) requireBidWriteScope(bidCostId);
         Long costSubjectId = request.getCostSubjectId() != null ? request.getCostSubjectId() : entry.getCostSubjectId();
         Long bidDepositId = request.getBidDepositId() != null ? request.getBidDepositId() : entry.getBidDepositId();
         String direction = request.getDirection() != null ? request.getDirection() : entry.getDirection();
@@ -567,10 +569,7 @@ public class CashJournalService {
         if (bidCostId == null || costSubjectId == null) {
             throw new BusinessException("BID_COST_CONTEXT_REQUIRED", "投标流水必须关联投标记录和成本科目");
         }
-        BidCost bid = bidCostMapper.selectById(bidCostId);
-        if (bid == null || !Objects.equals(bid.getTenantId(), tenantId())) {
-            throw new BusinessException("BID_COST_NOT_FOUND", "投标记录不存在");
-        }
+        BidCost bid = requireBidCost(bidCostId);
         CostSubject subject = costSubjectMapper.selectById(costSubjectId);
         if (subject == null || !Objects.equals(subject.getTenantId(), tenantId())
                 || !"ENABLE".equals(subject.getStatus()) || subject.getParentId() == null) {
@@ -749,6 +748,9 @@ public class CashJournalService {
         if (bid == null || !Objects.equals(bid.getTenantId(), tenantId())) {
             throw new BusinessException("BID_COST_NOT_FOUND", "投标记录不存在");
         }
+        if (bid.getProjectId() != null) {
+            projectAccessChecker.checkAccess(bid.getProjectId(), "访问投标成本");
+        }
         return bid;
     }
 
@@ -789,8 +791,18 @@ public class CashJournalService {
         }
         else {
             List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            String accessibleBid = "SELECT 1 FROM bid_cost b "
+                    + "WHERE b.tenant_id=cash_journal_entry.tenant_id "
+                    + "AND b.id=cash_journal_entry.bid_cost_id AND b.deleted_flag=0 "
+                    + "AND (b.project_id IS NULL"
+                    + (projectIds.isEmpty() ? "" : " OR b.project_id IN ("
+                    + IntStream.range(0, projectIds.size()).mapToObj(i -> "{" + i + "}")
+                    .collect(Collectors.joining(",")) + ")")
+                    + ")";
             wrapper.and(scope -> {
-                scope.isNull(CashJournalEntry::getProjectId);
+                scope.and(unprojected -> unprojected.isNull(CashJournalEntry::getProjectId)
+                        .and(bid -> bid.isNull(CashJournalEntry::getBidCostId)
+                                .or().exists(accessibleBid, projectIds.toArray())));
                 if (!projectIds.isEmpty()) scope.or().in(CashJournalEntry::getProjectId, projectIds);
             });
         }

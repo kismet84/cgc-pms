@@ -25,6 +25,31 @@ function Assert-SetEqual([string[]]$Actual,[string[]]$Expected,[string]$Name) {
   }
 }
 
+function Assert-ImmutableActionRefs([string]$Text,[string]$Name) {
+  foreach ($match in [regex]::Matches($Text,'(?m)^\s*(?:-\s*)?uses:\s*(?<ref>[^#\s]+)')) {
+    $ref = $match.Groups['ref'].Value
+    if (!$ref.StartsWith('./') -and $ref -notmatch '^[^@\s]+@[0-9a-f]{40}$') {
+      throw "$Name contains mutable action reference: $ref"
+    }
+  }
+}
+
+function Assert-ImmutableImageRefs([string]$Text,[string]$Name) {
+  foreach ($match in [regex]::Matches($Text,'(?m)^\s*image:\s*(?<ref>[^\s#]+)')) {
+    $ref = $match.Groups['ref'].Value
+    if ($ref -notmatch '@sha256:[0-9a-f]{64}$') {
+      throw "$Name contains mutable container reference: $ref"
+    }
+  }
+
+  $logicalText = [regex]::Replace($Text,'\\\r?\n\s*',' ')
+  foreach ($match in [regex]::Matches($logicalText,'(?m)^\s*docker\s+(?:run|pull)\s+(?<command>.+)$')) {
+    if ($match.Groups['command'].Value -notmatch '(?:^|\s)[^\s]+@sha256:[0-9a-f]{64}(?:\s|$)') {
+      throw "$Name contains docker execution without immutable image digest"
+    }
+  }
+}
+
 function Get-JobBlock([string]$Workflow,[string]$JobName) {
   $match = [regex]::Match($Workflow,"(?ms)^  $([regex]::Escape($JobName)):\r?\n(?<body>.*?)(?=^  [a-z0-9][a-z0-9-]*:\r?$|\z)")
   if (!$match.Success) { throw "workflow job block is missing: $JobName" }
@@ -33,6 +58,28 @@ function Get-JobBlock([string]$Workflow,[string]$JobName) {
 
 $workflow = Read-RepoText '.github\workflows\ci.yml'
 $postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
+$backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
+$frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
+$dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
+$minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
+foreach ($mutableImageSample in @("services:`n  db:`n    image: postgres:latest", 'docker run --rm postgres:latest')) {
+  $mutableImageRejected = $false
+  try { Assert-ImmutableImageRefs $mutableImageSample 'contract self-check' } catch { $mutableImageRejected = $true }
+  if (!$mutableImageRejected) { throw 'immutable image contract must reject unknown mutable images' }
+}
+Assert-ImmutableActionRefs $workflow 'CI workflow'
+Assert-ImmutableActionRefs $postMergeWorkflow 'post-merge workflow'
+Assert-ImmutableActionRefs $backendAction 'backend setup action'
+Assert-ImmutableActionRefs $frontendAction 'frontend setup action'
+Assert-ImmutableImageRefs "$workflow`n$dependencyScanScript`n$minioScript" 'CI execution inputs'
+Assert-Contains $workflow @(
+  'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+  'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+  'anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610',
+  'actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6'
+) 'pinned CI actions'
+Assert-Contains $postMergeWorkflow @('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') 'pinned post-merge action'
 $jobsMatch = [regex]::Match($workflow,'(?m)^jobs:\r?$')
 if (!$jobsMatch.Success) { throw 'workflow jobs mapping is missing' }
 $jobsText = $workflow.Substring($jobsMatch.Index + $jobsMatch.Length)
@@ -87,9 +134,10 @@ Assert-Contains $backendTest @(
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'
 ) 'backend-test'
 Assert-Contains $backendMySql @(
-  'mysql:','image: mysql:8.0','redis:','image: redis:7-alpine',
+  'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
-  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,PaymentMySqlConcurrencyTest',
+  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest',
   'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true'''
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
@@ -109,7 +157,8 @@ Assert-Contains $supplyChain @(
   'sbom-path: artifacts/backend/cgc-pms-backend.spdx.json',
   'subject-path: artifacts/frontend-dist.tar.gz',
   'sbom-path: artifacts/frontend-dist.spdx.json',
-  'aquasec/trivy:0.65.0','artifacts/backend:/workspace:ro'
+  'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436',
+  'artifacts/backend:/workspace:ro'
 ) 'supply-chain-security'
 $trivyCacheStep = [regex]::Match(
   $supplyChain,
@@ -118,14 +167,16 @@ $trivyCacheStep = [regex]::Match(
 if (!$trivyCacheStep.Success) { throw 'Trivy shared-cache restore step is missing' }
 Assert-Contains $trivyCacheStep.Value @(
   'if: ${{ github.event_name != ''workflow_dispatch'' || inputs.trivyColdCache != true }}',
-  'uses: actions/cache@v6','path: .trivy-cache',
+  'uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9','path: .trivy-cache',
   'key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}','restore-keys:'
 ) 'conditional Trivy shared-cache restore'
-if ([regex]::Matches($supplyChain,'uses: actions/cache@v6').Count -ne 1) {
+if ([regex]::Matches($supplyChain,'uses: actions/cache@[0-9a-f]{40}').Count -ne 1) {
   throw 'supply-chain-security must have exactly one conditional shared-cache restore'
 }
 Assert-Contains $e2e @(
-  'needs: [backend-test-mysql, frontend-build]','image: mysql:8.0','image: redis:7-alpine',
+  'needs: [backend-test-mysql, frontend-build]',
+  'image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
   'bash ./scripts/ci/start-e2e-minio.sh','bash ./scripts/ci/start-e2e-backend.sh',
   'pnpm test:e2e:migration-gate','PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173',
@@ -133,16 +184,19 @@ Assert-Contains $e2e @(
 ) 'e2e'
 Assert-Contains $sqlSafety @('./scripts/ci/test-workflow-contract.ps1','./scripts/check-sql-safety.ps1') 'sql-safety-scan'
 
-if ([regex]::Matches($workflow,'uses: actions/upload-artifact@v7').Count -ne 9) { throw 'artifact upload count changed' }
-if ([regex]::Matches($workflow,'uses: actions/download-artifact@v8').Count -ne 3) { throw 'artifact download count changed' }
+if ([regex]::Matches($workflow,'uses: actions/upload-artifact@[0-9a-f]{40}').Count -ne 9) { throw 'artifact upload count changed' }
+if ([regex]::Matches($workflow,'uses: actions/download-artifact@[0-9a-f]{40}').Count -ne 3) { throw 'artifact download count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 3) { throw 'backend setup composite usage count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-frontend').Count -ne 7) { throw 'frontend setup composite usage count changed' }
 if ($workflow.Contains('uses: ./.github/workflows/')) { throw 'reusable workflow split would change the current check boundary' }
 
-$backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
-$frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
-Assert-Contains $backendAction @('using: composite','actions/setup-java@v5','java-version: ''21''','distribution: temurin','cache: maven') 'backend setup action'
-Assert-Contains $frontendAction @('using: composite','working-directory:','pnpm/action-setup@v6','actions/setup-node@v6','node-version: ''22''','pnpm install --frozen-lockfile') 'frontend setup action'
+Assert-Contains $backendAction @('using: composite','actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961','java-version: ''21''','distribution: temurin','cache: maven') 'backend setup action'
+Assert-Contains $frontendAction @(
+  'using: composite','working-directory:',
+  'pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996',
+  'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38',
+  'node-version: ''22''','pnpm install --frozen-lockfile'
+) 'frontend setup action'
 
 foreach ($scriptName in @(
   'verify-mysql-grants.sh','run-frontend-lint.sh','scan-backend-dependencies.sh',
@@ -151,9 +205,17 @@ foreach ($scriptName in @(
   $scriptText = Read-RepoText "scripts\ci\$scriptName"
   Assert-Contains $scriptText @('#!/usr/bin/env bash','set -euo pipefail') $scriptName
 }
-Assert-Contains (Read-RepoText 'scripts\ci\start-e2e-minio.sh') @('mc mb --ignore-existing e2e/cgc-pms-e2e') 'MinIO E2E bucket bootstrap'
+Assert-Contains $minioScript @(
+  'minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e',
+  'minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727',
+  'mc mb --ignore-existing e2e/cgc-pms-e2e'
+) 'MinIO E2E bucket bootstrap'
 Assert-Contains (Read-RepoText 'scripts\ci\verify-mysql-grants.sh') @('normalized_grants','GRANT USAGE ON \*\.\*','MySQL migration user has global privileges') 'MySQL grant script'
-Assert-Contains (Read-RepoText 'scripts\ci\scan-backend-dependencies.sh') @('MSYS_NO_PATHCONV=1','TRIVY_CACHE_DIR','aquasec/trivy:0.65.0','--pkg-types library','--skip-dirs /workspace/backend/target','/workspace/backend') 'backend dependency scan script'
+Assert-Contains $dependencyScanScript @(
+  'MSYS_NO_PATHCONV=1','TRIVY_CACHE_DIR',
+  'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436',
+  '--pkg-types library','--skip-dirs /workspace/backend/target','/workspace/backend'
+) 'backend dependency scan script'
 
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'

@@ -17,7 +17,18 @@
 - 禁止默认读取、扫描、修改、总结或清理 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/`、`archive/v1.0/private/`；仅用户点名并明确解除禁止后例外。
 - 删除、移动、重置、迁移等破坏性操作前必须确认精确目标、环境、影响和恢复方式；禁止宽泛路径、盲删、删除 `.git`、用户目录或仓库外文件。
 - 禁止自动发布生产、连接生产数据库或执行生产写操作；需要时必须另获明确授权。
+- 本项目当前仅存在本地开发环境，不存在 prod、生产或目标环境；任何任务不得发起、尝试、规划或将非本地环境测试/验收列为阻塞项，除非用户以后明确修改本规则。
 - 不修改已应用的 Flyway migration；数据库结构变化新增版本化 migration。数据库重置只允许 dev/test/demo、host 为 `localhost`/`127.0.0.1` 且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`，缺一即禁止。
+
+## Code map gate
+
+- At the start of every code-changing task, compare the current repo with `docs/codemap/codemap.lock`.
+- Before modifying a module, use `docs/codemap/codemap.json` to answer:
+  1. What calls it?
+  2. What does it affect?
+  3. Which tests cover it?
+- If the map is stale or cannot answer those questions, regenerate `docs/codemap/codemap.html`, `docs/codemap/codemap.json`, and `docs/codemap/codemap.lock` before changing the code.
+- Whenever module boundaries, dependencies, routes, databases, queues, or major data flows change, update the code map in the same commit as the code.
 
 ## 子智能体门禁
 

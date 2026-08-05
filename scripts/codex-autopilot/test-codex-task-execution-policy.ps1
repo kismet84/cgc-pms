@@ -49,12 +49,14 @@ $skillsLock = Read-RepoText 'skills-lock.json' | ConvertFrom-Json
 
 if (Test-Path -LiteralPath (Join-Path $RepoRoot 'AGENTS.override.md')) { throw 'AGENTS.override.md must not remain as a second root rule' }
 $agentLineCount = @($agents -split "\r?\n").Count
-if ($agentLineCount -gt 70) { throw "AGENTS.md exceeds 70 lines: $agentLineCount" }
+if ($agentLineCount -gt 80) { throw "AGENTS.md exceeds 80 lines: $agentLineCount" }
 Assert-Contains 'AGENTS.md' $agents @(
   '所有回答使用中文','未获明确授权','git branch --show-current','git status --short',
   '保留既有脏改动','禁止自动发布生产','最小相关验证','Git','零悬空收口',
   '启动迭代-1','普通任务无需显式重读本文件','通常创建1～5个短生命周期子智能体',
-  '存在三个明确独立工作流时最多5个','用户单独发送完整指令“推送”时','不授权无关改动、强推、绕过保护、生产部署或删除目标分支'
+  '存在三个明确独立工作流时最多5个','用户单独发送完整指令“推送”时','不授权无关改动、强推、绕过保护、生产部署或删除目标分支',
+  'docs/codemap/codemap.lock','docs/codemap/codemap.json','regenerate `docs/codemap/codemap.html`',
+  '本项目当前仅存在本地开发环境','不得发起、尝试、规划或将非本地环境测试/验收列为阻塞项'
 )
 if ($agents -match 'luna_worker') { throw 'repository root hard-depends on an external fixed agent' }
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("JWT compact claims")
@@ -53,5 +54,25 @@ class JwtUtilsTest {
         assertTrue(claim instanceof String text && text.startsWith("gz:"));
         assertEquals(permissions, JwtUtils.decodePermissionClaim(claim));
         assertTrue(token.length() < 3_800, "access token must leave room for cookie attributes");
+    }
+
+    @Test
+    @DisplayName("access and refresh rotation always issues unique tokens")
+    void rotatedTokensAreUnique() {
+        JwtProperties properties = new JwtProperties();
+        properties.setSecret("0123456789abcdef0123456789abcdef0123456789abcdef");
+        properties.setExpiration(900_000L);
+        properties.setRefreshExpiration(604_800_000L);
+        JwtUtils jwtUtils = new JwtUtils(properties);
+
+        String access1 = jwtUtils.generateToken(7L, "tenant-admin", 1001L, List.of("ADMIN"), List.of());
+        String access2 = jwtUtils.generateToken(7L, "tenant-admin", 1001L, List.of("ADMIN"), List.of());
+        String refresh1 = jwtUtils.generateRefreshToken(7L, 1001L, "credential-version");
+        String refresh2 = jwtUtils.generateRefreshToken(7L, 1001L, "credential-version");
+
+        assertNotEquals(access1, access2);
+        assertNotEquals(refresh1, refresh2);
+        assertNotEquals(jwtUtils.parseToken(access1).getId(), jwtUtils.parseToken(access2).getId());
+        assertNotEquals(jwtUtils.parseToken(refresh1).getId(), jwtUtils.parseToken(refresh2).getId());
     }
 }

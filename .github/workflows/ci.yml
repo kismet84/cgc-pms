@@ -24,7 +24,7 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-backend
       - name: Install CJK font for PDF tests
         run: |
@@ -41,7 +41,7 @@ jobs:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Upload backend test reports
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: backend-test-reports-${{ github.run_number }}-${{ github.sha }}
           path: |
@@ -50,13 +50,13 @@ jobs:
           if-no-files-found: ignore
       - name: Upload backend jar
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: backend/target/cgc-pms-backend.jar
       - name: Upload backend coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}
           path: backend/target/site/jacoco
@@ -67,7 +67,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Scan backend high and critical library vulnerabilities
         run: bash ./scripts/ci/scan-backend-dependencies.sh
 
@@ -80,7 +80,7 @@ jobs:
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
         env:
           MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
           MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
@@ -94,17 +94,17 @@ jobs:
           --health-timeout=5s
           --health-retries=3
       redis:
-        image: redis:7-alpine
+        image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-backend
       - name: Verify MySQL migration user scope
         shell: bash
         run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
-      - name: Run MySQL migration and payment concurrency tests
-        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,PaymentMySqlConcurrencyTest test -Dspring.profiles.active=test
+      - name: Run MySQL migration, tenant scope, and payment concurrency tests
+        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
           CGCPMS_M52_MYSQL_BASELINE: 'true'
@@ -114,7 +114,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
       - name: Upload MySQL smoke test reports
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: backend-mysql-test-reports-${{ github.run_number }}-${{ github.sha }}
           path: backend/target/surefire-reports
@@ -123,7 +123,7 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -132,7 +132,7 @@ jobs:
         run: bash ./scripts/ci/run-frontend-lint.sh
       - name: Upload frontend lint evidence
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-lint-report-${{ github.run_number }}-${{ github.sha }}
           path: frontend-admin-v2/.ci-artifacts/lint-check.txt
@@ -141,7 +141,7 @@ jobs:
   type-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -151,7 +151,7 @@ jobs:
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -161,7 +161,7 @@ jobs:
         run: cd frontend-admin-v2 && pnpm check:bundle-size
       - name: Upload build artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin-v2/dist
@@ -169,7 +169,7 @@ jobs:
   frontend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -177,7 +177,7 @@ jobs:
         run: cd frontend-admin-v2 && pnpm test:ci
       - name: Upload frontend test evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.FRONTEND_TEST_ARTIFACT }}
           path: frontend-admin-v2/test-results
@@ -186,7 +186,7 @@ jobs:
   frontend-dependency-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -196,7 +196,7 @@ jobs:
   frontend-v2-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -217,14 +217,14 @@ jobs:
         run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
       - name: Restore Trivy vulnerability databases
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.trivyColdCache != true }}
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: .trivy-cache
           key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}
           restore-keys: |
             trivy-java-db-${{ runner.os }}-
       - name: Download backend jar
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: artifacts/backend
@@ -234,7 +234,7 @@ jobs:
           docker run --rm \
             -v "$PWD/.trivy-cache:/root/.cache/trivy" \
             -v "$PWD/artifacts/backend:/workspace:ro" \
-            aquasec/trivy:0.65.0 \
+            aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 \
             rootfs \
             --scanners vuln \
             --pkg-types library \
@@ -244,46 +244,46 @@ jobs:
             --timeout 10m \
             /workspace
       - name: Download frontend build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: artifacts/frontend-dist
       - name: Package frontend build artifact
         run: tar -C artifacts -czf artifacts/frontend-dist.tar.gz frontend-dist
       - name: Generate backend SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           file: artifacts/backend/cgc-pms-backend.jar
           format: spdx-json
           output-file: artifacts/backend/cgc-pms-backend.spdx.json
           upload-artifact: false
       - name: Generate frontend SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           path: artifacts/frontend-dist
           format: spdx-json
           output-file: artifacts/frontend-dist.spdx.json
           upload-artifact: false
       - name: Generate backend provenance attestation
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: artifacts/backend/cgc-pms-backend.jar
       - name: Generate backend SBOM attestation
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: artifacts/backend/cgc-pms-backend.jar
           sbom-path: artifacts/backend/cgc-pms-backend.spdx.json
       - name: Generate frontend provenance attestation
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: artifacts/frontend-dist.tar.gz
       - name: Generate frontend SBOM attestation
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: artifacts/frontend-dist.tar.gz
           sbom-path: artifacts/frontend-dist.spdx.json
       - name: Upload generated SBOMs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.SBOM_ARTIFACT }}
           path: |
@@ -301,7 +301,7 @@ jobs:
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
         env:
           MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
           MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
@@ -315,17 +315,17 @@ jobs:
           --health-timeout=5s
           --health-retries=3
       redis:
-        image: redis:7-alpine
+        image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/setup-backend
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
       - name: Download frontend build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin-v2/dist
@@ -346,7 +346,7 @@ jobs:
           PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
       - name: Upload E2E failure evidence
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-failure-evidence-${{ github.run_number }}-${{ github.sha }}
           path: |
@@ -358,7 +358,7 @@ jobs:
   sql-safety-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Verify CI workflow contract
         shell: pwsh
         run: ./scripts/ci/test-workflow-contract.ps1

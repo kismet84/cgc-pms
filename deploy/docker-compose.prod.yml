@@ -237,7 +237,7 @@ services:
       # useSSL=true + requireSSL=true + verifyServerCertificate=true for production security.
       # MySQL 8.0 auto-generates self-signed certs; JDBC connector 8.0+ trusts them by default.
       # For external CA-signed MySQL, mount the CA cert as a truststore and set trustCertificateKeyStoreUrl.
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=false"
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       # ---- Redis ----
@@ -269,7 +269,7 @@ services:
       CGCPMS_BOOTSTRAP_ADMIN_EMAIL: ${CGCPMS_BOOTSTRAP_ADMIN_EMAIL:-}
       CGCPMS_BOOTSTRAP_ADMIN_PASSWORD: ${CGCPMS_BOOTSTRAP_ADMIN_PASSWORD:-}
       # ---- CORS ----
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set in .env}
     # Backend port NOT exposed to host — only accessible via internal Docker network (frontend → backend proxy)
     # ports:
     #   - "8080:8080"

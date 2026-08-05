@@ -68,7 +68,8 @@ test('logs in through the existing contract and clears the password field', asyn
     }),
   )
   await page.route('**/api/auth/login', async (route) => {
-    const payload = route.request().postDataJSON() as { username?: string }
+    const payload = route.request().postDataJSON() as { tenantId?: number; username?: string }
+    expect(payload.tenantId).toBe(1001)
     expect(payload.username).toBe('admin')
     await route.fulfill({
       status: 200,
@@ -78,6 +79,7 @@ test('logs in through the existing contract and clears the password field', asyn
   })
 
   await page.goto('/login')
+  await page.getByLabel('租户ID').fill('1001')
   await page.getByLabel('用户名').fill('admin')
   await page.getByLabel('密码').fill('local-password')
   await page.getByRole('button', { name: '登录' }).click()

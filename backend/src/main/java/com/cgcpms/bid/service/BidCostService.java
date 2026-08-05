@@ -142,7 +142,7 @@ public class BidCostService {
     }
 
     public List<BidCostOption> listCostOptions() {
-        return mapper.selectCostOptions(tenant());
+        return mapper.selectCostOptions(tenant(), projectAccessChecker.accessibleProjectIds());
     }
 
     @Transactional(rollbackFor = Exception.class)

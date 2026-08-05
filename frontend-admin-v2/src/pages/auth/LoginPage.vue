@@ -9,6 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 
+const tenantId = ref('')
 const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
@@ -18,14 +19,23 @@ const showDemoEntry = import.meta.env.DEV
 
 async function submit(): Promise<void> {
   errorMessage.value = ''
+  const normalizedTenantId = Number(tenantId.value)
   const normalizedUsername = username.value.trim()
+  if (!/^\d+$/.test(tenantId.value.trim()) || !Number.isSafeInteger(normalizedTenantId)) {
+    errorMessage.value = '请输入有效的非负整数租户ID'
+    return
+  }
   if (!normalizedUsername || !password.value) {
-    errorMessage.value = '请输入用户名和密码'
+    errorMessage.value = '请输入租户ID、用户名和密码'
     return
   }
 
   try {
-    await session.login({ username: normalizedUsername, password: password.value })
+    await session.login({
+      tenantId: normalizedTenantId,
+      username: normalizedUsername,
+      password: password.value,
+    })
     password.value = ''
     await router.replace(normalizeRedirect(route.query.redirect))
   } catch (error) {
@@ -91,6 +101,14 @@ function readErrorCode(error: unknown): string | null {
           <V2Alert v-if="errorMessage" title="登录失败" tone="danger">
             {{ errorMessage }}
           </V2Alert>
+          <V2Input
+            v-model="tenantId"
+            label="租户ID"
+            type="number"
+            placeholder="请输入租户ID，例如 0"
+            required
+            :disabled="submitting || demoSubmitting"
+          />
           <V2Input
             v-model="username"
             label="用户名"

@@ -1,5 +1,7 @@
 package com.cgcpms.cashbook;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.bid.entity.BidCost;
@@ -9,6 +11,7 @@ import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.dto.CashJournalCreateRequest;
 import com.cgcpms.cashbook.dto.CashJournalQuery;
+import com.cgcpms.cashbook.dto.CashJournalUpdateRequest;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.entity.FundAccount;
 import com.cgcpms.cashbook.mapper.CashJournalChangeLogMapper;
@@ -30,6 +33,8 @@ import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.cashbook.vo.CashJournalEntryVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.io.Resources;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,15 +49,22 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -139,6 +151,78 @@ class CashJournalPrivacyTest {
         assertEquals("0.00", summary.getOutstandingDeposit());
         verify(fundAccountMapper, never()).selectList(any());
         verify(fundAccountMapper, never()).selectCurrentBalance(any(), any());
+        verify(projectAccessChecker, never()).checkAccess(anyLong(), anyString());
+    }
+
+    @Test
+    void inaccessibleBoundBidSummaryFailsBeforeAmountsAreRead() {
+        authenticate("bid:cost:query");
+        BidCost bid = bidCost();
+        bid.setProjectId(9L);
+        when(bidCostMapper.selectById(BID_COST_ID)).thenReturn(bid);
+        doThrow(new BusinessException("PROJECT_ACCESS_DENIED", "无权访问投标项目"))
+                .when(projectAccessChecker).checkAccess(9L, "访问投标成本");
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.summary(bidQuery()));
+
+        assertEquals("PROJECT_ACCESS_DENIED", error.getCode());
+        verify(entryMapper, never()).selectList(any());
+        verify(bidDepositMapper, never()).selectList(any());
+    }
+
+    @Test
+    void accessibleBoundBidSummaryUsesSharedProjectGate() {
+        authenticate("bid:cost:query");
+        BidCost bid = bidCost();
+        bid.setProjectId(9L);
+        when(bidCostMapper.selectById(BID_COST_ID)).thenReturn(bid);
+        when(entryMapper.selectList(any())).thenReturn(List.of());
+        when(bidDepositMapper.selectList(any())).thenReturn(List.of());
+
+        service.summary(bidQuery());
+
+        verify(projectAccessChecker).checkAccess(9L, "访问投标成本");
+    }
+
+    @Test
+    void generalQueriesScopeHistoricalNullProjectBidRowsBeforeRead() throws Exception {
+        authenticate("cashbook:journal:query");
+        when(projectAccessChecker.accessibleProjectIds()).thenReturn(List.of(9L));
+        List<String> wrapperSql = new ArrayList<>();
+        when(entryMapper.selectList(any())).thenAnswer(invocation -> {
+            Wrapper<CashJournalEntry> wrapper = invocation.getArgument(0);
+            wrapperSql.add(wrapper.getSqlSegment());
+            return List.of();
+        });
+        when(fundAccountMapper.selectList(any())).thenReturn(List.of());
+
+        service.summary(new CashJournalQuery());
+
+        assertEquals(2, wrapperSql.size());
+        assertTrue(wrapperSql.stream().allMatch(sql -> sql.contains("bid_cost_id IS NULL")
+                && sql.contains("b.project_id IS NULL OR b.project_id IN (")));
+
+        MybatisConfiguration configuration = new MybatisConfiguration();
+        String resource = "mapper/cashbook/CashJournalEntryMapper.xml";
+        try (var input = Resources.getResourceAsStream(resource)) {
+            new XMLMapperBuilder(input, configuration, resource, configuration.getSqlFragments()).parse();
+        }
+        var statement = configuration.getMappedStatement(
+                "com.cgcpms.cashbook.mapper.CashJournalEntryMapper.selectPageWithBalance");
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("tenantId", TENANT_ID);
+        parameters.put("query", new CashJournalQuery());
+        parameters.put("accessibleProjectIds", List.of(9L));
+        String scopedSql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+        parameters.put("accessibleProjectIds", List.of());
+        String emptyScopeSql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ");
+
+        assertTrue(scopedSql.contains("e.project_id IN"));
+        assertTrue(scopedSql.contains("e.bid_cost_id IS NULL OR EXISTS"));
+        assertTrue(scopedSql.contains("b.project_id IS NULL OR b.project_id IN"));
+        assertFalse(emptyScopeSql.contains("e.project_id IN"));
+        assertFalse(emptyScopeSql.contains("b.project_id IN"));
+        assertTrue(emptyScopeSql.contains("e.bid_cost_id IS NULL OR EXISTS"));
     }
 
     @Test
@@ -193,6 +277,25 @@ class CashJournalPrivacyTest {
 
         assertEquals("BID_COST_PROJECT_MISMATCH", error.getCode());
         verify(entryMapper, never()).insert(any(CashJournalEntry.class));
+    }
+
+    @Test
+    void cashbookMaintainerCannotAttachBidWithoutBidMaintainAuthority() {
+        authenticate("cashbook:journal:maintain");
+        CashJournalEntry entry = new CashJournalEntry();
+        entry.setId(501L);
+        entry.setTenantId(TENANT_ID);
+        entry.setSourceType(CashbookConstants.SourceType.MANUAL);
+        entry.setStatus(CashbookConstants.Status.DRAFT);
+        when(entryMapper.selectByIdForUpdate(501L, TENANT_ID)).thenReturn(entry);
+        CashJournalUpdateRequest request = new CashJournalUpdateRequest();
+        request.setBidCostId(BID_COST_ID);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.updateDraft(501L, request));
+
+        assertEquals("BID_COST_ACCESS_DENIED", error.getCode());
+        verify(bidCostMapper, never()).selectById(any());
     }
 
     private void authenticate(String... authorities) {

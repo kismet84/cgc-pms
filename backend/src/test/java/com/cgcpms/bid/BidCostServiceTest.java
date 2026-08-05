@@ -2,6 +2,7 @@ package com.cgcpms.bid;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.cgcpms.bid.dto.BidCostOption;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
@@ -15,21 +16,28 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,5 +109,43 @@ class BidCostServiceTest {
         command.setBidProjectName("待中标工程");
 
         assertDoesNotThrow(() -> service.update(command));
+    }
+
+    @Test
+    void costOptionsUseAccessibleProjectScope() {
+        List<Long> projectIds = List.of(11L, 12L);
+        List<BidCostOption> options = List.of(new BidCostOption(21L, "BID-021", "授权投标"));
+        when(projectAccessChecker.accessibleProjectIds()).thenReturn(projectIds);
+        when(mapper.selectCostOptions(TestUserContext.TENANT_0, projectIds)).thenReturn(options);
+
+        assertEquals(options, service.listCostOptions());
+
+        verify(mapper).selectCostOptions(TestUserContext.TENANT_0, projectIds);
+    }
+
+    @Test
+    void costOptionsKeepEmptyProjectScopeFailClosed() throws NoSuchMethodException {
+        when(projectAccessChecker.accessibleProjectIds()).thenReturn(List.of());
+        when(mapper.selectCostOptions(TestUserContext.TENANT_0, List.of())).thenReturn(List.of());
+
+        assertEquals(List.of(), service.listCostOptions());
+
+        verify(mapper).selectCostOptions(TestUserContext.TENANT_0, List.of());
+
+        Select select = BidCostMapper.class
+                .getMethod("selectCostOptions", Long.class, List.class)
+                .getAnnotation(Select.class);
+        var sqlSource = new XMLLanguageDriver().createSqlSource(
+                new MybatisConfiguration(), String.join(" ", select.value()), Map.class);
+        String emptySql = sqlSource.getBoundSql(Map.of(
+                "tenantId", TestUserContext.TENANT_0,
+                "accessibleProjectIds", List.of())).getSql();
+        String scopedSql = sqlSource.getBoundSql(Map.of(
+                "tenantId", TestUserContext.TENANT_0,
+                "accessibleProjectIds", List.of(11L))).getSql();
+
+        assertTrue(emptySql.contains("project_id IS NULL"));
+        assertFalse(emptySql.contains("project_id IN"));
+        assertTrue(scopedSql.contains("project_id IN"));
     }
 }

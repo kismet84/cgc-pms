@@ -1,25 +1,21 @@
 package com.cgcpms.auth.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.dto.LoginRequest;
 import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.dto.UserInfo;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.system.entity.SysMenu;
-import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.mapper.*;
+import com.cgcpms.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import io.jsonwebtoken.Claims;
 
 @Slf4j
@@ -30,15 +26,11 @@ public class AuthService {
     private static final String ENABLED_STATUS = "ENABLE";
 
     private final SysUserMapper sysUserMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysRoleMenuMapper sysRoleMenuMapper;
-    private final SysMenuMapper sysMenuMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
     public LoginResponse login(LoginRequest request) {
-        SysUser user = findUserByUsername(request.getUsername());
+        SysUser user = findUserByUsername(request.getTenantId(), request.getUsername());
         if (user == null) {
             throw new BusinessException("AUTH_FAILED", "用户名或密码错误");
         }
@@ -49,90 +41,39 @@ public class AuthService {
             throw new BusinessException("AUTH_DISABLED", "账号已被禁用");
         }
 
-        List<String> roleCodes = getRoleCodes(user.getId());
-        List<String> permCodes = getPermissionCodes(user.getId());
-
         log.info("User login: {}", request.getUsername());
-        String credentialVersion = jwtUtils.credentialVersion(user.getPassword());
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes, credentialVersion);
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getTenantId(), credentialVersion);
-        UserInfo userInfo = UserInfo.builder()
-                .userId(String.valueOf(user.getId()))
-                .username(user.getUsername())
-                .realName(user.getRealName())
-                .avatar(user.getAvatar())
-                .phone(user.getPhone())
-                .email(user.getEmail())
-                .roles(roleCodes)
-                .permissions(permCodes)
-                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
-                .build();
-
-        return new LoginResponse(token, refreshToken, userInfo);
+        return issueLogin(user);
     }
 
-    public LoginResponse loginById(Long userId) {
-        SysUser user = sysUserMapper.selectById(userId);
+    public LoginResponse loginById(Long tenantId, Long userId) {
+        SysUser user = sysUserMapper.selectByTenantAndId(tenantId, userId);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
         if (!ENABLED_STATUS.equals(user.getStatus())) {
             throw new BusinessException("AUTH_DISABLED", "账号已被禁用");
         }
-        List<String> roleCodes = getRoleCodes(userId);
-        List<String> permCodes = getPermissionCodes(userId);
-        String credentialVersion = jwtUtils.credentialVersion(user.getPassword());
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes, credentialVersion);
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getTenantId(), credentialVersion);
-        UserInfo userInfo = UserInfo.builder()
-                .userId(String.valueOf(user.getId()))
-                .username(user.getUsername())
-                .realName(user.getRealName())
-                .avatar(user.getAvatar())
-                .phone(user.getPhone())
-                .email(user.getEmail())
-                .roles(roleCodes)
-                .permissions(permCodes)
-                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
-                .build();
-        return new LoginResponse(token, refreshToken, userInfo);
-    }
-
-    public LoginResponse loginByUsername(String username) {
-        SysUser user = findUserByUsername(username);
-        if (user == null) {
-            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
-        }
-        return loginById(user.getId());
+        return issueLogin(user);
     }
 
     public LoginResponse loginByUsernameEnsuringDevAccount(String username, String defaultUsername) {
         String effectiveUsername = normalizeUsername(username);
-        SysUser user = findUserByUsername(effectiveUsername);
+        if (!StringUtils.hasText(effectiveUsername)) {
+            effectiveUsername = normalizeUsername(defaultUsername);
+        }
+        SysUser user = findUserByUsername(0L, effectiveUsername);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
-        return loginById(user.getId());
+        return loginById(0L, user.getId());
     }
 
-    public UserInfo getUserInfo(Long userId) {
-        SysUser user = sysUserMapper.selectById(userId);
+    public UserInfo getUserInfo(Long tenantId, Long userId) {
+        SysUser user = sysUserMapper.selectByTenantAndId(tenantId, userId);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
-        List<String> roleCodes = getRoleCodes(userId);
-        List<String> permCodes = getPermissionCodes(userId);
-        return UserInfo.builder()
-                .userId(String.valueOf(user.getId()))
-                .username(user.getUsername())
-                .realName(user.getRealName())
-                .avatar(user.getAvatar())
-                .phone(user.getPhone())
-                .email(user.getEmail())
-                .roles(roleCodes)
-                .permissions(permCodes)
-                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
-                .build();
+        return buildUserInfo(user, getRoleCodes(tenantId, userId), getPermissionCodes(tenantId, userId));
     }
 
     /** Fail closed for tokens issued before password reset, disabled users, or tenant changes. */
@@ -142,7 +83,7 @@ public class AuthService {
         Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
         String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
         if (userId == null || tenantId == null || version == null || version.isBlank()) return false;
-        SysUser user = sysUserMapper.selectById(userId);
+        SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
         return user != null && tenantId.equals(user.getTenantId())
                 && ENABLED_STATUS.equals(user.getStatus())
                 && version.equals(jwtUtils.credentialVersion(user.getPassword()));
@@ -155,12 +96,12 @@ public class AuthService {
         Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
         if (userId == null || tenantId == null) return false;
         try {
-            SysUser user = sysUserMapper.selectById(userId);
-            if (user == null || !tenantId.equals(user.getTenantId()) || !ENABLED_STATUS.equals(user.getStatus())) {
+            SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
+            if (user == null || !ENABLED_STATUS.equals(user.getStatus())) {
                 return false;
             }
-            return Set.copyOf(getRoleCodes(userId)).equals(Set.copyOf(roleClaim(claims)))
-                    && Set.copyOf(getPermissionCodes(userId)).equals(
+            return Set.copyOf(getRoleCodes(tenantId, userId)).equals(Set.copyOf(roleClaim(claims)))
+                    && Set.copyOf(getPermissionCodes(tenantId, userId)).equals(
                     Set.copyOf(JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS))));
         } catch (RuntimeException exception) {
             return false;
@@ -190,21 +131,11 @@ public class AuthService {
      * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
      */
     public List<String> getRoleCodes(Long userId) {
-        Long tenantId = requireUserTenant(userId);
-        var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
-                .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, tenantId)
-                .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> roleIds = userRoles.stream()
-                .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
-                .toList();
-        return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                        .eq(SysRole::getTenantId, tenantId)
-                        .in(SysRole::getId, roleIds)).stream()
-                .map(SysRole::getRoleCode)
-                .collect(Collectors.toList());
+        return getRoleCodes(requireCurrentTenant(), userId);
+    }
+
+    public List<String> getRoleCodes(Long tenantId, Long userId) {
+        return sysUserMapper.selectEnabledRoleCodesByTenantAndUserId(tenantId, userId);
     }
 
     /**
@@ -212,58 +143,19 @@ public class AuthService {
      * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
      */
     public List<String> getPermissionCodes(Long userId) {
-        Long tenantId = requireUserTenant(userId);
-        var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
-                .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, tenantId)
-                .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> roleIds = userRoles.stream()
-                .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
-                .toList();
-        List<String> roleCodes = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                        .eq(SysRole::getTenantId, tenantId)
-                        .in(SysRole::getId, roleIds)).stream()
-                .map(SysRole::getRoleCode)
-                .toList();
-        if (roleCodes.contains("SUPER_ADMIN") || roleCodes.contains("ADMIN")) {
-            return sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
-                            .eq(SysMenu::getTenantId, tenantId)
-                            .isNotNull(SysMenu::getPerms)
-                            .ne(SysMenu::getPerms, ""))
-                    .stream()
-                    .map(SysMenu::getPerms)
-                    .distinct()
-                    .collect(Collectors.toList());
-        }
-
-        var roleMenus = sysRoleMenuMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
-                .eq(com.cgcpms.system.entity.SysRoleMenu::getTenantId, tenantId)
-                .in(com.cgcpms.system.entity.SysRoleMenu::getRoleId, roleIds));
-        if (roleMenus.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> menuIds = roleMenus.stream()
-                .map(com.cgcpms.system.entity.SysRoleMenu::getMenuId)
-                .distinct()
-                .toList();
-
-        return sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
-                        .eq(SysMenu::getTenantId, tenantId)
-                        .in(SysMenu::getId, menuIds)).stream()
-                .map(SysMenu::getPerms)
-                .filter(p -> p != null && !p.isBlank())
-                .collect(Collectors.toList());
+        return getPermissionCodes(requireCurrentTenant(), userId);
     }
 
-    private SysUser findUserByUsername(String username) {
+    public List<String> getPermissionCodes(Long tenantId, Long userId) {
+        return sysUserMapper.selectEnabledPermissionCodesByTenantAndUserId(tenantId, userId);
+    }
+
+    private SysUser findUserByUsername(Long tenantId, String username) {
         String normalizedUsername = normalizeUsername(username);
         if (!StringUtils.hasText(normalizedUsername)) {
             return null;
         }
-        return sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, normalizedUsername));
+        return sysUserMapper.selectByTenantAndUsername(tenantId, normalizedUsername);
     }
 
     private String normalizeUsername(String username) {
@@ -273,11 +165,35 @@ public class AuthService {
         return username.trim();
     }
 
-    private Long requireUserTenant(Long userId) {
-        SysUser user = sysUserMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+    private LoginResponse issueLogin(SysUser user) {
+        List<String> roleCodes = getRoleCodes(user.getTenantId(), user.getId());
+        List<String> permCodes = getPermissionCodes(user.getTenantId(), user.getId());
+        String credentialVersion = jwtUtils.credentialVersion(user.getPassword());
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(),
+                roleCodes, permCodes, credentialVersion);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getTenantId(), credentialVersion);
+        return new LoginResponse(token, refreshToken, buildUserInfo(user, roleCodes, permCodes));
+    }
+
+    private UserInfo buildUserInfo(SysUser user, List<String> roleCodes, List<String> permCodes) {
+        return UserInfo.builder()
+                .userId(String.valueOf(user.getId()))
+                .username(user.getUsername())
+                .realName(user.getRealName())
+                .avatar(user.getAvatar())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .roles(roleCodes)
+                .permissions(permCodes)
+                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
+                .build();
+    }
+
+    private Long requireCurrentTenant() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new BusinessException("AUTH_TOKEN_INVALID", "缺少租户上下文");
         }
-        return user.getTenantId();
+        return tenantId;
     }
 }

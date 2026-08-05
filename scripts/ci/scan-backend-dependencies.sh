@@ -16,7 +16,7 @@ fi
 
 docker run "${docker_args[@]}" \
   -v "$PWD:/workspace" \
-  aquasec/trivy:0.65.0 \
+  aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 \
   fs \
   --scanners vuln \
   --pkg-types library \

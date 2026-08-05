@@ -1,0 +1,138 @@
+{
+  "current_commit": "ac6bd6c37c99888021ca0e7037a8f2a03d465df2",
+  "working_tree_dirty": true,
+  "generation_time": "2026-08-05T19:36:02+08:00",
+  "scanned_scope": [
+    ".github",
+    ".githooks",
+    ".agents",
+    ".codex-autopilot",
+    "backend",
+    "deploy",
+    "docs",
+    "frontend-admin-v2",
+    "mobile",
+    "packages",
+    "plugins",
+    "scripts",
+    "tools",
+    "repository root files"
+  ],
+  "excluded_directories": [
+    "vendor",
+    "node_modules",
+    "build",
+    "dist",
+    "target",
+    "cache",
+    ".cache",
+    "generated",
+    "coverage",
+    "test-results",
+    "tmp",
+    ".omc",
+    ".omo",
+    ".opencode",
+    ".claude",
+    ".mimocode",
+    "graphify-out",
+    ".sisyphus",
+    ".archive",
+    "archive",
+    "memory",
+    "frontend-admin",
+    "docs/codemap"
+  ],
+  "fingerprint_algorithm": {
+    "name": "sha256",
+    "version": "repo-path-content-v2",
+    "input": "git tracked and untracked non-ignored paths plus current working-tree bytes",
+    "path_order": "ordinal case-sensitive",
+    "record_format": "P:<utf8-path-byte-length>:<utf8-path>C:<content-byte-length>:<raw-content><LF>",
+    "untracked_files": "included unless ignored, out of scope, or excluded",
+    "self_reference": "docs/codemap excluded"
+  },
+  "tracked_file_count": 3686,
+  "repository_file_count": 3695,
+  "included_file_count": 2425,
+  "excluded_file_count": 1270,
+  "comparison": {
+    "previous_lock_found": true,
+    "stale_modules": [
+      "documentation"
+    ],
+    "reason": "72# staged delivery scope and validation evidence regenerated into current snapshot."
+  },
+  "modules": [
+    {
+      "id": "agent_platform",
+      "scope": [
+        ".agents/**",
+        ".codex-autopilot/**",
+        "plugins/**"
+      ],
+      "file_count": 80,
+      "fingerprint": "5c8f92f5bade892eb65392a53ce550d517381820bf416f2a85ea5fc5b5ced07f"
+    },
+    {
+      "id": "backend",
+      "scope": [
+        "backend/**"
+      ],
+      "file_count": 1725,
+      "fingerprint": "fe2ae208f854825927d22eaf4817795bdc70b56f54481c3dc3a38616e8edc3ce"
+    },
+    {
+      "id": "delivery_tooling",
+      "scope": [
+        ".github/**",
+        ".githooks/**",
+        "deploy/**",
+        "scripts/**",
+        "tools/**"
+      ],
+      "file_count": 257,
+      "fingerprint": "0bbbdd420923306b774442502bbbc14e83cc5a28364f43b31bd901d0b9c53703"
+    },
+    {
+      "id": "documentation",
+      "scope": [
+        "docs/**"
+      ],
+      "file_count": 92,
+      "fingerprint": "ed5dcefd504553341cb1724170d2e176a60cafe3d31aee6639a2677f9b7397f6"
+    },
+    {
+      "id": "frontend_v2",
+      "scope": [
+        "frontend-admin-v2/**"
+      ],
+      "file_count": 245,
+      "fingerprint": "68540c9f5048e743153bd7c368c81a5d5b5ae37fcdf52bc14f722823b6d1a167"
+    },
+    {
+      "id": "mobile",
+      "scope": [
+        "mobile/**"
+      ],
+      "file_count": 1,
+      "fingerprint": "e66f6ce1323b73e04141090bbaffa5bf28e4e7340340545c37199610a943128f"
+    },
+    {
+      "id": "repository_meta",
+      "scope": [
+        "tracked and untracked repository root files"
+      ],
+      "file_count": 7,
+      "fingerprint": "5a30a7571be88d71b5c213e95c566fc45b6690f2e0b970b9a92f742eed1c9565"
+    },
+    {
+      "id": "shared_packages",
+      "scope": [
+        "packages/**"
+      ],
+      "file_count": 18,
+      "fingerprint": "afc19ea27e51a6b4e39a6d6e8a90d265772ccf4ba933f13ac7db9d57d44e2709"
+    }
+  ]
+}

@@ -85,6 +85,7 @@ test.describe('V2 live local authentication', () => {
       }
     })
     await page.goto('/login')
+    await page.getByLabel('租户ID').fill('0')
     await page.getByLabel('用户名').fill('__v2_denied_identity__')
     await page.getByLabel('密码').fill('invalid-credential-053002')
     await page.getByRole('button', { name: '登录' }).click()
