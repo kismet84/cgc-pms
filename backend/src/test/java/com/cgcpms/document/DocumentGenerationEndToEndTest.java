@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.cgcpms.projectfile.ProjectFileService;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -57,6 +58,8 @@ import static org.mockito.Mockito.when;
 @Import(DocumentGenerationEndToEndTest.TestProviderConfig.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DocumentGenerationEndToEndTest {
+
+    @MockitoBean private ProjectFileService projectFileService;
     private static final AtomicReference<String> TEST_APPLY_AMOUNT = new AtomicReference<>("123456.78");
 
     @Autowired private DocumentTemplateService templateService;

@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.cgcpms.projectfile.ProjectFileService;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +29,9 @@ import static org.mockito.Mockito.reset;
 @ActiveProfiles("local")
 @DisplayName("结算删除级联事务故障注入回归")
 class StlSettlementDeleteTransactionTest {
+
+    @MockitoBean
+    private ProjectFileService projectFileService;
 
     private static final long TENANT_ID = 0L;
     private static final long USER_ID = 1L;

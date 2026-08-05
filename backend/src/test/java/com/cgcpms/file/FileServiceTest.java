@@ -10,6 +10,7 @@ import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.service.FileService;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
+import com.cgcpms.projectfile.ProjectFileService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -80,6 +81,9 @@ class FileServiceTest {
 
     @MockitoBean
     private VirusScanner virusScanner;
+
+    @MockitoBean
+    private ProjectFileService projectFileService;
 
     @BeforeEach
     void setupContext() {

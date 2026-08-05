@@ -48,6 +48,15 @@ describe('V2 navigation contract', () => {
       )?.tabs,
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
+    expect(permissionForPath('/project/files')).toBe('project:file:query')
+    expect(permissionForPath('/communication')).toBe('communication:view')
+    expect(findWorkspace('/communication')?.workspace.label).toBe('站内通讯')
+    expect(
+      visibleNavigation(['USER'], ['communication:view'])
+        .flatMap((domain) => domain.workspaces)
+        .map((workspace) => workspace.id),
+    ).toContain('communication')
+    expect(findWorkspace('/project/files')?.workspace.label).toBe('项目管理')
     expect(findWorkspace('/project-schedule/11')?.domain.label).toBe('施工管理')
     expect(findWorkspace('/engineering-tender/records')?.domain.label).toBe('项目履约')
     expect(navigationDomains.find((domain) => domain.id === 'delivery')?.workspaces[0]?.id).toBe(

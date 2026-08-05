@@ -15,6 +15,8 @@ const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
 const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue')
 const ProjectPage = () => import('./pages/projects/ProjectPage.vue')
+const ProjectFileCenterPage = () => import('./pages/project/ProjectFileCenterPage.vue')
+const CommunicationPage = () => import('./pages/communication/CommunicationPage.vue')
 const ContractPage = () => import('./pages/commercial/ContractPage.vue')
 const VariationPage = () => import('./pages/commercial/VariationPage.vue')
 const BidCostPage = () => import('./pages/commercial/BidCostPage.vue')
@@ -93,6 +95,8 @@ const navigationComponents = {
   '/approval/cc': WorkflowWorkbenchPage,
   '/approval/mine': WorkflowWorkbenchPage,
   '/project/list': ProjectPage,
+  '/project/files': ProjectFileCenterPage,
+  '/communication': CommunicationPage,
   '/contract/ledger': ContractPage,
   '/variation/order': VariationPage,
   '/engineering-tender/records': BidCostPage,

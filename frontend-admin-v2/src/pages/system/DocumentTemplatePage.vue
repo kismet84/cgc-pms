@@ -10,7 +10,6 @@ import {
   V2Input,
   V2PageState,
   V2Pagination,
-  V2Select,
   V2Stack,
   showToast,
 } from '@/components'
@@ -59,7 +58,7 @@ const form = reactive({
   fieldManifest: '',
   remark: '',
 })
-const businessOptions = [
+const businessOptions: Array<{ value: DocumentBusinessType; label: string }> = [
   { value: 'PAYMENT', label: '付款申请单' },
   { value: 'SETTLEMENT', label: '结算单' },
   { value: 'PURCHASE_REQUEST', label: '采购申请单' },
@@ -106,6 +105,16 @@ async function refresh(preferredTemplateId?: string, preferredVersionId?: string
 async function refreshPage(): Promise<void> {
   await refresh()
   if (!error.value) showToast('success', '业务模板已刷新')
+}
+
+async function selectBusinessType(value: DocumentBusinessType): Promise<void> {
+  if (value === businessType.value) return
+  businessType.value = value
+  templates.value = []
+  detail.value = null
+  selectedTemplateId.value = ''
+  selectedVersionId.value = ''
+  await refresh()
 }
 
 async function selectTemplate(id: string, preferredVersionId?: string): Promise<void> {
@@ -283,13 +292,6 @@ onBeforeUnmount(() => controller?.abort())
   <V2Stack class="document-template-page" :gap="4">
     <V2Card title="业务单据模板" :heading-level="1">
       <template #actions>
-        <V2Select
-          v-model="businessType"
-          label="业务类型"
-          hide-label
-          :options="businessOptions"
-          @update:model-value="refresh()"
-        />
         <V2Button size="small" variant="secondary" @click="refreshPage">刷新</V2Button>
         <V2Button v-if="canEdit" size="small" @click="openCreate">新增模板</V2Button>
       </template>
@@ -300,6 +302,25 @@ onBeforeUnmount(() => controller?.abort())
       <template #actions><V2Button @click="refresh()">重试</V2Button></template>
     </V2PageState>
     <div v-else class="document-template-page__columns">
+      <V2Card title="业务类型" title-id="document-business-types-title">
+        <div
+          class="document-template-page__business-list"
+          aria-labelledby="document-business-types-title"
+        >
+          <button
+            v-for="option in businessOptions"
+            :key="option.value"
+            type="button"
+            class="document-template-page__business-option"
+            :class="{ 'is-selected': option.value === businessType }"
+            :aria-pressed="option.value === businessType"
+            @click="selectBusinessType(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </V2Card>
+
       <V2Card title="模板">
         <V2PageState
           v-if="!templates.length"
@@ -313,6 +334,7 @@ onBeforeUnmount(() => controller?.abort())
             :key="item.id"
             variant="ghost"
             :class="{ 'is-selected': item.id === selectedTemplateId }"
+            :aria-pressed="item.id === selectedTemplateId"
             @click="selectTemplate(item.id)"
           >
             <strong>{{ item.templateName }}</strong>
@@ -333,7 +355,7 @@ onBeforeUnmount(() => controller?.abort())
         </template>
       </V2Card>
 
-      <V2Card title="版本">
+      <V2Card title="详情">
         <template #actions>
           <V2Button v-if="canEdit && detail" size="small" @click="openNewVersion">
             新建版本
@@ -365,7 +387,17 @@ onBeforeUnmount(() => controller?.abort())
             </thead>
             <tbody>
               <tr v-for="(version, index) in detail.versions" :key="version.id">
-                <th scope="row">V{{ version.versionNo }}</th>
+                <th scope="row">
+                  <button
+                    type="button"
+                    class="document-template-page__version-button"
+                    :class="{ 'is-selected': version.id === selectedVersionId }"
+                    :aria-pressed="version.id === selectedVersionId"
+                    @click="selectedVersionId = version.id"
+                  >
+                    V{{ version.versionNo }}
+                  </button>
+                </th>
                 <td>
                   <V2Badge :tone="statusTone(version.status)">
                     {{ versionStatusLabel(version.status) }}
@@ -498,8 +530,35 @@ onBeforeUnmount(() => controller?.abort())
 <style scoped>
 .document-template-page__columns {
   display: grid;
-  grid-template-columns: minmax(18rem, 0.7fr) minmax(36rem, 1.3fr);
+  grid-template-columns: minmax(12rem, 0.55fr) minmax(18rem, 0.8fr) minmax(0, 1.65fr);
   gap: var(--v2-space-4);
+}
+
+.document-template-page__columns > * {
+  min-width: 0;
+}
+
+.document-template-page__business-list {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.document-template-page__business-option,
+.document-template-page__version-button {
+  padding: var(--v2-space-2) var(--v2-space-3);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.document-template-page__business-option.is-selected,
+.document-template-page__version-button.is-selected {
+  border-color: var(--v2-color-primary);
+  box-shadow: inset 0 0 0 1px var(--v2-color-primary);
 }
 
 .document-template-page__list {
@@ -562,7 +621,7 @@ onBeforeUnmount(() => controller?.abort())
   resize: vertical;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1180px) {
   .document-template-page__columns {
     grid-template-columns: 1fr;
   }

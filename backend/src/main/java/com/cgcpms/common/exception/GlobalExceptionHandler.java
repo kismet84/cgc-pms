@@ -28,6 +28,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.UUID;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -40,6 +41,9 @@ public class GlobalExceptionHandler {
 
     private static final String SYSTEM_ERROR_CODE = "SYSTEM_ERROR";
     private static final String VALIDATION_ERROR_CODE = "VALIDATION_ERROR";
+    private static final Set<String> HIDDEN_RESOURCE_CODES =
+            Set.of("COMMUNICATION_NOT_FOUND", "COMMUNICATION_MEMBER_NOT_FOUND",
+                    "COMMUNICATION_MESSAGE_NOT_FOUND", "FILE_BIZ_OBJ_NOT_FOUND", "FILE_NOT_FOUND");
 
     @ExceptionHandler(RateLimitExceededException.class)
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
@@ -53,6 +57,10 @@ public class GlobalExceptionHandler {
         log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
         if ("PROJECT_ACCESS_DENIED".equals(e.getCode())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(forbiddenResponse());
+        }
+        if (HIDDEN_RESOURCE_CODES.contains(e.getCode())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.fail("RESOURCE_NOT_FOUND", "资源不存在"));
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
     }

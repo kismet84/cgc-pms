@@ -13,3 +13,4 @@ export * from "./workflow";
 export * from "./supply-chain";
 export * from "./subcontract";
 export * from "./finance";
+export * from "./communication";

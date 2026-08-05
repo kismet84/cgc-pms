@@ -15,6 +15,7 @@ import {
   markNotificationRead,
 } from '@/services/alerts'
 import { loadPreferences, type UserPreferences } from '@/services/account'
+import { loadCommunicationUnreadCount, openCommunicationStream } from '@/services/communication'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -29,6 +30,7 @@ const notificationItems = ref<NotificationRecord[]>([])
 const notificationUnreadCount = ref<number | null>(null)
 const notificationLoading = ref(false)
 const notificationError = ref('')
+const communicationUnreadCount = ref<number | null>(null)
 const demoRoleSwitcherOpen = ref(false)
 const switchingDemoUser = ref<string | null>(null)
 const isMobile = ref(false)
@@ -39,10 +41,13 @@ let mobileMedia: MediaQueryList | null = null
 let removeAfterEach: (() => void) | null = null
 let restoreMenuFocus = false
 let notificationController: AbortController | null = null
+let communicationController: AbortController | null = null
+let communicationStream: EventSource | null = null
 
 const navigation = computed(() => visibleNavigation(session.roles, session.permissions))
 const canRequestNotifications = computed(() => canRequestAlertNotifications(session.permissions))
 const canEditNotifications = computed(() => hasPermission(session.permissions, 'notification:edit'))
+const canViewCommunication = computed(() => session.hasAdminOrPermission('communication:view'))
 const activeMatch = computed(() => findWorkspace(route.path))
 const visibleActiveWorkspace = computed(() => {
   const match = activeMatch.value
@@ -104,6 +109,15 @@ watch(
   { immediate: true },
 )
 
+watch(
+  canViewCommunication,
+  (allowed) => {
+    if (allowed) startCommunication()
+    else clearCommunication()
+  },
+  { immediate: true },
+)
+
 watch(mobileNavigationOpen, async (open) => {
   document.body.classList.toggle('v2-mobile-nav-open', isMobile.value && open)
   if (open) {
@@ -119,6 +133,7 @@ watch(mobileNavigationOpen, async (open) => {
 onMounted(() => {
   void initializeWorkspaceContext()
   window.addEventListener('v2-preferences-updated', onPreferencesUpdated)
+  window.addEventListener('communication-unread-changed', refreshCommunicationUnread)
   void loadShellPreferences()
   mobileMedia = window.matchMedia('(max-width: 48rem)')
   syncMobileMode(mobileMedia)
@@ -172,7 +187,9 @@ async function initializeWorkspaceContext(): Promise<void> {
 
 onBeforeUnmount(() => {
   notificationController?.abort()
+  clearCommunication()
   window.removeEventListener('v2-preferences-updated', onPreferencesUpdated)
+  window.removeEventListener('communication-unread-changed', refreshCommunicationUnread)
   mobileMedia?.removeEventListener('change', syncMobileMode)
   removeAfterEach?.()
   document.body.classList.remove('v2-mobile-nav-open')
@@ -183,6 +200,40 @@ function clearNotifications(): void {
   notificationItems.value = []
   notificationUnreadCount.value = null
   notificationError.value = ''
+}
+
+function clearCommunication(): void {
+  communicationController?.abort()
+  communicationController = null
+  communicationStream?.close()
+  communicationStream = null
+  communicationUnreadCount.value = null
+}
+
+async function refreshCommunicationUnread(): Promise<void> {
+  if (!canViewCommunication.value) return
+  communicationController?.abort()
+  const controller = new AbortController()
+  communicationController = controller
+  try {
+    const unread = await loadCommunicationUnreadCount(controller.signal)
+    if (!controller.signal.aborted) communicationUnreadCount.value = unread.count
+  } catch {
+    if (!controller.signal.aborted) communicationUnreadCount.value = null
+  } finally {
+    if (communicationController === controller) communicationController = null
+  }
+}
+
+function startCommunication(): void {
+  clearCommunication()
+  void refreshCommunicationUnread()
+  communicationStream = openCommunicationStream((event) => {
+    void refreshCommunicationUnread()
+    if (event.action !== 'PING') {
+      window.dispatchEvent(new CustomEvent('communication-refresh', { detail: event }))
+    }
+  })
 }
 
 async function refreshNotifications(): Promise<void> {
@@ -515,6 +566,24 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
           />
         </div>
 
+        <RouterLink
+          v-if="canViewCommunication"
+          to="/communication"
+          class="app-shell__notification app-shell__communication"
+          :aria-label="
+            communicationUnreadCount === null
+              ? '打开站内通讯'
+              : `打开站内通讯，${communicationUnreadCount} 条未读`
+          "
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 5h16v11H8l-4 4V5zM8 9h8M8 12h5" />
+          </svg>
+          <span v-if="communicationUnreadCount" class="app-shell__notification-count">{{
+            communicationUnreadCount > 99 ? '99+' : communicationUnreadCount
+          }}</span>
+        </RouterLink>
+
         <button
           type="button"
           class="app-shell__notification"
@@ -844,7 +913,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   height: 4.0625rem;
   min-height: 4.0625rem;
   display: grid;
-  grid-template-columns: minmax(24rem, 1fr) auto auto;
+  grid-template-columns: minmax(24rem, 1fr) auto auto auto;
   align-items: center;
   gap: var(--v2-space-4);
   padding: var(--v2-space-2) var(--v2-page-gutter);
@@ -1249,7 +1318,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
 
 @media (max-width: 70rem) and (min-width: 48.01rem) {
   .app-shell__header {
-    grid-template-columns: minmax(20rem, 1fr) auto auto;
+    grid-template-columns: minmax(20rem, 1fr) auto auto auto;
   }
 
   .app-shell__context-controls {
@@ -1299,7 +1368,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   .app-shell__header {
     height: auto;
     min-height: auto;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     gap: var(--v2-space-2);
     padding: var(--v2-space-3);
   }
@@ -1342,13 +1411,18 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
     display: none;
   }
 
-  .app-shell__notification {
+  .app-shell__communication {
     grid-column: 3;
     grid-row: 1;
   }
 
-  .app-shell__account {
+  .app-shell__notification:not(.app-shell__communication) {
     grid-column: 4;
+    grid-row: 1;
+  }
+
+  .app-shell__account {
+    grid-column: 5;
     grid-row: 1;
   }
 

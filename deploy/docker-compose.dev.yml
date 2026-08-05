@@ -106,6 +106,29 @@ services:
     networks:
       - cgc-pms-dev-net
 
+  # Isolated OOXML -> PDF converter. No database, MinIO, or external-network access.
+  office-preview:
+    build:
+      context: ./office-preview
+    container_name: cgc-pms-office-preview-dev
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 1.0
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - office-preview-net
+
   # ===========================================================================
   # Backend — Spring Boot from pre-built JAR (bind mount source)
   # ===========================================================================
@@ -156,6 +179,7 @@ services:
       VIRUS_SCAN_ENABLED: "true"
       VIRUS_SCAN_HOST: clamav
       VIRUS_SCAN_PORT: "3310"
+      PROJECT_FILE_PREVIEW_CONVERTER_URL: "http://office-preview:8080/convert"
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD:?JASYPT_ENCRYPTOR_PASSWORD is required}
       CGCPMS_BOOTSTRAP_ENABLED: ${CGCPMS_BOOTSTRAP_ENABLED:-false}
@@ -178,6 +202,7 @@ services:
       start_period: 30s
     networks:
       - cgc-pms-dev-net
+      - office-preview-net
 
   # ===========================================================================
   # Frontend — current Vite dev server with HMR (bind mount source)
@@ -223,6 +248,9 @@ services:
 networks:
   cgc-pms-dev-net:
     driver: bridge
+  office-preview-net:
+    driver: bridge
+    internal: true
 
 # ===========================================================================
 # Volumes

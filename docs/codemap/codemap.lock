@@ -1,7 +1,7 @@
 {
-  "current_commit": "cd0c3a2e7032cb636de8c9b95cc6b86faed49ead",
+  "current_commit": "fdbbc94b44ed26c0119b7664bb756f0da18a83c8",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-05T20:47:26+08:00",
+  "generation_time": "2026-08-05T18:13:41.367Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,16 +52,17 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3686,
-  "repository_file_count": 3695,
-  "included_file_count": 2425,
+  "tracked_file_count": 3735,
+  "repository_file_count": 3735,
+  "included_file_count": 2465,
   "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
+      "backend",
       "documentation"
     ],
-    "reason": "Mainline 72 G5 merge and post-merge evidence reconciled; code-map topology unchanged."
+    "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
   "modules": [
     {
@@ -79,8 +80,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1725,
-      "fingerprint": "618ceea8931230578fec3c3a6e70bbfede96a35c9e84fc6f9289fa20111662bc"
+      "file_count": 1745,
+      "fingerprint": "bb7321529d794f6395859925a6cf9094e912b6286b67d9764d1b788f6ee19ae0"
     },
     {
       "id": "delivery_tooling",
@@ -91,24 +92,24 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 257,
-      "fingerprint": "0bbbdd420923306b774442502bbbc14e83cc5a28364f43b31bd901d0b9c53703"
+      "file_count": 260,
+      "fingerprint": "cef79e21836bf18ee5e54b194d0466a14de583de8fc062f896569bbbd33d315e"
     },
     {
       "id": "documentation",
       "scope": [
         "docs/**"
       ],
-      "file_count": 92,
-      "fingerprint": "a22e9ba936811797e2ed3110f0c1bc19fcb1135477779bf5f91ee466f0b03d52"
+      "file_count": 98,
+      "fingerprint": "115b79468781d1793e8bfef37c74a051f0aa4fc7019806f8283edd4718bfa444"
     },
     {
       "id": "frontend_v2",
       "scope": [
         "frontend-admin-v2/**"
       ],
-      "file_count": 245,
-      "fingerprint": "68540c9f5048e743153bd7c368c81a5d5b5ae37fcdf52bc14f722823b6d1a167"
+      "file_count": 255,
+      "fingerprint": "8864883262cef86627ea28af94106151c0200469c8345dfe8335843d6e5bdc66"
     },
     {
       "id": "mobile",
@@ -131,8 +132,8 @@
       "scope": [
         "packages/**"
       ],
-      "file_count": 18,
-      "fingerprint": "afc19ea27e51a6b4e39a6d6e8a90d265772ccf4ba933f13ac7db9d57d44e2709"
+      "file_count": 19,
+      "fingerprint": "17f0ed7a3271d11bd069c9d0ce1d9f13e0fcfda1457368effc23b9bb8f2d05bf"
     }
   ]
 }

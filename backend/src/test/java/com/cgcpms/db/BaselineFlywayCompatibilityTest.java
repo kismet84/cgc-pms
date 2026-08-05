@@ -25,8 +25,14 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("280", flyway.info().current().getVersion().getVersion());
+        assertEquals("284", flyway.info().current().getVersion().getVersion());
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='sys_file_object_task'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_catalog'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_version_link'"));
+        assertEquals(10, count(flyway, "sys_dict_data",
+                "dict_type_id=(SELECT id FROM sys_dict_type WHERE dict_code='file_category' AND tenant_id=0)"));
+        assertEquals(2, count(flyway, "sys_menu",
+                "perms IN ('project:file:query','project:file:manage') AND deleted_flag=0"));
         execute(flyway, """
                 INSERT INTO sys_file
                     (id,tenant_id,business_type,business_id,file_name,original_name,file_size,
@@ -168,7 +174,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("280", current.info().current().getVersion().getVersion());
+        assertEquals("284", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
@@ -266,6 +272,49 @@ class BaselineFlywayCompatibilityTest {
     }
 
     @Test
+    void v282H2EnforcesProjectFileCodeVersionAndFileIdentity() {
+        Flyway flyway = flyway("v282_project_file_constraints", ACTIVE, LEGACY, JAVA);
+        flyway.migrate();
+        execute(flyway, """
+                INSERT INTO pm_project(id,tenant_id,project_code,project_name)
+                VALUES(282101,282,'P282','项目文件约束测试')
+                """);
+        execute(flyway, """
+                INSERT INTO sys_file(id,tenant_id,business_type,business_id,file_name,original_name,
+                                     file_size,content_type,storage_path,bucket_name,virus_scan_status,deleted_flag)
+                VALUES(282201,282,'PROJECT',282101,'a.pdf','a.pdf',1,'application/pdf','p/a.pdf','files','CLEAN',0),
+                      (282202,282,'PROJECT',282101,'b.pdf','b.pdf',1,'application/pdf','p/b.pdf','files','CLEAN',0)
+                """);
+        execute(flyway, """
+                INSERT INTO project_file_catalog(id,tenant_id,project_id,file_code,display_name,category_code,
+                    source_kind,maintain_mode,created_at,updated_at,deleted_flag)
+                VALUES(282301,282,282101,'FILE-P282-20260805-001','约束文件','OTHER',
+                    'MANAGED','MANAGED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """);
+        execute(flyway, """
+                INSERT INTO project_file_version_link(id,tenant_id,catalog_id,version_no,sys_file_id,
+                    preview_status,created_at,updated_at,deleted_flag)
+                VALUES(282401,282,282301,1,282201,'READY',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO project_file_catalog(id,tenant_id,project_id,file_code,display_name,category_code,
+                    source_kind,maintain_mode,created_at,updated_at,deleted_flag)
+                VALUES(282302,282,282101,'FILE-P282-20260805-001','重复编号','OTHER',
+                    'MANAGED','MANAGED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """));
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO project_file_version_link(id,tenant_id,catalog_id,version_no,sys_file_id,
+                    preview_status,created_at,updated_at,deleted_flag)
+                VALUES(282402,282,282301,1,282202,'READY',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """));
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO project_file_version_link(id,tenant_id,catalog_id,version_no,sys_file_id,
+                    preview_status,created_at,updated_at,deleted_flag)
+                VALUES(282403,282,282301,2,282201,'READY',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """));
+    }
+
+    @Test
     void paymentRelationOrphanBlocksV226Upgrade() {
         Flyway old = Flyway.configure()
                 .dataSource(url("payment_orphan"), "sa", "")
@@ -349,7 +398,7 @@ class BaselineFlywayCompatibilityTest {
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
                 WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
-                                                           27401,27402,27403,27404)
+                                                           27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY tenant_id, role_id, menu_id
                 """);
         List<String> rolePermissions = rows(old, """
@@ -358,7 +407,7 @@ class BaselineFlywayCompatibilityTest {
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
                   AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
-                                                                 27401,27402,27403,27404)
+                                                                 27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY 1
                 """);
 
@@ -369,7 +418,7 @@ class BaselineFlywayCompatibilityTest {
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
                 WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
-                                                           27401,27402,27403,27404)
+                                                           27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY tenant_id, role_id, menu_id
                 """));
         assertEquals(rolePermissions, rows(current, """
@@ -378,7 +427,7 @@ class BaselineFlywayCompatibilityTest {
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
                   AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
-                                                                 27401,27402,27403,27404)
+                                                                 27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY 1
                 """));
         assertEquals(2, count(current, "sys_menu",

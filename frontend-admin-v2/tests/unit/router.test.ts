@@ -35,6 +35,25 @@ beforeEach(() => {
 })
 
 describe('V2 application-shell routes', () => {
+  it('registers communication separately from notification permissions', () => {
+    const route = routes
+      .flatMap((item) => item.children ?? [])
+      .find((item) => item.path === '/communication')
+
+    expect(route?.meta).toMatchObject({
+      permission: 'communication:view',
+      adminBypassesPermission: true,
+    })
+  })
+
+  it('registers the project file center with its query permission', () => {
+    const route = routes
+      .flatMap((item) => item.children ?? [])
+      .find((item) => item.path === '/project/files')
+
+    expect(route?.meta?.permission).toBe('project:file:query')
+  })
+
   it('keeps retired Legacy as frozen ledger universe and locks acceptance counts', () => {
     const ledger = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docs/ui-v2/route-migration-ledger.json'), 'utf8'),

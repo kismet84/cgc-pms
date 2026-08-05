@@ -1,243 +1,1647 @@
 {
-  "generated_at": "2026-08-05T19:05:54+08:00",
-  "generated_from_commit": "ac6bd6c37c99888021ca0e7037a8f2a03d465df2",
-  "scope": ["frontend-admin-v2", "packages/frontend-contracts", "backend", "deploy", ".github/workflows", "scripts/ci"],
+  "generated_at": "2026-08-05T18:13:41.367Z",
+  "generated_from_commit": "fdbbc94b44ed26c0119b7664bb756f0da18a83c8",
+  "scope": [
+    "frontend-admin-v2",
+    "packages/frontend-contracts",
+    "backend",
+    "deploy",
+    ".github/workflows",
+    "scripts/ci"
+  ],
   "nodes": [
     {
-      "id": "v2-client", "label": "V2 管理端", "type": "client", "boundary": "浏览器", "layer": 0,
-      "path": "frontend-admin-v2/src", "role": "Vue 3 管理端入口、路由、状态与 API 调用。",
-      "entrypoints": [{"path": "frontend-admin-v2/src/main.ts", "symbol": "const app = createApp(App)"}],
-      "tests": [{"path": "frontend-admin-v2/e2e/shell-live.spec.ts", "symbol": "test.describe"}],
-      "constraints": ["正式前端仅映射 frontend-admin-v2；旧 frontend-admin 被排除。", "业务请求统一经 /api。"],
-      "evidence": [{"path": "frontend-admin-v2/src/services/request.ts", "symbol": "export async function apiRequest"}]
+      "id": "v2-client",
+      "label": "V2 管理端",
+      "type": "client",
+      "boundary": "浏览器",
+      "layer": 0,
+      "path": "frontend-admin-v2/src",
+      "role": "Vue 3 管理端入口、路由、状态与 API 调用。",
+      "entrypoints": [
+        {
+          "path": "frontend-admin-v2/src/main.ts",
+          "symbol": "const app = createApp(App)"
+        }
+      ],
+      "tests": [
+        {
+          "path": "frontend-admin-v2/e2e/shell-live.spec.ts",
+          "symbol": "test.describe"
+        }
+      ],
+      "constraints": [
+        "正式前端仅映射 frontend-admin-v2；旧 frontend-admin 被排除。",
+        "业务请求统一经 /api。"
+      ],
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/request.ts",
+          "symbol": "export async function apiRequest"
+        }
+      ]
     },
     {
-      "id": "frontend-contracts", "label": "前端共享契约", "type": "library", "boundary": "浏览器", "layer": 0,
-      "path": "packages/frontend-contracts", "role": "前端共享认证与 API 类型契约。",
-      "entrypoints": [{"path": "packages/frontend-contracts/src/index.ts", "symbol": "export * from \"./auth\""}],
-      "tests": [{"path": "frontend-admin-v2/tests/unit/contracts.test.ts", "symbol": "shared no-UI contracts"}],
-      "constraints": ["只承载无 UI 契约，不执行网络或业务逻辑。"],
-      "evidence": [{"path": "frontend-admin-v2/src/stores/session.ts", "symbol": "@cgc-pms/frontend-contracts"}]
+      "id": "frontend-contracts",
+      "label": "前端共享契约",
+      "type": "library",
+      "boundary": "浏览器",
+      "layer": 0,
+      "path": "packages/frontend-contracts",
+      "role": "前端共享认证与 API 类型契约。",
+      "entrypoints": [
+        {
+          "path": "packages/frontend-contracts/src/index.ts",
+          "symbol": "export * from \"./auth\""
+        }
+      ],
+      "tests": [
+        {
+          "path": "frontend-admin-v2/tests/unit/contracts.test.ts",
+          "symbol": "shared no-UI contracts"
+        }
+      ],
+      "constraints": [
+        "只承载无 UI 契约，不执行网络或业务逻辑。"
+      ],
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/stores/session.ts",
+          "symbol": "@cgc-pms/frontend-contracts"
+        }
+      ]
     },
     {
-      "id": "edge-proxy-deploy", "label": "边缘代理", "type": "edge", "boundary": "边缘层", "layer": 1,
-      "path": "deploy", "role": "Vite 开发代理与 Nginx 部署入口，把 /api 转发到后端。",
-      "entrypoints": [{"path": "deploy/m8/nginx.v2-root.conf", "symbol": "location /api/"}],
-      "tests": [{"path": "frontend-admin-v2/e2e/shell-live.spec.ts", "symbol": "test.describe"}],
-      "constraints": ["浏览器只依赖同源 /api；目标地址由环境配置。"],
-      "evidence": [{"path": "frontend-admin-v2/vite.config.ts", "symbol": "proxy:"}, {"path": "deploy/m8/nginx.v2-root.conf", "symbol": "proxy_pass"}]
+      "id": "edge-proxy-deploy",
+      "label": "边缘代理",
+      "type": "edge",
+      "boundary": "边缘层",
+      "layer": 1,
+      "path": "deploy",
+      "role": "Vite 开发代理与 Nginx 部署入口，把 /api 转发到后端。",
+      "entrypoints": [
+        {
+          "path": "deploy/m8/nginx.v2-root.conf",
+          "symbol": "location /api/"
+        }
+      ],
+      "tests": [
+        {
+          "path": "frontend-admin-v2/e2e/shell-live.spec.ts",
+          "symbol": "test.describe"
+        }
+      ],
+      "constraints": [
+        "浏览器只依赖同源 /api；目标地址由环境配置。"
+      ],
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/vite.config.ts",
+          "symbol": "proxy:"
+        },
+        {
+          "path": "deploy/m8/nginx.v2-root.conf",
+          "symbol": "proxy_pass"
+        }
+      ]
     },
     {
-      "id": "security-auth", "label": "安全与认证", "type": "security", "boundary": "后端", "layer": 2,
-      "path": "backend/src/main/java/com/cgcpms/auth", "role": "JWT 认证、授权过滤、登录态吊销与黑名单。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/auth/config/SecurityConfig.java", "symbol": "SecurityFilterChain filterChain"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/auth/service/AuthServiceTest.java", "symbol": "class AuthServiceTest"}, {"path": "backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java", "symbol": "class AuthControllerTest"}, {"path": "backend/src/test/java/com/cgcpms/auth/filter/JwtAuthenticationFilterTest.java", "symbol": "class JwtAuthenticationFilterTest"}, {"path": "backend/src/test/java/com/cgcpms/auth/service/TokenBlacklistServiceTest.java", "symbol": "class TokenBlacklistServiceTest"}],
-      "constraints": ["除显式放行端点外，API 请求需认证。", "黑名单状态依赖 Redis。", "登录与刷新同时受 tenant_id、用户启用状态和角色授权约束。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/auth/filter/JwtAuthenticationFilter.java", "symbol": "doFilterInternal"}, {"path": "backend/src/main/java/com/cgcpms/auth/service/AuthService.java", "symbol": "public LoginResponse login"}]
+      "id": "security-auth",
+      "label": "安全与认证",
+      "type": "security",
+      "boundary": "后端",
+      "layer": 2,
+      "path": "backend/src/main/java/com/cgcpms/auth",
+      "role": "JWT 认证、授权过滤、登录态吊销与黑名单。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/config/SecurityConfig.java",
+          "symbol": "SecurityFilterChain filterChain"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/auth/service/AuthServiceTest.java",
+          "symbol": "class AuthServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java",
+          "symbol": "class AuthControllerTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/auth/filter/JwtAuthenticationFilterTest.java",
+          "symbol": "class JwtAuthenticationFilterTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/auth/service/TokenBlacklistServiceTest.java",
+          "symbol": "class TokenBlacklistServiceTest"
+        }
+      ],
+      "constraints": [
+        "除显式放行端点外，API 请求需认证。",
+        "黑名单状态依赖 Redis。",
+        "登录与刷新同时受 tenant_id、用户启用状态和角色授权约束。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/filter/JwtAuthenticationFilter.java",
+          "symbol": "doFilterInternal"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/service/AuthService.java",
+          "symbol": "public LoginResponse login"
+        }
+      ]
     },
     {
-      "id": "spring-api", "label": "Spring API 平台", "type": "platform", "boundary": "后端", "layer": 2,
-      "path": "backend/src/main/java/com/cgcpms", "role": "Spring Boot 应用、REST 控制器、事务与通用基础设施。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java", "symbol": "public class CgcPmsApplication"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/Phase2FullChainIntegrationTest.java", "symbol": "class Phase2FullChainIntegrationTest"}],
-      "constraints": ["HTTP 上下文路径为 /api。", "领域写入由服务层事务控制。"],
-      "evidence": [{"path": "backend/src/main/resources/application.yml", "symbol": "context-path: /api"}]
+      "id": "spring-api",
+      "label": "Spring API 平台",
+      "type": "platform",
+      "boundary": "后端",
+      "layer": 2,
+      "path": "backend/src/main/java/com/cgcpms",
+      "role": "Spring Boot 应用、REST 控制器、事务与通用基础设施。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java",
+          "symbol": "public class CgcPmsApplication"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/Phase2FullChainIntegrationTest.java",
+          "symbol": "class Phase2FullChainIntegrationTest"
+        }
+      ],
+      "constraints": [
+        "HTTP 上下文路径为 /api。",
+        "领域写入由服务层事务控制。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/resources/application.yml",
+          "symbol": "context-path: /api"
+        }
+      ]
     },
     {
-      "id": "prod-config-gate", "label": "生产配置启动门禁", "type": "security", "boundary": "后端启动", "layer": 2,
-      "path": "backend/src/main/java/com/cgcpms/config/ProductionEnvironmentValidator.java", "role": "生产 profile 启动前拒绝占位密钥、回环或示例依赖地址及不安全 CORS。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java", "symbol": "application.addInitializers"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/config/ProductionEnvironmentValidatorTest.java", "symbol": "class ProductionEnvironmentValidatorTest"}],
-      "constraints": ["只在 prod profile 激活时执行。", "错误只报告配置键，不回显密钥或凭据。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/config/ProductionEnvironmentValidator.java", "symbol": "validate"}, {"path": "deploy/docker-compose.prod.yml", "symbol": "SPRING_PROFILES_ACTIVE: prod"}]
+      "id": "prod-config-gate",
+      "label": "生产配置启动门禁",
+      "type": "security",
+      "boundary": "后端启动",
+      "layer": 2,
+      "path": "backend/src/main/java/com/cgcpms/config/ProductionEnvironmentValidator.java",
+      "role": "生产 profile 启动前拒绝占位密钥、回环或示例依赖地址及不安全 CORS。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java",
+          "symbol": "application.addInitializers"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/config/ProductionEnvironmentValidatorTest.java",
+          "symbol": "class ProductionEnvironmentValidatorTest"
+        }
+      ],
+      "constraints": [
+        "只在 prod profile 激活时执行。",
+        "错误只报告配置键，不回显密钥或凭据。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/config/ProductionEnvironmentValidator.java",
+          "symbol": "validate"
+        },
+        {
+          "path": "deploy/docker-compose.prod.yml",
+          "symbol": "SPRING_PROFILES_ACTIVE: prod"
+        }
+      ]
     },
     {
-      "id": "bid-project-scope", "label": "投标与项目范围", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/bid", "role": "投标成本读写及现金日记账关联投标时的租户、项目成员范围约束。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java", "symbol": "class BidCostController"}, {"path": "backend/src/main/java/com/cgcpms/cashbook/controller/CashJournalController.java", "symbol": "class CashJournalController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java", "symbol": "class BidCostServiceTest"}, {"path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java", "symbol": "class BidProjectScopeH2Test"}, {"path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java", "symbol": "class BidProjectScopeMySqlTest"}, {"path": "backend/src/test/java/com/cgcpms/cashbook/CashJournalPrivacyTest.java", "symbol": "class CashJournalPrivacyTest"}],
-      "constraints": ["非跨项目权限用户只能访问自己参与的项目。", "越权拒绝发生在写入前。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java", "symbol": "ensureBoundProjectVisible"}, {"path": "backend/src/main/java/com/cgcpms/bid/mapper/BidCostMapper.java", "symbol": "selectCostOptions"}, {"path": "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java", "symbol": "requireBidWriteScope"}]
+      "id": "bid-project-scope",
+      "label": "投标与项目范围",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/bid",
+      "role": "投标成本读写及现金日记账关联投标时的租户、项目成员范围约束。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java",
+          "symbol": "class BidCostController"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/cashbook/controller/CashJournalController.java",
+          "symbol": "class CashJournalController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java",
+          "symbol": "class BidCostServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java",
+          "symbol": "class BidProjectScopeH2Test"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java",
+          "symbol": "class BidProjectScopeMySqlTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/cashbook/CashJournalPrivacyTest.java",
+          "symbol": "class CashJournalPrivacyTest"
+        }
+      ],
+      "constraints": [
+        "非跨项目权限用户只能访问自己参与的项目。",
+        "越权拒绝发生在写入前。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java",
+          "symbol": "ensureBoundProjectVisible"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/mapper/BidCostMapper.java",
+          "symbol": "selectCostOptions"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java",
+          "symbol": "requireBidWriteScope"
+        }
+      ]
     },
     {
-      "id": "project-contract-cost", "label": "项目 / 合同 / 成本", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/project", "role": "项目、合同、目标成本与开工门禁聚合。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/project/controller/ProjectCommencementController.java", "symbol": "class ProjectCommencementController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/project/ProjectCommencementServiceTest.java", "symbol": "class ProjectCommencementServiceTest"}],
-      "constraints": ["节点聚合 project、contract、cost；低层文件不单列。", "开工与合同审批通过 WorkflowEngine。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/project/service/ProjectCommencementService.java", "symbol": "public class ProjectCommencementService"}, {"path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java", "symbol": "public class CtContractService"}]
+      "id": "project-contract-cost",
+      "label": "项目 / 合同 / 成本",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/project",
+      "role": "项目、合同、目标成本与开工门禁聚合。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/controller/ProjectCommencementController.java",
+          "symbol": "class ProjectCommencementController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/project/ProjectCommencementServiceTest.java",
+          "symbol": "class ProjectCommencementServiceTest"
+        }
+      ],
+      "constraints": [
+        "节点聚合 project、contract、cost；低层文件不单列。",
+        "开工与合同审批通过 WorkflowEngine。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/ProjectCommencementService.java",
+          "symbol": "public class ProjectCommencementService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java",
+          "symbol": "public class CtContractService"
+        }
+      ]
     },
     {
-      "id": "supply-inventory", "label": "供应链与库存", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/purchase", "role": "采购申请、采购订单、收料、库存与材料主数据。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/purchase/controller/MatPurchaseOrderController.java", "symbol": "class MatPurchaseOrderController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/purchase/handler/PurchaseOrderWorkflowHandlerTest.java", "symbol": "class PurchaseOrderWorkflowHandlerTest"}],
-      "constraints": ["节点聚合 purchase、receipt、inventory、material。", "采购审批由工作流驱动。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java", "symbol": "workflowEngine.submitPurchaseOrder"}]
+      "id": "supply-inventory",
+      "label": "供应链与库存",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/purchase",
+      "role": "采购申请、采购订单、收料、库存与材料主数据。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/controller/MatPurchaseOrderController.java",
+          "symbol": "class MatPurchaseOrderController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/purchase/handler/PurchaseOrderWorkflowHandlerTest.java",
+          "symbol": "class PurchaseOrderWorkflowHandlerTest"
+        }
+      ],
+      "constraints": [
+        "节点聚合 purchase、receipt、inventory、material。",
+        "采购审批由工作流驱动。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
+          "symbol": "workflowEngine.submitPurchaseOrder"
+        }
+      ]
     },
     {
-      "id": "construction-fulfillment", "label": "施工履约", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/schedule", "role": "计划、WBS、质量、安全、变更、签证与项目收尾。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/schedule/controller/ProjectScheduleController.java", "symbol": "class ProjectScheduleController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/schedule/ProjectScheduleServiceQueryTest.java", "symbol": "class ProjectScheduleServiceQueryTest"}],
-      "constraints": ["节点聚合 schedule、wbs、quality、safety、variation、closeout。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java", "symbol": "public class ProjectScheduleService"}]
+      "id": "construction-fulfillment",
+      "label": "施工履约",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/schedule",
+      "role": "计划、WBS、质量、安全、变更、签证与项目收尾。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/schedule/controller/ProjectScheduleController.java",
+          "symbol": "class ProjectScheduleController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/schedule/ProjectScheduleServiceQueryTest.java",
+          "symbol": "class ProjectScheduleServiceQueryTest"
+        }
+      ],
+      "constraints": [
+        "节点聚合 schedule、wbs、quality、safety、variation、closeout。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java",
+          "symbol": "public class ProjectScheduleService"
+        }
+      ]
     },
     {
-      "id": "workflow", "label": "工作流引擎", "type": "platform", "boundary": "后端", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/workflow", "role": "审批实例、任务、处理器路由、通过/拒绝回调与通知。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/workflow/controller/WorkflowController.java", "symbol": "class WorkflowController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/workflow/WorkflowEngineIntegrationTest.java", "symbol": "class WorkflowEngineIntegrationTest"}],
-      "constraints": ["领域审批状态只能经工作流处理器回调推进。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowEngine.java", "symbol": "public class WorkflowEngine"}, {"path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowCoreService.java", "symbol": "handler.onApproved"}]
+      "id": "workflow",
+      "label": "工作流引擎",
+      "type": "platform",
+      "boundary": "后端",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/workflow",
+      "role": "审批实例、任务、处理器路由、通过/拒绝回调与通知。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/controller/WorkflowController.java",
+          "symbol": "class WorkflowController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/workflow/WorkflowEngineIntegrationTest.java",
+          "symbol": "class WorkflowEngineIntegrationTest"
+        }
+      ],
+      "constraints": [
+        "领域审批状态只能经工作流处理器回调推进。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowEngine.java",
+          "symbol": "public class WorkflowEngine"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowCoreService.java",
+          "symbol": "handler.onApproved"
+        }
+      ]
     },
     {
-      "id": "notification-alert", "label": "通知与预警", "type": "platform", "boundary": "后端", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/notification", "role": "站内通知、预警规则求值与计划任务。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java", "symbol": "@Scheduled"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java", "symbol": "class AlertEvaluationServiceTest"}],
-      "constraints": ["当前图只确认站内通知与服务端预警；浏览器实时订阅未取得源码证据。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/notification/service/NotificationService.java", "symbol": "public class NotificationService"}]
+      "id": "notification-alert",
+      "label": "通知与预警",
+      "type": "platform",
+      "boundary": "后端",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/notification",
+      "role": "站内通知、预警规则求值与计划任务。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java",
+          "symbol": "@Scheduled"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java",
+          "symbol": "class AlertEvaluationServiceTest"
+        }
+      ],
+      "constraints": [
+        "当前图只确认站内通知与服务端预警；浏览器实时订阅未取得源码证据。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/notification/service/NotificationService.java",
+          "symbol": "public class NotificationService"
+        }
+      ]
     },
     {
-      "id": "finance-accounting", "label": "资金与核算", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/payment", "role": "付款申请、支付记录、现金日记账与资金闭环。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/payment/controller/PayRecordController.java", "symbol": "class PayRecordController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/payment/PayRecordCashJournalIntegrationTest.java", "symbol": "class PayRecordCashJournalIntegrationTest"}],
-      "constraints": ["节点聚合 payment 与 cashbook。", "支付归档后才形成正式现金日记账影响。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java", "symbol": "cashJournalService.createPendingFromPayRecord"}, {"path": "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java", "symbol": "public class CashJournalService"}]
+      "id": "communication",
+      "label": "站内即时通讯",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/communication",
+      "role": "租户隔离会话、成员治理、消息幂等发送、未读与最小化 SSE 事件。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/controller/CommunicationController.java",
+          "symbol": "class CommunicationController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/communication/CommunicationServiceTest.java",
+          "symbol": "class CommunicationServiceTest"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/communication-page.test.ts",
+          "symbol": "describe"
+        }
+      ],
+      "constraints": [
+        "消息序号在会话行锁内生成；客户端消息ID按租户和发送人幂等。",
+        "附件复用文件域并要求草稿归属、成员资格和 CLEAN 状态。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationService.java",
+          "symbol": "public MessageRecord send"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationEventService.java",
+          "symbol": "public SseEmitter subscribe"
+        }
+      ]
     },
     {
-      "id": "file-document", "label": "文件与文档", "type": "domain", "boundary": "业务域", "layer": 3,
-      "path": "backend/src/main/java/com/cgcpms/file", "role": "文件上传、病毒扫描、对象存储元数据与文档生成。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/file/controller/FileController.java", "symbol": "class FileController"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/file/FileServiceTest.java", "symbol": "class FileServiceTest"}],
-      "constraints": ["文件入库前必须完成扫描。", "元数据写 MySQL；内容写 MinIO。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/file/service/FileService.java", "symbol": "virusScanner.scan"}]
+      "id": "finance-accounting",
+      "label": "资金与核算",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/payment",
+      "role": "付款申请、支付记录、现金日记账与资金闭环。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/controller/PayRecordController.java",
+          "symbol": "class PayRecordController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/payment/PayRecordCashJournalIntegrationTest.java",
+          "symbol": "class PayRecordCashJournalIntegrationTest"
+        }
+      ],
+      "constraints": [
+        "节点聚合 payment 与 cashbook。",
+        "支付归档后才形成正式现金日记账影响。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "cashJournalService.createPendingFromPayRecord"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java",
+          "symbol": "public class CashJournalService"
+        }
+      ]
     },
     {
-      "id": "async-runtime", "label": "异步运行时", "type": "queue", "boundary": "后端", "layer": 4,
-      "path": "backend/src/main/java/com/cgcpms/config/AsyncConfig.java", "role": "Spring 进程内线程池与 @Scheduled 调度；不是持久化消息队列。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/config/AsyncConfig.java", "symbol": "ThreadPoolTaskExecutor"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/config/AsyncConfigTest.java", "symbol": "class AsyncConfigTest"}],
-      "constraints": ["未发现 Kafka、RabbitMQ 等持久化外部队列。", "进程退出时任务持久性未由此组件保证。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java", "symbol": "@EnableAsync"}]
+      "id": "file-document",
+      "label": "文件与文档",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/file",
+      "role": "文件上传、病毒扫描、对象存储元数据与文档生成。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/controller/FileController.java",
+          "symbol": "class FileController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/file/FileServiceTest.java",
+          "symbol": "class FileServiceTest"
+        }
+      ],
+      "constraints": [
+        "文件入库前必须完成扫描。",
+        "元数据写 MySQL；内容写 MinIO。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/service/FileService.java",
+          "symbol": "virusScanner.scan"
+        }
+      ]
     },
     {
-      "id": "mysql-flyway", "label": "MySQL 数据库与 Flyway", "type": "database", "boundary": "数据层", "layer": 5,
-      "path": "backend/src/main/resources/db/migration", "role": "主关系数据库与版本化 Schema 迁移。",
-      "entrypoints": [{"path": "backend/src/main/resources/application-dev.yml", "symbol": "datasource:"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/db/BaselineFlywayCompatibilityTest.java", "symbol": "class BaselineFlywayCompatibilityTest"}],
-      "constraints": ["已应用 Flyway migration 不修改；结构变化新增版本。"],
-      "evidence": [{"path": "backend/pom.xml", "symbol": "flyway-mysql"}]
+      "id": "project-file-center",
+      "label": "项目文件中心",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/projectfile",
+      "role": "项目范围内逻辑目录、版本索引、历史业务只读聚合和受控预览。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/projectfile/ProjectFileController.java",
+          "symbol": "class ProjectFileController"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/projectfile/ProjectFileObjectTaskTest.java",
+          "symbol": "class ProjectFileObjectTaskTest"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/project-file-center.test.ts",
+          "symbol": "describe"
+        }
+      ],
+      "constraints": [
+        "只保存 sys_file 引用，不复制原文件事实。",
+        "业务来源文件只读，并同时校验中心、项目和来源业务读取权限。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/projectfile/ProjectFileService.java",
+          "symbol": "public PageResult<ProjectFileModels.Record> page"
+        }
+      ]
     },
     {
-      "id": "redis", "label": "Redis 缓存", "type": "cache", "boundary": "数据层", "layer": 5,
-      "path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java", "role": "JWT 黑名单与短期认证状态存储。",
-      "entrypoints": [{"path": "backend/src/main/resources/application-dev.yml", "symbol": "redis:"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/auth/service/TokenBlacklistServiceTest.java", "symbol": "class TokenBlacklistServiceTest"}],
-      "constraints": ["Redis 不可用会影响令牌吊销语义。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java", "symbol": "redisTemplate.opsForValue"}]
+      "id": "async-runtime",
+      "label": "异步运行时",
+      "type": "queue",
+      "boundary": "后端",
+      "layer": 4,
+      "path": "backend/src/main/java/com/cgcpms/config/AsyncConfig.java",
+      "role": "Spring 进程内线程池与 @Scheduled 调度；不是持久化消息队列。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/config/AsyncConfig.java",
+          "symbol": "ThreadPoolTaskExecutor"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/config/AsyncConfigTest.java",
+          "symbol": "class AsyncConfigTest"
+        }
+      ],
+      "constraints": [
+        "未发现 Kafka、RabbitMQ 等持久化外部队列。",
+        "进程退出时任务持久性未由此组件保证。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java",
+          "symbol": "@EnableAsync"
+        }
+      ]
     },
     {
-      "id": "minio", "label": "MinIO 对象存储", "type": "external", "boundary": "外部依赖", "layer": 5,
-      "path": "backend/src/main/java/com/cgcpms/config/MinioConfig.java", "role": "S3 兼容对象存储，保存上传与生成文件内容。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/config/MinioConfig.java", "symbol": "MinioClient minioClient"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/config/MinioHealthIndicatorTest.java", "symbol": "class MinioHealthIndicatorTest"}],
-      "constraints": ["对象内容与 MySQL 元数据需保持一致。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/file/service/FileService.java", "symbol": "putObjectWithRetry"}]
+      "id": "mysql-flyway",
+      "label": "MySQL 数据库与 Flyway",
+      "type": "database",
+      "boundary": "数据层",
+      "layer": 5,
+      "path": "backend/src/main/resources/db/migration",
+      "role": "主关系数据库与版本化 Schema 迁移。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/resources/application-dev.yml",
+          "symbol": "datasource:"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/db/BaselineFlywayCompatibilityTest.java",
+          "symbol": "class BaselineFlywayCompatibilityTest"
+        }
+      ],
+      "constraints": [
+        "已应用 Flyway migration 不修改；结构变化新增版本。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/pom.xml",
+          "symbol": "flyway-mysql"
+        }
+      ]
     },
     {
-      "id": "clamav", "label": "ClamAV 病毒扫描", "type": "external", "boundary": "外部依赖", "layer": 5,
-      "path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java", "role": "上传文件病毒扫描适配器。",
-      "entrypoints": [{"path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java", "symbol": "public class ClamAvVirusScanner"}],
-      "tests": [{"path": "backend/src/test/java/com/cgcpms/file/FileServiceTest.java", "symbol": "class FileServiceTest"}],
-      "constraints": ["仅确认 FileService 单测覆盖扫描协作；真实 ClamAV 集成测试未发现。"],
-      "evidence": [{"path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java", "symbol": "ScanResult.clean"}]
+      "id": "redis",
+      "label": "Redis 缓存",
+      "type": "cache",
+      "boundary": "数据层",
+      "layer": 5,
+      "path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java",
+      "role": "JWT 黑名单与短期认证状态存储。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/resources/application-dev.yml",
+          "symbol": "redis:"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/auth/service/TokenBlacklistServiceTest.java",
+          "symbol": "class TokenBlacklistServiceTest"
+        }
+      ],
+      "constraints": [
+        "Redis 不可用会影响令牌吊销语义。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java",
+          "symbol": "redisTemplate.opsForValue"
+        }
+      ]
     },
     {
-      "id": "observability", "label": "可观测性", "type": "observability", "boundary": "运维", "layer": 4,
-      "path": "deploy/monitoring", "role": "Actuator、Prometheus 抓取与 Grafana 运行监控配置。",
-      "entrypoints": [{"path": "deploy/monitoring/prometheus.yml", "symbol": "/api/actuator/prometheus"}],
+      "id": "minio",
+      "label": "MinIO 对象存储",
+      "type": "external",
+      "boundary": "外部依赖",
+      "layer": 5,
+      "path": "backend/src/main/java/com/cgcpms/config/MinioConfig.java",
+      "role": "S3 兼容对象存储，保存上传与生成文件内容。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/config/MinioConfig.java",
+          "symbol": "MinioClient minioClient"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/config/MinioHealthIndicatorTest.java",
+          "symbol": "class MinioHealthIndicatorTest"
+        }
+      ],
+      "constraints": [
+        "对象内容与 MySQL 元数据需保持一致。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/service/FileService.java",
+          "symbol": "putObjectWithRetry"
+        }
+      ]
+    },
+    {
+      "id": "clamav",
+      "label": "ClamAV 病毒扫描",
+      "type": "external",
+      "boundary": "外部依赖",
+      "layer": 5,
+      "path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java",
+      "role": "上传文件病毒扫描适配器。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java",
+          "symbol": "public class ClamAvVirusScanner"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/file/FileServiceTest.java",
+          "symbol": "class FileServiceTest"
+        }
+      ],
+      "constraints": [
+        "仅确认 FileService 单测覆盖扫描协作；真实 ClamAV 集成测试未发现。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java",
+          "symbol": "ScanResult.clean"
+        }
+      ]
+    },
+    {
+      "id": "office-preview",
+      "label": "隔离 Office 预览转换器",
+      "type": "external",
+      "boundary": "本地隔离容器",
+      "layer": 5,
+      "path": "deploy/office-preview",
+      "role": "在无外网、无存储凭据容器内把 OOXML 转换为 PDF 字节。",
+      "entrypoints": [
+        {
+          "path": "deploy/office-preview/server.py",
+          "symbol": "class Handler"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/projectfile/ProjectFileObjectTaskTest.java",
+          "symbol": "previewClassificationDoesNotSendLegacyOfficeToConverter"
+        }
+      ],
+      "constraints": [
+        "不持有数据库或 MinIO 凭据；仅接受内部网络请求。",
+        "输入不超过20MB，输出PDF不超过100MB，单次转换超时55秒。"
+      ],
+      "evidence": [
+        {
+          "path": "deploy/docker-compose.dev.yml",
+          "symbol": "office-preview:"
+        }
+      ]
+    },
+    {
+      "id": "observability",
+      "label": "可观测性",
+      "type": "observability",
+      "boundary": "运维",
+      "layer": 4,
+      "path": "deploy/monitoring",
+      "role": "Actuator、Prometheus 抓取与 Grafana 运行监控配置。",
+      "entrypoints": [
+        {
+          "path": "deploy/monitoring/prometheus.yml",
+          "symbol": "/api/actuator/prometheus"
+        }
+      ],
       "tests": [],
-      "constraints": ["本图确认配置连接，不等同于目标环境监控已部署。"],
-      "evidence": [{"path": "backend/src/main/resources/application-prod.yml", "symbol": "prometheus:"}]
+      "constraints": [
+        "本图确认配置连接，不等同于目标环境监控已部署。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/resources/application-prod.yml",
+          "symbol": "prometheus:"
+        }
+      ]
     },
     {
-      "id": "repository-governance", "label": "仓库执行治理", "type": "governance", "boundary": "仓库", "layer": 6,
-      "path": "AGENTS.md", "role": "约束代码地图、授权、安全、验证、Git 与主线零悬空执行。",
-      "entrypoints": [{"path": "AGENTS.md", "symbol": "## Code map gate"}],
-      "tests": [{"path": "scripts/codex-autopilot/test-codex-task-execution-policy.ps1", "symbol": "rootRuleLines"}],
-      "constraints": ["根规则保持单一事实源。", "代码变更前必须用当前 code map 回答调用、影响和测试。", "项目仅有本地开发环境；禁止规划、发起或阻塞于非本地环境测试和验收。"],
-      "evidence": [{"path": "docs/standards/codex-task-execution-policy.md", "symbol": "任务路由"}]
+      "id": "repository-governance",
+      "label": "仓库执行治理",
+      "type": "governance",
+      "boundary": "仓库",
+      "layer": 6,
+      "path": "AGENTS.md",
+      "role": "约束代码地图、授权、安全、验证、Git 与主线零悬空执行。",
+      "entrypoints": [
+        {
+          "path": "AGENTS.md",
+          "symbol": "## Code map gate"
+        }
+      ],
+      "tests": [
+        {
+          "path": "scripts/codex-autopilot/test-codex-task-execution-policy.ps1",
+          "symbol": "rootRuleLines"
+        }
+      ],
+      "constraints": [
+        "根规则保持单一事实源。",
+        "代码变更前必须用当前 code map 回答调用、影响和测试。",
+        "项目仅有本地开发环境；禁止规划、发起或阻塞于非本地环境测试和验收。"
+      ],
+      "evidence": [
+        {
+          "path": "docs/standards/codex-task-execution-policy.md",
+          "symbol": "任务路由"
+        }
+      ]
     },
     {
-      "id": "ci-verification", "label": "CI 验证", "type": "delivery", "boundary": "交付", "layer": 6,
-      "path": ".github/workflows/ci.yml", "role": "后端、MySQL、前端、E2E 与部署依赖验证。",
-      "entrypoints": [{"path": ".github/workflows/ci.yml", "symbol": "backend-test:"}, {"path": ".github/workflows/ci.yml", "symbol": "frontend-build:"}],
-      "tests": [{"path": "scripts/ci/test-workflow-contract.ps1", "symbol": "backend-test-mysql"}],
-      "constraints": ["工作流定义是可执行门禁，不代表当前提交已取得 CI 成功证据。", "容器与 Action 引用必须不可变且不得使用 latest。"],
-      "evidence": [{"path": ".github/workflows/ci.yml", "symbol": "backend-test-mysql:"}, {"path": "scripts/ci/start-e2e-minio.sh", "symbol": "minio/minio@sha256"}]
+      "id": "ci-verification",
+      "label": "CI 验证",
+      "type": "delivery",
+      "boundary": "交付",
+      "layer": 6,
+      "path": ".github/workflows/ci.yml",
+      "role": "后端、MySQL、前端、E2E 与部署依赖验证。",
+      "entrypoints": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "backend-test:"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "frontend-build:"
+        }
+      ],
+      "tests": [
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "backend-test-mysql"
+        }
+      ],
+      "constraints": [
+        "工作流定义是可执行门禁，不代表当前提交已取得 CI 成功证据。",
+        "容器与 Action 引用必须不可变且不得使用 latest。"
+      ],
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "backend-test-mysql:"
+        },
+        {
+          "path": "scripts/ci/start-e2e-minio.sh",
+          "symbol": "minio/minio@sha256"
+        }
+      ]
     }
   ],
   "edges": [
-    {"from":"v2-client","to":"frontend-contracts","type":"imports","evidence":[{"path":"frontend-admin-v2/src/stores/session.ts","symbol":"@cgc-pms/frontend-contracts"}]},
-    {"from":"v2-client","to":"edge-proxy-deploy","type":"calls","evidence":[{"path":"frontend-admin-v2/src/services/request.ts","symbol":"const API_PREFIX = '/api'"}]},
-    {"from":"edge-proxy-deploy","to":"security-auth","type":"calls","evidence":[{"path":"deploy/m8/nginx.v2-root.conf","symbol":"location /api/"}]},
-    {"from":"security-auth","to":"spring-api","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/auth/filter/JwtAuthenticationFilter.java","symbol":"filterChain.doFilter"}]},
-    {"from":"spring-api","to":"prod-config-gate","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/CgcPmsApplication.java","symbol":"application.addInitializers"}]},
-    {"from":"prod-config-gate","to":"spring-api","type":"guards","evidence":[{"path":"backend/src/main/java/com/cgcpms/CgcPmsApplication.java","symbol":"application.addInitializers"}]},
-    {"from":"spring-api","to":"bid-project-scope","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java","symbol":"service"},{"path":"backend/src/main/java/com/cgcpms/cashbook/controller/CashJournalController.java","symbol":"cashJournalService"}]},
-    {"from":"spring-api","to":"project-contract-cost","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/project/controller/ProjectCommencementController.java","symbol":"commencementService"}]},
-    {"from":"spring-api","to":"supply-inventory","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/purchase/controller/MatPurchaseOrderController.java","symbol":"matPurchaseOrderService"}]},
-    {"from":"spring-api","to":"construction-fulfillment","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/schedule/controller/ProjectScheduleController.java","symbol":"ProjectScheduleService service"}]},
-    {"from":"spring-api","to":"workflow","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/workflow/controller/WorkflowController.java","symbol":"workflowEngine"}]},
-    {"from":"spring-api","to":"finance-accounting","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/payment/controller/PayRecordController.java","symbol":"payRecordService"}]},
-    {"from":"spring-api","to":"file-document","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/file/controller/FileController.java","symbol":"fileService"}]},
-    {"from":"project-contract-cost","to":"workflow","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/contract/service/CtContractService.java","symbol":"workflowEngine"}]},
-    {"from":"supply-inventory","to":"workflow","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java","symbol":"workflowEngine.submitPurchaseOrder"}]},
-    {"from":"construction-fulfillment","to":"workflow","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java","symbol":"workflowEngine.submit"}]},
-    {"from":"finance-accounting","to":"workflow","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java","symbol":"workflowEngine.submit"}]},
-    {"from":"workflow","to":"project-contract-cost","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/project/handler/ProjectCommencementWorkflowHandler.java","symbol":"onApproved"}]},
-    {"from":"workflow","to":"supply-inventory","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/purchase/handler/PurchaseOrderWorkflowHandler.java","symbol":"onApproved"}]},
-    {"from":"workflow","to":"finance-accounting","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/payment/handler/PayRequestWorkflowHandler.java","symbol":"onApproved"}]},
-    {"from":"workflow","to":"notification-alert","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/workflow/service/WorkflowCoreService.java","symbol":"notificationService"}]},
-    {"from":"notification-alert","to":"finance-accounting","type":"reads","evidence":[{"path":"backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java","symbol":"cashJournalAlertService"}]},
-    {"from":"project-contract-cost","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/project/service/PmProjectService.java","symbol":"pmProjectMapper.insert"}]},
-    {"from":"supply-inventory","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java","symbol":"matPurchaseOrderMapper.insert"}]},
-    {"from":"construction-fulfillment","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java","symbol":"jdbc.update"}]},
-    {"from":"workflow","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/workflow/service/WorkflowSubmitService.java","symbol":"wfInstanceMapper.insert"}]},
-    {"from":"finance-accounting","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java","symbol":"payRecordMapper.insert"}]},
-    {"from":"bid-project-scope","to":"mysql-flyway","type":"reads-writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/bid/mapper/BidCostMapper.java","symbol":"selectByIdForUpdate"},{"path":"backend/src/main/java/com/cgcpms/bid/service/BidCostService.java","symbol":"mapper.insert"}]},
-    {"from":"security-auth","to":"mysql-flyway","type":"reads","evidence":[{"path":"backend/src/main/java/com/cgcpms/auth/service/AuthService.java","symbol":"sysUserMapper.selectByTenantAndUsername"}]},
-    {"from":"file-document","to":"mysql-flyway","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/file/service/FileService.java","symbol":"sysFileMapper.insert"}]},
-    {"from":"security-auth","to":"redis","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java","symbol":"redisTemplate.opsForValue"}]},
-    {"from":"security-auth","to":"redis","type":"reads","evidence":[{"path":"backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java","symbol":"redisTemplate.hasKey"}]},
-    {"from":"file-document","to":"clamav","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/file/service/FileService.java","symbol":"virusScanner.scan"}]},
-    {"from":"clamav","to":"file-document","type":"publishes","evidence":[{"path":"backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java","symbol":"ScanResult.clean"}]},
-    {"from":"file-document","to":"minio","type":"writes","evidence":[{"path":"backend/src/main/java/com/cgcpms/file/service/FileService.java","symbol":"putObjectWithRetry"}]},
-    {"from":"spring-api","to":"async-runtime","type":"publishes","evidence":[{"path":"backend/src/main/java/com/cgcpms/project/service/ProjectArchiveNotifier.java","symbol":"@Async"}]},
-    {"from":"async-runtime","to":"notification-alert","type":"calls","evidence":[{"path":"backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java","symbol":"@Scheduled"}]},
-    {"from":"observability","to":"spring-api","type":"reads","evidence":[{"path":"deploy/monitoring/prometheus.yml","symbol":"/api/actuator/prometheus"}]},
-    {"from":"repository-governance","to":"ci-verification","type":"guards","evidence":[{"path":"AGENTS.md","symbol":"## 验证与裁决"}]},
-    {"from":"ci-verification","to":"repository-governance","type":"tests","evidence":[{"path":"scripts/codex-autopilot/test-codex-task-execution-policy.ps1","symbol":"AGENTS.md exceeds"}]},
-    {"from":"ci-verification","to":"v2-client","type":"calls","evidence":[{"path":".github/workflows/ci.yml","symbol":"frontend-build:"}]},
-    {"from":"ci-verification","to":"spring-api","type":"calls","evidence":[{"path":".github/workflows/ci.yml","symbol":"backend-test:"}]},
-    {"from":"ci-verification","to":"prod-config-gate","type":"tests","evidence":[{"path":"backend/src/test/java/com/cgcpms/config/ProductionEnvironmentValidatorTest.java","symbol":"class ProductionEnvironmentValidatorTest"}]},
-    {"from":"ci-verification","to":"bid-project-scope","type":"tests","evidence":[{"path":"backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java","symbol":"class BidProjectScopeH2Test"},{"path":"backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java","symbol":"class BidProjectScopeMySqlTest"},{"path":"backend/src/test/java/com/cgcpms/cashbook/CashJournalPrivacyTest.java","symbol":"class CashJournalPrivacyTest"}]},
-    {"from":"ci-verification","to":"mysql-flyway","type":"calls","evidence":[{"path":".github/workflows/ci.yml","symbol":"backend-test-mysql:"}]},
-    {"from":"ci-verification","to":"minio","type":"calls","evidence":[{"path":".github/workflows/ci.yml","symbol":"start-e2e-minio.sh"}]}
+    {
+      "from": "v2-client",
+      "to": "frontend-contracts",
+      "type": "imports",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/stores/session.ts",
+          "symbol": "@cgc-pms/frontend-contracts"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "edge-proxy-deploy",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/request.ts",
+          "symbol": "const API_PREFIX = '/api'"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "project-file-center",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/project-files.ts",
+          "symbol": "loadProjectFiles"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "communication",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/communication.ts",
+          "symbol": "loadConversations"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "project-file-center",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/projectfile/ProjectFileController.java",
+          "symbol": "@RequestMapping(\"/project-files\")"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "communication",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/controller/CommunicationController.java",
+          "symbol": "@RequestMapping(\"/communications\")"
+        }
+      ]
+    },
+    {
+      "from": "project-file-center",
+      "to": "file-document",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/projectfile/ProjectFileService.java",
+          "symbol": "fileService.upload"
+        }
+      ]
+    },
+    {
+      "from": "project-file-center",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/resources/db/migration/V282__add_project_file_center.sql",
+          "symbol": "CREATE TABLE project_file_catalog"
+        }
+      ]
+    },
+    {
+      "from": "project-file-center",
+      "to": "office-preview",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/projectfile/OfficePreviewClient.java",
+          "symbol": "public byte[] convert"
+        }
+      ]
+    },
+    {
+      "from": "communication",
+      "to": "file-document",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationService.java",
+          "symbol": "deleteForBusinessCascade"
+        }
+      ]
+    },
+    {
+      "from": "communication",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/resources/db/migration/V283__add_internal_communication.sql",
+          "symbol": "CREATE TABLE communication_message"
+        }
+      ]
+    },
+    {
+      "from": "edge-proxy-deploy",
+      "to": "security-auth",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "deploy/m8/nginx.v2-root.conf",
+          "symbol": "location /api/"
+        }
+      ]
+    },
+    {
+      "from": "security-auth",
+      "to": "spring-api",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/filter/JwtAuthenticationFilter.java",
+          "symbol": "filterChain.doFilter"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "prod-config-gate",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java",
+          "symbol": "application.addInitializers"
+        }
+      ]
+    },
+    {
+      "from": "prod-config-gate",
+      "to": "spring-api",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/CgcPmsApplication.java",
+          "symbol": "application.addInitializers"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "bid-project-scope",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java",
+          "symbol": "service"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/cashbook/controller/CashJournalController.java",
+          "symbol": "cashJournalService"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "project-contract-cost",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/controller/ProjectCommencementController.java",
+          "symbol": "commencementService"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "supply-inventory",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/controller/MatPurchaseOrderController.java",
+          "symbol": "matPurchaseOrderService"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "construction-fulfillment",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/schedule/controller/ProjectScheduleController.java",
+          "symbol": "ProjectScheduleService service"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "workflow",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/controller/WorkflowController.java",
+          "symbol": "workflowEngine"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "finance-accounting",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/controller/PayRecordController.java",
+          "symbol": "payRecordService"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "file-document",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/controller/FileController.java",
+          "symbol": "fileService"
+        }
+      ]
+    },
+    {
+      "from": "project-contract-cost",
+      "to": "workflow",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java",
+          "symbol": "workflowEngine"
+        }
+      ]
+    },
+    {
+      "from": "supply-inventory",
+      "to": "workflow",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
+          "symbol": "workflowEngine.submitPurchaseOrder"
+        }
+      ]
+    },
+    {
+      "from": "construction-fulfillment",
+      "to": "workflow",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java",
+          "symbol": "workflowEngine.submit"
+        }
+      ]
+    },
+    {
+      "from": "finance-accounting",
+      "to": "workflow",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java",
+          "symbol": "workflowEngine.submit"
+        }
+      ]
+    },
+    {
+      "from": "workflow",
+      "to": "project-contract-cost",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/handler/ProjectCommencementWorkflowHandler.java",
+          "symbol": "onApproved"
+        }
+      ]
+    },
+    {
+      "from": "workflow",
+      "to": "supply-inventory",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/handler/PurchaseOrderWorkflowHandler.java",
+          "symbol": "onApproved"
+        }
+      ]
+    },
+    {
+      "from": "workflow",
+      "to": "finance-accounting",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/handler/PayRequestWorkflowHandler.java",
+          "symbol": "onApproved"
+        }
+      ]
+    },
+    {
+      "from": "workflow",
+      "to": "notification-alert",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowCoreService.java",
+          "symbol": "notificationService"
+        }
+      ]
+    },
+    {
+      "from": "notification-alert",
+      "to": "finance-accounting",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java",
+          "symbol": "cashJournalAlertService"
+        }
+      ]
+    },
+    {
+      "from": "project-contract-cost",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/PmProjectService.java",
+          "symbol": "pmProjectMapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "supply-inventory",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
+          "symbol": "matPurchaseOrderMapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "construction-fulfillment",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/schedule/service/ProjectScheduleService.java",
+          "symbol": "jdbc.update"
+        }
+      ]
+    },
+    {
+      "from": "workflow",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/workflow/service/WorkflowSubmitService.java",
+          "symbol": "wfInstanceMapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "finance-accounting",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "payRecordMapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "bid-project-scope",
+      "to": "mysql-flyway",
+      "type": "reads-writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/mapper/BidCostMapper.java",
+          "symbol": "selectByIdForUpdate"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java",
+          "symbol": "mapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "security-auth",
+      "to": "mysql-flyway",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/service/AuthService.java",
+          "symbol": "sysUserMapper.selectByTenantAndUsername"
+        }
+      ]
+    },
+    {
+      "from": "file-document",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/service/FileService.java",
+          "symbol": "sysFileMapper.insert"
+        }
+      ]
+    },
+    {
+      "from": "security-auth",
+      "to": "redis",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java",
+          "symbol": "redisTemplate.opsForValue"
+        }
+      ]
+    },
+    {
+      "from": "security-auth",
+      "to": "redis",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java",
+          "symbol": "redisTemplate.hasKey"
+        }
+      ]
+    },
+    {
+      "from": "file-document",
+      "to": "clamav",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/service/FileService.java",
+          "symbol": "virusScanner.scan"
+        }
+      ]
+    },
+    {
+      "from": "clamav",
+      "to": "file-document",
+      "type": "publishes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/scan/ClamAvVirusScanner.java",
+          "symbol": "ScanResult.clean"
+        }
+      ]
+    },
+    {
+      "from": "file-document",
+      "to": "minio",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/file/service/FileService.java",
+          "symbol": "putObjectWithRetry"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "async-runtime",
+      "type": "publishes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/ProjectArchiveNotifier.java",
+          "symbol": "@Async"
+        }
+      ]
+    },
+    {
+      "from": "async-runtime",
+      "to": "notification-alert",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java",
+          "symbol": "@Scheduled"
+        }
+      ]
+    },
+    {
+      "from": "observability",
+      "to": "spring-api",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "deploy/monitoring/prometheus.yml",
+          "symbol": "/api/actuator/prometheus"
+        }
+      ]
+    },
+    {
+      "from": "repository-governance",
+      "to": "ci-verification",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": "AGENTS.md",
+          "symbol": "## 验证与裁决"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "repository-governance",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "scripts/codex-autopilot/test-codex-task-execution-policy.ps1",
+          "symbol": "AGENTS.md exceeds"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "v2-client",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "frontend-build:"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "spring-api",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "backend-test:"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "prod-config-gate",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/config/ProductionEnvironmentValidatorTest.java",
+          "symbol": "class ProductionEnvironmentValidatorTest"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "bid-project-scope",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java",
+          "symbol": "class BidProjectScopeH2Test"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidProjectScopeDataTest.java",
+          "symbol": "class BidProjectScopeMySqlTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/cashbook/CashJournalPrivacyTest.java",
+          "symbol": "class CashJournalPrivacyTest"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "mysql-flyway",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "backend-test-mysql:"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "minio",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "start-e2e-minio.sh"
+        }
+      ]
+    }
   ],
   "flows": [
-    {"id":"production-startup-gate","name":"生产启动配置门禁","trigger":"应用以 prod profile 启动","steps":["prod-config-gate","spring-api"],"outcome":"仅合格生产配置允许 Spring API 完成启动。"},
-    {"id":"authenticated-web-request","name":"认证 Web 请求","trigger":"浏览器访问受保护的 V2 业务页面","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","project-contract-cost","mysql-flyway"],"outcome":"授权请求进入项目服务并持久化。"},
-    {"id":"tenant-login-refresh-logout","name":"租户登录、刷新与退出","trigger":"租户用户建立或轮换登录态","steps":["v2-client","edge-proxy-deploy","security-auth","mysql-flyway"],"outcome":"租户身份受数据库校验；令牌吊销由安全认证组件写入 Redis。"},
-    {"id":"token-revocation","name":"令牌吊销","trigger":"刷新、退出或管理端吊销登录态","steps":["security-auth","redis"],"outcome":"旧访问令牌与刷新令牌进入 Redis 黑名单。"},
-    {"id":"repository-policy-validation","name":"仓库执行策略验证","trigger":"本地或 CI 执行治理静态契约","steps":["repository-governance","ci-verification"],"outcome":"根规则、专项 Skill、CI 和发布边界保持一致。"},
-    {"id":"bid-project-scope-write","name":"投标项目范围写入","trigger":"用户新增或修改投标成本或关联现金日记账","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","bid-project-scope","mysql-flyway"],"outcome":"只有同租户且具备项目范围的请求可写入。"},
-    {"id":"project-commencement-approval","name":"项目开工审批","trigger":"用户提交项目开工申请","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","project-contract-cost","workflow","project-contract-cost","mysql-flyway"],"outcome":"工作流回调推进开工状态并写入数据库。"},
-    {"id":"procurement-to-stock","name":"采购到库存","trigger":"用户提交采购订单并完成审批","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","supply-inventory","workflow","supply-inventory","mysql-flyway"],"outcome":"采购审批结果回写供应链记录，为收料与库存更新提供依据。"},
-    {"id":"payment-to-cash-journal","name":"付款到现金日记账","trigger":"用户提交付款并完成审批与支付归档","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","finance-accounting","workflow","finance-accounting","mysql-flyway"],"outcome":"付款记录与现金日记账形成可追踪资金闭环。"},
-    {"id":"file-upload-scan-store","name":"文件上传、扫描与存储","trigger":"用户上传业务附件","steps":["v2-client","edge-proxy-deploy","security-auth","spring-api","file-document","clamav","file-document","minio"],"outcome":"安全文件内容进入对象存储，元数据由文件服务管理。"}
+    {
+      "id": "production-startup-gate",
+      "name": "生产启动配置门禁",
+      "trigger": "应用以 prod profile 启动",
+      "steps": [
+        "prod-config-gate",
+        "spring-api"
+      ],
+      "outcome": "仅合格生产配置允许 Spring API 完成启动。"
+    },
+    {
+      "id": "authenticated-web-request",
+      "name": "认证 Web 请求",
+      "trigger": "浏览器访问受保护的 V2 业务页面",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "project-contract-cost",
+        "mysql-flyway"
+      ],
+      "outcome": "授权请求进入项目服务并持久化。"
+    },
+    {
+      "id": "tenant-login-refresh-logout",
+      "name": "租户登录、刷新与退出",
+      "trigger": "租户用户建立或轮换登录态",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "mysql-flyway"
+      ],
+      "outcome": "租户身份受数据库校验；令牌吊销由安全认证组件写入 Redis。"
+    },
+    {
+      "id": "token-revocation",
+      "name": "令牌吊销",
+      "trigger": "刷新、退出或管理端吊销登录态",
+      "steps": [
+        "security-auth",
+        "redis"
+      ],
+      "outcome": "旧访问令牌与刷新令牌进入 Redis 黑名单。"
+    },
+    {
+      "id": "repository-policy-validation",
+      "name": "仓库执行策略验证",
+      "trigger": "本地或 CI 执行治理静态契约",
+      "steps": [
+        "repository-governance",
+        "ci-verification"
+      ],
+      "outcome": "根规则、专项 Skill、CI 和发布边界保持一致。"
+    },
+    {
+      "id": "bid-project-scope-write",
+      "name": "投标项目范围写入",
+      "trigger": "用户新增或修改投标成本或关联现金日记账",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "bid-project-scope",
+        "mysql-flyway"
+      ],
+      "outcome": "只有同租户且具备项目范围的请求可写入。"
+    },
+    {
+      "id": "project-commencement-approval",
+      "name": "项目开工审批",
+      "trigger": "用户提交项目开工申请",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "project-contract-cost",
+        "workflow",
+        "project-contract-cost",
+        "mysql-flyway"
+      ],
+      "outcome": "工作流回调推进开工状态并写入数据库。"
+    },
+    {
+      "id": "procurement-to-stock",
+      "name": "采购到库存",
+      "trigger": "用户提交采购订单并完成审批",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "supply-inventory",
+        "workflow",
+        "supply-inventory",
+        "mysql-flyway"
+      ],
+      "outcome": "采购审批结果回写供应链记录，为收料与库存更新提供依据。"
+    },
+    {
+      "id": "payment-to-cash-journal",
+      "name": "付款到现金日记账",
+      "trigger": "用户提交付款并完成审批与支付归档",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "finance-accounting",
+        "workflow",
+        "finance-accounting",
+        "mysql-flyway"
+      ],
+      "outcome": "付款记录与现金日记账形成可追踪资金闭环。"
+    },
+    {
+      "id": "file-upload-scan-store",
+      "name": "文件上传、扫描与存储",
+      "trigger": "用户上传业务附件",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "file-document",
+        "clamav",
+        "file-document",
+        "minio"
+      ],
+      "outcome": "安全文件内容进入对象存储，元数据由文件服务管理。"
+    },
+    {
+      "id": "project-file-preview",
+      "name": "项目文件授权与受控预览",
+      "trigger": "用户在项目文件中心查看或预览一个版本",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "project-file-center",
+        "file-document",
+        "clamav",
+        "office-preview",
+        "minio"
+      ],
+      "outcome": "中心、项目、来源业务、租户及 CLEAN 交集通过后签发短期原件或派生PDF地址。"
+    },
+    {
+      "id": "communication-send",
+      "name": "站内消息幂等发送",
+      "trigger": "成员发送文本或已扫描附件草稿",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "communication",
+        "file-document",
+        "mysql-flyway"
+      ],
+      "outcome": "会话行锁生成唯一序号，消息提交后只向当前有效成员发布最小 SSE 事件。"
+    }
   ]
 }

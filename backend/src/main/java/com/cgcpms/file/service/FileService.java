@@ -10,22 +10,25 @@ import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
+import com.cgcpms.projectfile.ProjectFileService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.http.Method;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ContentDisposition;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -46,17 +49,18 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
 public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
     private static final int MAX_GENERATED_PDF_BYTES = 20 * 1024 * 1024;
+    private static final int MAX_PREVIEW_PDF_BYTES = 100 * 1024 * 1024;
     private static final Set<String> BID_DOCUMENT_TYPES = Set.of(
             "TENDER_DOCUMENT", "BILL_OF_QUANTITIES", "TENDER_DRAWING",
             "BID_PRICE", "TECHNICAL_DOCUMENT", "BID_DRAWING",
@@ -71,7 +75,46 @@ public class FileService {
     private final ObjectProvider<MeterRegistry> meterRegistryProvider;
     private final VirusScanner virusScanner;
     private final FileObjectTaskService objectTaskService;
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectProvider<ProjectFileService> projectFileServiceProvider;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
+
+    @Autowired
+    public FileService(SysFileMapper sysFileMapper, MinioClient minioClient, MinioConfig minioConfig,
+                       com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer,
+                       RetryTemplate minioRetryTemplate, ObjectProvider<MeterRegistry> meterRegistryProvider,
+                       VirusScanner virusScanner, FileObjectTaskService objectTaskService,
+                       JdbcTemplate jdbcTemplate, ObjectProvider<ProjectFileService> projectFileServiceProvider) {
+        this.sysFileMapper = sysFileMapper;
+        this.minioClient = minioClient;
+        this.minioConfig = minioConfig;
+        this.authorizer = authorizer;
+        this.minioRetryTemplate = minioRetryTemplate;
+        this.meterRegistryProvider = meterRegistryProvider;
+        this.virusScanner = virusScanner;
+        this.objectTaskService = objectTaskService;
+        this.jdbcTemplate = jdbcTemplate;
+        this.projectFileServiceProvider = projectFileServiceProvider;
+    }
+
+    /** Compatibility constructor used by focused legacy unit tests. */
+    public FileService(SysFileMapper sysFileMapper, MinioClient minioClient, MinioConfig minioConfig,
+                       com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer,
+                       RetryTemplate minioRetryTemplate, ObjectProvider<MeterRegistry> meterRegistryProvider,
+                       VirusScanner virusScanner, FileObjectTaskService objectTaskService,
+                       JdbcTemplate jdbcTemplate) {
+        this(sysFileMapper, minioClient, minioConfig, authorizer, minioRetryTemplate,
+                meterRegistryProvider, virusScanner, objectTaskService, jdbcTemplate, null);
+    }
+
+    /** Compatibility constructor used by focused legacy unit tests. */
+    public FileService(SysFileMapper sysFileMapper, MinioClient minioClient, MinioConfig minioConfig,
+                       com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer,
+                       RetryTemplate minioRetryTemplate, ObjectProvider<MeterRegistry> meterRegistryProvider,
+                       VirusScanner virusScanner, FileObjectTaskService objectTaskService) {
+        this(sysFileMapper, minioClient, minioConfig, authorizer, minioRetryTemplate,
+                meterRegistryProvider, virusScanner, objectTaskService, null, null);
+    }
 
     /**
      * Upload a file and associate it with a business entity.
@@ -147,6 +190,9 @@ public class FileService {
             sysFile.setVirusScanDetail(null);
             sysFile.setVirusScannedAt(LocalDateTime.now());
             sysFileMapper.insert(sysFile);
+            if (projectFileServiceProvider != null) {
+                projectFileServiceProvider.ifAvailable(service -> service.indexBusinessFile(sysFile));
+            }
 
             return toVO(sysFile);
 
@@ -362,9 +408,101 @@ public class FileService {
     }
 
     private void ensureNoImmutableReferences(SysFile file) {
-        if (sysFileMapper.countImmutableReferences(file.getTenantId(), file.getId()) > 0) {
+        Integer projectFileTableCount = jdbcTemplate == null ? 0 : jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM information_schema.tables
+                    WHERE LOWER(table_name)='project_file_version_link'
+                    """, Integer.class);
+        Long managedProjectFileReferences = projectFileTableCount == null || projectFileTableCount == 0 ? 0L
+                : jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM project_file_version_link v
+                    JOIN project_file_catalog c ON c.tenant_id=v.tenant_id AND c.id=v.catalog_id
+                    WHERE v.tenant_id=? AND v.sys_file_id=? AND v.deleted_flag=0
+                      AND c.deleted_flag=0 AND c.source_kind='MANAGED'
+                    """, Long.class, file.getTenantId(), file.getId());
+        if (sysFileMapper.countImmutableReferences(file.getTenantId(), file.getId()) > 0
+                || (managedProjectFileReferences != null && managedProjectFileReferences > 0)) {
             throw new BusinessException("FILE_IMMUTABLE", "文件已被不可变业务事实引用");
         }
+    }
+
+    /** Internal conversion input. Caller must hold an authorized persisted preview task. */
+    public InternalFileContent readCleanObjectForInternalConversion(long tenantId, long fileId) {
+        SysFile file = sysFileMapper.selectById(fileId);
+        if (file == null || !Objects.equals(file.getTenantId(), tenantId)) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        ensureDownloadAllowed(file);
+        statObjectOrReject(file);
+        try {
+            byte[] content = minioRetryTemplate.execute(context -> {
+                try (var input = minioClient.getObject(GetObjectArgs.builder()
+                        .bucket(file.getBucketName()).object(file.getStoragePath()).build())) {
+                    return input.readAllBytes();
+                }
+            });
+            if (content == null || content.length == 0 || content.length > 20 * 1024 * 1024) {
+                throw new BusinessException("OFFICE_PREVIEW_SOURCE_INVALID", "Office预览源文件无效");
+            }
+            String identity = file.getFileName() != null
+                    && file.getFileName().matches("^[0-9a-f]{64}\\..+$")
+                    ? file.getFileName().substring(0, 64) : sha256Hex(content);
+            return new InternalFileContent(content, file.getOriginalName(), identity);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件存储服务暂不可用，请稍后重试", exception);
+        }
+    }
+
+    /** Store a scanned PDF derivative without creating a second sys_file fact. */
+    public String storeDerivedPreview(long tenantId, long fileId, String contentIdentity, byte[] pdf) {
+        if (pdf == null || pdf.length < 5 || pdf.length > MAX_PREVIEW_PDF_BYTES
+                || !"%PDF-".equals(new String(pdf, 0, 5, StandardCharsets.US_ASCII))) {
+            throw new BusinessException("OFFICE_PREVIEW_OUTPUT_INVALID", "Office预览输出无效");
+        }
+        SysFile source = sysFileMapper.selectById(fileId);
+        if (source == null || !Objects.equals(source.getTenantId(), tenantId)) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        if (contentIdentity == null || !contentIdentity.matches("[0-9a-f]{64}")) {
+            throw new BusinessException("OFFICE_PREVIEW_SOURCE_INVALID", "Office预览内容标识无效");
+        }
+        scanOrReject(pdf);
+        String outputSha256 = sha256Hex(pdf);
+        String path = "tenants/" + tenantId + "/derived-preview/" + fileId + "/"
+                + contentIdentity + "-" + outputSha256 + ".pdf";
+        try {
+            putObjectWithRetry(source.getBucketName(), path, "application/pdf", pdf);
+            return path;
+        } catch (Exception exception) {
+            throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件存储服务暂不可用，请稍后重试", exception);
+        }
+    }
+
+    public String getDerivedPreviewPresignedUrl(long fileId, String path) {
+        SysFile source = sysFileMapper.selectById(fileId);
+        if (source == null || !Objects.equals(source.getTenantId(), UserContext.getCurrentTenantId())) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        authorizer.checkReadAccess(source.getBusinessType(), source.getBusinessId());
+        ensureDownloadAllowed(source);
+        String prefix = "tenants/" + source.getTenantId() + "/derived-preview/" + source.getId() + "/";
+        if (path == null || !path.startsWith(prefix) || !path.endsWith(".pdf")) {
+            throw new BusinessException("PROJECT_FILE_PREVIEW_NOT_READY", "预览尚未就绪");
+        }
+        try {
+            statObjectWithRetry(source.getBucketName(), path);
+        } catch (Exception exception) {
+            throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件存储服务暂不可用，请稍后重试", exception);
+        }
+        SysFile preview = new SysFile();
+        preview.setContentType("application/pdf");
+        preview.setOriginalName(source.getOriginalName() + ".pdf");
+        return genPresignedUrl(source.getBucketName(), path, preview);
+    }
+
+    public void deleteDerivedPreviewLater(long tenantId, String path) {
+        objectTaskService.enqueueDeleteRequiresNew(tenantId, minioConfig.getBucket(), path);
     }
 
     private void deleteStoredFile(SysFile sysFile) {
@@ -374,6 +512,10 @@ public class FileService {
             log.error("File delete requires active transaction synchronization: fileId={}, storagePath={}",
                     fileId, sysFile.getStoragePath());
             throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
+        }
+
+        if (projectFileServiceProvider != null) {
+            projectFileServiceProvider.ifAvailable(service -> service.invalidateBusinessFile(sysFile));
         }
 
         // Logical delete in DB
@@ -673,6 +815,8 @@ public class FileService {
     public record PresignedFileUrl(String url, String businessType, Long businessId, Long fileId) {}
 
     public record FileAuditBinding(String businessType, Long businessId) {}
+
+    public record InternalFileContent(byte[] content, String originalName, String contentIdentity) {}
 
     private String normalizeDocumentType(String documentType, String businessType) {
         String type = documentType == null ? "OTHER" : documentType.trim().toUpperCase();
