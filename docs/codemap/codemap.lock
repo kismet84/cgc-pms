@@ -1,7 +1,7 @@
 {
-  "current_commit": "c858369cbb2a7d3b3efd0a9a089a7ae72e681de8",
+  "current_commit": "cd0c3a2e7032cb636de8c9b95cc6b86faed49ead",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-05T20:15:41+08:00",
+  "generation_time": "2026-08-05T20:47:26+08:00",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -59,10 +59,9 @@
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "backend",
       "documentation"
     ],
-    "reason": "CI SQL-safety false-positive exemption and failed-gate evidence documented; code-map topology unchanged."
+    "reason": "Mainline 72 G5 merge and post-merge evidence reconciled; code-map topology unchanged."
   },
   "modules": [
     {
@@ -101,7 +100,7 @@
         "docs/**"
       ],
       "file_count": 92,
-      "fingerprint": "3a0f4d8afe462ec1e0aeae4b51571e644e7d08c7be0ff6cce27cf0269269641d"
+      "fingerprint": "a22e9ba936811797e2ed3110f0c1bc19fcb1135477779bf5f91ee466f0b03d52"
     },
     {
       "id": "frontend_v2",

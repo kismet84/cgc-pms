@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-05T19:33:52+08:00",
+  "updatedAt": "2026-08-05T20:46:00+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -167,26 +167,6 @@
       },
       "sourceRefs": [
         "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "ISSUE-072-001",
-      "title": "全量审计认证授权与生产治理整改",
-      "status": "IN_PROGRESS",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": true,
-      "summary": "非零租户登录/刷新和投标读侧项目范围存在发布阻断；非Compose生产配置、CI第三方不可变引用及第69至71条Git状态需一并收口。合并SHA无CI已由等价tree、13项源HEAD CI和post-merge证据判为误报。",
-      "acceptanceCriteria": "显式tenantId认证和refresh全链、绑定项目投标选项与保证金汇总、应用级prod启动失败关闭、Action完整SHA与容器digest、当前治理状态全部通过G0至G5；三个既有REL保持冻结、非阻塞且不进入执行队列。",
-      "deferReason": "本地实施、G0至G4本地门禁及隔离源分支完整后端/前端/治理门禁已通过；非本地环境测试/验收不适用。隔离源分支已从origin/master创建并排除无关材料提交及V281断言适配；交付pom与新鲜Trivy扫描0漏洞版本哈希一致，本地漏洞库下载超时由同SHA远端扫描闭环。G5待取得source commit、push/PR CI、合并与post-merge证据。",
-      "sourceRefs": [
-        "docs/plans/第72条主线-全量审计认证授权与生产治理整改任务计划书.md",
-        "backend/src/main/java/com/cgcpms/auth/service/AuthService.java",
-        "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java",
-        "backend/src/main/resources/application-prod.yml",
-        ".github/workflows/ci.yml",
-        "docs/backlog/current-focus.md",
-        "docs/quality/2026-08-05-issue-072-全量审计认证授权与生产治理整改.md"
       ]
     },
     {
