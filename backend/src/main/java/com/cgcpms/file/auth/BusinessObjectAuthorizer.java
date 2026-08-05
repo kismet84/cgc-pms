@@ -78,7 +78,7 @@ public class BusinessObjectAuthorizer {
     private final JdbcTemplate jdbcTemplate;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
-            "PROJECT", "PROJECT_COMMENCEMENT", "CONTRACT", "INVOICE", "RECEIPT",
+            "PROJECT", "PROJECT_FILE", "PROJECT_COMMENCEMENT", "COMMUNICATION_MESSAGE", "CONTRACT", "INVOICE", "RECEIPT",
             "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
@@ -220,6 +220,8 @@ public class BusinessObjectAuthorizer {
             case "BID_COST" -> write ? "bid:file:manage" : "bid:query";
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             case "PROJECT_COMMENCEMENT" -> write ? "project:commencement:edit" : "project:commencement:query";
+            case "PROJECT_FILE" -> write ? "project:file:manage" : "project:file:query";
+            case "COMMUNICATION_MESSAGE" -> write ? "communication:send" : "communication:view";
             case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
             case "SETTLEMENT" -> write ? "settlement:edit" : "settlement:query";
             case "EXPENSE" -> write ? "expense:edit" : "expense:query";
@@ -254,6 +256,78 @@ public class BusinessObjectAuthorizer {
                 }
                 projectAccessChecker.checkAccess(businessId, action + "项目文件");
                 break;
+            case "PROJECT_FILE": {
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                        SELECT project_id,source_kind,source_business_type,source_business_id,maintain_mode
+                        FROM project_file_catalog
+                        WHERE id=? AND tenant_id=? AND deleted_flag=0
+                        """ + (write ? " FOR UPDATE" : ""),
+                        businessId, UserContext.getCurrentTenantId());
+                if (rows.size() != 1) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "项目文件不存在: " + businessId);
+                }
+                Map<String, Object> row = rows.getFirst();
+                if (write && !("MANAGED".equals(value(row.get("source_kind")))
+                        && "MANAGED".equals(value(row.get("maintain_mode"))))) {
+                    throw new BusinessException("PROJECT_FILE_READ_ONLY", "业务来源文件只能在原业务模块维护");
+                }
+                projectAccessChecker.checkAccess(((Number) row.get("project_id")).longValue(), action + "项目文件");
+                if (!write && "BUSINESS".equals(value(row.get("source_kind")))) {
+                    String sourceType = value(row.get("source_business_type"));
+                    Object sourceId = row.get("source_business_id");
+                    if (sourceType == null || "PROJECT_FILE".equals(sourceType) || !(sourceId instanceof Number number)) {
+                        throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "项目文件来源不存在");
+                    }
+                    requireSourceReadAuthority(sourceType);
+                    checkAccess(sourceType, number.longValue(), action, false,
+                            "file:query", "cashbook:journal:query");
+                }
+                break;
+            }
+            case "COMMUNICATION_MESSAGE": {
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                        SELECT msg.sender_id,msg.status AS message_status,msg.seq,
+                               conversation.status AS conversation_status,
+                               member.status AS member_status,member.join_seq,member.leave_seq,
+                               (SELECT COUNT(*) FROM sys_file file
+                                WHERE file.tenant_id=msg.tenant_id
+                                  AND file.business_type='COMMUNICATION_MESSAGE'
+                                  AND file.business_id=msg.id AND file.deleted_flag=0) AS attachment_count
+                        FROM communication_message msg
+                        JOIN communication_conversation conversation
+                          ON conversation.tenant_id=msg.tenant_id AND conversation.id=msg.conversation_id
+                        LEFT JOIN communication_member member
+                          ON member.tenant_id=msg.tenant_id AND member.conversation_id=msg.conversation_id
+                         AND member.user_id=? AND member.deleted_flag=0
+                        WHERE msg.id=? AND msg.tenant_id=? AND msg.deleted_flag=0
+                          AND conversation.deleted_flag=0
+                        """ + (write ? " FOR UPDATE" : ""),
+                        UserContext.getCurrentUserId(), businessId, UserContext.getCurrentTenantId());
+                if (rows.size() != 1) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "通讯消息不存在");
+                }
+                Map<String, Object> row = rows.getFirst();
+                boolean activeMember = "ACTIVE".equals(value(row.get("member_status")));
+                String messageStatus = value(row.get("message_status"));
+                boolean ownDraft = "DRAFT".equals(messageStatus)
+                        && java.util.Objects.equals(((Number) row.get("sender_id")).longValue(),
+                        UserContext.getCurrentUserId());
+                long joinSeq = row.get("join_seq") instanceof Number number ? number.longValue() : Long.MAX_VALUE;
+                long messageSeq = row.get("seq") instanceof Number number ? number.longValue() : -1L;
+                if (!activeMember || !(ownDraft || ("SENT".equals(messageStatus) && messageSeq > joinSeq))) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "通讯消息不存在");
+                }
+                if (write && (!ownDraft || !"ACTIVE".equals(value(row.get("conversation_status"))))) {
+                    throw new BusinessException("COMMUNICATION_MESSAGE_IMMUTABLE", "已发送消息附件不可变更");
+                }
+                if (write && ((Number) row.get("attachment_count")).intValue() >= 5) {
+                    throw new BusinessException("COMMUNICATION_ATTACHMENT_LIMIT", "消息附件不能超过5个");
+                }
+                if (write && !"CHAT_ATTACHMENT".equalsIgnoreCase(documentType)) {
+                    throw new BusinessException("COMMUNICATION_DOCUMENT_TYPE_INVALID", "通讯附件类型无效");
+                }
+                break;
+            }
             case "PROJECT_COMMENCEMENT": {
                 List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                         SELECT c.project_id,c.approval_status AS commencement_status,
@@ -946,6 +1020,30 @@ public class BusinessObjectAuthorizer {
         if (!allowed) {
             throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该文件操作");
         }
+    }
+
+    private void requireSourceReadAuthority(String businessType) {
+        String authority = switch (businessType) {
+            case "PROJECT" -> "project:query";
+            case "PROJECT_COMMENCEMENT" -> "project:commencement:query";
+            case "CONTRACT" -> "contract:query";
+            case "INVOICE" -> "invoice:query";
+            case "RECEIPT", "MATERIAL_RECEIPT" -> "receipt:query";
+            case "PURCHASE_REQUEST" -> "purchase:request:list";
+            case "PURCHASE_ORDER" -> "purchase:order:query";
+            case "PAYMENT" -> "payment:app:query";
+            case "SUBCONTRACT" -> "subcontract:measure:query";
+            case "SETTLEMENT" -> "settlement:query";
+            case "BID_COST" -> "bid:query";
+            case "SITE_DAILY_LOG" -> "site:daily:query";
+            case "EXPENSE" -> "expense:query";
+            case "CASH_JOURNAL" -> "cashbook:journal:query";
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD" ->
+                    "revenue:operations:query";
+            case "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION" -> "measurement:query";
+            default -> null;
+        };
+        if (authority != null) requireAuthority(authority);
     }
 
     private void requireBidFileAuthority(String requiredAuthority) {

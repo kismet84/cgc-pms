@@ -12,7 +12,9 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
-import lombok.RequiredArgsConstructor;
+import com.cgcpms.projectfile.ProjectFileService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,6 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 public class BidDocumentVersionService {
 
     private static final long CURRENT = 0L;
@@ -38,8 +39,29 @@ public class BidDocumentVersionService {
     private final SysFileMapper sysFileMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<ProjectFileService> projectFileServiceProvider;
 
     public record BidDocumentFinalizedEvent(Long bidCostId) {}
+
+    @Autowired
+    public BidDocumentVersionService(BidDocumentVersionMapper mapper, BidCostMapper bidCostMapper,
+                                     SysFileMapper sysFileMapper, ProjectAccessChecker projectAccessChecker,
+                                     ApplicationEventPublisher eventPublisher,
+                                     ObjectProvider<ProjectFileService> projectFileServiceProvider) {
+        this.mapper = mapper;
+        this.bidCostMapper = bidCostMapper;
+        this.sysFileMapper = sysFileMapper;
+        this.projectAccessChecker = projectAccessChecker;
+        this.eventPublisher = eventPublisher;
+        this.projectFileServiceProvider = projectFileServiceProvider;
+    }
+
+    /** Compatibility constructor for focused legacy tests. */
+    public BidDocumentVersionService(BidDocumentVersionMapper mapper, BidCostMapper bidCostMapper,
+                                     SysFileMapper sysFileMapper, ProjectAccessChecker projectAccessChecker,
+                                     ApplicationEventPublisher eventPublisher) {
+        this(mapper, bidCostMapper, sysFileMapper, projectAccessChecker, eventPublisher, null);
+    }
 
     public List<BidDocumentVersion> list(Long bidCostId) {
         Long tenantId = tenant();
@@ -54,7 +76,7 @@ public class BidDocumentVersionService {
     @Transactional(rollbackFor = Exception.class)
     public BidDocumentVersion append(Long bidCostId, BidDocumentCreateRequest request) {
         Long tenantId = tenant();
-        requireBidForUpdate(bidCostId, tenantId);
+        BidCost bid = requireBidForUpdate(bidCostId, tenantId);
         validateType(request.documentGroup(), request.documentType());
         SysFile file = requireFile(request.sysFileId(), bidCostId, tenantId);
 
@@ -86,6 +108,10 @@ public class BidDocumentVersionService {
             mapper.insert(version);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException("BID_DOCUMENT_CONCURRENT_CHANGE", "文件版本已变化，请刷新后重试");
+        }
+        if (projectFileServiceProvider != null && bid.getProjectId() != null) {
+            projectFileServiceProvider.ifAvailable(service -> service.indexBidDocumentVersion(
+                    file, bidCostId, bid.getProjectId(), request.logicalName(), versionNo, version.getId()));
         }
         return version;
     }
@@ -197,9 +223,10 @@ public class BidDocumentVersionService {
         requireVisibleBid(bid, tenantId);
     }
 
-    private void requireBidForUpdate(Long bidCostId, Long tenantId) {
+    private BidCost requireBidForUpdate(Long bidCostId, Long tenantId) {
         BidCost bid = bidCostMapper.selectByIdForUpdate(bidCostId, tenantId);
         requireVisibleBid(bid, tenantId);
+        return bid;
     }
 
     private void requireVisibleBid(BidCost bid, Long tenantId) {

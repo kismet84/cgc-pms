@@ -7,6 +7,7 @@ import com.cgcpms.measurement.dto.MeasurementModels.OwnerReviewLineRequest;
 import com.cgcpms.measurement.dto.MeasurementModels.OwnerReviewRequest;
 import com.cgcpms.measurement.dto.MeasurementModels.OwnerSubmissionRequest;
 import com.cgcpms.measurement.service.ProductionMeasurementService;
+import com.cgcpms.projectfile.ProjectFileService;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,7 @@ class ProductionMeasurementConcurrencyTest {
     @Autowired ProductionMeasurementService service;
     @Autowired FileService fileService;
     @MockitoBean MinioClient minioClient;
+    @MockitoBean ProjectFileService projectFileService;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     @BeforeEach void setup() {

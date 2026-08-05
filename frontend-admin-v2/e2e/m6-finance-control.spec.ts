@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const permissions = [
   'finance:operations:query',
@@ -314,6 +315,7 @@ async function install(page: Page, writes: string[]) {
     fulfill(route, { userId: '1', username: 'finance-user', roles: ['SUPER_ADMIN'], permissions }),
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
+  await installShellPreferencesMock(page)
 }
 
 test('five finance-control routes render real-shaped facts and write then reread', async ({

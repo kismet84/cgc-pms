@@ -50,6 +50,7 @@ public class FileMaintenanceService {
         Set<String> activeTenantPaths = new HashSet<>();
         List<String> missing = new java.util.ArrayList<>();
         long missingCount = 0;
+        long missingDerivedPreviewCount = 0;
         long legacyMetadata = 0;
         String tenantPrefix = "tenants/" + tenantId + "/";
 
@@ -67,6 +68,26 @@ public class FileMaintenanceService {
                 if (!isMissing(exception)) throw storageUnavailable();
                 missingCount++;
                 if (missing.size() < MAX_SAMPLE) missing.add(file.getId().toString());
+            }
+        }
+
+        List<String> derivedPreviewPaths = jdbcTemplate.queryForList("""
+                SELECT preview_storage_path FROM project_file_version_link
+                WHERE tenant_id=? AND deleted_flag=0 AND preview_status='READY'
+                  AND preview_storage_path IS NOT NULL
+                """, String.class, tenantId);
+        for (String path : derivedPreviewPaths) {
+            if (path == null || !path.startsWith(tenantPrefix + "derived-preview/")) {
+                legacyMetadata++;
+                continue;
+            }
+            activeTenantPaths.add(path);
+            try {
+                minioClient.statObject(StatObjectArgs.builder()
+                        .bucket(minioConfig.getBucket()).object(path).build());
+            } catch (Exception exception) {
+                if (!isMissing(exception)) throw storageUnavailable();
+                missingDerivedPreviewCount++;
             }
         }
 
@@ -106,7 +127,10 @@ public class FileMaintenanceService {
                           HAVING COUNT(DISTINCT tenant_id)>1
                         ) path_conflicts
                         """),
-                relationOrphans(tenantId));
+                relationOrphans(tenantId),
+                derivedPreviewPaths.size(),
+                missingDerivedPreviewCount,
+                projectFileIndexDefectCount(tenantId));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -165,6 +189,31 @@ public class FileMaintenanceService {
                 """, tenantId);
     }
 
+    private long projectFileIndexDefectCount(Long tenantId) {
+        return scalar("""
+                SELECT COUNT(*) FROM project_file_catalog c
+                WHERE c.tenant_id=? AND c.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM project_file_version_link v
+                                  WHERE v.tenant_id=c.tenant_id AND v.catalog_id=c.id AND v.deleted_flag=0)
+                """, tenantId)
+                + scalar("""
+                SELECT COUNT(*) FROM (
+                  SELECT catalog_id FROM project_file_version_link
+                  WHERE tenant_id=? AND deleted_flag=0
+                  GROUP BY catalog_id
+                  HAVING MAX(version_no)-MIN(version_no)+1<>COUNT(*) OR MIN(version_no)<>1
+                ) version_gaps
+                """, tenantId)
+                + scalar("""
+                SELECT COUNT(*) FROM project_file_version_link v
+                LEFT JOIN project_file_catalog c ON c.id=v.catalog_id
+                LEFT JOIN sys_file f ON f.id=v.sys_file_id
+                WHERE v.tenant_id=? AND v.deleted_flag=0
+                  AND (c.id IS NULL OR c.tenant_id<>v.tenant_id
+                       OR f.id IS NULL OR f.tenant_id<>v.tenant_id)
+                """, tenantId);
+    }
+
     private long scalar(String sql, Object... args) {
         return Objects.requireNonNullElse(jdbcTemplate.queryForObject(sql, Long.class, args), 0L);
     }
@@ -203,7 +252,10 @@ public class FileMaintenanceService {
             long pendingCleanupTaskCount,
             long duplicateActiveGroupCount,
             long crossTenantPathConflictCount,
-            long relationOrphanCount) {
+            long relationOrphanCount,
+            long derivedPreviewReferenceCount,
+            long missingDerivedPreviewCount,
+            long projectFileIndexDefectCount) {
     }
 
     public record RescanReport(

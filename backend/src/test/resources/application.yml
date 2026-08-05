@@ -36,6 +36,10 @@ mybatis-plus:
 minio:
   enabled: false
 
+communication:
+  # Legacy-fixture Spring tests do not include V283; focused tests construct service directly.
+  enabled: false
+
 auth:
   csrf:
     enabled: false

@@ -28,6 +28,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.cgcpms.projectfile.ProjectFileService;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +50,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("SubMeasureService — CRUD + guards + net calc")
 class SubMeasureServiceTest {
+
+    @MockitoBean
+    private ProjectFileService projectFileService;
 
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_ID = 0L;

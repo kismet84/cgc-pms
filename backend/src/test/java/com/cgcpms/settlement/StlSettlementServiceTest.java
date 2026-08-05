@@ -16,6 +16,7 @@ import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.projectfile.ProjectFileService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.minio.MinioClient;
@@ -57,6 +58,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class StlSettlementServiceTest {
+
+    @MockitoBean
+    private ProjectFileService projectFileService;
 
     private static final long TENANT_ID = 0L;
     private static final long USER_ADMIN = 1L;

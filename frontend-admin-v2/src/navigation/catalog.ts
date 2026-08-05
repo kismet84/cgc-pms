@@ -77,6 +77,20 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/dashboard/reports',
         tabs: [{ path: '/dashboard/reports', label: '报表目录' }],
       },
+      {
+        id: 'communication',
+        label: '站内通讯',
+        defaultPath: '/communication',
+        adminBypassesPermission: true,
+        tabs: [
+          {
+            path: '/communication',
+            label: '消息',
+            permission: 'communication:view',
+            adminBypassesPermission: true,
+          },
+        ],
+      },
     ],
   },
   {
@@ -104,6 +118,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/project/list',
             label: '项目列表',
             permission: 'project:query',
+          },
+          {
+            path: '/project/files',
+            label: '文件中心',
+            permission: 'project:file:query',
           },
         ],
       },

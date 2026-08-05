@@ -46,6 +46,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -109,6 +110,44 @@ class BusinessObjectAuthorizerTest {
         authorizer.checkReadAccess("CONTRACT", 30001L);
 
         verify(projectAccessChecker).checkAccess(10001L, "读取合同文件");
+    }
+
+    @Test
+    void projectFileBusinessSourceRequiresItsDomainReadAuthority() {
+        setAuthentication("project:file:query", "file:query");
+        when(jdbcTemplate.queryForList(anyString(), eq(90001L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 10001L,
+                        "source_kind", "BUSINESS",
+                        "source_business_type", "CONTRACT",
+                        "source_business_id", 30001L,
+                        "maintain_mode", "READ_ONLY")));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("PROJECT_FILE", 90001L));
+
+        assertEquals("FILE_ACCESS_DENIED", error.getCode());
+        verify(contractMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void projectFileBusinessSourceChecksCenterProjectAndOriginalObject() {
+        setAuthentication("project:file:query", "file:query", "contract:query");
+        when(jdbcTemplate.queryForList(anyString(), eq(90001L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 10001L,
+                        "source_kind", "BUSINESS",
+                        "source_business_type", "CONTRACT",
+                        "source_business_id", 30001L,
+                        "maintain_mode", "READ_ONLY")));
+        CtContract contract = new CtContract();
+        contract.setTenantId(TestUserContext.TENANT_0);
+        contract.setProjectId(10001L);
+        when(contractMapper.selectById(30001L)).thenReturn(contract);
+
+        authorizer.checkReadAccess("PROJECT_FILE", 90001L);
+
+        verify(projectAccessChecker, times(2)).checkAccess(eq(10001L), anyString());
     }
 
     @Test
@@ -679,6 +718,81 @@ class BusinessObjectAuthorizerTest {
 
         authorizer.checkDeleteAccess("PARTNER", 84002L);
         verify(partnerMapper).selectByIdForUpdate(84002L, TestUserContext.TENANT_0);
+    }
+
+    @Test
+    void communicationAttachmentsRequireMembershipOwnDraftAndFiveFileLimit() {
+        long messageId = 99001L;
+        setAuthentication("communication:view", "communication:send");
+        Map<String, Object> row = new HashMap<>();
+        row.put("sender_id", TestUserContext.USER_ADMIN);
+        row.put("message_status", "DRAFT");
+        row.put("seq", null);
+        row.put("conversation_status", "ACTIVE");
+        row.put("member_status", "ACTIVE");
+        row.put("join_seq", 0L);
+        row.put("leave_seq", null);
+        row.put("attachment_count", 0);
+        when(jdbcTemplate.queryForList(anyString(), eq(TestUserContext.USER_ADMIN),
+                eq(messageId), eq(TestUserContext.TENANT_0))).thenReturn(List.of(row));
+
+        authorizer.checkUploadAccess("COMMUNICATION_MESSAGE", messageId, "CHAT_ATTACHMENT");
+
+        row.put("attachment_count", 5);
+        assertEquals("COMMUNICATION_ATTACHMENT_LIMIT", assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess(
+                        "COMMUNICATION_MESSAGE", messageId, "CHAT_ATTACHMENT")).getCode());
+        row.put("attachment_count", 0);
+        row.put("message_status", "SENT");
+        row.put("seq", 1L);
+        authorizer.checkReadAccess("COMMUNICATION_MESSAGE", messageId);
+        assertEquals("COMMUNICATION_MESSAGE_IMMUTABLE", assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess(
+                        "COMMUNICATION_MESSAGE", messageId, "CHAT_ATTACHMENT")).getCode());
+    }
+
+    @Test
+    void communicationAttachmentsHideCrossTenantNonMemberAndPreJoinMessages() {
+        long messageId = 99002L;
+        setAuthentication("communication:view");
+        when(jdbcTemplate.queryForList(anyString(), eq(TestUserContext.USER_ADMIN),
+                eq(messageId), eq(TestUserContext.TENANT_0))).thenReturn(List.of());
+        assertEquals("FILE_BIZ_OBJ_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("COMMUNICATION_MESSAGE", messageId)).getCode());
+
+        Map<String, Object> preJoin = new HashMap<>();
+        preJoin.put("sender_id", 99L);
+        preJoin.put("message_status", "SENT");
+        preJoin.put("seq", 1L);
+        preJoin.put("conversation_status", "ACTIVE");
+        preJoin.put("member_status", "ACTIVE");
+        preJoin.put("join_seq", 1L);
+        preJoin.put("leave_seq", null);
+        preJoin.put("attachment_count", 1);
+        when(jdbcTemplate.queryForList(anyString(), eq(TestUserContext.USER_ADMIN),
+                eq(messageId), eq(TestUserContext.TENANT_0))).thenReturn(List.of(preJoin));
+        assertEquals("FILE_BIZ_OBJ_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("COMMUNICATION_MESSAGE", messageId)).getCode());
+    }
+
+    @Test
+    void communicationAttachmentsHideMessagesFromBeforeLatestRejoin() {
+        long messageId = 99003L;
+        setAuthentication("communication:view");
+        Map<String, Object> oldAttachment = new HashMap<>();
+        oldAttachment.put("sender_id", 99L);
+        oldAttachment.put("message_status", "SENT");
+        oldAttachment.put("seq", 3L);
+        oldAttachment.put("conversation_status", "ACTIVE");
+        oldAttachment.put("member_status", "ACTIVE");
+        oldAttachment.put("join_seq", 5L);
+        oldAttachment.put("leave_seq", null);
+        oldAttachment.put("attachment_count", 1);
+        when(jdbcTemplate.queryForList(anyString(), eq(TestUserContext.USER_ADMIN),
+                eq(messageId), eq(TestUserContext.TENANT_0))).thenReturn(List.of(oldAttachment));
+
+        assertEquals("FILE_BIZ_OBJ_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("COMMUNICATION_MESSAGE", messageId)).getCode());
     }
 
     @Test

@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.cgcpms.projectfile.ProjectFileService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -48,6 +49,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("local")
 @DisplayName("OperationAuditAspect — 切面审计测试")
 class OperationAuditAspectTest {
+
+    @MockitoBean
+    private ProjectFileService projectFileService;
 
     @TestConfiguration
     static class TestListenerConfig {
