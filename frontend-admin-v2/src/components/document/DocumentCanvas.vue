@@ -41,6 +41,8 @@ const gridVisible = ref(true)
 const componentPresets = [
   { key: 'TITLE', label: '标题', description: '居中大标题' },
   { key: 'TEXT', label: '文本', description: '普通说明文字' },
+  { key: 'DIVIDER', label: '分割线', description: '横向分隔内容' },
+  { key: 'TABLE', label: '表格', description: '业务明细表' },
   { key: 'HEADER', label: '页眉', description: '每页重复' },
   { key: 'FOOTER', label: '页脚', description: '每页重复' },
 ] as const
@@ -86,6 +88,7 @@ const selectedElement = computed(
 const selectedTable = computed(
   () => props.modelValue.tables.find((item) => item.id === selectedId.value) ?? null,
 )
+const firstCollectionField = computed(() => props.fields.find((field) => field.collectionPath))
 const overflowIds = computed(() => {
   const margin = props.modelValue.page.marginMm
   const elementIds = props.modelValue.elements
@@ -198,19 +201,32 @@ function addField(field: DocumentCatalogField, position?: { xMm: number; yMm: nu
   })
 }
 
-function addText(preset: ComponentPreset): void {
+function addComponent(preset: ComponentPreset): void {
+  if (preset === 'TABLE') {
+    if (firstCollectionField.value) addTableColumn(firstCollectionField.value)
+    return
+  }
   const margin = props.modelValue.page.marginMm
+  const divider = preset === 'DIVIDER'
   const footer = preset === 'FOOTER'
   const header = preset === 'HEADER'
   const title = preset === 'TITLE'
   const element: DocumentCanvasElement = {
-    id: nextId('text'),
-    type: 'TEXT',
-    text: title ? '单据标题' : header ? '公司名称' : footer ? '第 1 页' : '说明文字',
+    id: nextId(divider ? 'divider' : 'text'),
+    type: divider ? 'DIVIDER' : 'TEXT',
+    text: divider
+      ? undefined
+      : title
+        ? '单据标题'
+        : header
+          ? '公司名称'
+          : footer
+            ? '第 1 页'
+            : '说明文字',
     xMm: margin.left,
     yMm: footer ? pageSize.value.height - margin.bottom - 10 : margin.top,
     widthMm: Math.min(120, pageSize.value.width - margin.left - margin.right),
-    heightMm: title ? 14 : 10,
+    heightMm: divider ? 2 : title ? 14 : 10,
     fontSizePt: title ? 18 : header || footer ? 10 : 12,
     align: title || header || footer ? 'CENTER' : 'LEFT',
     repeat: header ? 'HEADER' : footer ? 'FOOTER' : 'BODY',
@@ -465,8 +481,8 @@ function round(value: number): number {
             :key="preset.key"
             type="button"
             class="document-canvas__component"
-            :disabled="disabled"
-            @click="addText(preset.key)"
+            :disabled="disabled || (preset.key === 'TABLE' && !firstCollectionField)"
+            @click="addComponent(preset.key)"
           >
             <strong>{{ preset.label }}</strong>
             <small>{{ preset.description }}</small>
@@ -574,6 +590,7 @@ function round(value: number): number {
             :class="{
               'is-selected': element.id === selectedId,
               'is-overflow': overflowIds.includes(element.id),
+              'is-divider': element.type === 'DIVIDER',
             }"
             :style="{
               left: `${element.xMm}mm`,
@@ -590,8 +607,11 @@ function round(value: number): number {
             @pointerup="stopInteraction"
             @focus="selectedId = element.id"
           >
-            <span>{{ element.text }}</span
-            ><code v-if="element.fieldPath" v-text="'{{' + element.fieldPath + '}}'"></code>
+            <hr v-if="element.type === 'DIVIDER'" />
+            <template v-else>
+              <span>{{ element.text }}</span
+              ><code v-if="element.fieldPath" v-text="'{{' + element.fieldPath + '}}'"></code>
+            </template>
             <button
               type="button"
               class="document-canvas__resize"
@@ -965,6 +985,18 @@ function round(value: number): number {
   font-size: 0.65em;
   color: var(--v2-color-text-secondary);
   text-overflow: ellipsis;
+}
+.document-canvas__element.is-divider {
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+}
+.document-canvas__element.is-divider hr {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 0.3mm solid var(--v2-color-text);
 }
 .document-canvas__table strong {
   display: block;

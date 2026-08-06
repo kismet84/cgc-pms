@@ -55,6 +55,8 @@ class DocumentControllerAuthorizationTest {
                         + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))");
         assertPolicy(DocumentTemplateController.class, "publish", publish);
         assertPolicy(DocumentTemplateController.class, "disable", publish);
+        assertPolicy(DocumentTemplateController.class, "enable", publish);
+        assertPolicy(DocumentTemplateController.class, "delete", edit);
         assertPolicy(DocumentTemplateController.class, "bindDefault", publish);
         assertPolicy(DocumentTemplateController.class, "provisionPaymentSystemTemplate", publish);
         assertPolicy(DocumentTemplateController.class, "provisionSettlementSystemTemplate", publish);

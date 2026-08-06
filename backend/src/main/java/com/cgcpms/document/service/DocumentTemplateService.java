@@ -116,7 +116,7 @@ public class DocumentTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public DocumentTemplateVersion createNextDraft(Long templateId, DraftCommand draft) {
-        DocumentTemplate template = requireTemplate(templateId);
+        DocumentTemplate template = requireTemplateForUpdate(templateId);
         if (!Integer.valueOf(1).equals(template.getEnabled())) {
             throw new BusinessException("DOCUMENT_TEMPLATE_DISABLED", "停用模板不能创建新草稿");
         }
@@ -138,7 +138,7 @@ public class DocumentTemplateService {
     @Transactional(rollbackFor = Exception.class)
     public void updateDraft(Long versionId, DraftCommand draft) {
         DocumentTemplateVersion version = requireVersion(versionId);
-        DocumentTemplate template = requireTemplate(version.getTemplateId());
+        DocumentTemplate template = requireTemplateForUpdate(version.getTemplateId());
         DraftCommand normalizedDraft = normalizeDraft(template.getBusinessType(), draft);
         validateDraft(template.getBusinessType(), normalizedDraft);
         int changed = versionMapper.update(null, new LambdaUpdateWrapper<DocumentTemplateVersion>()
@@ -162,7 +162,7 @@ public class DocumentTemplateService {
         if (!"DRAFT".equals(version.getStatus())) {
             throw new BusinessException("DOCUMENT_TEMPLATE_VERSION_IMMUTABLE", "仅草稿版本允许发布");
         }
-        DocumentTemplate template = requireTemplate(version.getTemplateId());
+        DocumentTemplate template = requireTemplateForUpdate(version.getTemplateId());
         validateDraft(template.getBusinessType(), new DraftCommand(version.getSchemaVersion(), version.getTemplateContent(),
                 version.getFieldManifest(), version.getRemark(), version.getDesignSchema()));
         LocalDateTime now = LocalDateTime.now();
@@ -184,6 +184,8 @@ public class DocumentTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void disablePublishedVersion(Long versionId) {
+        DocumentTemplateVersion version = requireVersion(versionId);
+        requireTemplateForUpdate(version.getTemplateId());
         int changed = versionMapper.update(null, new LambdaUpdateWrapper<DocumentTemplateVersion>()
                 .eq(DocumentTemplateVersion::getId, versionId)
                 .eq(DocumentTemplateVersion::getTenantId, requireTenant())
@@ -195,12 +197,64 @@ public class DocumentTemplateService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public DocumentTemplateVersion enableDisabledVersion(Long versionId) {
+        DocumentTemplateVersion version = requireVersion(versionId);
+        requireTemplateForUpdate(version.getTemplateId());
+        int changed = versionMapper.update(null, new LambdaUpdateWrapper<DocumentTemplateVersion>()
+                .eq(DocumentTemplateVersion::getId, versionId)
+                .eq(DocumentTemplateVersion::getTenantId, requireTenant())
+                .eq(DocumentTemplateVersion::getStatus, "DISABLED")
+                .set(DocumentTemplateVersion::getStatus, "PUBLISHED"));
+        if (changed != 1) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_VERSION_STATE_INVALID", "仅已停用版本允许启用");
+        }
+        version.setStatus("PUBLISHED");
+        return version;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTemplate(Long templateId) {
+        DocumentTemplate template = requireTemplateForUpdate(templateId);
+        Long tenantId = requireTenant();
+        long bound = bindingMapper.selectCount(new LambdaQueryWrapper<DocumentDefaultBinding>()
+                .eq(DocumentDefaultBinding::getTenantId, tenantId)
+                .eq(DocumentDefaultBinding::getTemplateId, template.getId()));
+        if (bound > 0) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_DEFAULT_BOUND", "默认模板不可删除，请先切换默认模板");
+        }
+        long versions = versionMapper.selectCount(new LambdaQueryWrapper<DocumentTemplateVersion>()
+                .eq(DocumentTemplateVersion::getTenantId, tenantId)
+                .eq(DocumentTemplateVersion::getTemplateId, template.getId()));
+        long drafts = versionMapper.selectCount(new LambdaQueryWrapper<DocumentTemplateVersion>()
+                .eq(DocumentTemplateVersion::getTenantId, tenantId)
+                .eq(DocumentTemplateVersion::getTemplateId, template.getId())
+                .eq(DocumentTemplateVersion::getStatus, "DRAFT"));
+        if (versions != drafts) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_DELETE_FORBIDDEN", "已发布模板不可删除，请停用后保留历史");
+        }
+        int deleted = versionMapper.delete(new LambdaQueryWrapper<DocumentTemplateVersion>()
+                .eq(DocumentTemplateVersion::getTenantId, tenantId)
+                .eq(DocumentTemplateVersion::getTemplateId, template.getId())
+                .eq(DocumentTemplateVersion::getStatus, "DRAFT"));
+        if (deleted != versions) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_DELETE_CONFLICT", "模板版本已被其他用户处理，请刷新后重试");
+        }
+        int changed = templateMapper.delete(new LambdaQueryWrapper<DocumentTemplate>()
+                .eq(DocumentTemplate::getId, template.getId())
+                .eq(DocumentTemplate::getTenantId, tenantId));
+        if (changed != 1) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_DELETE_CONFLICT", "模板已被其他用户处理，请刷新后重试");
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public void bindDefault(Long versionId, Integer expectedLockVersion) {
         DocumentTemplateVersion version = requireVersion(versionId);
+        DocumentTemplate template = requireTemplateForUpdate(version.getTemplateId());
+        version = requireVersion(versionId);
         if (!"PUBLISHED".equals(version.getStatus())) {
             throw new BusinessException("DOCUMENT_TEMPLATE_NOT_PUBLISHED", "默认模板必须绑定已发布版本");
         }
-        DocumentTemplate template = requireTemplate(version.getTemplateId());
         Long tenantId = requireTenant();
         DocumentDefaultBinding current = bindingMapper.selectOne(new LambdaQueryWrapper<DocumentDefaultBinding>()
                 .eq(DocumentDefaultBinding::getTenantId, tenantId)
@@ -525,6 +579,15 @@ public class DocumentTemplateService {
         DocumentTemplate template = templateMapper.selectOne(new LambdaQueryWrapper<DocumentTemplate>()
                 .eq(DocumentTemplate::getId, id)
                 .eq(DocumentTemplate::getTenantId, requireTenant()));
+        if (template == null) throw new BusinessException("DOCUMENT_TEMPLATE_NOT_FOUND", "业务单据模板不存在");
+        return template;
+    }
+
+    private DocumentTemplate requireTemplateForUpdate(Long id) {
+        DocumentTemplate template = templateMapper.selectOne(new LambdaQueryWrapper<DocumentTemplate>()
+                .eq(DocumentTemplate::getId, id)
+                .eq(DocumentTemplate::getTenantId, requireTenant())
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         if (template == null) throw new BusinessException("DOCUMENT_TEMPLATE_NOT_FOUND", "业务单据模板不存在");
         return template;
     }

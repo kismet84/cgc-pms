@@ -22,7 +22,7 @@ public class DocumentCanvasCompiler {
     private static final Set<String> TABLE_FIELDS = Set.of("id", "collectionPath", "xMm", "yMm", "widthMm",
             "heightMm", "columns");
     private static final Set<String> COLUMN_FIELDS = Set.of("fieldPath", "header", "widthMm");
-    private static final Set<String> ELEMENT_TYPES = Set.of("TEXT", "FIELD");
+    private static final Set<String> ELEMENT_TYPES = Set.of("TEXT", "FIELD", "DIVIDER");
     private static final Set<String> ALIGNMENTS = Set.of("LEFT", "CENTER", "RIGHT");
     private static final Set<String> REPEATS = Set.of("BODY", "HEADER", "FOOTER");
 
@@ -78,7 +78,7 @@ public class DocumentCanvasCompiler {
         rejectUnknown(node, ELEMENT_FIELDS, path);
         uniqueId(requireText(node, "id", path), ids, path + ".id");
         String type = requireText(node, "type", path).toUpperCase(Locale.ROOT);
-        if (!ELEMENT_TYPES.contains(type)) invalid(path + ".type", "仅支持TEXT或FIELD");
+        if (!ELEMENT_TYPES.contains(type)) invalid(path + ".type", "仅支持TEXT、FIELD或DIVIDER");
         Rect rect = rect(node, path, page);
         double fontSize = optionalNumber(node, "fontSizePt", 10, path, 6, 72);
         double zIndex = optionalNumber(node, "zIndex", 0, path, 0, 100);
@@ -95,7 +95,13 @@ public class DocumentCanvasCompiler {
             if (field == null) fieldUnavailable(fieldPath);
             if (field.collectionPath() != null) contextInvalid(fieldPath);
             fields.add(fieldPath);
-            content = "{{" + fieldPath + "}}";
+            JsonNode labelNode = node.get("text");
+            if (labelNode != null && !labelNode.isTextual()) invalid(path + ".text", "必须是字符串");
+            String label = labelNode == null || labelNode.textValue().isBlank()
+                    ? "" : escapeHtml(labelNode.textValue()) + " ";
+            content = label + "{{" + fieldPath + "}}";
+        } else if ("DIVIDER".equals(type)) {
+            content = "<hr style=\"border:0;border-top:0.3mm solid #333;margin:0\"/>";
         } else {
             content = escapeHtml(requireText(node, "text", path));
         }

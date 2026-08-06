@@ -32,11 +32,23 @@ class DocumentCanvasCompilerTest {
 
         assertTrue(result.html().contains("@page{size:A4 portrait"));
         assertTrue(result.html().contains("{{document.code}}"));
+        assertTrue(result.html().contains("单据编号 {{document.code}}"));
+        assertTrue(result.html().contains("border-top:0.3mm solid #333"));
         assertTrue(result.html().contains("{{#each items}}"));
         assertTrue(result.html().contains("data-repeat=\"HEADER\""));
         assertTrue(result.html().contains("-fs-table-paginate:paginate"));
         assertTrue(result.html().contains("display:table-header-group"));
         assertEquals(java.util.Set.of("document.code", "items.name"), result.fieldManifest());
+    }
+
+    @Test
+    void acceptsMissingOrBlankOptionalFieldLabel() {
+        String labeled = schema("PORTRAIT", 20, false);
+
+        assertTrue(compiler.compile(labeled.replace("\"text\":\"单据编号\"", "\"text\":\"\""), catalog)
+                .html().contains(">{{document.code}}</div>"));
+        assertTrue(compiler.compile(labeled.replace(",\"text\":\"单据编号\"", ""), catalog)
+                .html().contains(">{{document.code}}</div>"));
     }
 
     @Test
@@ -87,7 +99,8 @@ class DocumentCanvasCompilerTest {
                   "schemaVersion":"test.v1",
                   "page":{"size":"A4","orientation":"%s","marginMm":{"top":10,"right":10,"bottom":10,"left":10}},
                   "elements":[{"id":"code","type":"FIELD","xMm":%d,"yMm":20,"widthMm":40,"heightMm":10,
-                    "fieldPath":"document.code","fontSizePt":10,"align":"LEFT","repeat":"HEADER"%s}],
+                    "fieldPath":"document.code","text":"单据编号","fontSizePt":10,"align":"LEFT","repeat":"HEADER"%s},
+                    {"id":"divider","type":"DIVIDER","xMm":10,"yMm":40,"widthMm":80,"heightMm":2}],
                   "tables":[{"id":"items","collectionPath":"items","xMm":10,"yMm":50,"widthMm":80,"heightMm":40,
                     "columns":[{"fieldPath":"items.name","header":"名称","widthMm":80}]}]
                 }

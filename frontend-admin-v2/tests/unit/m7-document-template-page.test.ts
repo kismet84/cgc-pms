@@ -9,7 +9,9 @@ vi.mock('@/services/system-management', () => ({
   bindDefaultDocumentVersion: vi.fn(),
   createDocumentTemplate: vi.fn(),
   createDocumentVersion: vi.fn(),
+  deleteDocumentTemplate: vi.fn(),
   disableDocumentVersion: vi.fn(),
+  enableDocumentVersion: vi.fn(),
   loadDocumentBusinessTypes: vi.fn(),
   loadDocumentFieldCatalog: vi.fn(),
   loadDocumentTemplate: vi.fn(),
@@ -45,6 +47,26 @@ const paymentDetail = {
       templateContent: '<p>v1</p>',
       fieldManifest: '["payment.code"]',
       contentHash: 'hash-v1',
+      designSchema: JSON.stringify({
+        schemaVersion: 'payment.v1',
+        page: {
+          size: 'A4',
+          orientation: 'PORTRAIT',
+          marginMm: { top: 12, right: 12, bottom: 12, left: 12 },
+        },
+        elements: [
+          {
+            id: 'historical-code',
+            type: 'FIELD',
+            xMm: 10,
+            yMm: 10,
+            widthMm: 60,
+            heightMm: 10,
+            fieldPath: 'payment.code',
+          },
+        ],
+        tables: [],
+      }),
       publishedAt: '2026-08-01',
     },
     {
@@ -112,6 +134,13 @@ beforeEach(() => {
       providerReady: true,
       fieldCount: 1,
     },
+    {
+      businessType: 'COST_SUBJECT_MAPPING',
+      displayName: '成本科目映射',
+      schemaVersion: 'cost-subject-mapping.v1',
+      providerReady: true,
+      fieldCount: 4,
+    },
   ])
   vi.mocked(service.loadDocumentFieldCatalog).mockImplementation(async (businessType) => ({
     businessType,
@@ -129,6 +158,7 @@ beforeEach(() => {
     ],
   }))
   vi.mocked(service.previewDocumentTemplateHtml).mockResolvedValue({ html: '<p>preview</p>' })
+  vi.mocked(service.deleteDocumentTemplate).mockResolvedValue()
 })
 
 describe('M7 document template page', () => {
@@ -140,6 +170,18 @@ describe('M7 document template page', () => {
     expect(
       wrapper.findAll('.document-template-page__columns > .v2-card h2').map((item) => item.text()),
     ).toEqual(['业务模块', '模板', 'HTML预览'])
+    expect(
+      wrapper
+        .findAll('.document-template-page__business-group-heading h3')
+        .map((item) => item.text()),
+    ).toEqual(['资金财务', '分包与结算'])
+    expect(
+      wrapper
+        .findAll('.document-template-page__business-group-heading span')
+        .map((item) => item.text()),
+    ).toEqual(['1', '1'])
+    expect(wrapper.text()).not.toContain('基础资料')
+    expect(wrapper.text()).not.toContain('成本科目映射')
     expect(service.loadDocumentTemplates).toHaveBeenCalledWith('PAYMENT', expect.any(AbortSignal))
     expect(service.loadDocumentFieldCatalog).toHaveBeenCalledWith(
       'PAYMENT',
@@ -147,6 +189,7 @@ describe('M7 document template page', () => {
     )
     expect(service.loadDocumentTemplate).toHaveBeenCalledWith(paymentTemplate.id)
     expect(wrapper.get('button[aria-pressed="true"]').text()).toContain('付款申请单')
+    expect(wrapper.text()).not.toContain('PAYMENT-001')
     expect(wrapper.text()).toContain('hash-v1')
     expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
       '<p>v1</p>',
@@ -161,6 +204,176 @@ describe('M7 document template page', () => {
     expect(wrapper.text()).toContain('payment.amount')
     expect(service.loadDocumentTemplate).toHaveBeenCalledTimes(requestCount)
     wrapper.unmount()
+  })
+
+  it('shows edit and delete entries and opens the editor full screen', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((item) => item.text() === '编辑模板')).toBe(true)
+    expect(wrapper.findAll('button').some((item) => item.text() === '删除模板')).toBe(true)
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '编辑模板')!
+      .trigger('click')
+    await flushPromises()
+    expect(document.querySelector('.v2-dialog__panel--fullscreen')).not.toBeNull()
+
+    ;(document.querySelector<HTMLButtonElement>('.v2-dialog__close') as HTMLButtonElement).click()
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '删除模板')!
+      .trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll<HTMLButtonElement>('.v2-dialog__footer button')]
+      .find((item) => item.textContent?.trim() === '删除')!
+      .click()
+    await flushPromises()
+    expect(service.deleteDocumentTemplate).toHaveBeenCalledWith(paymentTemplate.id)
+
+    wrapper.unmount()
+    host.remove()
+  })
+
+  it('offers enable after a version is disabled', async () => {
+    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
+      ...paymentDetail,
+      versions: [{ ...paymentDetail.versions[0]!, status: 'DISABLED' }],
+    })
+    const wrapper = mount(DocumentTemplatePage)
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((item) => item.text() === '启用')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('imports a historical version into the new-template canvas', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '新增模板')!
+      .trigger('click')
+    await flushPromises()
+    const importButton = [
+      ...document.querySelectorAll<HTMLButtonElement>('.v2-dialog__body button'),
+    ].find((item) => item.textContent?.includes('导入 V1'))!
+    importButton.click()
+    await flushPromises()
+
+    expect(document.querySelector('.document-canvas__element')?.textContent).toContain(
+      '{{payment.code}}',
+    )
+    wrapper.unmount()
+    host.remove()
+  })
+
+  it('opens a published legacy template as a canvas draft', async () => {
+    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
+      ...paymentDetail,
+      versions: [
+        {
+          ...paymentDetail.versions[0]!,
+          designSchema: undefined,
+          templateContent: '<style>@page{size:A4 landscape}</style>',
+        },
+      ],
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '编辑模板')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(document.querySelector('.document-canvas')).not.toBeNull()
+    expect(document.querySelector('.document-template-page__textarea')).toBeNull()
+    expect(document.querySelector('.document-template-page__conversion-warning')).toBeNull()
+    expect(document.querySelector('.document-canvas__element code')?.textContent).toContain(
+      '{{payment.code}}',
+    )
+    expect(document.querySelector('[data-testid="orientation-toggle"]')?.textContent).toContain(
+      '横向 A4',
+    )
+    wrapper.unmount()
+    host.remove()
+  })
+
+  it('upgrades an old draft to the current field-catalog schema before editing', async () => {
+    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
+      ...paymentDetail,
+      versions: [
+        {
+          ...paymentDetail.versions[1]!,
+          schemaVersion: 'payment.v1',
+          designSchema: undefined,
+          fieldManifest: '["payment.code"]',
+        },
+      ],
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '编辑模板')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="契约版本"]')?.value).toBe(
+      'payment.v2',
+    )
+    wrapper.unmount()
+    host.remove()
+  })
+
+  it('keeps an unsupported legacy field as an editable placeholder without blocking save', async () => {
+    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
+      ...paymentDetail,
+      versions: [
+        {
+          ...paymentDetail.versions[0]!,
+          designSchema: undefined,
+          fieldManifest: '["payment.code","retired.value"]',
+        },
+      ],
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '编辑模板')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(
+      document.querySelector('.document-template-page__conversion-warning')?.textContent,
+    ).toContain('retired.value')
+    expect(
+      [...document.querySelectorAll('.document-canvas__element')].some((element) =>
+        element.textContent?.includes('retired.value：________'),
+      ),
+    ).toBe(true)
+    expect(
+      document.querySelector<HTMLButtonElement>('.v2-dialog__footer button:last-child')?.disabled,
+    ).toBe(false)
+    wrapper.unmount()
+    host.remove()
   })
 
   it('changes business type once and selects its first template and version', async () => {

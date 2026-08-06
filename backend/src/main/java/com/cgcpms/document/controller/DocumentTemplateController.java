@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -171,6 +172,21 @@ public class DocumentTemplateController {
     @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> disable(@PathVariable Long versionId) {
         service.disablePublishedVersion(versionId);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/versions/{versionId}/enable")
+    @AuditedOperation(type = "ENABLE", businessType = "DOCUMENT_TEMPLATE_VERSION", businessIdExpression = "#versionId")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<DocumentTemplateVersion> enable(@PathVariable Long versionId) {
+        return ApiResponse.success(service.enableDisabledVersion(versionId));
+    }
+
+    @DeleteMapping("/{templateId}")
+    @AuditedOperation(type = "DELETE", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "#templateId")
+    @PreAuthorize("hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> delete(@PathVariable Long templateId) {
+        service.deleteTemplate(templateId);
         return ApiResponse.success();
     }
 

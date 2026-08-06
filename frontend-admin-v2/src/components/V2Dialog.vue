@@ -9,6 +9,7 @@ const props = withDefaults(
     closeLabel?: string
     closeOnBackdrop?: boolean
     closeDisabled?: boolean
+    fullscreen?: boolean
     panelClass?: string
   }>(),
   {
@@ -16,6 +17,7 @@ const props = withDefaults(
     closeLabel: '关闭对话框',
     closeOnBackdrop: true,
     closeDisabled: false,
+    fullscreen: false,
     panelClass: undefined,
   },
 )
@@ -117,7 +119,12 @@ onBeforeUnmount(() => {
       <div v-if="open" class="v2-dialog__backdrop" @click.self="onBackdrop">
         <section
           ref="panel"
-          :class="['v2-dialog__panel', 'v2-dialog-standard', panelClass]"
+          :class="[
+            'v2-dialog__panel',
+            'v2-dialog-standard',
+            { 'v2-dialog__panel--fullscreen': fullscreen },
+            panelClass,
+          ]"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="titleId"

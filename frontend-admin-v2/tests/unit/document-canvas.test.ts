@@ -86,7 +86,27 @@ describe('document canvas', () => {
       props: { modelValue: blank(), fields, previewHtml: '<p>server preview</p>' },
     })
 
-    expect(wrapper.findAll('.document-canvas__component')).toHaveLength(4)
+    expect(wrapper.findAll('.document-canvas__component')).toHaveLength(6)
+    expect(wrapper.findAll('.document-canvas__component').map((item) => item.text())).toEqual(
+      expect.arrayContaining(['分割线横向分隔内容', '表格业务明细表']),
+    )
+
+    await wrapper
+      .findAll('.document-canvas__component')
+      .find((item) => item.text().includes('分割线'))!
+      .trigger('click')
+    expect(
+      (wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema).elements[0],
+    ).toMatchObject({ type: 'DIVIDER', heightMm: 2 })
+
+    await wrapper.setProps({ modelValue: blank() })
+    await wrapper
+      .findAll('.document-canvas__component')
+      .find((item) => item.text().includes('表格'))!
+      .trigger('click')
+    expect(
+      (wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema).tables[0],
+    ).toMatchObject({ collectionPath: 'items', columns: [{ fieldPath: 'items.name' }] })
     expect(wrapper.get('.document-canvas__page').classes()).toContain('has-grid')
 
     await wrapper.get('[data-testid="preview-toggle"]').trigger('click')

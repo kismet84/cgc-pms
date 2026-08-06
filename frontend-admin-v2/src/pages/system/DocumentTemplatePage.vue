@@ -15,11 +15,14 @@ import {
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import DocumentCanvas from '@/components/document/DocumentCanvas.vue'
+import { workflowModule } from '@/pages/system/workflow-business-modules'
 import {
   bindDefaultDocumentVersion,
   createDocumentTemplate,
   createDocumentVersion,
+  deleteDocumentTemplate,
   disableDocumentVersion,
+  enableDocumentVersion,
   loadDocumentBusinessTypes,
   loadDocumentFieldCatalog,
   loadDocumentTemplate,
@@ -29,6 +32,8 @@ import {
   updateDocumentVersion,
   type DocumentBusinessType,
   type DocumentBusinessTypeOption,
+  type DocumentCanvasElement,
+  type DocumentCanvasTable,
   type DocumentDesignSchema,
   type DocumentFieldCatalog,
   type DocumentDraft,
@@ -39,7 +44,14 @@ import {
 import { useSessionStore } from '@/stores/session'
 
 type EditorMode = 'create' | 'version' | 'edit'
-type VersionAction = { kind: 'publish' | 'disable' | 'default'; version: DocumentTemplateVersion }
+type VersionAction = {
+  kind: 'publish' | 'disable' | 'enable' | 'default'
+  version: DocumentTemplateVersion
+}
+type BusinessOption = {
+  value: DocumentBusinessType
+  label: string
+}
 
 const session = useSessionStore()
 const businessType = ref<DocumentBusinessType>('')
@@ -58,10 +70,13 @@ const pageSize = 10
 const editorOpen = ref(false)
 const editorMode = ref<EditorMode>('create')
 const canvasValid = ref(false)
+const conversionIssues = ref<string[]>([])
+const conversionNotices = ref<string[]>([])
 const previewHtml = ref('')
 const previewError = ref('')
 const previewLoading = ref(false)
 const versionAction = ref<VersionAction | null>(null)
+const deleteOpen = ref(false)
 let controller: AbortController | null = null
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -69,20 +84,26 @@ const form = reactive({
   templateCode: '',
   templateName: '',
   schemaVersion: '',
-  templateContent: '',
-  fieldManifest: '',
   designSchema: blankDesign(''),
   previewBusinessId: '',
-  legacy: false,
   remark: '',
 })
-const businessOptions = computed(() =>
+const businessOptions = computed<BusinessOption[]>(() =>
   businessTypes.value.map((item) => ({
     value: item.businessType,
     label: item.displayName,
-    ready: item.providerReady,
   })),
 )
+const businessGroups = computed(() => {
+  const groups = new Map<string, { key: string; label: string; options: BusinessOption[] }>()
+  for (const option of businessOptions.value) {
+    const module = workflowModule(option.value)
+    const group = groups.get(module.key) ?? { ...module, options: [] }
+    group.options.push(option)
+    groups.set(module.key, group)
+  }
+  return [...groups.values()]
+})
 const selectedBusiness = computed(() =>
   businessTypes.value.find((item) => item.businessType === businessType.value),
 )
@@ -104,7 +125,9 @@ async function refresh(preferredTemplateId?: string, preferredVersionId?: string
   error.value = ''
   try {
     if (!businessTypes.value.length)
-      businessTypes.value = await loadDocumentBusinessTypes(current.signal)
+      businessTypes.value = (await loadDocumentBusinessTypes(current.signal)).filter(
+        (item) => item.businessType !== 'COST_SUBJECT_MAPPING',
+      )
     if (
       !businessType.value ||
       !businessTypes.value.some((item) => item.businessType === businessType.value)
@@ -181,13 +204,12 @@ function blankDraft(): void {
     templateCode: '',
     templateName: '',
     schemaVersion,
-    templateContent: '',
-    fieldManifest: '',
     designSchema: blankDesign(schemaVersion),
     previewBusinessId: '',
-    legacy: false,
     remark: '',
   })
+  conversionIssues.value = []
+  conversionNotices.value = []
 }
 
 function openCreate(): void {
@@ -204,8 +226,16 @@ function openNewVersion(): void {
   form.templateCode = detail.value.template.templateCode
   form.templateName = detail.value.template.templateName
   const source = selectedVersion.value
-  if (source) applyVersion(source)
+  if (source && applyVersion(source)) {
+    showToast('warning', '旧版模板已转为画布草稿', '原版本保持不变；保存后生成新版。')
+  }
   editorOpen.value = true
+}
+
+function openTemplateEditor(): void {
+  if (!selectedVersion.value) return
+  if (selectedVersion.value.status === 'DRAFT') openEdit(selectedVersion.value)
+  else openNewVersion()
 }
 
 function openEdit(version: DocumentTemplateVersion): void {
@@ -215,21 +245,19 @@ function openEdit(version: DocumentTemplateVersion): void {
     templateName: detail.value?.template.templateName ?? '',
     remark: version.remark ?? '',
   })
-  applyVersion(version)
+  if (applyVersion(version)) {
+    showToast('warning', '旧版草稿已转为画布', '保存后将使用画布模型。')
+  }
   selectedVersionId.value = version.id
   editorOpen.value = true
 }
 
 async function saveDraft(): Promise<void> {
-  if (
-    !form.schemaVersion.trim() ||
-    (!form.legacy && !canvasValid.value) ||
-    (form.legacy && (!form.templateContent.trim() || !validManifest(form.fieldManifest)))
-  ) {
+  if (!form.schemaVersion.trim() || !canvasValid.value || conversionIssues.value.length) {
     showToast(
       'warning',
       '模板草稿无效',
-      form.legacy ? '契约版本、模板内容和字段清单必须有效。' : '请修复越出页面安全区域的元素。',
+      conversionIssues.value[0] ?? '请修复越出页面安全区域的元素。',
     )
     return
   }
@@ -238,15 +266,11 @@ async function saveDraft(): Promise<void> {
     const draft: DocumentDraft = {
       schemaVersion: form.schemaVersion.trim(),
       remark: form.remark.trim() || undefined,
-    }
-    if (form.legacy) {
-      draft.templateContent = form.templateContent
-      draft.fieldManifest = form.fieldManifest
-    } else
-      draft.designSchema = JSON.stringify({
+      designSchema: JSON.stringify({
         ...form.designSchema,
         schemaVersion: form.schemaVersion.trim(),
-      })
+      }),
+    }
     let templateId = selectedTemplateId.value
     let versionId = selectedVersionId.value
     if (editorMode.value === 'create') {
@@ -285,6 +309,7 @@ async function confirmVersionAction(): Promise<void> {
     const { kind, version } = versionAction.value
     if (kind === 'publish') await publishDocumentVersion(version.id)
     else if (kind === 'disable') await disableDocumentVersion(version.id)
+    else if (kind === 'enable') await enableDocumentVersion(version.id)
     else {
       await bindDefaultDocumentVersion(
         version.id,
@@ -301,12 +326,18 @@ async function confirmVersionAction(): Promise<void> {
   }
 }
 
-function validManifest(value: string): boolean {
+async function confirmDeleteTemplate(): Promise<void> {
+  if (!detail.value) return
+  saving.value = true
   try {
-    const parsed: unknown = JSON.parse(value)
-    return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')
-  } catch {
-    return false
+    await deleteDocumentTemplate(detail.value.template.id)
+    deleteOpen.value = false
+    await refresh()
+    showToast('success', '模板已删除')
+  } catch (value) {
+    showToast('error', '模板删除失败', messageOf(value))
+  } finally {
+    saving.value = false
   }
 }
 
@@ -323,22 +354,191 @@ function blankDesign(schemaVersion: string): DocumentDesignSchema {
   }
 }
 
-function applyVersion(version: DocumentTemplateVersion): void {
-  form.schemaVersion = version.schemaVersion
-  form.templateContent = version.templateContent
-  form.fieldManifest = version.fieldManifest
-  form.legacy = !version.designSchema
-  if (!version.designSchema) return
+function applyVersion(version: DocumentTemplateVersion): boolean {
+  conversionIssues.value = []
+  conversionNotices.value = []
+  form.schemaVersion = catalog.value?.schemaVersion ?? version.schemaVersion
+  if (version.designSchema) {
+    try {
+      form.designSchema = {
+        ...(JSON.parse(version.designSchema) as DocumentDesignSchema),
+        schemaVersion: form.schemaVersion,
+      }
+      return false
+    } catch {
+      showToast('warning', '原画布模型无法读取', '已按字段清单生成新画布草稿。')
+    }
+  }
+  form.designSchema = designFromLegacy(version)
+  return true
+}
+
+function importHistoricalVersion(version: DocumentTemplateVersion): void {
+  const converted = applyVersion(version)
+  showToast(
+    'success',
+    `已导入 V${version.versionNo}`,
+    conversionIssues.value.length
+      ? conversionIssues.value.join('；')
+      : conversionNotices.value.length
+        ? conversionNotices.value.join('；')
+        : converted
+          ? '旧版字段已转换为画布，可继续二次设计。'
+          : '可继续二次设计并保存为新模板或新版本。',
+  )
+}
+
+function designFromLegacy(version: DocumentTemplateVersion): DocumentDesignSchema {
+  const orientation = /@page\s*\{[^}]*\blandscape\b/i.test(version.templateContent)
+    ? 'LANDSCAPE'
+    : 'PORTRAIT'
+  const pageWidth = orientation === 'PORTRAIT' ? 210 : 297
+  const margin = 12
+  const width = pageWidth - margin * 2
+  let manifest = new Set<string>()
   try {
-    form.designSchema = JSON.parse(version.designSchema) as DocumentDesignSchema
+    const parsed: unknown = JSON.parse(version.fieldManifest)
+    if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === 'string')) {
+      throw new Error('invalid manifest')
+    }
+    manifest = new Set(parsed)
   } catch {
-    form.legacy = true
-    showToast('warning', '画布模型无法读取', '已切换到旧源码兼容入口。')
+    conversionIssues.value.push('历史字段清单无效，需修复后再保存')
+  }
+  const catalogFields = catalog.value?.fields ?? []
+  const fieldByPath = new Map(catalogFields.map((field) => [field.path, field]))
+  const legacyAliases: Record<string, string> = {
+    'items.orderQuantity': 'items.orderedQuantity',
+    'items.cumulativeReceivedQuantity': 'items.receivedQuantity',
+  }
+  const resolvedFields = [...manifest].map((path) => ({
+    originalPath: path,
+    field: fieldByPath.get(legacyAliases[path] ?? path),
+  }))
+  const aliasFields = resolvedFields.filter(
+    ({ originalPath, field }) => field && field.path !== originalPath,
+  )
+  if (aliasFields.length) {
+    conversionNotices.value.push(
+      `旧字段已映射：${aliasFields.map(({ originalPath, field }) => `${originalPath}→${field!.path}`).join('、')}`,
+    )
+  }
+  const missingFields = resolvedFields
+    .filter(({ field }) => !field)
+    .map(({ originalPath }) => originalPath)
+  if (missingFields.length) {
+    conversionNotices.value.push(`无现行数据源字段已转为文本占位：${missingFields.join('、')}`)
+  }
+  const fields = resolvedFields.flatMap(({ field }) => (field ? [field] : []))
+  const scalarFields = fields.filter((field) => !field.collectionPath)
+  const collectionGroups = new Map<string, typeof fields>()
+  fields
+    .filter((field) => field.collectionPath)
+    .forEach((field) => {
+      const collectionPath = field.collectionPath!
+      collectionGroups.set(collectionPath, [...(collectionGroups.get(collectionPath) ?? []), field])
+    })
+  for (const [collectionPath, collectionFields] of collectionGroups) {
+    if (collectionFields.length > 30) {
+      conversionIssues.value.push(`${collectionPath} 超过30列，需精简后再保存`)
+    }
+  }
+  const tableGroups = [...collectionGroups.entries()].map(
+    ([collectionPath, collectionFields]) =>
+      [collectionPath, collectionFields.slice(0, 30)] as const,
+  )
+  const gap = 6
+  const columnWidth = (width - gap) / 2
+  const elements: DocumentCanvasElement[] = [
+    {
+      id: 'legacy-title',
+      type: 'TEXT',
+      text: form.templateName || '单据标题',
+      xMm: margin,
+      yMm: margin,
+      widthMm: width,
+      heightMm: 14,
+      fontSizePt: 18,
+      align: 'CENTER',
+      repeat: 'BODY',
+      zIndex: 0,
+    },
+    ...scalarFields.map((field, index) => ({
+      id: `legacy-field-${index + 1}`,
+      type: 'FIELD' as const,
+      text: field.label,
+      fieldPath: field.path,
+      xMm: margin + (index % 2) * (columnWidth + gap),
+      yMm: 34 + Math.floor(index / 2) * 13,
+      widthMm: columnWidth,
+      heightMm: 10,
+      fontSizePt: 10,
+      align: 'LEFT' as const,
+      repeat: 'BODY' as const,
+      zIndex: index + 1,
+    })),
+    ...missingFields.map((path, index) => ({
+      id: `legacy-placeholder-${index + 1}`,
+      type: 'TEXT' as const,
+      text: `${legacyPlaceholderLabel(path)}：________`,
+      xMm: margin + ((scalarFields.length + index) % 2) * (columnWidth + gap),
+      yMm: 34 + Math.floor((scalarFields.length + index) / 2) * 13,
+      widthMm: columnWidth,
+      heightMm: 10,
+      fontSizePt: 10,
+      align: 'LEFT' as const,
+      repeat: 'BODY' as const,
+      zIndex: scalarFields.length + index + 1,
+    })),
+  ]
+  const tableY = 38 + Math.ceil((scalarFields.length + missingFields.length) / 2) * 13
+  const tables: DocumentCanvasTable[] = tableGroups.map(
+    ([collectionPath, collectionFields], tableIndex) => {
+      const columnWidthMm = Math.round((width / collectionFields.length) * 10) / 10
+      return {
+        id: `legacy-table-${tableIndex + 1}`,
+        collectionPath,
+        xMm: margin,
+        yMm: tableY + tableIndex * 46,
+        widthMm: width,
+        heightMm: 38,
+        columns: collectionFields.map((field, index) => ({
+          fieldPath: field.path,
+          header: field.label,
+          widthMm:
+            index === collectionFields.length - 1
+              ? Math.round((width - columnWidthMm * index) * 10) / 10
+              : columnWidthMm,
+        })),
+      }
+    },
+  )
+  return {
+    schemaVersion: form.schemaVersion,
+    page: {
+      size: 'A4',
+      orientation,
+      marginMm: { top: margin, right: margin, bottom: margin, left: margin },
+    },
+    elements,
+    tables,
   }
 }
 
+function legacyPlaceholderLabel(path: string): string {
+  return (
+    {
+      'receipt.totalAmountChinese': '本次合计金额（大写）',
+      'signatures.supplierRepresentative': '供应商代表',
+      'signatures.receiver': '验收人',
+      'signatures.projectManager': '项目负责人',
+      'signatures.warehouseKeeperOrUser': '仓库管理员/使用人',
+    }[path] ?? path
+  )
+}
+
 async function refreshPreview(): Promise<void> {
-  if (!editorOpen.value || form.legacy || !businessType.value || !canvasValid.value) {
+  if (!editorOpen.value || !businessType.value || !canvasValid.value) {
     previewHtml.value = ''
     previewError.value = ''
     previewLoading.value = false
@@ -368,7 +568,6 @@ watch(
     businessType.value,
     JSON.stringify(form.designSchema),
     form.previewBusinessId,
-    form.legacy,
     canvasValid.value,
   ],
   () => {
@@ -397,6 +596,10 @@ function statusTone(status: string): 'success' | 'warning' | 'neutral' {
 
 function versionStatusLabel(status: DocumentTemplateVersion['status']): string {
   return { DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '已停用' }[status]
+}
+
+function versionActionLabel(kind: VersionAction['kind']): string {
+  return { publish: '发布', disable: '停用', enable: '启用', default: '设为默认' }[kind]
 }
 
 onMounted(() => void refresh())
@@ -431,25 +634,47 @@ onBeforeUnmount(() => {
           class="document-template-page__business-list"
           aria-labelledby="document-business-types-title"
         >
-          <button
-            v-for="option in businessOptions"
-            :key="option.value"
-            type="button"
-            class="document-template-page__business-option"
-            :class="{ 'is-selected': option.value === businessType }"
-            :aria-pressed="option.value === businessType"
-            @click="selectBusinessType(option.value)"
+          <section
+            v-for="group in businessGroups"
+            :key="group.key"
+            class="document-template-page__business-group"
           >
-            <span>{{ option.label }}</span>
-            <small>{{ option.ready ? '字段契约就绪' : '完整详情契约待配置' }}</small>
-          </button>
+            <div class="document-template-page__business-group-heading">
+              <h3>{{ group.label }}</h3>
+              <span>{{ group.options.length }}</span>
+            </div>
+            <div class="document-template-page__business-options">
+              <button
+                v-for="option in group.options"
+                :key="option.value"
+                type="button"
+                class="document-template-page__business-option"
+                :class="{ 'is-selected': option.value === businessType }"
+                :aria-pressed="option.value === businessType"
+                @click="selectBusinessType(option.value)"
+              >
+                <span>{{ option.label }}</span>
+              </button>
+            </div>
+          </section>
         </div>
       </V2Card>
 
       <V2Card title="模板">
         <template #actions>
+          <V2Button v-if="canEdit && selectedVersion" size="small" @click="openTemplateEditor">
+            编辑模板
+          </V2Button>
           <V2Button v-if="canEdit && detail" size="small" @click="openNewVersion">
             新建版本
+          </V2Button>
+          <V2Button
+            v-if="canEdit && detail"
+            size="small"
+            variant="danger"
+            @click="deleteOpen = true"
+          >
+            删除模板
           </V2Button>
         </template>
         <V2PageState
@@ -468,7 +693,6 @@ onBeforeUnmount(() => {
             @click="selectTemplate(item.id)"
           >
             <strong>{{ item.templateName }}</strong>
-            <span>{{ item.templateCode }}</span>
             <V2Badge :tone="item.enabled === 1 ? 'success' : 'neutral'">
               {{ item.enabled === 1 ? '启用' : '停用' }}
             </V2Badge>
@@ -537,6 +761,13 @@ onBeforeUnmount(() => {
               >
                 停用
               </V2Button>
+              <V2Button
+                v-if="canPublish && version.status === 'DISABLED'"
+                size="small"
+                @click="versionAction = { kind: 'enable', version }"
+              >
+                启用
+              </V2Button>
             </V2ActionMenu>
           </div>
         </section>
@@ -600,9 +831,28 @@ onBeforeUnmount(() => {
       description="可视化画布保存后由服务端生成 HTML 和字段清单；发布与默认绑定仍使用独立命令。"
       :close-disabled="saving"
       :close-on-backdrop="false"
-      panel-class="v2-dialog-standard v2-dialog-wide"
+      fullscreen
     >
       <div class="document-template-page__form">
+        <section
+          v-if="editorMode !== 'edit' && detail?.versions.length"
+          class="document-template-page__history-import"
+          aria-label="导入历史模板"
+        >
+          <div>
+            <strong>导入历史模板</strong>
+            <small>一键载入历史版本后继续设计</small>
+          </div>
+          <V2Button
+            v-for="version in detail.versions"
+            :key="version.id"
+            size="small"
+            variant="secondary"
+            @click="importHistoricalVersion(version)"
+          >
+            导入 V{{ version.versionNo }} · {{ versionStatusLabel(version.status) }}
+          </V2Button>
+        </section>
         <V2Input
           v-model="form.templateCode"
           label="模板编码"
@@ -615,33 +865,40 @@ onBeforeUnmount(() => {
           required
           :disabled="editorMode !== 'create'"
         />
-        <V2Input v-model="form.schemaVersion" label="契约版本" required :disabled="!form.legacy" />
+        <V2Input v-model="form.schemaVersion" label="契约版本" required disabled />
         <V2Input v-model="form.remark" label="备注" />
-        <label v-if="form.legacy" class="document-template-page__textarea">
-          <span>HTML 模板内容</span>
-          <textarea v-model="form.templateContent" rows="12" required />
-        </label>
-        <div v-if="form.legacy" class="document-template-page__textarea">
-          <span>字段清单（服务端只读）</span>
-          <pre>{{ form.fieldManifest }}</pre>
-        </div>
       </div>
-      <template v-if="!form.legacy">
-        <DocumentCanvas
-          v-model="form.designSchema"
-          :fields="catalog?.fields ?? []"
-          :disabled="saving"
-          :preview-html="previewHtml"
-          :preview-loading="previewLoading"
-          :preview-error="previewError"
-          :preview-business-id="form.previewBusinessId"
-          @update:valid="canvasValid = $event"
-          @update:preview-business-id="form.previewBusinessId = $event"
-        />
-      </template>
+      <p
+        v-if="conversionIssues.length"
+        class="document-template-page__conversion-warning"
+        role="alert"
+      >
+        历史模板未完全转换：{{ conversionIssues.join('；') }}。保存已阻止。
+      </p>
+      <p
+        v-if="conversionNotices.length"
+        class="document-template-page__conversion-warning"
+        role="status"
+      >
+        历史模板兼容处理：{{ conversionNotices.join('；') }}。可继续设计并保存。
+      </p>
+      <DocumentCanvas
+        v-model="form.designSchema"
+        :fields="catalog?.fields ?? []"
+        :disabled="saving"
+        :preview-html="previewHtml"
+        :preview-loading="previewLoading"
+        :preview-error="previewError"
+        :preview-business-id="form.previewBusinessId"
+        @update:valid="canvasValid = $event"
+        @update:preview-business-id="form.previewBusinessId = $event"
+      />
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="editorOpen = false">取消</V2Button>
-        <V2Button :loading="saving" :disabled="!form.legacy && !canvasValid" @click="saveDraft"
+        <V2Button
+          :loading="saving"
+          :disabled="!canvasValid || Boolean(conversionIssues.length)"
+          @click="saveDraft"
           >保存草稿</V2Button
         >
       </template>
@@ -652,20 +909,24 @@ onBeforeUnmount(() => {
       title="确认模板状态变更"
       :description="
         versionAction
-          ? `${versionAction.kind === 'publish' ? '发布' : versionAction.kind === 'disable' ? '停用' : '设为默认'} V${versionAction.version.versionNo}？`
+          ? `${versionActionLabel(versionAction.kind)} V${versionAction.version.versionNo}？`
           : ''
       "
-      :confirm-text="
-        versionAction?.kind === 'publish'
-          ? '发布'
-          : versionAction?.kind === 'disable'
-            ? '停用'
-            : '设为默认'
-      "
+      :confirm-text="versionAction ? versionActionLabel(versionAction.kind) : '确认'"
       :danger="versionAction?.kind === 'disable'"
       :loading="saving"
       @close="versionAction = null"
       @confirm="confirmVersionAction"
+    />
+    <V2ConfirmDialog
+      :open="deleteOpen"
+      title="确认删除模板"
+      :description="detail ? `删除“${detail.template.templateName}”？仅未发布草稿允许删除。` : ''"
+      confirm-text="删除"
+      danger
+      :loading="saving"
+      @close="deleteOpen = false"
+      @confirm="confirmDeleteTemplate"
     />
   </V2Stack>
 </template>
@@ -683,7 +944,32 @@ onBeforeUnmount(() => {
 
 .document-template-page__business-list {
   display: grid;
+  gap: var(--v2-space-4);
+}
+
+.document-template-page__business-group,
+.document-template-page__business-options {
+  display: grid;
   gap: var(--v2-space-2);
+}
+
+.document-template-page__business-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--v2-space-1);
+  color: var(--v2-color-text-muted);
+  border-bottom: 1px solid var(--v2-color-border);
+}
+
+.document-template-page__business-group-heading h3 {
+  margin: 0;
+  color: var(--v2-color-text);
+  font-size: var(--v2-font-size-14);
+}
+
+.document-template-page__business-group-heading span {
+  font-size: var(--v2-font-size-11);
 }
 
 .document-template-page__business-option {
@@ -695,12 +981,6 @@ onBeforeUnmount(() => {
   background: transparent;
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
-}
-
-.document-template-page__business-option small {
-  display: block;
-  margin-top: var(--v2-space-1);
-  color: var(--v2-color-text-muted);
 }
 
 .document-template-page__business-option.is-selected,
@@ -821,22 +1101,33 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-4);
 }
 
-.document-template-page__textarea {
-  display: grid;
+.document-template-page__history-import {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
   gap: var(--v2-space-2);
-}
-
-.document-template-page__textarea textarea {
-  width: 100%;
+  flex-wrap: wrap;
   padding: var(--v2-space-3);
-  resize: vertical;
-}
-
-.document-template-page__textarea pre {
-  max-height: 16rem;
-  padding: var(--v2-space-3);
-  overflow: auto;
   background: var(--v2-color-surface-subtle);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.document-template-page__history-import > div {
+  display: grid;
+  gap: var(--v2-space-1);
+  margin-right: auto;
+}
+
+.document-template-page__history-import small {
+  color: var(--v2-color-text-muted);
+}
+
+.document-template-page__conversion-warning {
+  margin: 0;
+  padding: var(--v2-space-3);
+  color: var(--v2-color-danger-text);
+  background: var(--v2-color-danger-soft);
   border-radius: var(--v2-radius-md);
 }
 
