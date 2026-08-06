@@ -81,6 +81,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
@@ -443,11 +444,11 @@ class PaymentApplicationClosedLoopIntegrationTest {
         @SuppressWarnings("unchecked")
         var payeeDocument = (java.util.Map<String, Object>) document.values().get("payee");
         assertEquals("500.00", paymentDocument.get("applyAmount"));
-        assertEquals("****5678", payeeDocument.get("bankAccount"));
-        assertEquals("138****5678", payeeDocument.get("contactPhone"));
+        assertFalse(payeeDocument.containsKey("bankAccount"));
+        assertFalse(payeeDocument.containsKey("contactPhone"));
         assertEquals(1, ((java.util.List<?>) document.values().get("sources")).size());
         assertEquals(1, ((java.util.List<?>) document.values().get("invoices")).size());
-        assertEquals(1, ((java.util.List<?>) document.values().get("attachments")).size());
+        assertFalse(document.values().containsKey("attachments"));
 
         var trace = traceService.byCashJournal(journal.getId());
         assertEquals(applicationId, trace.getPaymentApplication().getId());

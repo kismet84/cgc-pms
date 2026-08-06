@@ -1,11 +1,13 @@
 package com.cgcpms.project;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.ProjectCommencement;
 import com.cgcpms.project.handler.ProjectCommencementWorkflowHandler;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.ProjectCommencementMapper;
+import com.cgcpms.project.service.ProjectCommencementService;
 import com.cgcpms.project.service.ProjectLifecycleService;
 import com.cgcpms.project.vo.ProjectActivationReadinessVO;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -42,6 +44,7 @@ class ProjectCommencementServiceTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PmProjectMapper projectMapper;
     @Autowired ProjectCommencementMapper commencementMapper;
+    @Autowired ProjectCommencementService commencementService;
     @Autowired ProjectLifecycleService lifecycleService;
     @Autowired ProjectCommencementWorkflowHandler handler;
 
@@ -131,6 +134,24 @@ class ProjectCommencementServiceTest {
         ProjectActivationReadinessVO readiness = lifecycleService.getActivationReadiness(PROJECT);
         assertFalse(readiness.ready());
         assertTrue(readiness.blockers().contains("PROJECT_INITIATION_BASIS_INVALID"));
+    }
+
+    @Test
+    @DisplayName("按单据ID读取时执行租户与项目数据范围隔离")
+    void getByIdFailsClosedAcrossTenantProjectAndMissingObject() {
+        assertEquals(COMMENCEMENT, commencementService.getById(COMMENCEMENT).getId());
+        assertEquals("PROJECT_COMMENCEMENT_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> commencementService.getById(Long.MAX_VALUE)).getCode());
+
+        UserContext.set(Jwts.claims().add("userId", 99999L).add("username", "commencement-reader")
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> commencementService.getById(COMMENCEMENT)).getCode());
+
+        UserContext.set(Jwts.claims().add("userId", 1L).add("username", "other-tenant")
+                .add("tenantId", 99L).add("roleCodes", List.of("ADMIN")).build());
+        assertEquals("PROJECT_COMMENCEMENT_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> commencementService.getById(COMMENCEMENT)).getCode());
     }
 
     private WorkflowContext context() {

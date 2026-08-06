@@ -164,6 +164,39 @@ async function installMocks(page: Page, identity: Identity) {
         ],
       })
     }
+    if (path === '/api/document-templates/business-types') {
+      return success(route, [
+        {
+          businessType: 'PAYMENT',
+          displayName: '付款申请单',
+          schemaVersion: 'payment.v2',
+          providerReady: true,
+          fieldCount: 2,
+        },
+      ])
+    }
+    if (path === '/api/document-templates/catalog') {
+      return success(route, {
+        businessType: 'PAYMENT',
+        displayName: '付款申请单',
+        schemaVersion: 'payment.v2',
+        fields: [
+          {
+            path: 'payment.applyCode',
+            label: '申请编号',
+            valueType: 'TEXT',
+            nullable: false,
+            group: '基本信息',
+            collectionPath: null,
+            masked: false,
+            sortOrder: 1,
+          },
+        ],
+      })
+    }
+    if (path === '/api/document-templates/preview-html') {
+      return success(route, { html: '<html><body>付款申请预览</body></html>' })
+    }
     if (path === '/api/document-templates') {
       return success(route, [
         {

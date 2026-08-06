@@ -163,6 +163,22 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         service.submitFinalAcceptance(finalId);
         approveAll("PROJECT_FINAL_ACCEPTANCE", finalId);
         assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM closeout_final_acceptance WHERE id=?", String.class, finalId));
+        Map<String, Object> finalDetail = service.finalAcceptanceDetail(finalId);
+        assertEquals(finalId, id((Map<?, ?>) finalDetail.get("main")));
+        assertEquals("工程实体、资料和功能验收通过", ((Map<?, ?>) finalDetail.get("main")).get("acceptanceSummary"));
+        assertEquals(1, ((List<?>) finalDetail.get("items")).size());
+        assertFalse(((Map<?, ?>) finalDetail.get("main")).containsKey("tenant_id"));
+        assertEquals("CLOSEOUT_FINAL_ACCEPTANCE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.finalAcceptanceDetail(Long.MAX_VALUE)).getCode());
+        UserContext.set(Jwts.claims().subject("closeout-reader").add("userId", 99999L).add("username", "closeout-reader")
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> service.finalAcceptanceDetail(finalId)).getCode());
+        UserContext.set(Jwts.claims().subject("other-tenant").add("userId", 1L).add("username", "other-tenant")
+                .add("tenantId", 99L).add("roleCodes", List.of("ADMIN")).build());
+        assertEquals("CLOSEOUT_FINAL_ACCEPTANCE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.finalAcceptanceDetail(finalId)).getCode());
+        asUser(1L);
 
         service.bindFinalSettlement(closeoutId, new SettlementBindingCommand(SETTLEMENT));
         assertEquals("FINAL", jdbc.queryForObject("SELECT settlement_type FROM owner_settlement WHERE id=?", String.class, SETTLEMENT));

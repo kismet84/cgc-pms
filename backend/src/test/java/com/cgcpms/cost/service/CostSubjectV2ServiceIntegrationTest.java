@@ -14,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest(properties = "spring.main.allow-circular-references=true")
@@ -118,9 +120,19 @@ class CostSubjectV2ServiceIntegrationTest {
         jdbc.update("""
                 INSERT INTO cost_subject_mapping_item
                 (id,tenant_id,mapping_version_id,source_subject_id,target_group_code,target_subject_id,
-                 historical_display_name,mapping_reason)
+                historical_display_name,mapping_reason)
                 VALUES (?,0,?,?,'BID_TARGET',?,'投标费用历史口径','集成测试')
                 """, 99351201L, VERSION_ID, SOURCE_SUBJECT_ID, PROJECT_SUBJECT_ID);
+        Map<String, Object> mappingDetail = service.mappingVersionDetail(VERSION_ID);
+        assertEquals("V2-IT", ((Map<?, ?>) mappingDetail.get("main")).get("versionCode"));
+        assertEquals(1, ((List<?>) mappingDetail.get("items")).size());
+        assertFalse(((Map<?, ?>) mappingDetail.get("main")).containsKey("tenant_id"));
+        assertEquals("BUSINESS_SOURCE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.mappingVersionDetail(Long.MAX_VALUE)).getCode());
+        TestUserContext.setAdmin(99L, 1L);
+        assertEquals("BUSINESS_SOURCE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.mappingVersionDetail(VERSION_ID)).getCode());
+        TestUserContext.setAdmin(0L, 1L);
         jdbc.update("""
                 INSERT INTO bid_cost
                 (id,tenant_id,project_id,bid_code,bid_project_name,bid_status,created_by,deleted_flag)
@@ -142,12 +154,17 @@ class CostSubjectV2ServiceIntegrationTest {
 
         Long firstTransfer = service.transferBidCost(new CostSubjectV2Service.TransferCommand(
                 BID_ID, PROJECT_ID, TARGET_ID, VERSION_ID, TRANSFER_APPROVAL_ID, "v2-it-transfer-1", "集成测试"));
+        Map<String, Object> transferDetail = service.bidCostTransferDetail(BID_ID);
+        assertEquals(firstTransfer, ((Number) ((Map<?, ?>) transferDetail.get("main")).get("id")).longValue());
+        assertEquals(1, ((List<?>) transferDetail.get("items")).size());
+        assertFalse(((Map<?, ?>) transferDetail.get("main")).containsKey("idempotency_key"));
         assertEquals(0, new BigDecimal("1000.00").compareTo(jdbc.queryForObject(
                 "SELECT total_target_amount FROM cost_target WHERE id=?", BigDecimal.class, TARGET_ID)));
         assertEquals("BID_COST", jdbc.queryForObject(
                 "SELECT source_type FROM cost_item WHERE id=?", String.class, SOURCE_ITEM_ID));
         TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
         assertEquals(List.of(), service.transfers());
+        assertProjectDenied(() -> service.bidCostTransferDetail(BID_ID));
         TestUserContext.setAdmin(0L, 1L);
 
         BusinessException duplicate = assertThrows(BusinessException.class,
@@ -162,7 +179,11 @@ class CostSubjectV2ServiceIntegrationTest {
         assertProjectDenied(() -> service.reverseBidTransfer(
                 firstTransfer, REVERSAL_APPROVAL_ID, "unauthorized-reversal", "unauthorized"));
         TestUserContext.setAdmin(0L, 1L);
-        service.reverseBidTransfer(firstTransfer, REVERSAL_APPROVAL_ID, "v2-it-reversal-1", "集成测试冲销");
+        Long reversalId = service.reverseBidTransfer(firstTransfer, REVERSAL_APPROVAL_ID, "v2-it-reversal-1", "集成测试冲销");
+        Map<String, Object> reversalDetail = service.bidCostTransferReversalDetail(firstTransfer);
+        assertEquals(reversalId, ((Number) ((Map<?, ?>) reversalDetail.get("main")).get("id")).longValue());
+        assertEquals(firstTransfer, ((Number) ((Map<?, ?>) reversalDetail.get("main")).get("originalTransferId")).longValue());
+        assertEquals(-1, ((BigDecimal) ((Map<?, ?>) ((List<?>) reversalDetail.get("items")).get(0)).get("amount")).signum());
         assertEquals(0, BigDecimal.ZERO.compareTo(jdbc.queryForObject(
                 "SELECT total_target_amount FROM cost_target WHERE id=?", BigDecimal.class, TARGET_ID)));
 
@@ -202,6 +223,9 @@ class CostSubjectV2ServiceIntegrationTest {
                 List.of(
                         new CostSubjectV2Service.AllocationLine(PROJECT_ID, new BigDecimal("1")),
                         new CostSubjectV2Service.AllocationLine(OTHER_PROJECT_ID, new BigDecimal("3")))));
+        Map<String, Object> allocationDetail = service.financeAllocationDetail(ACCOUNTING_LINE_ID);
+        assertEquals(batchId, ((Number) ((Map<?, ?>) allocationDetail.get("main")).get("id")).longValue());
+        assertEquals(2, ((List<?>) allocationDetail.get("items")).size());
 
         assertEquals(0, new BigDecimal("1000.00").compareTo(jdbc.queryForObject(
                 "SELECT SUM(allocated_amount) FROM finance_cost_allocation_line WHERE batch_id=?",
@@ -211,6 +235,7 @@ class CostSubjectV2ServiceIntegrationTest {
                 BigDecimal.class, batchId, PROJECT_ID)));
         TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
         assertEquals(List.of(), service.financeAllocations());
+        assertProjectDenied(() -> service.financeAllocationDetail(ACCOUNTING_LINE_ID));
         TestUserContext.setAdmin(0L, 1L);
 
         BusinessException duplicate = assertThrows(BusinessException.class,
@@ -226,8 +251,13 @@ class CostSubjectV2ServiceIntegrationTest {
         assertProjectDenied(() -> service.reverseFinanceAllocation(
                 batchId, ALLOCATION_REVERSAL_APPROVAL_ID, "unauthorized-allocation-reversal", "unauthorized"));
         TestUserContext.setAdmin(0L, 1L);
-        service.reverseFinanceAllocation(batchId, ALLOCATION_REVERSAL_APPROVAL_ID,
+        Long reversalId = service.reverseFinanceAllocation(batchId, ALLOCATION_REVERSAL_APPROVAL_ID,
                 "v2-it-allocation-reversal-1", "财务分摊冲销");
+        Map<String, Object> reversalDetail = service.financeAllocationReversalDetail(batchId);
+        assertEquals(reversalId, ((Number) ((Map<?, ?>) reversalDetail.get("main")).get("id")).longValue());
+        assertEquals(batchId, ((Number) ((Map<?, ?>) reversalDetail.get("main")).get("originalBatchId")).longValue());
+        assertEquals(2, ((List<?>) reversalDetail.get("items")).size());
+        assertEquals(-1, ((BigDecimal) ((Map<?, ?>) ((List<?>) reversalDetail.get("items")).get(0)).get("allocatedAmount")).signum());
         assertEquals(0, BigDecimal.ZERO.compareTo(jdbc.queryForObject(
                 "SELECT SUM(source_amount) FROM finance_cost_allocation_batch WHERE source_type='ACCOUNTING_ENTRY_LINE' AND source_id=?",
                 BigDecimal.class, ACCOUNTING_LINE_ID)));

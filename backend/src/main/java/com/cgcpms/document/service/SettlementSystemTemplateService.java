@@ -37,41 +37,31 @@ public class SettlementSystemTemplateService {
             <table>
               <tr><th class="label">结算编号</th><td>{{settlement.code}}</td><th class="label">结算类型</th><td>{{settlement.type}}</td></tr>
               <tr><th>审批状态</th><td>{{settlement.approvalStatus}}</td><th>定案状态</th><td>{{settlement.finalStatus}}</td></tr>
-              <tr><th>项目</th><td>{{project.name}}</td><th>项目编号</th><td>{{project.id}}</td></tr>
-              <tr><th>合同</th><td>{{contract.name}}</td><th>合同编号</th><td>{{contract.id}}</td></tr>
-              <tr><th>结算对象</th><td>{{partner.name}}</td><th>结算对象编号</th><td>{{partner.id}}</td></tr>
-              <tr><th>金额公式版本</th><td>{{settlement.amountFormulaVersion}}</td><th>定案时间</th><td>{{audit.finalizedAt}}</td></tr>
+              <tr><th>项目</th><td>{{project.name}}</td><th>合同</th><td>{{contract.name}}</td></tr>
+              <tr><th>结算对象</th><td>{{partner.name}}</td><th>定案时间</th><td>{{settlement.finalizedAt}}</td></tr>
             </table>
             <h2>金额基线</h2>
             <table>
               <tr><th>合同金额</th><th>变更金额</th><th>累计计量</th><th>扣款金额</th></tr>
-              <tr><td class="amount">{{settlement.amount.contract}}</td><td class="amount">{{settlement.amount.change}}</td><td class="amount">{{settlement.amount.measured}}</td><td class="amount">{{settlement.amount.deduction}}</td></tr>
+              <tr><td class="amount">{{settlement.contractAmount}}</td><td class="amount">{{settlement.changeAmount}}</td><td class="amount">{{settlement.measuredAmount}}</td><td class="amount">{{settlement.deductionAmount}}</td></tr>
               <tr><th>已付金额</th><th>定案金额</th><th>未付金额</th><th>质保金额</th></tr>
-              <tr><td class="amount">{{settlement.amount.paid}}</td><td class="amount">{{settlement.amount.final}}</td><td class="amount">{{settlement.amount.unpaid}}</td><td class="amount">{{settlement.amount.warranty}}</td></tr>
+              <tr><td class="amount">{{settlement.paidAmount}}</td><td class="amount">{{settlement.finalAmount}}</td><td class="amount">{{settlement.unpaidAmount}}</td><td class="amount">{{settlement.warrantyAmount}}</td></tr>
             </table>
             <h2>结算明细</h2>
             <table><tr><th>名称</th><th>单位</th><th>数量</th><th>单价</th><th>金额</th><th>来源</th><th>备注</th></tr>
-            {{#each settlement.items}}<tr><td>{{name}}</td><td>{{unit}}</td><td class="amount">{{quantity}}</td><td class="amount">{{unitPrice}}</td><td class="amount">{{amount}}</td><td>{{sourceType}}/{{sourceId}}</td><td>{{remark}}</td></tr>{{/each}}
+            {{#each items}}<tr><td>{{name}}</td><td>{{unit}}</td><td class="amount">{{quantity}}</td><td class="amount">{{unitPrice}}</td><td class="amount">{{amount}}</td><td>{{sourceType}}</td><td>{{remark}}</td></tr>{{/each}}
             </table>
             <h2>变更签证</h2>
             <table><tr><th>编号</th><th>名称</th><th>类型</th><th>方向</th><th>确认金额</th><th>状态</th></tr>
-            {{#each settlement.variations}}<tr><td>{{code}}</td><td>{{name}}</td><td>{{type}}</td><td>{{direction}}</td><td class="amount">{{confirmedAmount}}</td><td>{{status}}</td></tr>{{/each}}
+            {{#each variations}}<tr><td>{{code}}</td><td>{{name}}</td><td>{{type}}</td><td>{{direction}}</td><td class="amount">{{confirmedAmount}}</td><td>{{status}}</td></tr>{{/each}}
             </table>
             <h2>付款关联</h2>
             <table><tr><th>申请编号</th><th>类型</th><th>申请金额</th><th>批准金额</th><th>实付金额</th><th>状态</th><th>日期/凭证</th></tr>
-            {{#each settlement.payments}}<tr><td>{{applicationCode}}</td><td>{{type}}</td><td class="amount">{{applyAmount}}</td><td class="amount">{{approvedAmount}}</td><td class="amount">{{actualPayAmount}}</td><td>{{status}}</td><td>{{payDate}}/{{voucherNo}}</td></tr>{{/each}}
+            {{#each payments}}<tr><td>{{applyCode}}</td><td>{{payType}}</td><td class="amount">{{applyAmount}}</td><td class="amount">{{approvedAmount}}</td><td class="amount">{{actualPayAmount}}</td><td>{{status}}</td><td>{{payDate}}/{{voucherNo}}</td></tr>{{/each}}
             </table>
             <h2>成本明细</h2>
             <table><tr><th>成本科目</th><th>类型</th><th>来源</th><th>含税金额</th><th>税额</th><th>不含税金额</th><th>日期</th><th>状态</th></tr>
-            {{#each settlement.costs}}<tr><td>{{subjectName}}</td><td>{{type}}</td><td>{{sourceType}}/{{sourceId}}</td><td class="amount">{{amount}}</td><td class="amount">{{taxAmount}}</td><td class="amount">{{amountWithoutTax}}</td><td>{{date}}</td><td>{{status}}</td></tr>{{/each}}
-            </table>
-            <h2>附件清单</h2>
-            <table><tr><th>文件名</th><th>类型</th><th>字节数</th><th>上传人</th><th>上传时间</th></tr>
-            {{#each settlement.attachments}}<tr><td>{{name}}</td><td>{{type}}</td><td class="amount">{{size}}</td><td>{{uploadedBy}}</td><td>{{uploadedAt}}</td></tr>{{/each}}
-            </table>
-            <h2>审批轨迹</h2>
-            <table><tr><th>节点</th><th>动作</th><th>操作人</th><th>时间</th><th>意见</th></tr>
-            {{#each settlement.approvalRecords}}<tr><td>{{node}}</td><td>{{action}}</td><td>{{operator}}</td><td>{{time}}</td><td>{{comment}}</td></tr>{{/each}}
+            {{#each costs}}<tr><td>{{subjectName}}</td><td>{{type}}</td><td>{{sourceType}}</td><td class="amount">{{amount}}</td><td class="amount">{{taxAmount}}</td><td class="amount">{{amountWithoutTax}}</td><td>{{date}}</td><td>{{status}}</td></tr>{{/each}}
             </table>
             <div class="footer">本文件由 CGC-PMS 依据已审批且已定案结算数据生成；金额以结算服务权威字段为准。</div>
             </body></html>
@@ -79,25 +69,16 @@ public class SettlementSystemTemplateService {
 
     private static final String MANIFEST = """
             ["settlement.code","settlement.type","settlement.approvalStatus","settlement.finalStatus",
-             "settlement.amountFormulaVersion","settlement.amount.contract","settlement.amount.change",
-             "settlement.amount.measured","settlement.amount.deduction","settlement.amount.paid",
-             "settlement.amount.final","settlement.amount.unpaid","settlement.amount.warranty",
-             "project.id","project.name","contract.id","contract.name","partner.id","partner.name",
-             "audit.finalizedAt",
-             "settlement.items.name","settlement.items.unit","settlement.items.quantity","settlement.items.unitPrice",
-             "settlement.items.amount","settlement.items.sourceType","settlement.items.sourceId","settlement.items.remark",
-             "settlement.variations.code","settlement.variations.name","settlement.variations.type",
-             "settlement.variations.direction","settlement.variations.confirmedAmount","settlement.variations.status",
-             "settlement.payments.applicationCode","settlement.payments.type","settlement.payments.applyAmount",
-             "settlement.payments.approvedAmount","settlement.payments.actualPayAmount","settlement.payments.status",
-             "settlement.payments.payDate","settlement.payments.voucherNo",
-             "settlement.costs.subjectName","settlement.costs.type","settlement.costs.sourceType","settlement.costs.sourceId",
-             "settlement.costs.amount","settlement.costs.taxAmount","settlement.costs.amountWithoutTax",
-             "settlement.costs.date","settlement.costs.status",
-             "settlement.attachments.name","settlement.attachments.type","settlement.attachments.size",
-             "settlement.attachments.uploadedBy","settlement.attachments.uploadedAt",
-             "settlement.approvalRecords.node","settlement.approvalRecords.action","settlement.approvalRecords.operator",
-             "settlement.approvalRecords.time","settlement.approvalRecords.comment"]
+             "settlement.contractAmount","settlement.changeAmount","settlement.measuredAmount",
+             "settlement.deductionAmount","settlement.paidAmount","settlement.finalAmount",
+             "settlement.unpaidAmount","settlement.warrantyAmount","settlement.finalizedAt",
+             "project.name","contract.name","partner.name",
+             "items.name","items.unit","items.quantity","items.unitPrice","items.amount","items.sourceType","items.remark",
+             "variations.code","variations.name","variations.type","variations.direction","variations.confirmedAmount","variations.status",
+             "payments.applyCode","payments.payType","payments.applyAmount","payments.approvedAmount",
+             "payments.actualPayAmount","payments.status","payments.payDate","payments.voucherNo",
+             "costs.subjectName","costs.type","costs.sourceType","costs.amount","costs.taxAmount",
+             "costs.amountWithoutTax","costs.date","costs.status"]
             """;
 
     private final DocumentTemplateService templateService;
@@ -114,8 +95,8 @@ public class SettlementSystemTemplateService {
                 .eq(DocumentTemplate::getTemplateCode, TEMPLATE_CODE));
         if (existing == null) {
             DocumentTemplateVersion draft = templateService.create(TEMPLATE_CODE, "系统结算单", "SETTLEMENT",
-                    new DocumentTemplateService.DraftCommand("settlement.v1", TEMPLATE, MANIFEST,
-                            "第48条主线M3受控系统模板"));
+                    new DocumentTemplateService.DraftCommand("settlement.v2", TEMPLATE, MANIFEST,
+                            "第78条主线安全业务详情模板"));
             DocumentTemplateVersion published = templateService.publish(draft.getId());
             templateService.bindDefault(published.getId(), 0);
             return published;
@@ -130,10 +111,10 @@ public class SettlementSystemTemplateService {
         if (published == null) {
             throw new BusinessException("DOCUMENT_SYSTEM_TEMPLATE_STATE_INVALID", "系统结算模板存在但没有已发布版本");
         }
-        if (!TEMPLATE.equals(published.getTemplateContent())) {
+        if (!"settlement.v2".equals(published.getSchemaVersion()) || !TEMPLATE.equals(published.getTemplateContent())) {
             DocumentTemplateVersion draft = templateService.createNextDraft(existing.getId(),
-                    new DocumentTemplateService.DraftCommand("settlement.v1", TEMPLATE, MANIFEST,
-                            "第48条主线M3受控系统模板升级"));
+                    new DocumentTemplateService.DraftCommand("settlement.v2", TEMPLATE, MANIFEST,
+                            "第78条主线安全业务详情模板升级"));
             published = templateService.publish(draft.getId());
         }
 

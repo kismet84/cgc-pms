@@ -54,7 +54,7 @@ class PaymentSystemTemplateServiceIntegrationTest {
         String html = templateEngine.render(first.getTemplateContent(), sample());
         assertTrue(html.contains("PAY-2026-001"));
         assertTrue(html.contains("INV-001"));
-        assertTrue(html.contains("审核通过"));
+        assertTrue(html.contains("示范供应商"));
         RenderedDocument pdf = renderer.render(html);
         assertTrue(pdf.content().length > 1000);
         assertTrue(pdf.pageCount() >= 1 && pdf.pageCount() <= 3);
@@ -70,7 +70,7 @@ class PaymentSystemTemplateServiceIntegrationTest {
         String legacyContent = first.getTemplateContent()
                 .replace(" font-family: 'CGC PMS Document Font', sans-serif;", "");
         DocumentTemplateVersion legacyDraft = templateService.createNextDraft(first.getTemplateId(),
-                new DocumentTemplateService.DraftCommand("payment.v1", legacyContent,
+                new DocumentTemplateService.DraftCommand("payment.v2", legacyContent,
                         first.getFieldManifest(), "legacy system template"));
         DocumentTemplateVersion legacyPublished = templateService.publish(legacyDraft.getId());
         templateService.bindDefault(legacyPublished.getId(), 0);
@@ -112,7 +112,7 @@ class PaymentSystemTemplateServiceIntegrationTest {
         assertTrue(longPdf.pageCount() > 1);
         try (var pdf = Loader.loadPDF(longPdf.content())) {
             String text = new PDFTextStripper().getText(pdf);
-            assertTrue(text.contains("SRC-79"));
+            assertTrue(text.contains("EXPENSE-79"));
             assertTrue(text.contains("INV-LONG-24"));
             assertTrue(text.contains("123456.78"));
         }
@@ -122,7 +122,8 @@ class PaymentSystemTemplateServiceIntegrationTest {
         return Map.ofEntries(
                 Map.entry("payment", Map.of("applyCode", "PAY-2026-001", "approvalStatus", "APPROVED",
                         "applyAmount", "123456.78", "approvedAmount", "120000.00", "payType", "PROGRESS",
-                        "createdAt", "2026-07-17T12:00:00", "applyReason", "工程进度款")),
+                        "createdAt", "2026-07-17T12:00:00", "applyReason", "工程进度款",
+                        "expenseCategory", "工程款")),
                 Map.entry("project", Map.of("name", "示范项目", "code", "PRJ-001")),
                 Map.entry("contract", Map.of("name", "施工合同", "code", "CT-001")),
                 Map.entry("payee", Map.of("name", "示范供应商", "bankName", "示范银行",
@@ -130,7 +131,7 @@ class PaymentSystemTemplateServiceIntegrationTest {
                 Map.entry("sources", List.of(Map.of("type", "SETTLEMENT", "referenceId", "11",
                         "amount", "120000.00", "paidAmount", "0.00"))),
                 Map.entry("basis", List.of(Map.of("type", "SUB_MEASURE", "referenceId", "21",
-                        "amount", "120000.00"))),
+                        "amount", "120000.00", "remark", "进度计量"))),
                 Map.entry("invoices", List.of(Map.of("number", "INV-001", "type", "VAT_SPECIAL",
                         "date", "2026-07-16", "amount", "120000.00", "verifyStatus", "VERIFIED"))),
                 Map.entry("attachments", List.of(Map.of("name", "付款依据.pdf", "type", "PAYMENT_PROOF",

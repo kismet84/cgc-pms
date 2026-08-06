@@ -19,6 +19,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedCaseInsensitiveMap;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -148,6 +149,42 @@ public class CostControlService {
         result.put("approvalInstances", jdbc.queryForList("SELECT w.* FROM wf_instance w JOIN cost_corrective_action c ON c.approval_instance_id=w.id WHERE c.tenant_id=? AND c.forecast_id=? AND c.deleted_flag=0 ORDER BY w.started_at", tenant(), forecastId));
         result.put("costSources", costSourceBreakdown(projectId, localDate(forecast.get("forecast_date"))));
         result.put("summary", jdbc.queryForList("SELECT * FROM cost_summary WHERE tenant_id=? AND project_id=? AND cost_forecast_id=? AND deleted_flag=0 ORDER BY summary_date DESC,cost_subject_id", tenant(), projectId, forecastId));
+        return moneyPayload(result);
+    }
+
+    public Map<String, Object> correctiveActionDetail(Long actionId) {
+        Map<String, Object> main = queryOne("""
+                SELECT c.id,c.project_id `projectId`,p.project_code `projectCode`,p.project_name `projectName`,
+                 c.forecast_id `forecastId`,f.forecast_code `forecastCode`,f.forecast_name `forecastName`,
+                 f.forecast_date `forecastDate`,f.cost_variance_amount `costVarianceAmount`,
+                 c.action_code `actionCode`,c.action_title `actionTitle`,c.root_cause `rootCause`,c.action_plan `actionPlan`,
+                 c.expected_saving_amount `expectedSavingAmount`,c.actual_saving_amount `actualSavingAmount`,
+                 c.responsible_user_id `responsibleUserId`,u.real_name `responsibleUserName`,c.due_date `dueDate`,
+                 c.status,c.result_description `resultDescription`,c.completed_at `completedAt`,c.remark
+                FROM cost_corrective_action c
+                JOIN pm_project p ON p.id=c.project_id AND p.tenant_id=c.tenant_id AND p.deleted_flag=0
+                JOIN cost_forecast f ON f.id=c.forecast_id AND f.tenant_id=c.tenant_id AND f.deleted_flag=0
+                LEFT JOIN sys_user u ON u.id=c.responsible_user_id AND u.tenant_id=c.tenant_id AND u.deleted_flag=0
+                WHERE c.id=? AND c.tenant_id=? AND c.deleted_flag=0
+                """, "COST_CORRECTIVE_NOT_FOUND", "成本纠偏措施不存在或无权访问", actionId, tenant());
+        Long projectId = idValue(main.get("projectId"));
+        projectAccessChecker.checkAccess(projectId, "查看成本纠偏措施");
+        List<Map<String, Object>> items = jdbc.queryForList("""
+                SELECT i.id,i.cost_subject_id `costSubjectId`,s.subject_code `subjectCode`,s.subject_name `subjectName`,
+                 i.bid_cost_amount `bidCostAmount`,i.target_cost_amount `targetCostAmount`,
+                 i.responsibility_amount `responsibilityAmount`,i.committed_cost_amount `committedCostAmount`,
+                 i.actual_cost_amount `actualCostAmount`,i.estimated_remaining_amount `estimatedRemainingAmount`,
+                 i.forecast_at_completion_amount `forecastAtCompletionAmount`,i.cost_variance_amount `costVarianceAmount`,
+                 i.responsible_user_id `responsibleUserId`,u.real_name `responsibleUserName`,
+                 i.responsibility_unit `responsibilityUnit`,i.remark
+                FROM cost_forecast_item i
+                JOIN cost_subject s ON s.id=i.cost_subject_id AND s.tenant_id=i.tenant_id AND s.deleted_flag=0
+                LEFT JOIN sys_user u ON u.id=i.responsible_user_id AND u.tenant_id=i.tenant_id AND u.deleted_flag=0
+                WHERE i.tenant_id=? AND i.forecast_id=? AND i.project_id=? ORDER BY s.subject_code,i.id
+                """, tenant(), main.get("forecastId"), projectId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("main", main);
+        result.put("items", items);
         return moneyPayload(result);
     }
 
@@ -549,7 +586,7 @@ public class CostControlService {
     @SuppressWarnings("unchecked")
     private static <T> T moneyPayload(T value) {
         if (value instanceof Map<?, ?> map) {
-            Map<String, Object> normalized = new LinkedHashMap<>();
+            Map<String, Object> normalized = new LinkedCaseInsensitiveMap<>();
             map.forEach((key, item) -> normalized.put(String.valueOf(key), payloadEntry(String.valueOf(key), item)));
             return (T) normalized;
         }

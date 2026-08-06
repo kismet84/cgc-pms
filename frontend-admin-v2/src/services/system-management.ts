@@ -146,9 +146,78 @@ export interface DataMaintenancePreview {
   ignoredViews: string[]
 }
 
-export type DocumentBusinessType =
-  'PAYMENT' | 'SETTLEMENT' | 'PURCHASE_REQUEST' | 'PURCHASE_ORDER' | 'MATERIAL_RECEIPT'
+export type DocumentBusinessType = string
 export type DocumentVersionStatus = 'DRAFT' | 'PUBLISHED' | 'DISABLED'
+
+export interface DocumentBusinessTypeOption {
+  businessType: DocumentBusinessType
+  displayName: string
+  schemaVersion: string
+  providerReady: boolean
+  fieldCount: number
+}
+
+export interface DocumentCatalogField {
+  path: string
+  label: string
+  valueType: string
+  nullable: boolean
+  group?: string
+  collectionPath?: string | null
+  masked: boolean
+  sortOrder?: number
+}
+
+export interface DocumentFieldCatalog {
+  businessType: DocumentBusinessType
+  displayName?: string
+  schemaVersion: string
+  fields: DocumentCatalogField[]
+}
+
+export type DocumentPageOrientation = 'PORTRAIT' | 'LANDSCAPE'
+
+export interface DocumentCanvasElement {
+  id: string
+  type: 'TEXT' | 'FIELD'
+  xMm: number
+  yMm: number
+  widthMm: number
+  heightMm: number
+  text?: string
+  fieldPath?: string
+  fontSizePt?: number
+  align?: 'LEFT' | 'CENTER' | 'RIGHT'
+  repeat?: 'BODY' | 'HEADER' | 'FOOTER'
+  zIndex?: number
+}
+
+export interface DocumentCanvasTableColumn {
+  fieldPath: string
+  header: string
+  widthMm: number
+}
+
+export interface DocumentCanvasTable {
+  id: string
+  collectionPath: string
+  xMm: number
+  yMm: number
+  widthMm: number
+  heightMm: number
+  columns: DocumentCanvasTableColumn[]
+}
+
+export interface DocumentDesignSchema {
+  schemaVersion: string
+  page: {
+    size: 'A4'
+    orientation: DocumentPageOrientation
+    marginMm: { top: number; right: number; bottom: number; left: number }
+  }
+  elements: DocumentCanvasElement[]
+  tables: DocumentCanvasTable[]
+}
 
 export interface DocumentTemplateSummary {
   id: string
@@ -169,6 +238,7 @@ export interface DocumentTemplateVersion {
   schemaVersion: string
   templateContent: string
   fieldManifest: string
+  designSchema?: string | null
   contentHash: string
   remark?: string
   publishedAt?: string
@@ -186,8 +256,9 @@ export interface DocumentTemplateDetail {
 
 export interface DocumentDraft {
   schemaVersion: string
-  templateContent: string
-  fieldManifest: string
+  templateContent?: string
+  fieldManifest?: string
+  designSchema?: string
   remark?: string
 }
 
@@ -514,6 +585,48 @@ export function loadDocumentTemplates(
   return apiRequest<DocumentTemplateSummary[]>(`/document-templates?${params({ businessType })}`, {
     signal,
   }).then((rows) => rows.map(normalizeTemplate))
+}
+
+export function loadDocumentBusinessTypes(
+  signal?: AbortSignal,
+): Promise<DocumentBusinessTypeOption[]> {
+  return apiRequest<DocumentBusinessTypeOption[]>('/document-templates/business-types', {
+    signal,
+  }).then((rows) =>
+    (rows ?? []).map((row) => ({
+      ...row,
+      providerReady: Boolean(row.providerReady),
+      fieldCount: Number(row.fieldCount ?? 0),
+    })),
+  )
+}
+
+export function loadDocumentFieldCatalog(
+  businessType: DocumentBusinessType,
+  signal?: AbortSignal,
+): Promise<DocumentFieldCatalog> {
+  return apiRequest<DocumentFieldCatalog>(
+    `/document-templates/catalog?${params({ businessType })}`,
+    { signal },
+  ).then((catalog) => ({
+    ...catalog,
+    fields: (catalog.fields ?? []).map((field, index) => ({
+      ...field,
+      group: field.group || (field.collectionPath ? '业务明细' : '基本信息'),
+      sortOrder: Number(field.sortOrder ?? index),
+    })),
+  }))
+}
+
+export function previewDocumentTemplateHtml(command: {
+  businessType: DocumentBusinessType
+  designSchema: string
+  businessId?: string
+}): Promise<{ html: string }> {
+  return apiRequest<{ html: string }, typeof command>('/document-templates/preview-html', {
+    method: 'POST',
+    body: command,
+  })
 }
 
 export function loadDocumentTemplate(id: string): Promise<DocumentTemplateDetail> {

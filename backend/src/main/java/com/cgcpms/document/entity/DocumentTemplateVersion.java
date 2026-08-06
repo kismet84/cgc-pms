@@ -20,6 +20,7 @@ public class DocumentTemplateVersion extends BaseEntity {
     private Integer versionNo;
     private String status;
     private String schemaVersion;
+    private String designSchema;
     private String templateContent;
     private String contentHash;
     private String fieldManifest;

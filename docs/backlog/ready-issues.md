@@ -4,6 +4,8 @@
 
 当前 Ready 为 0，执行中为 0。
 
+- `ISSUE-078-001`已完成G0～G5并关闭，不进入AutoPilot Ready。
+
 - `ISSUE-077-001`已完成 G0～G5 并关闭，不进入 AutoPilot Ready。
 
 - `ISSUE-069-001`、`ISSUE-070-001`、`ISSUE-071-001`均已关闭，不进入AutoPilot Ready。

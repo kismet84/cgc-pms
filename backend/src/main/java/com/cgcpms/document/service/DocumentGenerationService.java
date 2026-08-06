@@ -11,6 +11,7 @@ import com.cgcpms.document.entity.DocumentTemplateVersion;
 import com.cgcpms.document.config.DocumentGenerationProperties;
 import com.cgcpms.document.mapper.DocumentGenerationMapper;
 import com.cgcpms.document.provider.DocumentDataProviderRegistry;
+import com.cgcpms.document.provider.DocumentDataProvider;
 import com.cgcpms.document.provider.DocumentDataSnapshot;
 import com.cgcpms.document.render.DocumentRenderer;
 import com.cgcpms.document.render.RenderedDocument;
@@ -93,8 +94,15 @@ public class DocumentGenerationService {
         if (existing != null) return existing;
         validateRetrySource(retryOfGenerationId, tenantId, normalizedType, businessId);
 
-        if (!trustedSystemRequest) businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
-        if (!trustedSystemRequest) requireGenerationEnabled(normalizedType);
+        DocumentDataProvider provider = null;
+        if (!trustedSystemRequest) {
+            requireGenerationEnabled(normalizedType);
+            provider = providerRegistry.require(normalizedType);
+            businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+            if ("PAYMENT".equals(normalizedType)) {
+                businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
+            }
+        }
         DocumentTemplateVersion version = templateService.requireDefaultVersion(normalizedType);
 
         long generationId = IdWorker.getId();
@@ -125,8 +133,11 @@ public class DocumentGenerationService {
         }
 
         try {
-            if (trustedSystemRequest) requireGenerationEnabled(normalizedType);
-            DocumentDataSnapshot snapshot = providerRegistry.require(normalizedType).load(businessId);
+            if (trustedSystemRequest) {
+                requireGenerationEnabled(normalizedType);
+                provider = providerRegistry.require(normalizedType);
+            }
+            DocumentDataSnapshot snapshot = provider.load(businessId);
             if (!version.getSchemaVersion().equals(snapshot.schemaVersion())) {
                 throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
             }
@@ -151,8 +162,12 @@ public class DocumentGenerationService {
         String normalizedType = normalizeBusinessType(businessType);
         requireGenerationEnabled(normalizedType);
         if (businessId == null) throw new BusinessException("DOCUMENT_BUSINESS_ID_REQUIRED", "业务ID不能为空");
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
-        DocumentDataSnapshot snapshot = providerRegistry.require(normalizedType).loadPreview(businessId);
+        DocumentDataProvider provider = providerRegistry.require(normalizedType);
+        businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+        if ("PAYMENT".equals(normalizedType)) {
+            businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
+        }
+        DocumentDataSnapshot snapshot = provider.loadPreview(businessId);
         DocumentTemplateVersion version = templateService.requireDefaultVersion(normalizedType);
         if (!version.getSchemaVersion().equals(snapshot.schemaVersion())) {
             throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
@@ -170,8 +185,12 @@ public class DocumentGenerationService {
         DocumentTemplateService.TemplateVersionContext context = templateService.requirePreviewVersionContext(templateVersionId);
         String businessType = context.template().getBusinessType();
         requireGenerationEnabled(businessType);
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(businessType, businessId);
-        DocumentDataSnapshot snapshot = providerRegistry.require(businessType).loadPreview(businessId);
+        DocumentDataProvider provider = providerRegistry.require(businessType);
+        businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+        if ("PAYMENT".equals(businessType)) {
+            businessObjectAuthorizer.checkGeneratedDocumentAccess(businessType, businessId);
+        }
+        DocumentDataSnapshot snapshot = provider.loadPreview(businessId);
         if (!context.version().getSchemaVersion().equals(snapshot.schemaVersion())) {
             throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
         }
@@ -181,14 +200,14 @@ public class DocumentGenerationService {
 
     public DocumentGeneration requireGeneration(Long id) {
         DocumentGeneration generation = requireGeneration(id, requireTenant());
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(generation.getBusinessType(), generation.getBusinessId());
+        authorizeBusinessObject(generation.getBusinessType(), generation.getBusinessId());
         return generation;
     }
 
     public IPage<DocumentGeneration> history(long pageNo, long pageSize, String businessType, Long businessId) {
         String normalizedType = normalizeBusinessType(businessType);
         if (businessId == null) throw new BusinessException("DOCUMENT_BUSINESS_ID_REQUIRED", "业务ID不能为空");
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
+        authorizeBusinessObject(normalizedType, businessId);
         return generationMapper.selectPage(new Page<>(Math.max(1, pageNo), Math.min(100, Math.max(1, pageSize))),
                 new LambdaQueryWrapper<DocumentGeneration>()
                         .eq(DocumentGeneration::getTenantId, requireTenant())
@@ -199,7 +218,7 @@ public class DocumentGenerationService {
 
     public String downloadUrl(Long generationId) {
         DocumentGeneration generation = requireGeneration(generationId, requireTenant());
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(generation.getBusinessType(), generation.getBusinessId());
+        authorizeBusinessObject(generation.getBusinessType(), generation.getBusinessId());
         if (!"SUCCEEDED".equals(generation.getStatus()) || generation.getFileId() == null) {
             throw new BusinessException("DOCUMENT_GENERATION_NOT_DOWNLOADABLE", "文档尚未成功归档");
         }
@@ -280,10 +299,19 @@ public class DocumentGenerationService {
 
     private String normalizeBusinessType(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("PAYMENT", "SETTLEMENT", "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT").contains(normalized)) {
+        if (!normalized.matches("[A-Z][A-Z0-9_]{1,63}")) {
             throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "不支持该业务单据类型");
         }
         return normalized;
+    }
+
+    private void authorizeBusinessObject(String businessType, Long businessId) {
+        DocumentDataProvider provider = providerRegistry.require(businessType);
+        businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+        if ("PAYMENT".equals(businessType)) {
+            businessObjectAuthorizer.checkGeneratedDocumentAccess(businessType, businessId);
+        }
+        provider.loadPreview(businessId);
     }
 
     private void requireGenerationEnabled(String businessType) {
