@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("284", flyway.info().current().getVersion().getVersion());
+        assertEquals("285", flyway.info().current().getVersion().getVersion());
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='sys_file_object_task'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_catalog'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_version_link'"));
@@ -98,6 +98,11 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(0, count(flyway, "wf_instance"));
         assertEquals(1, count(flyway, "sys_bootstrap_state"));
         assertEquals(1, count(flyway, "sys_menu", "perms='payment:direct'"));
+        assertEquals(1, count(flyway, "sys_menu", """
+                perms='material:dict:delete' AND deleted_flag=0
+                AND parent_id=(SELECT id FROM sys_menu
+                    WHERE tenant_id=0 AND perms='material:dict:list' AND deleted_flag=0)
+                """));
         assertEquals(1, count(flyway, "sys_role_menu",
                 "role_id=1 AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:direct')"));
         assertEquals(1, count(flyway, "sys_role_menu",
@@ -174,7 +179,12 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("284", current.info().current().getVersion().getVersion());
+        assertEquals("285", current.info().current().getVersion().getVersion());
+        assertEquals(1, count(current, "sys_menu", """
+                perms='material:dict:delete' AND deleted_flag=0
+                AND parent_id=(SELECT id FROM sys_menu
+                    WHERE tenant_id=0 AND perms='material:dict:list' AND deleted_flag=0)
+                """));
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))

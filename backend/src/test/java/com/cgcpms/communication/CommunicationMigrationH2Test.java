@@ -25,6 +25,11 @@ class CommunicationMigrationH2Test {
                 VALUES(990100,1001,'PROJECT_MANAGER','租户项目经理','CUSTOM','ENABLE','SELF',0),
                       (990101,1001,'COMMON_USER','租户普通用户','CUSTOM','ENABLE','SELF',0)
                 """);
+        execute(beforeBackfill, """
+                INSERT INTO sys_menu
+                    (id,tenant_id,parent_id,menu_name,menu_type,perms,order_num,status,visible,deleted_flag)
+                VALUES(990200,1001,0,'租户材料字典','MENU','material:dict:list',1,'ENABLE',1,0)
+                """);
         Flyway flyway = Flyway.configure()
                 .dataSource(beforeBackfill.getConfiguration().getDataSource())
                 .locations("classpath:db/migration-h2", "filesystem:src/main/resources/db/migration-h2-legacy",
@@ -33,7 +38,7 @@ class CommunicationMigrationH2Test {
                 .load();
         flyway.migrate();
 
-        assertEquals("284", flyway.info().current().getVersion().getVersion());
+        assertEquals("285", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO communication_conversation(
                     id,tenant_id,type,direct_pair_key,status,created_at,updated_at)
@@ -87,6 +92,16 @@ class CommunicationMigrationH2Test {
                 JOIN sys_menu menu ON menu.id=role_menu.menu_id AND menu.tenant_id=role_menu.tenant_id
                 WHERE role_menu.tenant_id=1001 AND role_menu.role_id=990101
                   AND menu.perms='communication:group:manage'
+                """));
+        assertEquals(1, scalar(flyway, """
+                SELECT COUNT(*) FROM sys_menu
+                WHERE tenant_id=1001 AND parent_id=990200
+                  AND perms='material:dict:delete' AND deleted_flag=0
+                """));
+        assertEquals(0, scalar(flyway, """
+                SELECT COUNT(*) FROM sys_role_menu role_menu
+                JOIN sys_menu menu ON menu.id=role_menu.menu_id AND menu.tenant_id=role_menu.tenant_id
+                WHERE role_menu.tenant_id=1001 AND menu.perms='material:dict:delete'
                 """));
     }
 

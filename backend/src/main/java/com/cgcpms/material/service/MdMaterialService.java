@@ -137,6 +137,21 @@ public class MdMaterialService {
         if (updated != 1) throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        MdMaterial existing = mdMaterialMapper.selectByIdForUpdate(id, tenantId);
+        if (existing == null) {
+            throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
+        }
+        if (mdMaterialMapper.hasActiveReferences(id, tenantId) != 0) {
+            throw new BusinessException("MATERIAL_REFERENCED", "材料已被业务引用，无法删除，请改为停用");
+        }
+        if (mdMaterialMapper.deleteById(id) != 1) {
+            throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
+        }
+    }
+
     private void normalizeAndValidate(MdMaterial material, boolean creating) {
         material.setMaterialCode(required(material.getMaterialCode(), 64,
                 "MATERIAL_CODE_REQUIRED", "材料编码不能为空"));
