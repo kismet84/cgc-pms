@@ -26,7 +26,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -41,6 +44,7 @@ class CommunicationMySqlConcurrencyTest {
 
     private TransactionTemplate transactions;
     private CommunicationService service;
+    private ObjectProvider<CommunicationService> selfProvider;
 
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
@@ -58,8 +62,10 @@ class CommunicationMySqlConcurrencyTest {
                 """, USER_ONE, USER_TWO);
         @SuppressWarnings("unchecked")
         ObjectProvider<CommunicationService> self = mock(ObjectProvider.class);
+        selfProvider = self;
         service = new CommunicationService(
                 jdbc, mock(FileService.class), mock(CommunicationEventService.class), self);
+        when(selfProvider.getObject()).thenReturn(service);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
     }
 
@@ -108,6 +114,39 @@ class CommunicationMySqlConcurrencyTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    @Test
+    void draftCleanupContinuesWhenCandidateIsDeletedOrSentBeforeLock() {
+        TestUserContext.setUser(0, USER_ONE, "m75-mysql-one", List.of());
+        long conversationId = Long.parseLong(transactions.execute(status ->
+                service.createConversation("DIRECT", null, List.of(USER_TWO))).id());
+        long missingDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "missing", "m76-mysql-race-missing")).id());
+        long sentDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "sent", "m76-mysql-race-sent")).id());
+        long survivingDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "surviving", "m76-mysql-race-surviving")).id());
+        jdbc.update("UPDATE communication_message SET created_at=DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 25 HOUR) WHERE id IN (?,?,?)",
+                missingDraft, sentDraft, survivingDraft);
+
+        CommunicationService proxy = mock(CommunicationService.class);
+        when(selfProvider.getObject()).thenReturn(proxy);
+        doAnswer(invocation -> {
+            long messageId = invocation.getArgument(0);
+            if (messageId == missingDraft) jdbc.update(
+                    "UPDATE communication_message SET deleted_flag=1 WHERE id=?", messageId);
+            if (messageId == sentDraft) jdbc.update(
+                    "UPDATE communication_message SET status='SENT',seq=1 WHERE id=?", messageId);
+            transactions.executeWithoutResult(status -> service.deleteDraft(messageId));
+            return null;
+        }).when(proxy).deleteDraft(org.mockito.ArgumentMatchers.anyLong());
+
+        assertDoesNotThrow(service::expireDrafts);
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT deleted_flag FROM communication_message WHERE id=?", Integer.class, survivingDraft));
+        assertEquals("SENT", jdbc.queryForObject(
+                "SELECT status FROM communication_message WHERE id=?", String.class, sentDraft));
     }
 
     private String createDirect(long current, long target, CyclicBarrier barrier) throws Exception {

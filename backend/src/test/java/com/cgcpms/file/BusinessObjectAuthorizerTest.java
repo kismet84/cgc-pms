@@ -51,7 +51,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -127,6 +129,17 @@ class BusinessObjectAuthorizerTest {
                 () -> authorizer.checkReadAccess("PROJECT_FILE", 90001L));
 
         assertEquals("FILE_ACCESS_DENIED", error.getCode());
+        verify(contractMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void projectFileSourceTypePermissionReusesDomainAuthoritiesWithoutObjectQueries() {
+        setAuthentication("file:query", "contract:query");
+        assertTrue(authorizer.canReadProjectFileSource("CONTRACT"));
+
+        setAuthentication("file:query");
+        assertFalse(authorizer.canReadProjectFileSource("CONTRACT"));
+        assertFalse(authorizer.canReadProjectFileSource("UNKNOWN"));
         verify(contractMapper, never()).selectById(anyLong());
     }
 

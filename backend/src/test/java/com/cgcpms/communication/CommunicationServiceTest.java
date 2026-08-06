@@ -11,11 +11,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -25,6 +28,8 @@ import java.util.stream.LongStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,7 +41,7 @@ class CommunicationServiceTest {
     private static final long OUTSIDER = 991003L;
 
     private CommunicationService service;
-    private JdbcTemplate jdbc;
+    private CountingJdbcTemplate jdbc;
     private TransactionTemplate transactions;
     private FileService files;
     private CommunicationEventService events;
@@ -52,7 +57,7 @@ class CommunicationServiceTest {
         flyway.clean();
         flyway.migrate();
         DataSource dataSource = flyway.getConfiguration().getDataSource();
-        jdbc = new JdbcTemplate(dataSource);
+        jdbc = new CountingJdbcTemplate(dataSource);
         jdbc.update("""
                 INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,deleted_flag)
                 VALUES(991001,0,'comm-one','-', '用户一','ENABLE',0,0),
@@ -343,6 +348,90 @@ class CommunicationServiceTest {
                 "SELECT deleted_flag FROM communication_message WHERE id=?", Integer.class, freshDraft));
     }
 
+    @Test
+    void messageAttachmentsStayOrderedAndUseThreeQueriesForAnyPageSize() {
+        var conversation = transactions.execute(status ->
+                service.createConversation("DIRECT", null, List.of(USER_TWO)));
+        long conversationId = Long.parseLong(conversation.id());
+        List<Object[]> messages = new ArrayList<>(100);
+        for (int index = 1; index <= 100; index++) {
+            messages.add(new Object[]{890_000L + index, conversationId, USER_ONE, index,
+                    "message-" + index, "bulk-message-" + index});
+        }
+        jdbc.batchUpdate("""
+                INSERT INTO communication_message(
+                    id,tenant_id,conversation_id,sender_id,status,seq,body,client_message_id,
+                    created_at,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'SENT',?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, messages);
+        insertAttachment(892_002L, 890_001L, "CLEAN");
+        insertAttachment(892_001L, 890_001L, "CLEAN");
+        jdbc.update("UPDATE sys_file SET created_at=TIMESTAMP '2026-01-01 00:00:00' WHERE id IN (892001,892002)");
+
+        jdbc.resetQueryCount();
+        var one = service.messages(conversationId, 0, 1);
+        assertEquals(3, jdbc.queryCount());
+        assertEquals(List.of("892001", "892002"), one.getFirst().attachments().stream()
+                .map(CommunicationService.AttachmentRecord::id).toList());
+
+        jdbc.resetQueryCount();
+        var fifty = service.messages(conversationId, 0, 50);
+        assertEquals(3, jdbc.queryCount());
+        assertEquals(50, fifty.size());
+        assertEquals(List.of(), fifty.get(1).attachments());
+
+        jdbc.resetQueryCount();
+        assertEquals(100, service.messages(conversationId, 0, 100).size());
+        assertEquals(3, jdbc.queryCount());
+    }
+
+    @Test
+    void draftCleanupSkipsExpectedRacesButPropagatesUnknownFailures() {
+        var conversation = transactions.execute(status ->
+                service.createConversation("DIRECT", null, List.of(USER_TWO)));
+        long conversationId = Long.parseLong(conversation.id());
+        long missingDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "missing", "client-race-missing")).id());
+        long sentDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "sent", "client-race-sent")).id());
+        long survivingDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "surviving", "client-race-surviving")).id());
+        jdbc.update("UPDATE communication_message SET created_at=DATEADD('HOUR',-25,CURRENT_TIMESTAMP) WHERE id IN (?,?,?)",
+                missingDraft, sentDraft, survivingDraft);
+
+        @SuppressWarnings("unchecked")
+        ObjectProvider<CommunicationService> proxyProvider = mock(ObjectProvider.class);
+        CommunicationService cleanup = new CommunicationService(jdbc, files, events, proxyProvider);
+        CommunicationService proxy = mock(CommunicationService.class);
+        when(proxyProvider.getObject()).thenReturn(proxy);
+        doAnswer(invocation -> {
+            long messageId = invocation.getArgument(0);
+            if (messageId == missingDraft) jdbc.update(
+                    "UPDATE communication_message SET deleted_flag=1 WHERE id=?", messageId);
+            if (messageId == sentDraft) jdbc.update(
+                    "UPDATE communication_message SET status='SENT',seq=1 WHERE id=?", messageId);
+            cleanup.deleteDraft(messageId);
+            return null;
+        }).when(proxy).deleteDraft(org.mockito.ArgumentMatchers.anyLong());
+
+        cleanup.expireDrafts();
+
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT deleted_flag FROM communication_message WHERE id=?", Integer.class, survivingDraft));
+
+        long failedDraft = Long.parseLong(transactions.execute(status -> service.createDraft(
+                conversationId, "failed", "client-race-failed")).id());
+        insertAttachment(893_001L, failedDraft, "CLEAN");
+        jdbc.update("UPDATE communication_message SET created_at=DATEADD('HOUR',-25,CURRENT_TIMESTAMP) WHERE id=?",
+                failedDraft);
+        doThrow(new IllegalStateException("object storage unavailable")).when(files)
+                .deleteForBusinessCascade(893_001L, "COMMUNICATION_MESSAGE", failedDraft);
+
+        assertThrows(IllegalStateException.class, service::expireDrafts);
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT deleted_flag FROM communication_message WHERE id=?", Integer.class, failedDraft));
+    }
+
     private String createDirectAfterBarrier(long currentUser, long targetUser, CyclicBarrier barrier) throws Exception {
         TestUserContext.setUser(0, currentUser, "concurrent", List.of());
         try {
@@ -378,5 +467,39 @@ class CommunicationServiceTest {
                     'application/pdf',?,'test',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
                 """, fileId, messageId, "COMMUNICATION_MESSAGE/" + messageId + "/" + fileId, scanStatus,
                 USER_ONE, USER_ONE);
+    }
+
+    private static final class CountingJdbcTemplate extends JdbcTemplate {
+        private int queryCount;
+
+        private CountingJdbcTemplate(DataSource dataSource) {
+            super(dataSource);
+        }
+
+        @Override
+        public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
+            queryCount++;
+            return super.queryForObject(sql, requiredType, args);
+        }
+
+        @Override
+        public List<Map<String, Object>> queryForList(String sql, Object... args) {
+            queryCount++;
+            return super.queryForList(sql, args);
+        }
+
+        @Override
+        public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... args) {
+            queryCount++;
+            return super.query(sql, rowMapper, args);
+        }
+
+        private int queryCount() {
+            return queryCount;
+        }
+
+        private void resetQueryCount() {
+            queryCount = 0;
+        }
     }
 }

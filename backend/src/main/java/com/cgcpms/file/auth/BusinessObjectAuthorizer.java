@@ -100,6 +100,20 @@ public class BusinessObjectAuthorizer {
                 "file:query", "cashbook:journal:query");
     }
 
+    /** Permission-only half of project-file source visibility; object existence stays in SQL. */
+    public boolean canReadProjectFileSource(String businessType) {
+        String upperType = businessType == null ? "" : businessType.toUpperCase();
+        if (!KNOWN_BUSINESS_TYPES.contains(upperType)) return false;
+        try {
+            requireSourceReadAuthority(upperType);
+            requireAccessAuthority(upperType, false, "file:query", "cashbook:journal:query", null);
+            return true;
+        } catch (BusinessException denied) {
+            if ("FILE_ACCESS_DENIED".equals(denied.getCode())) return false;
+            throw denied;
+        }
+    }
+
     /** Business-query half of the generated-document permission intersection. */
     public void checkGeneratedDocumentAccess(String businessType, Long businessId) {
         String upper = businessType == null ? "" : businessType.toUpperCase();
@@ -215,6 +229,12 @@ public class BusinessObjectAuthorizer {
         }
 
         String upperType = businessType.toUpperCase();
+        requireAccessAuthority(upperType, write, genericAuthority, cashJournalAuthority, documentType);
+        checkBusinessObject(upperType, businessId, action, write, documentType, businessType);
+    }
+
+    private void requireAccessAuthority(String upperType, boolean write, String genericAuthority,
+                                        String cashJournalAuthority, String documentType) {
         String requiredAuthority = switch (upperType) {
             case "CASH_JOURNAL" -> cashJournalAuthority;
             case "BID_COST" -> write ? "bid:file:manage" : "bid:query";
@@ -244,7 +264,10 @@ public class BusinessObjectAuthorizer {
         else if (upperType.startsWith("TECH_")) requireTechnicalAuthority(upperType, write);
         else if (upperType.startsWith("CLOSEOUT_")) requireCloseoutAuthority(upperType, write);
         else requireAuthority(requiredAuthority);
+    }
 
+    private void checkBusinessObject(String upperType, Long businessId, String action, boolean write,
+                                     String documentType, String businessType) {
         switch (upperType) {
             case "PROJECT":
                 if (write) {
