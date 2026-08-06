@@ -69,20 +69,32 @@ describe('document canvas', () => {
     })
     const wrapper = mount(DocumentCanvas, { props: { modelValue: schema, fields } })
 
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '横向')!
-      .trigger('click')
+    expect(wrapper.findAll('[data-testid="orientation-toggle"]')).toHaveLength(1)
+    await wrapper.get('[data-testid="orientation-toggle"]').trigger('click')
     const changed = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
     expect(changed.page.orientation).toBe('LANDSCAPE')
     expect(changed.elements[0]?.xMm).toBe(180)
     expect(wrapper.emitted('update:valid')!.at(-1)![0]).toBe(true)
 
     await wrapper.setProps({ modelValue: { ...schema, page: changed.page } })
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '纵向')!
-      .trigger('click')
+    await wrapper.get('[data-testid="orientation-toggle"]').trigger('click')
     expect(wrapper.emitted('update:valid')!.at(-1)![0]).toBe(false)
+  })
+
+  it('offers component presets and switches the shared canvas area to HTML preview', async () => {
+    const wrapper = mount(DocumentCanvas, {
+      props: { modelValue: blank(), fields, previewHtml: '<p>server preview</p>' },
+    })
+
+    expect(wrapper.findAll('.document-canvas__component')).toHaveLength(4)
+    expect(wrapper.get('.document-canvas__page').classes()).toContain('has-grid')
+
+    await wrapper.get('[data-testid="preview-toggle"]').trigger('click')
+
+    expect(wrapper.find('.document-canvas__page').exists()).toBe(false)
+    expect(wrapper.get('.document-canvas__preview-page iframe').attributes('srcdoc')).toContain(
+      'server preview',
+    )
+    expect(wrapper.get('.document-canvas__viewport').findAll('iframe')).toHaveLength(1)
   })
 })

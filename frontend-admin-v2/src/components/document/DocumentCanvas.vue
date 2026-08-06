@@ -9,19 +9,42 @@ import type {
   DocumentPageOrientation,
 } from '@/services/system-management'
 
-const props = defineProps<{
-  modelValue: DocumentDesignSchema
-  fields: DocumentCatalogField[]
-  disabled?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: DocumentDesignSchema
+    fields: DocumentCatalogField[]
+    disabled?: boolean
+    previewHtml?: string
+    previewLoading?: boolean
+    previewError?: string
+    previewBusinessId?: string
+  }>(),
+  {
+    disabled: false,
+    previewHtml: '',
+    previewLoading: false,
+    previewError: '',
+    previewBusinessId: '',
+  },
+)
 const emit = defineEmits<{
   'update:modelValue': [value: DocumentDesignSchema]
   'update:valid': [value: boolean]
+  'update:previewBusinessId': [value: string]
 }>()
 
 const search = ref('')
 const zoom = ref('75')
 const selectedId = ref('')
+const viewMode = ref<'DESIGN' | 'PREVIEW'>('DESIGN')
+const gridVisible = ref(true)
+const componentPresets = [
+  { key: 'TITLE', label: '标题', description: '居中大标题' },
+  { key: 'TEXT', label: '文本', description: '普通说明文字' },
+  { key: 'HEADER', label: '页眉', description: '每页重复' },
+  { key: 'FOOTER', label: '页脚', description: '每页重复' },
+] as const
+type ComponentPreset = (typeof componentPresets)[number]['key']
 let sequence = 0
 let interaction:
   | {
@@ -129,6 +152,10 @@ function changeOrientation(orientation: DocumentPageOrientation): void {
   commit({ page: { ...props.modelValue.page, orientation } })
 }
 
+function toggleOrientation(): void {
+  changeOrientation(props.modelValue.page.orientation === 'PORTRAIT' ? 'LANDSCAPE' : 'PORTRAIT')
+}
+
 function updateMargin(value: string): void {
   const margin = Math.max(0, Math.min(30, Number(value) || 0))
   commit({
@@ -171,18 +198,22 @@ function addField(field: DocumentCatalogField, position?: { xMm: number; yMm: nu
   })
 }
 
-function addText(): void {
+function addText(preset: ComponentPreset): void {
+  const margin = props.modelValue.page.marginMm
+  const footer = preset === 'FOOTER'
+  const header = preset === 'HEADER'
+  const title = preset === 'TITLE'
   const element: DocumentCanvasElement = {
     id: nextId('text'),
     type: 'TEXT',
-    text: '单据标题',
-    xMm: props.modelValue.page.marginMm.left,
-    yMm: props.modelValue.page.marginMm.top,
-    widthMm: 80,
-    heightMm: 14,
-    fontSizePt: 16,
-    align: 'CENTER',
-    repeat: 'BODY',
+    text: title ? '单据标题' : header ? '公司名称' : footer ? '第 1 页' : '说明文字',
+    xMm: margin.left,
+    yMm: footer ? pageSize.value.height - margin.bottom - 10 : margin.top,
+    widthMm: Math.min(120, pageSize.value.width - margin.left - margin.right),
+    heightMm: title ? 14 : 10,
+    fontSizePt: title ? 18 : header || footer ? 10 : 12,
+    align: title || header || footer ? 'CENTER' : 'LEFT',
+    repeat: header ? 'HEADER' : footer ? 'FOOTER' : 'BODY',
     zIndex: props.modelValue.elements.length,
   }
   selectedId.value = element.id
@@ -426,7 +457,25 @@ function round(value: number): number {
 <template>
   <div class="document-canvas">
     <aside class="document-canvas__fields" aria-label="字段目录">
+      <section class="document-canvas__library" aria-labelledby="document-component-library">
+        <h3 id="document-component-library">组件库</h3>
+        <div class="document-canvas__library-grid">
+          <button
+            v-for="preset in componentPresets"
+            :key="preset.key"
+            type="button"
+            class="document-canvas__component"
+            :disabled="disabled"
+            @click="addText(preset.key)"
+          >
+            <strong>{{ preset.label }}</strong>
+            <small>{{ preset.description }}</small>
+          </button>
+        </div>
+      </section>
+      <h3>业务字段</h3>
       <V2Input v-model="search" type="search" label="搜索字段" placeholder="名称或路径" />
+      <p class="document-canvas__hint">点击或拖入字段；集合字段自动创建明细表。</p>
       <p v-if="!groupedFields.length" class="document-canvas__empty">没有匹配字段</p>
       <section v-for="[group, items] in groupedFields" :key="group">
         <h3>{{ group }}</h3>
@@ -449,21 +498,22 @@ function round(value: number): number {
 
     <section class="document-canvas__workspace" aria-label="A4 设计画布">
       <div class="document-canvas__toolbar">
-        <span>方向</span>
         <V2Button
+          data-testid="orientation-toggle"
           size="small"
-          :variant="modelValue.page.orientation === 'PORTRAIT' ? 'primary' : 'secondary'"
-          @click="changeOrientation('PORTRAIT')"
-          >纵向</V2Button
+          variant="secondary"
+          :aria-label="`当前${modelValue.page.orientation === 'PORTRAIT' ? '纵向' : '横向'}，点击切换纸张方向`"
+          @click="toggleOrientation"
         >
+          {{ modelValue.page.orientation === 'PORTRAIT' ? '纵向 A4' : '横向 A4' }}
+        </V2Button>
         <V2Button
+          data-testid="grid-toggle"
           size="small"
-          :variant="modelValue.page.orientation === 'LANDSCAPE' ? 'primary' : 'secondary'"
-          @click="changeOrientation('LANDSCAPE')"
-          >横向</V2Button
+          variant="secondary"
+          @click="gridVisible = !gridVisible"
         >
-        <V2Button size="small" variant="secondary" :disabled="disabled" @click="addText">
-          添加文本
+          {{ gridVisible ? '隐藏网格' : '显示网格' }}
         </V2Button>
         <label
           >统一边距(mm)<input
@@ -480,13 +530,30 @@ function round(value: number): number {
             <option value="100">100%</option>
           </select></label
         >
+        <span class="document-canvas__toolbar-spacer"></span>
+        <V2Button
+          data-testid="preview-toggle"
+          size="small"
+          :variant="viewMode === 'PREVIEW' ? 'primary' : 'secondary'"
+          :disabled="viewMode === 'DESIGN' && !previewHtml && !previewLoading"
+          @click="viewMode = viewMode === 'DESIGN' ? 'PREVIEW' : 'DESIGN'"
+        >
+          {{ viewMode === 'DESIGN' ? '预览' : '返回设计' }}
+        </V2Button>
+      </div>
+      <div class="document-canvas__status" aria-live="polite">
+        <span>{{ viewMode === 'DESIGN' ? '设计模式' : 'HTML 预览' }}</span>
+        <span>{{ pageSize.width }} × {{ pageSize.height }} mm</span>
+        <span>{{ zoom }}%</span>
       </div>
       <p v-if="overflowIds.length" class="document-canvas__warning" role="alert">
         {{ overflowIds.length }} 个元素越出页面安全区域，保存已阻止。
       </p>
-      <div class="document-canvas__viewport">
+      <div class="document-canvas__viewport" :class="{ 'is-preview': viewMode === 'PREVIEW' }">
         <div
+          v-if="viewMode === 'DESIGN'"
           class="document-canvas__page"
+          :class="{ 'has-grid': gridVisible }"
           :style="{
             width: `${pageSize.width}mm`,
             height: `${pageSize.height}mm`,
@@ -570,12 +637,40 @@ function round(value: number): number {
             ></button>
           </div>
         </div>
+        <div
+          v-else
+          class="document-canvas__preview-page"
+          :style="{
+            width: `${pageSize.width}mm`,
+            height: `${pageSize.height}mm`,
+            transform: `scale(${scale})`,
+          }"
+        >
+          <p v-if="previewLoading" class="document-canvas__preview-state">正在生成预览…</p>
+          <p v-else-if="previewError" class="document-canvas__preview-state is-error" role="alert">
+            {{ previewError }}
+          </p>
+          <iframe v-else title="业务单据 HTML 预览" sandbox="" :srcdoc="previewHtml"></iframe>
+        </div>
       </div>
     </section>
 
     <aside class="document-canvas__properties" aria-label="元素属性">
-      <h3>属性</h3>
-      <template v-if="selectedElement">
+      <template v-if="viewMode === 'PREVIEW'">
+        <h3>预览设置</h3>
+        <V2Input
+          :model-value="previewBusinessId"
+          label="真实业务对象 ID"
+          type="number"
+          placeholder="留空使用示例数据"
+          @update:model-value="emit('update:previewBusinessId', $event)"
+        />
+        <p class="document-canvas__hint">预览与正式生成使用同一服务端编译链。</p>
+      </template>
+      <template v-else>
+        <h3>属性</h3>
+      </template>
+      <template v-if="viewMode === 'DESIGN' && selectedElement">
         <V2Input
           :model-value="selectedElement.text"
           label="显示名称"
@@ -638,7 +733,7 @@ function round(value: number): number {
           </select></label
         >
       </template>
-      <template v-else-if="selectedTable">
+      <template v-else-if="viewMode === 'DESIGN' && selectedTable">
         <p>{{ selectedTable.collectionPath }} 明细列</p>
         <div
           v-for="(column, index) in selectedTable.columns"
@@ -670,8 +765,12 @@ function round(value: number): number {
           </div>
         </div>
       </template>
-      <p v-else>选择画布元素后编辑属性</p>
-      <V2Button v-if="selectedId" size="small" variant="danger" @click="removeSelected"
+      <p v-else-if="viewMode === 'DESIGN'">选择画布元素后编辑属性</p>
+      <V2Button
+        v-if="viewMode === 'DESIGN' && selectedId"
+        size="small"
+        variant="danger"
+        @click="removeSelected"
         >删除所选</V2Button
       >
     </aside>
@@ -681,7 +780,7 @@ function round(value: number): number {
 <style scoped>
 .document-canvas {
   display: grid;
-  grid-template-columns: 15rem minmax(32rem, 1fr) 13rem;
+  grid-template-columns: 16rem minmax(32rem, 1fr) 14rem;
   gap: var(--v2-space-3);
   min-height: 38rem;
 }
@@ -696,6 +795,40 @@ function round(value: number): number {
 .document-canvas__fields section {
   display: grid;
   gap: var(--v2-space-1);
+}
+.document-canvas__library {
+  padding-bottom: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-color-border);
+}
+.document-canvas__library-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2);
+}
+.document-canvas__component {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-height: 4.25rem;
+  padding: var(--v2-space-2);
+  color: var(--v2-color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: var(--v2-color-surface);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  box-shadow: var(--v2-shadow-control);
+}
+.document-canvas__component:hover:not(:disabled),
+.document-canvas__field:hover:not(:disabled) {
+  background: var(--v2-color-surface-hover);
+  border-color: var(--v2-color-primary);
+}
+.document-canvas__component small,
+.document-canvas__hint {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+  line-height: var(--v2-line-height-ui);
 }
 .document-canvas h3 {
   margin: var(--v2-space-2) 0 0;
@@ -723,9 +856,26 @@ function round(value: number): number {
 .document-canvas__toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: flex-end;
   gap: var(--v2-space-2);
-  margin-bottom: var(--v2-space-2);
+  padding: var(--v2-space-2);
+  background: var(--v2-color-surface);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md) var(--v2-radius-md) 0 0;
+}
+.document-canvas__toolbar-spacer {
+  flex: 1;
+}
+.document-canvas__status {
+  display: flex;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-1) var(--v2-space-2);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+  background: var(--v2-color-surface-subtle);
+  border-right: 1px solid var(--v2-color-border);
+  border-bottom: 1px solid var(--v2-color-border);
+  border-left: 1px solid var(--v2-color-border);
 }
 .document-canvas__toolbar label,
 .document-canvas__properties label {
@@ -744,17 +894,50 @@ function round(value: number): number {
   min-height: 34rem;
   padding: var(--v2-space-5);
   overflow: auto;
-  background: var(--v2-color-surface-subtle);
+  background: var(--v2-color-canvas);
+  border: 1px solid var(--v2-color-border);
+  border-top: 0;
 }
-.document-canvas__page {
+.document-canvas__page,
+.document-canvas__preview-page {
   position: relative;
   box-sizing: border-box;
   margin: 0 auto;
   overflow: hidden;
-  touch-action: none;
   transform-origin: top center;
   background: white;
   box-shadow: var(--v2-shadow-md);
+}
+.document-canvas__page {
+  touch-action: none;
+}
+.document-canvas__page.has-grid {
+  background-image:
+    linear-gradient(rgb(37 99 235 / 12%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(37 99 235 / 12%) 1px, transparent 1px),
+    linear-gradient(rgb(37 99 235 / 7%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(37 99 235 / 7%) 1px, transparent 1px);
+  background-size:
+    25mm 25mm,
+    25mm 25mm,
+    5mm 5mm,
+    5mm 5mm;
+}
+.document-canvas__preview-page iframe {
+  width: 100%;
+  height: 100%;
+  background: white;
+  border: 0;
+}
+.document-canvas__preview-state {
+  display: grid;
+  min-height: 16rem;
+  margin: 0;
+  color: var(--v2-color-text-muted);
+  place-items: center;
+}
+.document-canvas__preview-state.is-error {
+  color: var(--v2-color-danger-text);
 }
 .document-canvas__safe-area {
   position: absolute;

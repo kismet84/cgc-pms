@@ -139,7 +139,7 @@ describe('M7 document template page', () => {
     expect(wrapper.findAll('.document-template-page__columns > .v2-card')).toHaveLength(3)
     expect(
       wrapper.findAll('.document-template-page__columns > .v2-card h2').map((item) => item.text()),
-    ).toEqual(['业务类型', '模板', '详情'])
+    ).toEqual(['业务模块', '模板', 'HTML预览'])
     expect(service.loadDocumentTemplates).toHaveBeenCalledWith('PAYMENT', expect.any(AbortSignal))
     expect(service.loadDocumentFieldCatalog).toHaveBeenCalledWith(
       'PAYMENT',
@@ -148,6 +148,9 @@ describe('M7 document template page', () => {
     expect(service.loadDocumentTemplate).toHaveBeenCalledWith(paymentTemplate.id)
     expect(wrapper.get('button[aria-pressed="true"]').text()).toContain('付款申请单')
     expect(wrapper.text()).toContain('hash-v1')
+    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
+      '<p>v1</p>',
+    )
 
     const requestCount = vi.mocked(service.loadDocumentTemplate).mock.calls.length
     await wrapper
