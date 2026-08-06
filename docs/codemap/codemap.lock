@@ -1,7 +1,7 @@
 {
-  "current_commit": "ec1fe310081791ef8463490093b8bc411bcdc780",
+  "current_commit": "d046f5e7fd2907e73461460ff65727aac5c981e7",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-06T01:25:02.401Z",
+  "generation_time": "2026-08-06T01:55:48.837Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,7 +52,7 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3735,
+  "tracked_file_count": 3738,
   "repository_file_count": 3738,
   "included_file_count": 2468,
   "excluded_file_count": 1270,
@@ -100,7 +100,7 @@
         "docs/**"
       ],
       "file_count": 100,
-      "fingerprint": "e6c407b18ac372ab84af4068af99e4ee480a51104650db9adaffc37f175edc4f"
+      "fingerprint": "693d8dfd842462ada4bab1fe1ecc9dc7360a86bc6aa8d02d571c8acb36f3d469"
     },
     {
       "id": "frontend_v2",
