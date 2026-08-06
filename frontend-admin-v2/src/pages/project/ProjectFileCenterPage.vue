@@ -347,8 +347,8 @@ onBeforeUnmount(() => controller?.abort())
           </caption>
           <thead>
             <tr>
-              <th scope="col">项目</th>
               <th scope="col">编号</th>
+              <th scope="col">项目</th>
               <th scope="col">名称</th>
               <th scope="col">分类</th>
               <th scope="col">版本</th>
@@ -360,7 +360,6 @@ onBeforeUnmount(() => controller?.abort())
           </thead>
           <tbody>
             <tr v-for="row in records" :key="row.id">
-              <td>{{ row.projectName || '—' }}</td>
               <th scope="row">
                 <V2Button
                   size="small"
@@ -370,11 +369,13 @@ onBeforeUnmount(() => controller?.abort())
                   >{{ row.fileCode }}</V2Button
                 >
               </th>
+              <td>{{ row.projectName || '—' }}</td>
               <td>{{ row.displayName }}</td>
               <td>{{ categoryLabel(row) }}</td>
               <td>
                 <V2Select
                   v-model="selectedVersions[row.id]"
+                  class="project-file-center__version-select"
                   :label="`${row.fileCode}版本`"
                   hide-label
                   :options="versionOptions(row)"
@@ -484,6 +485,10 @@ onBeforeUnmount(() => controller?.abort())
 }
 .table-wrap {
   overflow-x: auto;
+}
+.project-file-center__version-select :deep(.v2-field__control) {
+  height: var(--v2-control-height-sm);
+  min-height: var(--v2-control-height-sm);
 }
 table {
   width: 100%;

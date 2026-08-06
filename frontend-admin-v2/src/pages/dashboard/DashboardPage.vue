@@ -1056,6 +1056,8 @@ function isAbort(errorValue: unknown): boolean {
 <style scoped>
 .dashboard-page {
   display: grid;
+  min-height: 100%;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--v2-space-4);
   min-width: 0;
 }
@@ -1274,8 +1276,12 @@ function isAbort(errorValue: unknown): boolean {
 .command-grid {
   display: grid;
   grid-template-columns: minmax(430px, 0.92fr) minmax(550px, 1.18fr);
-  align-items: start;
+  min-height: 0;
+  align-items: stretch;
   gap: var(--v2-space-3);
+}
+.command-grid > .command-panel {
+  height: 100%;
 }
 .trend-range {
   display: flex;

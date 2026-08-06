@@ -62,6 +62,18 @@ class DocumentTemplateServiceIntegrationTest {
     }
 
     @Test
+    void automaticallyGeneratesStableTemplateCode() {
+        DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
+                "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",
+                "[\"payment.applyCode\"]", "generated code");
+
+        DocumentTemplateVersion draft = service.createAuto("自动编码模板", "PAYMENT", command);
+
+        String code = service.getTemplateDetail(draft.getTemplateId()).template().getTemplateCode();
+        assertTrue(code.matches("TPL-\\d{8}-\\d{3}"));
+    }
+
+    @Test
     void deletesDraftTemplateButPreservesPublishedHistory() {
         DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
                 "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",

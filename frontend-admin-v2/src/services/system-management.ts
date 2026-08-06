@@ -263,7 +263,6 @@ export interface DocumentDraft {
 }
 
 export interface DocumentCreateCommand extends DocumentDraft {
-  templateCode: string
   templateName: string
   businessType: DocumentBusinessType
 }

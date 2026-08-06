@@ -243,7 +243,7 @@ function domainFor(path) {
   if (/^\/(contract|variation|bid-cost|cost-target|cost|budget|production-measurement)/.test(path))
     return '商务合约'
   if (/^\/(supplier-sourcing|purchase|inventory)/.test(path)) return '供应链与物资'
-  if (/^\/(subcontract|settlement)/.test(path)) return '分包与结算'
+  if (/^\/(subcontract|settlement)/.test(path)) return '分包结算'
   if (
     /^\/(payment|revenue|invoice|finance-operations|cash-journal|cash-forecast|accounting-entry|financial-close)/.test(
       path,

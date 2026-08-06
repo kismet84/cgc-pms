@@ -189,6 +189,7 @@ class ProjectFileObjectTaskTest {
                 "jdbc:h2:mem:project_file_order;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("CREATE TABLE pm_project(id BIGINT PRIMARY KEY,tenant_id BIGINT,project_code VARCHAR(50),deleted_flag INT)");
+        jdbc.execute("CREATE TABLE project_file_code_scope(tenant_id BIGINT PRIMARY KEY)");
         jdbc.execute("""
                 CREATE TABLE sys_file(id BIGINT PRIMARY KEY,tenant_id BIGINT,business_type VARCHAR(50),
                 document_type VARCHAR(50),business_id BIGINT,original_name VARCHAR(200),content_type VARCHAR(100),
@@ -232,6 +233,8 @@ class ProjectFileObjectTaskTest {
 
             assertEquals(java.util.List.of("early.txt", "later.txt", "投标文件"), jdbc.queryForList(
                     "SELECT display_name FROM project_file_catalog ORDER BY file_code", String.class));
+            assertEquals(java.util.List.of("FILE-20260805-001", "FILE-20260805-002", "FILE-20260805-003"),
+                    jdbc.queryForList("SELECT file_code FROM project_file_catalog ORDER BY file_code", String.class));
         } finally {
             TestUserContext.clear();
         }

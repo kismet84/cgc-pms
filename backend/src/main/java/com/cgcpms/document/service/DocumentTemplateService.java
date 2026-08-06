@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.document.canvas.DocumentCanvasCompiler;
 import com.cgcpms.document.catalog.DocumentTemplateFieldCatalog;
 import com.cgcpms.document.entity.DocumentDefaultBinding;
@@ -54,6 +55,7 @@ public class DocumentTemplateService {
     private final DocumentCanvasCompiler canvasCompiler;
     private final DocumentDataProviderRegistry providerRegistry;
     private final BusinessObjectAuthorizer businessObjectAuthorizer;
+    private final CodeGenerationService codeGenerationService;
 
     public record DraftCommand(String schemaVersion, String templateContent, String fieldManifest, String remark,
                                String designSchema) {
@@ -84,6 +86,18 @@ public class DocumentTemplateService {
     }
 
     public record TemplateVersionContext(DocumentTemplate template, DocumentTemplateVersion version) {
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentTemplateVersion createAuto(String name, String businessType, DraftCommand draft) {
+        Long tenantId = requireTenant();
+        templateMapper.ensureTenantCodeScope(tenantId);
+        if (templateMapper.lockTenantCodeScope(tenantId) == null) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_CODE_SCOPE_UNAVAILABLE", "模板编号锁定范围不可用");
+        }
+        String code = codeGenerationService.nextCode(
+                templateMapper, DocumentTemplate::getTemplateCode, "TPL-", tenantId, true);
+        return create(code, name, businessType, draft);
     }
 
     @Transactional(rollbackFor = Exception.class)

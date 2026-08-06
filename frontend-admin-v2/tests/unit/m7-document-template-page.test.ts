@@ -174,7 +174,7 @@ describe('M7 document template page', () => {
       wrapper
         .findAll('.document-template-page__business-group-heading h3')
         .map((item) => item.text()),
-    ).toEqual(['资金财务', '分包与结算'])
+    ).toEqual(['资金财务', '分包结算'])
     expect(
       wrapper
         .findAll('.document-template-page__business-group-heading span')
@@ -421,10 +421,9 @@ describe('M7 document template page', () => {
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(service.previewDocumentTemplateHtml).not.toHaveBeenCalled()
     const inputs = [...document.querySelectorAll<HTMLInputElement>('.v2-dialog__panel input')]
-    inputs.find((item) => item.getAttribute('aria-label') === '模板编码')!.value = 'PAYMENT-CANVAS'
-    inputs
-      .find((item) => item.getAttribute('aria-label') === '模板编码')!
-      .dispatchEvent(new Event('input'))
+    expect(inputs.find((item) => item.getAttribute('aria-label') === '模板编码')?.disabled).toBe(
+      true,
+    )
     inputs.find((item) => item.getAttribute('aria-label') === '模板名称')!.value = '付款画布模板'
     inputs
       .find((item) => item.getAttribute('aria-label') === '模板名称')!
@@ -442,7 +441,6 @@ describe('M7 document template page', () => {
 
     expect(service.createDocumentTemplate).toHaveBeenCalledWith(
       expect.objectContaining({
-        templateCode: 'PAYMENT-CANVAS',
         templateName: '付款画布模板',
         businessType: 'PAYMENT',
         designSchema: expect.stringContaining('"fieldPath":"payment.code"'),

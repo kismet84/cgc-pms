@@ -101,6 +101,12 @@ describe('ProjectFileCenterPage', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('FILE-P001-20260805-001')
+    expect(
+      wrapper
+        .findAll('thead th')
+        .slice(0, 2)
+        .map((item) => item.text()),
+    ).toEqual(['编号', '项目'])
     expect(wrapper.text()).toContain('张三')
     expect(wrapper.text()).toContain('V2')
     const versionSelect = wrapper.get('select[aria-label="FILE-P001-20260805-001版本"]')

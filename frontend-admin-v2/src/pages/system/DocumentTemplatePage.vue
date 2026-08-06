@@ -274,12 +274,11 @@ async function saveDraft(): Promise<void> {
     let templateId = selectedTemplateId.value
     let versionId = selectedVersionId.value
     if (editorMode.value === 'create') {
-      if (!form.templateCode.trim() || !form.templateName.trim()) {
-        throw new Error('模板编码和名称不能为空')
+      if (!form.templateName.trim()) {
+        throw new Error('模板名称不能为空')
       }
       const version = await createDocumentTemplate({
         ...draft,
-        templateCode: form.templateCode.trim(),
         templateName: form.templateName.trim(),
         businessType: businessType.value,
       })
@@ -856,8 +855,8 @@ onBeforeUnmount(() => {
         <V2Input
           v-model="form.templateCode"
           label="模板编码"
-          required
-          :disabled="editorMode !== 'create'"
+          :placeholder="editorMode === 'create' ? '保存时自动生成' : undefined"
+          disabled
         />
         <V2Input
           v-model="form.templateName"
