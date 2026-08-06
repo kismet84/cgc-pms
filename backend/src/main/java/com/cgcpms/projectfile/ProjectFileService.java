@@ -198,14 +198,13 @@ public class ProjectFileService {
             return new PageResult<>(safePageNo, safePageSize, 0, List.of());
         }
 
-        QueryParts query = queryParts(projectIds, keyword, categoryCode);
-        List<Long> authorizedIds = authorizedCatalogIds(query);
-        long total = authorizedIds.size();
+        QueryParts query = visibleQueryParts(projectIds, keyword, categoryCode);
+        long total = scalar("SELECT COUNT(*) FROM project_file_catalog c WHERE " + query.where(),
+                query.args().toArray());
         if (total == 0) {
             return new PageResult<>(safePageNo, safePageSize, 0, List.of());
         }
-        String authorizedPlaceholders = authorizedIds.stream().map(ignored -> "?").collect(Collectors.joining(","));
-        List<Object> args = new ArrayList<>(authorizedIds);
+        List<Object> args = new ArrayList<>(query.args());
         args.add(safePageSize);
         args.add((safePageNo - 1) * safePageSize);
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
@@ -218,10 +217,10 @@ public class ProjectFileService {
                            ORDER BY t.tenant_id DESC LIMIT 1), c.category_code) AS category_name
                 FROM project_file_catalog c
                 JOIN pm_project p ON p.id=c.project_id AND p.tenant_id=c.tenant_id AND p.deleted_flag=0
-                WHERE c.tenant_id=? AND c.deleted_flag=0 AND c.id IN (%s)
+                WHERE %s
                 ORDER BY c.updated_at DESC,c.id DESC
                 LIMIT ? OFFSET ?
-                """.formatted(authorizedPlaceholders), prepend(requireTenantId(), args).toArray());
+                """.formatted(query.where()), args.toArray());
         return new PageResult<>(safePageNo, safePageSize, total, assemble(rows));
     }
 
@@ -607,9 +606,9 @@ public class ProjectFileService {
                     LEFT JOIN pay_application ia ON ia.id=i.pay_application_id AND ia.tenant_id=i.tenant_id AND ia.deleted_flag=0
                     WHERE i.id=? AND i.tenant_id=? AND i.deleted_flag=0
                     """;
-            case "QS_ISSUE" -> "SELECT r.project_id FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id AND r.tenant_id=i.tenant_id AND r.deleted_flag=0 WHERE i.id=? AND i.tenant_id=? AND i.deleted_flag=0";
+            case "QS_ISSUE" -> "SELECT i.project_id FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id AND r.tenant_id=i.tenant_id AND r.project_id=i.project_id AND r.deleted_flag=0 WHERE i.id=? AND i.tenant_id=? AND i.deleted_flag=0";
             case "SUPPLIER_QUOTE" -> "SELECT e.project_id FROM sp_supplier_quote q JOIN sp_sourcing_event e ON e.id=q.sourcing_event_id AND e.tenant_id=q.tenant_id AND e.deleted_flag=0 WHERE q.id=? AND q.tenant_id=? AND q.deleted_flag=0";
-            case "TECH_RFI_RESPONSE" -> "SELECT r.project_id FROM tech_rfi_response p JOIN tech_rfi r ON r.id=p.rfi_id AND r.tenant_id=p.tenant_id AND r.deleted_flag=0 WHERE p.id=? AND p.tenant_id=? AND p.deleted_flag=0";
+            case "TECH_RFI_RESPONSE" -> "SELECT r.project_id FROM tech_rfi_response p JOIN tech_rfi r ON r.id=p.rfi_id AND r.tenant_id=p.tenant_id AND r.deleted_flag=0 WHERE p.id=? AND p.tenant_id=?";
             default -> null;
         } : projectSql(directTable);
         if (sql == null) return new HistoricalResolution(null, "BUSINESS_TYPE_UNSUPPORTED");
@@ -759,34 +758,74 @@ public class ProjectFileService {
         return assemble(List.of(row)).getFirst();
     }
 
-    private List<Long> authorizedCatalogIds(QueryParts query) {
-        List<Map<String, Object>> candidates = jdbcTemplate.queryForList("""
-                SELECT c.id,c.source_kind,c.source_business_type,c.source_business_id
-                FROM project_file_catalog c WHERE %s
-                ORDER BY c.updated_at DESC,c.id DESC
-                """.formatted(query.where()), query.args().toArray());
-        List<Long> ids = new ArrayList<>(candidates.size());
-        for (Map<String, Object> candidate : candidates) {
-            long id = number(candidate.get("id"));
-            if (!"BUSINESS".equals(Objects.toString(candidate.get("source_kind"), null))) {
-                ids.add(id);
-                continue;
+    private QueryParts visibleQueryParts(List<Long> projectIds, String keyword, String categoryCode) {
+        QueryParts base = queryParts(projectIds, keyword, categoryCode);
+        List<String> sources = new ArrayList<>();
+        DIRECT_PROJECT_TABLES.forEach((type, table) -> {
+            if (businessObjectAuthorizer.canReadProjectFileSource(type)) {
+                sources.add(directSourceExists(type, table));
             }
-            try {
-                businessObjectAuthorizer.checkReadAccess("PROJECT_FILE", id);
-                ids.add(id);
-            } catch (BusinessException deniedOrMissing) {
-                // Source permission and source-object existence are part of list visibility.
-            }
-        }
-        return ids;
+        });
+        addSourceIfReadable(sources, "PROJECT", """
+                c.source_business_id=c.project_id AND EXISTS (
+                    SELECT 1 FROM pm_project source
+                    WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id
+                      AND source.deleted_flag=0)
+                """);
+        addSourceIfReadable(sources, "INVOICE", """
+                EXISTS (
+                    SELECT 1 FROM pay_invoice source
+                    LEFT JOIN pay_record record ON record.id=source.pay_record_id
+                      AND record.tenant_id=source.tenant_id AND record.deleted_flag=0
+                    LEFT JOIN pay_application record_app ON record_app.id=record.pay_application_id
+                      AND record_app.tenant_id=source.tenant_id AND record_app.deleted_flag=0
+                    LEFT JOIN pay_application invoice_app ON invoice_app.id=source.pay_application_id
+                      AND invoice_app.tenant_id=source.tenant_id AND invoice_app.deleted_flag=0
+                    WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id
+                      AND source.deleted_flag=0
+                      AND COALESCE(record.project_id,record_app.project_id,invoice_app.project_id)=c.project_id)
+                """);
+        addSourceIfReadable(sources, "QS_ISSUE", """
+                EXISTS (
+                    SELECT 1 FROM qs_issue source
+                    JOIN qs_inspection_record parent ON parent.id=source.inspection_id
+                      AND parent.tenant_id=source.tenant_id AND parent.project_id=source.project_id
+                      AND parent.deleted_flag=0
+                    WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id
+                      AND source.deleted_flag=0 AND source.project_id=c.project_id)
+                """);
+        addSourceIfReadable(sources, "SUPPLIER_QUOTE", """
+                EXISTS (
+                    SELECT 1 FROM sp_supplier_quote source
+                    JOIN sp_sourcing_event parent ON parent.id=source.sourcing_event_id
+                      AND parent.tenant_id=source.tenant_id AND parent.deleted_flag=0
+                    WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id
+                      AND source.deleted_flag=0 AND parent.project_id=c.project_id)
+                """);
+        addSourceIfReadable(sources, "TECH_RFI_RESPONSE", """
+                EXISTS (
+                    SELECT 1 FROM tech_rfi_response source
+                    JOIN tech_rfi parent ON parent.id=source.rfi_id
+                      AND parent.tenant_id=source.tenant_id AND parent.deleted_flag=0
+                    WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id
+                      AND parent.project_id=c.project_id)
+                """);
+        String business = sources.isEmpty() ? "1=0" : String.join(" OR ", sources);
+        return new QueryParts(base.where() + " AND (c.source_kind='MANAGED' OR "
+                + "(c.source_kind='BUSINESS' AND (" + business + ")))", base.args());
     }
 
-    private static List<Object> prepend(Object first, List<Object> rest) {
-        List<Object> values = new ArrayList<>(rest.size() + 1);
-        values.add(first);
-        values.addAll(rest);
-        return values;
+    private void addSourceIfReadable(List<String> sources, String type, String existsPredicate) {
+        if (businessObjectAuthorizer.canReadProjectFileSource(type)) {
+            sources.add("(c.source_business_type='" + type + "' AND " + existsPredicate + ")");
+        }
+    }
+
+    private static String directSourceExists(String type, String table) {
+        // SQL-SAFETY: type and table come only from immutable server-side maps above.
+        return "(c.source_business_type='" + type + "' AND EXISTS (SELECT 1 FROM " + table
+                + " source WHERE source.id=c.source_business_id AND source.tenant_id=c.tenant_id"
+                + " AND source.deleted_flag=0 AND source.project_id=c.project_id))";
     }
 
     private QueryParts queryParts(List<Long> projectIds, String keyword, String categoryCode) {

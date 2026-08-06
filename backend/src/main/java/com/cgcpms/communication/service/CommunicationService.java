@@ -4,6 +4,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.service.FileService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -21,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = {"minio.enabled", "communication.enabled"}, havingValue = "true", matchIfMissing = true)
 public class CommunicationService {
@@ -433,13 +436,36 @@ public class CommunicationService {
                 ORDER BY created_at,id LIMIT 100
                 """, LocalDateTime.now().minusHours(24));
         UserContext.Snapshot previous = UserContext.capture();
+        int deleted = 0;
+        int missing = 0;
+        int sent = 0;
         try {
             for (Map<String, Object> row : expired) {
                 long tenantId = ((Number) row.get("tenant_id")).longValue();
                 long senderId = ((Number) row.get("sender_id")).longValue();
                 UserContext.restore(new UserContext.Snapshot(senderId, null, tenantId, List.of()));
-                selfProvider.getObject().deleteDraft(((Number) row.get("id")).longValue());
+                long messageId = ((Number) row.get("id")).longValue();
+                try {
+                    selfProvider.getObject().deleteDraft(messageId);
+                    deleted++;
+                } catch (BusinessException race) {
+                    if ("COMMUNICATION_MESSAGE_NOT_FOUND".equals(race.getCode())) {
+                        missing++;
+                    } else if ("COMMUNICATION_MESSAGE_IMMUTABLE".equals(race.getCode())) {
+                        sent++;
+                    } else {
+                        log.error("communication_draft_cleanup failed expired={} deleted={} missing={} sent={} failed=1 messageId={}",
+                                expired.size(), deleted, missing, sent, messageId, race);
+                        throw race;
+                    }
+                } catch (RuntimeException failure) {
+                    log.error("communication_draft_cleanup failed expired={} deleted={} missing={} sent={} failed=1 messageId={}",
+                            expired.size(), deleted, missing, sent, messageId, failure);
+                    throw failure;
+                }
             }
+            log.info("communication_draft_cleanup completed expired={} deleted={} missing={} sent={} failed=0",
+                    expired.size(), deleted, missing, sent);
         } finally {
             UserContext.restore(previous);
         }
@@ -555,11 +581,27 @@ public class CommunicationService {
 
     private List<MessageRecord> attachFiles(List<MessageRecord> messages) {
         if (messages.isEmpty()) return messages;
-        List<MessageRecord> result = new ArrayList<>(messages.size());
-        for (MessageRecord message : messages) result.add(new MessageRecord(message.id(), message.conversationId(),
+        List<Long> messageIds = messages.stream().map(message -> Long.parseLong(message.id())).toList();
+        String placeholders = String.join(",", java.util.Collections.nCopies(messageIds.size(), "?"));
+        List<Object> args = new ArrayList<>(messageIds.size() + 1);
+        args.add(tenantId());
+        args.addAll(messageIds);
+        List<MessageAttachment> rows = jdbcTemplate.query("""
+                SELECT business_id,id,original_name,file_size,content_type,virus_scan_status FROM sys_file
+                WHERE tenant_id=? AND business_type='COMMUNICATION_MESSAGE' AND business_id IN (%s)
+                  AND deleted_flag=0
+                ORDER BY business_id,created_at,id
+                """.formatted(placeholders), (rs, ignored) -> new MessageAttachment(
+                rs.getLong("business_id"), new AttachmentRecord(id(rs.getLong("id")),
+                rs.getString("original_name"), rs.getLong("file_size"), rs.getString("content_type"),
+                rs.getString("virus_scan_status"))), args.toArray());
+        Map<Long, List<AttachmentRecord>> byMessage = new HashMap<>();
+        for (MessageAttachment row : rows) {
+            byMessage.computeIfAbsent(row.messageId(), ignored -> new ArrayList<>()).add(row.attachment());
+        }
+        return messages.stream().map(message -> new MessageRecord(message.id(), message.conversationId(),
                 message.senderId(), message.seq(), message.body(), message.senderName(), message.createdAt(),
-                attachments(Long.parseLong(message.id()))));
-        return result;
+                byMessage.getOrDefault(Long.parseLong(message.id()), List.of()))).toList();
     }
 
     private List<AttachmentRecord> attachments(long messageId) {
@@ -571,6 +613,8 @@ public class CommunicationService {
                 rs.getLong("file_size"), rs.getString("content_type"), rs.getString("virus_scan_status")),
                 tenantId(), messageId);
     }
+
+    private record MessageAttachment(long messageId, AttachmentRecord attachment) {}
 
     private void insertMember(long conversationId, long memberId, String role, long joinSeq) {
         jdbcTemplate.update("""
