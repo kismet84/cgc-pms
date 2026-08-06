@@ -37,7 +37,7 @@ class DocumentTemplateServiceIntegrationTest {
     @Test
     void publishedVersionIsImmutableAndCanBecomeDefault() {
         DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
-                "payment.v1",
+                "payment.v2",
                 "<html><body>付款申请 {{payment.applyCode}}</body></html>",
                 "[\"payment.applyCode\"]",
                 "integration test");
@@ -58,14 +58,14 @@ class DocumentTemplateServiceIntegrationTest {
     @Test
     void fieldCatalogBlocksUnknownAndOutOfLoopFieldsBeforePublish() {
         DocumentTemplateService.DraftCommand unknownField = new DocumentTemplateService.DraftCommand(
-                "payment.v1", "<html><body>{{payment.unknownField}}</body></html>",
+                "payment.v2", "<html><body>{{payment.unknownField}}</body></html>",
                 "[\"payment.unknownField\"]", "unknown field");
         BusinessException unavailable = assertThrows(BusinessException.class,
                 () -> service.create("PAYMENT_UNKNOWN_FIELD", "未知字段模板", "PAYMENT", unknownField));
         assertEquals("DOCUMENT_FIELD_UNAVAILABLE", unavailable.getCode());
 
         DocumentTemplateService.DraftCommand outOfLoop = new DocumentTemplateService.DraftCommand(
-                "payment.v1", "<html><body>{{sources.amount}}</body></html>",
+                "payment.v2", "<html><body>{{sources.amount}}</body></html>",
                 "[\"sources.amount\"]", "collection context");
         BusinessException context = assertThrows(BusinessException.class,
                 () -> service.create("PAYMENT_COLLECTION_CONTEXT", "集合上下文模板", "PAYMENT", outOfLoop));
@@ -75,12 +75,12 @@ class DocumentTemplateServiceIntegrationTest {
     @Test
     void catalogValidationCopyAndExportStayWithinTheSameTenantTemplate() {
         DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
-                "payment.v1", "<html><body>{{payment.applyCode}}</body></html>",
+                "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",
                 "[\"payment.applyCode\"]", "catalog test");
         DocumentTemplateVersion first = service.create("PAYMENT_CATALOG_TEMPLATE", "字段目录模板", "PAYMENT", command);
 
         DocumentTemplateService.TemplateValidationResult validation = service.validate("PAYMENT", command);
-        assertEquals("payment.v1", validation.schemaVersion());
+        assertEquals("payment.v2", validation.schemaVersion());
         assertTrue(validation.referencedFields().contains("payment.applyCode"));
         assertTrue(service.getFieldCatalog("PAYMENT").fieldPaths().contains("payment.applyCode"));
 
@@ -95,7 +95,7 @@ class DocumentTemplateServiceIntegrationTest {
     @Test
     void defaultBindingRejectsStaleLockAndKeepsOneEffectiveVersion() {
         DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
-                "payment.v1", "<html><body>{{payment.applyCode}}</body></html>",
+                "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",
                 "[\"payment.applyCode\"]", "default binding CAS");
         DocumentTemplateVersion first = service.publish(service.create(
                 "PAYMENT_DEFAULT_CAS_A", "默认绑定模板 A", "PAYMENT", command).getId());
@@ -109,5 +109,28 @@ class DocumentTemplateServiceIntegrationTest {
                 () -> service.bindDefault(first.getId(), 0));
         assertEquals("DOCUMENT_DEFAULT_BINDING_CONFLICT", conflict.getCode());
         assertEquals(second.getId(), service.requireDefaultVersion("PAYMENT").getId());
+    }
+
+    @Test
+    void designSchemaOwnsCompiledContentManifestAndRemainsImmutableAfterPublish() {
+        String designSchema = """
+                {"schemaVersion":"payment.v2","page":{"size":"A4","orientation":"PORTRAIT",
+                "marginMm":{"top":10,"right":10,"bottom":10,"left":10}},
+                "elements":[{"id":"code","type":"FIELD","xMm":10,"yMm":10,"widthMm":60,"heightMm":10,
+                "fieldPath":"payment.applyCode"}],"tables":[]}
+                """;
+        DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
+                "payment.v2", "<script>ignored</script>", "[]", "canvas", designSchema);
+
+        DocumentTemplateVersion draft = service.create(
+                "PAYMENT_CANVAS_TEMPLATE", "付款画布模板", "PAYMENT", command);
+
+        assertEquals(designSchema, draft.getDesignSchema());
+        assertTrue(draft.getTemplateContent().contains("{{payment.applyCode}}"));
+        assertEquals("[\"payment.applyCode\"]", draft.getFieldManifest());
+        DocumentTemplateVersion published = service.publish(draft.getId());
+        BusinessException immutable = assertThrows(BusinessException.class,
+                () -> service.updateDraft(published.getId(), command));
+        assertEquals("DOCUMENT_TEMPLATE_VERSION_IMMUTABLE", immutable.getCode());
     }
 }

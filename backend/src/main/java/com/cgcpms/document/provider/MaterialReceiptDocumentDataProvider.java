@@ -1,113 +1,97 @@
 package com.cgcpms.document.provider;
 
-import com.cgcpms.common.exception.BusinessException;
-import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.cgcpms.document.catalog.DocumentTemplateFieldCatalog;
+import com.cgcpms.receipt.service.MatReceiptService;
+import com.cgcpms.receipt.vo.MatReceiptItemVO;
+import com.cgcpms.receipt.vo.MatReceiptVO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
+import static com.cgcpms.document.provider.DocumentProviderMappingSupport.*;
+
 @Component
-@Profile("!document-test-provider")
-public class MaterialReceiptDocumentDataProvider extends ProcurementDocumentDataSupport implements DocumentDataProvider {
-    public static final String SCHEMA_VERSION = "material-receipt.v1";
+@RequiredArgsConstructor
+public class MaterialReceiptDocumentDataProvider implements DocumentDataProvider {
+    private static final String SCHEMA = "material-receipt.v2";
+    private static final DocumentTemplateFieldCatalog.Catalog CATALOG = catalog("MATERIAL_RECEIPT", SCHEMA,
+            field("receipt.receiptCode", "验收单号", "TEXT", false),
+            field("receipt.systemBatchNo", "系统批次号", "TEXT", false),
+            field("receipt.deliveryNoteNo", "送货单号", "TEXT", true),
+            field("receipt.receiptDate", "验收日期", "DATE", true),
+            field("receipt.receiptMode", "验收模式", "ENUM", false),
+            field("receipt.qualityStatus", "质量状态", "ENUM", true),
+            field("receipt.totalAmount", "验收金额", "MONEY", false),
+            field("receipt.approvalStatus", "审批状态", "ENUM", false),
+            field("receipt.costGenerated", "是否已生成成本", "BOOLEAN", false),
+            field("receipt.createdAt", "创建时间", "DATETIME", true),
+            field("receipt.updatedAt", "更新时间", "DATETIME", true),
+            field("receipt.remark", "备注", "TEXT", true),
+            field("project.name", "项目名称", "TEXT", true),
+            field("order.code", "采购订单号", "TEXT", true),
+            field("contract.name", "合同名称", "TEXT", true),
+            field("supplier.name", "供应商名称", "TEXT", true),
+            item("items.materialName", "材料名称", "TEXT", "items"),
+            item("items.specification", "规格型号", "TEXT", "items"),
+            item("items.unit", "单位", "TEXT", "items"),
+            item("items.actualQuantity", "实收数量", "NUMBER", "items"),
+            item("items.qualifiedQuantity", "合格数量", "NUMBER", "items"),
+            item("items.acceptedQuantity", "验收数量", "NUMBER", "items"),
+            item("items.unqualifiedQuantity", "不合格数量", "NUMBER", "items"),
+            item("items.unitPrice", "单价", "MONEY", "items"),
+            item("items.amount", "金额", "MONEY", "items"),
+            item("items.useLocation", "使用部位", "TEXT", "items"),
+            item("items.batchNo", "材料批次号", "TEXT", "items"),
+            item("items.dispositionType", "不合格处置类型", "ENUM", "items"),
+            item("items.dispositionStatus", "不合格处置状态", "ENUM", "items"),
+            item("items.dispositionReason", "不合格原因", "TEXT", "items"),
+            item("items.orderedQuantity", "订单数量", "NUMBER", "items"),
+            item("items.receivedQuantity", "累计收货数量", "NUMBER", "items"),
+            item("items.remainingQuantity", "剩余数量", "NUMBER", "items"),
+            item("items.remark", "明细备注", "TEXT", "items"));
 
-    public MaterialReceiptDocumentDataProvider(JdbcTemplate jdbc) { super(jdbc); }
+    private final MatReceiptService service;
 
-    @Override public String businessType() { return "MATERIAL_RECEIPT"; }
-    @Override public DocumentDataSnapshot load(Long businessId) { return snapshot(businessId, true); }
-    @Override public DocumentDataSnapshot loadPreview(Long businessId) { return snapshot(businessId, false); }
+    public String businessType() { return "MATERIAL_RECEIPT"; }
+    public String displayName() { return "材料验收"; }
+    public String schemaVersion() { return SCHEMA; }
+    public String queryAuthority() { return "receipt:query"; }
+    public DocumentTemplateFieldCatalog.Catalog fieldCatalog() { return CATALOG; }
+    public String defaultTemplatePolicy() { return "SYSTEM"; }
+    public DocumentDataSnapshot load(Long businessId) { return createSnapshot(businessId, true); }
+    public DocumentDataSnapshot loadPreview(Long businessId) { return createSnapshot(businessId, false); }
 
-    private DocumentDataSnapshot snapshot(Long businessId, boolean formal) {
-        Long tenantId = tenantId();
-        Map<String, Object> source = one("""
-                SELECT r.id,r.receipt_code,r.system_batch_no,r.delivery_note_no,r.receipt_date,r.receipt_mode,
-                       r.total_amount,r.approval_status,r.remark,r.receiver_id,
-                       p.project_code,p.project_name,o.order_code,c.contract_code,c.contract_name,
-                       s.partner_code,s.partner_name,w.warehouse_code,w.warehouse_name,u.real_name AS receiver_name,
-                       pm.real_name AS project_manager_name
-                FROM mat_receipt r
-                JOIN pm_project p ON p.id=r.project_id AND p.tenant_id=r.tenant_id AND p.deleted_flag=0
-                JOIN mat_purchase_order o ON o.id=r.order_id AND o.tenant_id=r.tenant_id AND o.deleted_flag=0
-                JOIN ct_contract c ON c.id=r.contract_id AND c.tenant_id=r.tenant_id AND c.deleted_flag=0
-                JOIN md_partner s ON s.id=r.partner_id AND s.tenant_id=r.tenant_id AND s.deleted_flag=0
-                LEFT JOIN mat_warehouse w ON w.id=r.warehouse_id AND w.tenant_id=r.tenant_id AND w.deleted_flag=0
-                LEFT JOIN sys_user u ON u.id=r.receiver_id AND u.tenant_id=r.tenant_id AND u.deleted_flag=0
-                LEFT JOIN sys_user pm ON pm.id=p.project_manager_id AND pm.tenant_id=r.tenant_id AND pm.deleted_flag=0
-                WHERE r.tenant_id=? AND r.id=? AND r.deleted_flag=0
-                """, tenantId, businessId);
-        String approval = String.valueOf(value(source, "approval_status"));
-        if (formal && !"APPROVED".equals(approval)) {
-            throw new BusinessException("DOCUMENT_MATERIAL_RECEIPT_NOT_APPROVED", "正式材料验收文档仅允许审批通过后生成");
-        }
-        if (!formal && !List.of("DRAFT", "REJECTED").contains(approval)) {
-            throw new BusinessException("DOCUMENT_MATERIAL_RECEIPT_PREVIEW_STATE_INVALID", "材料验收仅允许草稿或驳回状态预览签字件");
-        }
-
-        Map<String, Object> receipt = row();
-        put(receipt, "id", value(source, "id"));
-        put(receipt, "receiptCode", value(source, "receipt_code"));
-        put(receipt, "systemBatchNo", value(source, "system_batch_no"));
-        put(receipt, "deliveryNoteNo", value(source, "delivery_note_no"));
-        put(receipt, "receiptDate", value(source, "receipt_date"));
-        put(receipt, "receiptMode", value(source, "receipt_mode"));
-        put(receipt, "approvalStatus", value(source, "approval_status"));
-        money(receipt, "totalAmount", value(source, "total_amount"));
-        put(receipt, "totalAmountChinese", chineseMoney(value(source, "total_amount")));
-        put(receipt, "remark", value(source, "remark"));
-
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("receipt", receipt);
-        root.put("project", named(source, "project_code", "project_name"));
-        root.put("order", named(source, "order_code", "order_code"));
-        root.put("contract", named(source, "contract_code", "contract_name"));
-        root.put("supplier", named(source, "partner_code", "partner_name"));
-        root.put("warehouse", named(source, "warehouse_code", "warehouse_name"));
-        root.put("items", items(businessId, tenantId));
-        root.put("approvalRecords", approvalRecords(businessType(), businessId, tenantId));
-        root.put("attachments", attachments(businessType(), businessId, tenantId));
-        Map<String, Object> signatures = row();
-        put(signatures, "supplierRepresentative", "");
-        put(signatures, "receiver", value(source, "receiver_name"));
-        put(signatures, "projectManager", value(source, "project_manager_name"));
-        put(signatures, "warehouseKeeperOrUser", "");
-        root.put("signatures", signatures);
-        return new DocumentDataSnapshot(SCHEMA_VERSION, root);
+    private DocumentDataSnapshot createSnapshot(Long id, boolean formal) {
+        MatReceiptVO value = service.getById(id);
+        requireApproval(value.getApprovalStatus(), formal, "DOCUMENT_MATERIAL_RECEIPT_STATE_INVALID", "材料验收文档");
+        return snapshot(SCHEMA,
+                "receipt", map("receiptCode", text(value.getReceiptCode()), "systemBatchNo", text(value.getSystemBatchNo()),
+                        "deliveryNoteNo", text(value.getDeliveryNoteNo()), "receiptDate", text(value.getReceiptDate()),
+                        "receiptMode", text(value.getReceiptMode()), "qualityStatus", text(value.getQualityStatus()),
+                        "totalAmount", money(value.getTotalAmount()), "approvalStatus", text(value.getApprovalStatus()),
+                        "costGenerated", Integer.valueOf(1).equals(value.getCostGeneratedFlag()),
+                        "createdAt", text(value.getCreatedAt()), "updatedAt", text(value.getUpdatedAt()),
+                        "remark", text(value.getRemark())),
+                "project", map("name", text(value.getProjectName())),
+                "order", map("code", text(value.getOrderCode())),
+                "contract", map("name", text(value.getContractName())),
+                "supplier", map("name", text(value.getPartnerName())),
+                "items", rows(value.getItems(), this::itemRow));
     }
 
-    private Map<String, Object> named(Map<String, Object> source, String codeKey, String nameKey) {
-        Map<String, Object> row = row();
-        put(row, "code", value(source, codeKey));
-        put(row, "name", value(source, nameKey));
-        return row;
-    }
-
-    private List<Map<String, Object>> items(Long businessId, Long tenantId) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> source : query("""
-                SELECT m.material_name,m.specification,m.unit,oi.quantity AS order_quantity,
-                       oi.received_quantity,i.qualified_quantity,i.unit_price,i.amount,i.use_location,i.remark
-                FROM mat_receipt_item i
-                JOIN mat_purchase_order_item oi ON oi.id=i.order_item_id AND oi.tenant_id=i.tenant_id AND oi.deleted_flag=0
-                JOIN md_material m ON m.id=i.material_id AND m.tenant_id=i.tenant_id AND m.deleted_flag=0
-                WHERE i.tenant_id=? AND i.receipt_id=? AND i.deleted_flag=0 ORDER BY i.id
-                """, tenantId, businessId)) {
-            Map<String, Object> row = row();
-            put(row, "materialName", value(source, "material_name"));
-            put(row, "specification", value(source, "specification"));
-            put(row, "unit", value(source, "unit"));
-            decimal(row, "orderQuantity", value(source, "order_quantity"));
-            decimal(row, "cumulativeReceivedQuantity", value(source, "received_quantity"));
-            decimal(row, "acceptedQuantity", value(source, "qualified_quantity"));
-            money(row, "unitPrice", value(source, "unit_price"));
-            money(row, "amount", value(source, "amount"));
-            put(row, "useLocation", value(source, "use_location"));
-            put(row, "remark", value(source, "remark"));
-            result.add(row);
-        }
-        return result;
+    private Map<String, Object> itemRow(MatReceiptItemVO value) {
+        return map("materialName", text(value.getMaterialName()), "specification", text(value.getSpecification()),
+                "unit", text(value.getUnit()), "actualQuantity", number(value.getActualQuantity()),
+                "qualifiedQuantity", number(value.getQualifiedQuantity()),
+                "acceptedQuantity", number(value.getAcceptedQuantity()),
+                "unqualifiedQuantity", number(value.getUnqualifiedQuantity()), "unitPrice", money(value.getUnitPrice()),
+                "amount", money(value.getAmount()), "useLocation", text(value.getUseLocation()),
+                "batchNo", text(value.getBatchNo()), "dispositionType", text(value.getDispositionType()),
+                "dispositionStatus", text(value.getDispositionStatus()),
+                "dispositionReason", text(value.getDispositionReason()),
+                "orderedQuantity", number(value.getOrderedQuantity()),
+                "receivedQuantity", number(value.getReceivedQuantity()),
+                "remainingQuantity", number(value.getRemainingQuantity()), "remark", text(value.getRemark()));
     }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   V2ActionMenu,
   V2Badge,
@@ -14,16 +14,24 @@ import {
   showToast,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
+import DocumentCanvas from '@/components/document/DocumentCanvas.vue'
 import {
   bindDefaultDocumentVersion,
   createDocumentTemplate,
   createDocumentVersion,
   disableDocumentVersion,
+  loadDocumentBusinessTypes,
+  loadDocumentFieldCatalog,
   loadDocumentTemplate,
   loadDocumentTemplates,
   publishDocumentVersion,
+  previewDocumentTemplateHtml,
   updateDocumentVersion,
   type DocumentBusinessType,
+  type DocumentBusinessTypeOption,
+  type DocumentDesignSchema,
+  type DocumentFieldCatalog,
+  type DocumentDraft,
   type DocumentTemplateDetail,
   type DocumentTemplateSummary,
   type DocumentTemplateVersion,
@@ -34,7 +42,9 @@ type EditorMode = 'create' | 'version' | 'edit'
 type VersionAction = { kind: 'publish' | 'disable' | 'default'; version: DocumentTemplateVersion }
 
 const session = useSessionStore()
-const businessType = ref<DocumentBusinessType>('PAYMENT')
+const businessType = ref<DocumentBusinessType>('')
+const businessTypes = ref<DocumentBusinessTypeOption[]>([])
+const catalog = ref<DocumentFieldCatalog | null>(null)
 const loading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
@@ -47,8 +57,13 @@ const pageNo = ref(1)
 const pageSize = 10
 const editorOpen = ref(false)
 const editorMode = ref<EditorMode>('create')
+const canvasValid = ref(false)
+const previewHtml = ref('')
+const previewError = ref('')
+const previewLoading = ref(false)
 const versionAction = ref<VersionAction | null>(null)
 let controller: AbortController | null = null
+let previewTimer: ReturnType<typeof setTimeout> | undefined
 
 const form = reactive({
   templateCode: '',
@@ -56,15 +71,21 @@ const form = reactive({
   schemaVersion: '',
   templateContent: '',
   fieldManifest: '',
+  designSchema: blankDesign(''),
+  previewBusinessId: '',
+  legacy: false,
   remark: '',
 })
-const businessOptions: Array<{ value: DocumentBusinessType; label: string }> = [
-  { value: 'PAYMENT', label: '付款申请单' },
-  { value: 'SETTLEMENT', label: '结算单' },
-  { value: 'PURCHASE_REQUEST', label: '采购申请单' },
-  { value: 'PURCHASE_ORDER', label: '采购订单' },
-  { value: 'MATERIAL_RECEIPT', label: '材料验收单' },
-]
+const businessOptions = computed(() =>
+  businessTypes.value.map((item) => ({
+    value: item.businessType,
+    label: item.displayName,
+    ready: item.providerReady,
+  })),
+)
+const selectedBusiness = computed(() =>
+  businessTypes.value.find((item) => item.businessType === businessType.value),
+)
 const canEdit = computed(() => session.hasPermission('document:template:edit'))
 const canPublish = computed(() => session.hasPermission('document:template:publish'))
 const selectedVersion = computed(
@@ -82,7 +103,27 @@ async function refresh(preferredTemplateId?: string, preferredVersionId?: string
   loading.value = true
   error.value = ''
   try {
-    templates.value = await loadDocumentTemplates(businessType.value, current.signal)
+    if (!businessTypes.value.length)
+      businessTypes.value = await loadDocumentBusinessTypes(current.signal)
+    if (
+      !businessType.value ||
+      !businessTypes.value.some((item) => item.businessType === businessType.value)
+    ) {
+      businessType.value = businessTypes.value[0]?.businessType ?? ''
+    }
+    if (!businessType.value) throw new Error('服务端未返回审批业务类型')
+    const currentBusiness = businessTypes.value.find(
+      (item) => item.businessType === businessType.value,
+    )
+    if (currentBusiness?.providerReady) {
+      ;[templates.value, catalog.value] = await Promise.all([
+        loadDocumentTemplates(businessType.value, current.signal),
+        loadDocumentFieldCatalog(businessType.value, current.signal),
+      ])
+    } else {
+      templates.value = await loadDocumentTemplates(businessType.value, current.signal)
+      catalog.value = null
+    }
     const target =
       templates.value.find((item) => item.id === preferredTemplateId) ?? templates.value[0]
     if (target) await selectTemplate(target.id, preferredVersionId)
@@ -135,25 +176,22 @@ async function selectTemplate(id: string, preferredVersionId?: string): Promise<
 }
 
 function blankDraft(): void {
-  const defaults: Record<DocumentBusinessType, { field: string; schema: string }> = {
-    PAYMENT: { field: 'payment.applyCode', schema: 'payment.v1' },
-    SETTLEMENT: { field: 'settlement.code', schema: 'settlement.v1' },
-    PURCHASE_REQUEST: { field: 'purchaseRequest.requestCode', schema: 'purchase-request.v2' },
-    PURCHASE_ORDER: { field: 'purchaseOrder.orderCode', schema: 'purchase-order.v1' },
-    MATERIAL_RECEIPT: { field: 'receipt.receiptCode', schema: 'material-receipt.v1' },
-  }
-  const defaultValue = defaults[businessType.value]
+  const schemaVersion = catalog.value?.schemaVersion ?? selectedBusiness.value?.schemaVersion ?? ''
   Object.assign(form, {
     templateCode: '',
     templateName: '',
-    schemaVersion: defaultValue.schema,
-    templateContent: `<html><body><h1>业务单据</h1><p>{{${defaultValue.field}}}</p></body></html>`,
-    fieldManifest: JSON.stringify([defaultValue.field], null, 2),
+    schemaVersion,
+    templateContent: '',
+    fieldManifest: '',
+    designSchema: blankDesign(schemaVersion),
+    previewBusinessId: '',
+    legacy: false,
     remark: '',
   })
 }
 
 function openCreate(): void {
+  if (!selectedBusiness.value?.providerReady) return
   editorMode.value = 'create'
   blankDraft()
   editorOpen.value = true
@@ -165,6 +203,8 @@ function openNewVersion(): void {
   blankDraft()
   form.templateCode = detail.value.template.templateCode
   form.templateName = detail.value.template.templateName
+  const source = selectedVersion.value
+  if (source) applyVersion(source)
   editorOpen.value = true
 }
 
@@ -173,11 +213,9 @@ function openEdit(version: DocumentTemplateVersion): void {
   Object.assign(form, {
     templateCode: detail.value?.template.templateCode ?? '',
     templateName: detail.value?.template.templateName ?? '',
-    schemaVersion: version.schemaVersion,
-    templateContent: version.templateContent,
-    fieldManifest: version.fieldManifest,
     remark: version.remark ?? '',
   })
+  applyVersion(version)
   selectedVersionId.value = version.id
   editorOpen.value = true
 }
@@ -185,20 +223,30 @@ function openEdit(version: DocumentTemplateVersion): void {
 async function saveDraft(): Promise<void> {
   if (
     !form.schemaVersion.trim() ||
-    !form.templateContent.trim() ||
-    !validManifest(form.fieldManifest)
+    (!form.legacy && !canvasValid.value) ||
+    (form.legacy && (!form.templateContent.trim() || !validManifest(form.fieldManifest)))
   ) {
-    showToast('warning', '模板草稿无效', '契约版本、模板内容和 JSON 字段清单必须有效。')
+    showToast(
+      'warning',
+      '模板草稿无效',
+      form.legacy ? '契约版本、模板内容和字段清单必须有效。' : '请修复越出页面安全区域的元素。',
+    )
     return
   }
   saving.value = true
   try {
-    const draft = {
+    const draft: DocumentDraft = {
       schemaVersion: form.schemaVersion.trim(),
-      templateContent: form.templateContent,
-      fieldManifest: form.fieldManifest,
       remark: form.remark.trim() || undefined,
     }
+    if (form.legacy) {
+      draft.templateContent = form.templateContent
+      draft.fieldManifest = form.fieldManifest
+    } else
+      draft.designSchema = JSON.stringify({
+        ...form.designSchema,
+        schemaVersion: form.schemaVersion.trim(),
+      })
     let templateId = selectedTemplateId.value
     let versionId = selectedVersionId.value
     if (editorMode.value === 'create') {
@@ -262,6 +310,73 @@ function validManifest(value: string): boolean {
   }
 }
 
+function blankDesign(schemaVersion: string): DocumentDesignSchema {
+  return {
+    schemaVersion,
+    page: {
+      size: 'A4',
+      orientation: 'PORTRAIT',
+      marginMm: { top: 12, right: 12, bottom: 12, left: 12 },
+    },
+    elements: [],
+    tables: [],
+  }
+}
+
+function applyVersion(version: DocumentTemplateVersion): void {
+  form.schemaVersion = version.schemaVersion
+  form.templateContent = version.templateContent
+  form.fieldManifest = version.fieldManifest
+  form.legacy = !version.designSchema
+  if (!version.designSchema) return
+  try {
+    form.designSchema = JSON.parse(version.designSchema) as DocumentDesignSchema
+  } catch {
+    form.legacy = true
+    showToast('warning', '画布模型无法读取', '已切换到旧源码兼容入口。')
+  }
+}
+
+async function refreshPreview(): Promise<void> {
+  if (!editorOpen.value || form.legacy || !businessType.value || !canvasValid.value) {
+    previewHtml.value = ''
+    previewError.value = ''
+    previewLoading.value = false
+    return
+  }
+  previewLoading.value = true
+  previewError.value = ''
+  try {
+    previewHtml.value = (
+      await previewDocumentTemplateHtml({
+        businessType: businessType.value,
+        designSchema: JSON.stringify(form.designSchema),
+        businessId: form.previewBusinessId.trim() || undefined,
+      })
+    ).html
+  } catch (value) {
+    previewHtml.value = ''
+    previewError.value = messageOf(value)
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+watch(
+  () => [
+    editorOpen.value,
+    businessType.value,
+    JSON.stringify(form.designSchema),
+    form.previewBusinessId,
+    form.legacy,
+    canvasValid.value,
+  ],
+  () => {
+    clearTimeout(previewTimer)
+    previewTimer = setTimeout(() => void refreshPreview(), 250)
+  },
+)
+
 function requiredTemplateId(): string {
   if (!selectedTemplateId.value) throw new Error('请选择模板')
   return selectedTemplateId.value
@@ -285,7 +400,10 @@ function versionStatusLabel(status: DocumentTemplateVersion['status']): string {
 }
 
 onMounted(() => void refresh())
-onBeforeUnmount(() => controller?.abort())
+onBeforeUnmount(() => {
+  controller?.abort()
+  clearTimeout(previewTimer)
+})
 </script>
 
 <template>
@@ -293,7 +411,13 @@ onBeforeUnmount(() => controller?.abort())
     <V2Card title="业务单据模板" :heading-level="1">
       <template #actions>
         <V2Button size="small" variant="secondary" @click="refreshPage">刷新</V2Button>
-        <V2Button v-if="canEdit" size="small" @click="openCreate">新增模板</V2Button>
+        <V2Button
+          v-if="canEdit"
+          size="small"
+          :disabled="!selectedBusiness?.providerReady"
+          @click="openCreate"
+          >新增模板</V2Button
+        >
       </template>
     </V2Card>
 
@@ -316,7 +440,8 @@ onBeforeUnmount(() => controller?.abort())
             :aria-pressed="option.value === businessType"
             @click="selectBusinessType(option.value)"
           >
-            {{ option.label }}
+            <span>{{ option.label }}</span>
+            <small>{{ option.ready ? '字段契约就绪' : '完整详情契约待配置' }}</small>
           </button>
         </div>
       </V2Card>
@@ -469,10 +594,10 @@ onBeforeUnmount(() => controller?.abort())
             ? '新建模板版本'
             : '编辑模板草稿'
       "
-      description="只保存草稿；发布和默认绑定使用独立命令。"
+      description="可视化画布保存后由服务端生成 HTML 和字段清单；发布与默认绑定仍使用独立命令。"
       :close-disabled="saving"
       :close-on-backdrop="false"
-      panel-class="v2-dialog-standard"
+      panel-class="v2-dialog-standard v2-dialog-wide"
     >
       <div class="document-template-page__form">
         <V2Input
@@ -487,20 +612,41 @@ onBeforeUnmount(() => controller?.abort())
           required
           :disabled="editorMode !== 'create'"
         />
-        <V2Input v-model="form.schemaVersion" label="契约版本" required />
+        <V2Input v-model="form.schemaVersion" label="契约版本" required :disabled="!form.legacy" />
         <V2Input v-model="form.remark" label="备注" />
-        <label class="document-template-page__textarea">
+        <label v-if="form.legacy" class="document-template-page__textarea">
           <span>HTML 模板内容</span>
           <textarea v-model="form.templateContent" rows="12" required />
         </label>
-        <label class="document-template-page__textarea">
-          <span>字段清单 JSON</span>
-          <textarea v-model="form.fieldManifest" rows="12" required />
-        </label>
+        <div v-if="form.legacy" class="document-template-page__textarea">
+          <span>字段清单（服务端只读）</span>
+          <pre>{{ form.fieldManifest }}</pre>
+        </div>
       </div>
+      <template v-if="!form.legacy">
+        <DocumentCanvas
+          v-model="form.designSchema"
+          :fields="catalog?.fields ?? []"
+          :disabled="saving"
+          @update:valid="canvasValid = $event"
+        />
+        <section class="document-template-page__preview" aria-label="实时 HTML 预览">
+          <h3>实时 HTML 预览</h3>
+          <V2Input
+            v-model="form.previewBusinessId"
+            label="真实业务对象 ID（留空使用示例数据）"
+            type="number"
+          />
+          <p v-if="previewLoading">正在生成预览…</p>
+          <p v-else-if="previewError" role="alert">{{ previewError }}</p>
+          <iframe v-else title="业务单据 HTML 预览" sandbox="" :srcdoc="previewHtml"></iframe>
+        </section>
+      </template>
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="editorOpen = false">取消</V2Button>
-        <V2Button :loading="saving" @click="saveDraft">保存草稿</V2Button>
+        <V2Button :loading="saving" :disabled="!form.legacy && !canvasValid" @click="saveDraft"
+          >保存草稿</V2Button
+        >
       </template>
     </V2Dialog>
 
@@ -553,6 +699,12 @@ onBeforeUnmount(() => controller?.abort())
   background: transparent;
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
+}
+
+.document-template-page__business-option small {
+  display: block;
+  margin-top: var(--v2-space-1);
+  color: var(--v2-color-text-muted);
 }
 
 .document-template-page__business-option.is-selected,
@@ -610,6 +762,17 @@ onBeforeUnmount(() => controller?.abort())
   gap: var(--v2-space-4);
 }
 
+.document-template-page__preview {
+  margin-top: var(--v2-space-4);
+}
+
+.document-template-page__preview iframe {
+  width: 100%;
+  min-height: 32rem;
+  background: white;
+  border: 1px solid var(--v2-color-border);
+}
+
 .document-template-page__textarea {
   display: grid;
   gap: var(--v2-space-2);
@@ -619,6 +782,14 @@ onBeforeUnmount(() => controller?.abort())
   width: 100%;
   padding: var(--v2-space-3);
   resize: vertical;
+}
+
+.document-template-page__textarea pre {
+  max-height: 16rem;
+  padding: var(--v2-space-3);
+  overflow: auto;
+  background: var(--v2-color-surface-subtle);
+  border-radius: var(--v2-radius-md);
 }
 
 @media (max-width: 1180px) {

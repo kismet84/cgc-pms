@@ -129,6 +129,14 @@ public class BusinessObjectAuthorizer {
         checkAccess(upper, businessId, "读取生成文档", false, authority, authority);
     }
 
+    /** Provider handles tenant/project/object lookup; this preserves the domain query permission intersection. */
+    public void checkDocumentQueryAuthority(String authority) {
+        if (authority == null || authority.isBlank()) {
+            throw new BusinessException("DOCUMENT_PROVIDER_AUTHORITY_INVALID", "业务单据 Provider 未配置查询权限");
+        }
+        requireAuthority(authority);
+    }
+
     /**
      * 验证当前用户对指定业务对象拥有附件上传权限。
      */

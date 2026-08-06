@@ -2,6 +2,7 @@ package com.cgcpms.document;
 
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.document.catalog.DocumentTemplateFieldCatalog;
 import com.cgcpms.document.entity.DocumentGeneration;
 import com.cgcpms.document.entity.DocumentTemplateVersion;
 import com.cgcpms.document.render.RenderedDocument;
@@ -29,6 +30,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.cgcpms.projectfile.ProjectFileService;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -170,6 +172,22 @@ class DocumentGenerationEndToEndTest {
             return new DocumentDataProvider() {
                 @Override
                 public String businessType() { return "PAYMENT"; }
+
+                @Override
+                public String schemaVersion() { return "payment.v1"; }
+
+                @Override
+                public String queryAuthority() { return "payment:app:query"; }
+
+                @Override
+                public String defaultTemplatePolicy() { return "SYSTEM"; }
+
+                @Override
+                public DocumentTemplateFieldCatalog.Catalog fieldCatalog() {
+                    return new DocumentTemplateFieldCatalog.Catalog("PAYMENT", "payment.v1", List.of(
+                            new DocumentTemplateFieldCatalog.Field("payment.applyCode", "申请编号", "TEXT", false, null, false),
+                            new DocumentTemplateFieldCatalog.Field("payment.applyAmount", "申请金额", "MONEY", false, null, false)));
+                }
 
                 @Override
                 public DocumentDataSnapshot load(Long businessId) {

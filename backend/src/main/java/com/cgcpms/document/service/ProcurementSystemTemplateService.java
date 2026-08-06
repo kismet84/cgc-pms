@@ -21,11 +21,11 @@ import java.util.Objects;
 public class ProcurementSystemTemplateService {
     private static final Map<String, Definition> DEFINITIONS = Map.of(
             "PURCHASE_REQUEST", new Definition("SYSTEM_PURCHASE_REQUEST_V1", "工程材料采购申请计划单",
-                    "purchase-request.v2", purchaseRequestTemplate(), purchaseRequestManifest()),
+                    "purchase-request.v3", purchaseRequestTemplate(), purchaseRequestManifest()),
             "PURCHASE_ORDER", new Definition("SYSTEM_PURCHASE_ORDER_V1", "工程材料采购订单",
-                    "purchase-order.v1", purchaseOrderTemplate(), purchaseOrderManifest()),
+                    "purchase-order.v2", purchaseOrderTemplate(), purchaseOrderManifest()),
             "MATERIAL_RECEIPT", new Definition("SYSTEM_MATERIAL_RECEIPT_V1", "工程材料到货验收单",
-                    "material-receipt.v1", materialReceiptTemplate(), materialReceiptManifest()));
+                    "material-receipt.v2", materialReceiptTemplate(), materialReceiptManifest()));
 
     private final DocumentTemplateService templateService;
     private final DocumentTemplateMapper templateMapper;
@@ -81,12 +81,11 @@ public class ProcurementSystemTemplateService {
                 <html><head><style>@page{size:A4;margin:12mm}body{font-size:10pt}h1{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #777;padding:5px}.sign{height:38px}</style></head><body>
                 <h1>工程材料采购申请计划单</h1>
                 <table><tr><th>申请编号</th><td>{{purchaseRequest.requestCode}}</td><th>项目</th><td>{{project.name}}</td></tr>
-                <tr><th>申请人</th><td>{{applicant.name}}</td><th>部门</th><td>{{applicant.department}}</td></tr>
-                <tr><th>计划日期</th><td>{{purchaseRequest.planDate}}</td><th>技术质量品牌要求</th><td>{{purchaseRequest.technicalQualityBrandRequirements}}</td></tr>
+                <tr><th>合同</th><td>{{contract.name}}</td><th>审批状态</th><td>{{purchaseRequest.approvalStatus}}</td></tr>
+                <tr><th>预计总额</th><td>{{purchaseRequest.totalAmount}}</td><th>业务状态</th><td>{{purchaseRequest.status}}</td></tr>
                 </table>
                 <table><tr><th>材料</th><th>规格</th><th>单位</th><th>申请数量</th><th>审批数量</th><th>使用部位</th><th>到货日期</th><th>备注</th></tr>
-                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{quantity}}</td><td>{{approvedQuantity}}</td><td>{{useLocation}}</td><td>{{requiredArrivalDate}}</td><td>{{remark}}</td></tr>{{/each}}</table>
-                <table><tr><th>申请人签字</th><th>部门负责人</th><th>项目负责人</th><th>审批日期</th></tr><tr class="sign"><td></td><td>{{signatures.departmentManager}}</td><td>{{signatures.projectManager}}</td><td>{{signatures.approvalDate}}</td></tr></table>
+                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{quantity}}</td><td>{{approvedQuantity}}</td><td>{{useLocation}}</td><td>{{plannedDate}}</td><td>{{remark}}</td></tr>{{/each}}</table>
                 </body></html>
                 """;
     }
@@ -98,11 +97,10 @@ public class ProcurementSystemTemplateService {
                 <table><tr><th>验收单号</th><td>{{receipt.receiptCode}}</td><th>系统批次号</th><td>{{receipt.systemBatchNo}}</td></tr>
                 <tr><th>送货单号</th><td>{{receipt.deliveryNoteNo}}</td><th>验收日期</th><td>{{receipt.receiptDate}}</td></tr>
                 <tr><th>项目</th><td>{{project.name}}</td><th>订单</th><td>{{order.code}}</td></tr>
-                <tr><th>合同</th><td>{{contract.name}}</td><th>供应商</th><td>{{supplier.name}}</td></tr><tr><th>仓库</th><td>{{warehouse.name}}</td><th>验收模式</th><td>{{receipt.receiptMode}}</td></tr></table>
+                <tr><th>合同</th><td>{{contract.name}}</td><th>供应商</th><td>{{supplier.name}}</td></tr><tr><th>质量状态</th><td>{{receipt.qualityStatus}}</td><th>验收模式</th><td>{{receipt.receiptMode}}</td></tr></table>
                 <table><tr><th>材料</th><th>规格</th><th>单位</th><th>订单数量</th><th>累计已收</th><th>本次合格</th><th>单价</th><th>金额</th><th>位置</th><th>备注</th></tr>
-                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{orderQuantity}}</td><td>{{cumulativeReceivedQuantity}}</td><td>{{acceptedQuantity}}</td><td>{{unitPrice}}</td><td>{{amount}}</td><td>{{useLocation}}</td><td>{{remark}}</td></tr>{{/each}}</table>
-                <p>合计：{{receipt.totalAmount}}（大写：{{receipt.totalAmountChinese}}）</p>
-                <table><tr><th>供应商代表</th><th>验收人</th><th>项目负责人</th><th>仓库管理员/使用人</th></tr><tr class="sign"><td>{{signatures.supplierRepresentative}}</td><td>{{signatures.receiver}}</td><td>{{signatures.projectManager}}</td><td>{{signatures.warehouseKeeperOrUser}}</td></tr></table>
+                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{orderedQuantity}}</td><td>{{receivedQuantity}}</td><td>{{acceptedQuantity}}</td><td>{{unitPrice}}</td><td>{{amount}}</td><td>{{useLocation}}</td><td>{{remark}}</td></tr>{{/each}}</table>
+                <p>合计：{{receipt.totalAmount}}</p>
                 </body></html>
                 """;
     }
@@ -113,24 +111,23 @@ public class ProcurementSystemTemplateService {
                 <h1>工程材料采购订单</h1>
                 <table><tr><th>订单编号</th><td>{{purchaseOrder.orderCode}}</td><th>项目</th><td>{{project.name}}</td></tr>
                 <tr><th>合同</th><td>{{contract.name}}</td><th>供应商</th><td>{{supplier.name}}</td></tr>
-                <tr><th>计价模式</th><td>{{purchaseOrder.pricingMode}}</td><th>交付日期</th><td>{{purchaseOrder.deliveryDate}}</td></tr></table>
+                <tr><th>订单类型</th><td>{{purchaseOrder.orderType}}</td><th>交付日期</th><td>{{purchaseOrder.deliveryDate}}</td></tr></table>
                 <table><tr><th>材料</th><th>规格</th><th>单位</th><th>数量</th><th>单价</th><th>含税金额</th><th>价格来源</th><th>预算科目</th><th>WBS</th></tr>
-                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{quantity}}</td><td>{{unitPrice}}</td><td>{{amount}}</td><td>{{priceSource.type}}/{{priceSource.referenceId}}</td><td>{{budget.subjectName}}</td><td>{{wbs.name}}</td></tr>{{/each}}</table>
-                <p>订单总额：{{purchaseOrder.totalAmount}}（大写：{{purchaseOrder.totalAmountChinese}}）</p>
-                <table><tr><th>审批节点</th><th>动作</th><th>审批人</th><th>时间</th><th>意见</th></tr>{{#each approvalRecords}}<tr><td>{{node}}</td><td>{{action}}</td><td>{{operator}}</td><td>{{time}}</td><td>{{comment}}</td></tr>{{/each}}</table>
+                {{#each items}}<tr><td>{{materialName}}</td><td>{{specification}}</td><td>{{unit}}</td><td>{{quantity}}</td><td>{{unitPrice}}</td><td>{{amount}}</td><td>{{priceSource}}</td><td>{{quantityAdjustReason}}</td><td>{{remark}}</td></tr>{{/each}}</table>
+                <p>订单总额：{{purchaseOrder.totalAmount}}</p>
                 </body></html>
                 """;
     }
 
     private static String purchaseRequestManifest() {
-        return "[\"purchaseRequest.requestCode\",\"purchaseRequest.planDate\",\"purchaseRequest.technicalQualityBrandRequirements\",\"project.name\",\"applicant.name\",\"applicant.department\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.quantity\",\"items.approvedQuantity\",\"items.useLocation\",\"items.requiredArrivalDate\",\"items.remark\",\"signatures.applicant\",\"signatures.departmentManager\",\"signatures.projectManager\",\"signatures.approvalDate\"]";
+        return "[\"purchaseRequest.requestCode\",\"purchaseRequest.totalAmount\",\"purchaseRequest.approvalStatus\",\"purchaseRequest.status\",\"project.name\",\"contract.name\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.quantity\",\"items.approvedQuantity\",\"items.useLocation\",\"items.plannedDate\",\"items.remark\"]";
     }
 
     private static String materialReceiptManifest() {
-        return "[\"receipt.receiptCode\",\"receipt.systemBatchNo\",\"receipt.deliveryNoteNo\",\"receipt.receiptDate\",\"receipt.receiptMode\",\"receipt.totalAmount\",\"receipt.totalAmountChinese\",\"project.name\",\"order.code\",\"contract.name\",\"supplier.name\",\"warehouse.name\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.orderQuantity\",\"items.cumulativeReceivedQuantity\",\"items.acceptedQuantity\",\"items.unitPrice\",\"items.amount\",\"items.useLocation\",\"items.remark\",\"signatures.supplierRepresentative\",\"signatures.receiver\",\"signatures.projectManager\",\"signatures.warehouseKeeperOrUser\"]";
+        return "[\"receipt.receiptCode\",\"receipt.systemBatchNo\",\"receipt.deliveryNoteNo\",\"receipt.receiptDate\",\"receipt.receiptMode\",\"receipt.qualityStatus\",\"receipt.totalAmount\",\"project.name\",\"order.code\",\"contract.name\",\"supplier.name\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.orderedQuantity\",\"items.receivedQuantity\",\"items.acceptedQuantity\",\"items.unitPrice\",\"items.amount\",\"items.useLocation\",\"items.remark\"]";
     }
 
     private static String purchaseOrderManifest() {
-        return "[\"purchaseOrder.orderCode\",\"purchaseOrder.pricingMode\",\"purchaseOrder.deliveryDate\",\"purchaseOrder.totalAmount\",\"purchaseOrder.totalAmountChinese\",\"project.name\",\"contract.name\",\"supplier.name\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.quantity\",\"items.unitPrice\",\"items.amount\",\"items.priceSource.type\",\"items.priceSource.referenceId\",\"items.budget.subjectName\",\"items.wbs.name\",\"approvalRecords.node\",\"approvalRecords.action\",\"approvalRecords.operator\",\"approvalRecords.time\",\"approvalRecords.comment\"]";
+        return "[\"purchaseOrder.orderCode\",\"purchaseOrder.orderType\",\"purchaseOrder.deliveryDate\",\"purchaseOrder.totalAmount\",\"project.name\",\"contract.name\",\"supplier.name\",\"items.materialName\",\"items.specification\",\"items.unit\",\"items.quantity\",\"items.unitPrice\",\"items.amount\",\"items.priceSource\",\"items.quantityAdjustReason\",\"items.remark\"]";
     }
 }

@@ -37,6 +37,19 @@ public class ProjectCommencementService {
         return find(project.getId(), project.getTenantId(), false);
     }
 
+    public ProjectCommencement getById(Long commencementId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        ProjectCommencement commencement = commencementMapper.selectOne(new LambdaQueryWrapper<ProjectCommencement>()
+                .eq(ProjectCommencement::getId, commencementId)
+                .eq(ProjectCommencement::getTenantId, tenantId)
+                .eq(ProjectCommencement::getDeletedFlag, 0));
+        if (commencement == null) {
+            throw new BusinessException("PROJECT_COMMENCEMENT_NOT_FOUND", "开工准入单不存在或无权访问");
+        }
+        projectAccessChecker.checkAccess(commencement.getProjectId(), "查看开工准入");
+        return commencement;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ProjectCommencement save(Long projectId, ProjectCommencementSaveRequest request) {
         PmProject project = requireProject(projectId, true, "保存开工准入");

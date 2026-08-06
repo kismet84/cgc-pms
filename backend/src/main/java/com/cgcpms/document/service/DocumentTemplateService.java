@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.document.canvas.DocumentCanvasCompiler;
 import com.cgcpms.document.catalog.DocumentTemplateFieldCatalog;
 import com.cgcpms.document.entity.DocumentDefaultBinding;
 import com.cgcpms.document.entity.DocumentTemplate;
@@ -11,7 +12,11 @@ import com.cgcpms.document.entity.DocumentTemplateVersion;
 import com.cgcpms.document.mapper.DocumentDefaultBindingMapper;
 import com.cgcpms.document.mapper.DocumentTemplateMapper;
 import com.cgcpms.document.mapper.DocumentTemplateVersionMapper;
+import com.cgcpms.document.provider.DocumentDataProvider;
+import com.cgcpms.document.provider.DocumentDataProviderRegistry;
+import com.cgcpms.document.provider.DocumentDataSnapshot;
 import com.cgcpms.document.render.RestrictedTemplateEngine;
+import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +31,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -35,7 +41,6 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class DocumentTemplateService {
-    private static final Set<String> BUSINESS_TYPES = Set.of("PAYMENT", "SETTLEMENT", "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*)\\s*}}");
     private static final Pattern LOOP = Pattern.compile(
             "\\{\\{#each\\s+([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*)\\s*}}(.*?)\\{\\{/each}}",
@@ -46,9 +51,15 @@ public class DocumentTemplateService {
     private final DocumentDefaultBindingMapper bindingMapper;
     private final RestrictedTemplateEngine templateEngine;
     private final ObjectMapper objectMapper;
-    private final DocumentTemplateFieldCatalog fieldCatalog;
+    private final DocumentCanvasCompiler canvasCompiler;
+    private final DocumentDataProviderRegistry providerRegistry;
+    private final BusinessObjectAuthorizer businessObjectAuthorizer;
 
-    public record DraftCommand(String schemaVersion, String templateContent, String fieldManifest, String remark) {
+    public record DraftCommand(String schemaVersion, String templateContent, String fieldManifest, String remark,
+                               String designSchema) {
+        public DraftCommand(String schemaVersion, String templateContent, String fieldManifest, String remark) {
+            this(schemaVersion, templateContent, fieldManifest, remark, null);
+        }
     }
 
     public record TemplateSummary(Long id, String templateCode, String templateName, String businessType,
@@ -65,7 +76,7 @@ public class DocumentTemplateService {
 
     public record TemplateExport(String templateCode, String templateName, String businessType,
                                  String schemaVersion, String templateContent, String fieldManifest,
-                                 String remark) {
+                                 String remark, String designSchema) {
     }
 
     public record TemplateValidationResult(String schemaVersion, int fieldCount, Set<String> referencedFields,
@@ -85,7 +96,8 @@ public class DocumentTemplateService {
         if (name == null || name.isBlank() || name.length() > 200) {
             throw new BusinessException("DOCUMENT_TEMPLATE_NAME_INVALID", "模板名称不能为空且不得超过200字符");
         }
-        validateDraft(normalizedType, draft);
+        DraftCommand normalizedDraft = normalizeDraft(normalizedType, draft);
+        validateDraft(normalizedType, normalizedDraft);
 
         DocumentTemplate template = new DocumentTemplate();
         template.setTenantId(tenantId);
@@ -99,7 +111,7 @@ public class DocumentTemplateService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessException("DOCUMENT_TEMPLATE_CODE_DUPLICATE", "模板编码已存在");
         }
-        return insertDraft(template.getId(), 1, draft);
+        return insertDraft(template.getId(), 1, normalizedDraft);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -108,7 +120,8 @@ public class DocumentTemplateService {
         if (!Integer.valueOf(1).equals(template.getEnabled())) {
             throw new BusinessException("DOCUMENT_TEMPLATE_DISABLED", "停用模板不能创建新草稿");
         }
-        validateDraft(template.getBusinessType(), draft);
+        DraftCommand normalizedDraft = normalizeDraft(template.getBusinessType(), draft);
+        validateDraft(template.getBusinessType(), normalizedDraft);
         DocumentTemplateVersion latest = versionMapper.selectOne(new LambdaQueryWrapper<DocumentTemplateVersion>()
                 .eq(DocumentTemplateVersion::getTenantId, requireTenant())
                 .eq(DocumentTemplateVersion::getTemplateId, templateId)
@@ -116,7 +129,7 @@ public class DocumentTemplateService {
                 .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment — fixed row limit, no user input
         int next = latest == null ? 1 : latest.getVersionNo() + 1;
         try {
-            return insertDraft(templateId, next, draft);
+            return insertDraft(templateId, next, normalizedDraft);
         } catch (DuplicateKeyException exception) {
             throw new BusinessException("DOCUMENT_TEMPLATE_VERSION_CONFLICT", "模板版本号并发冲突，请重试");
         }
@@ -126,16 +139,18 @@ public class DocumentTemplateService {
     public void updateDraft(Long versionId, DraftCommand draft) {
         DocumentTemplateVersion version = requireVersion(versionId);
         DocumentTemplate template = requireTemplate(version.getTemplateId());
-        validateDraft(template.getBusinessType(), draft);
+        DraftCommand normalizedDraft = normalizeDraft(template.getBusinessType(), draft);
+        validateDraft(template.getBusinessType(), normalizedDraft);
         int changed = versionMapper.update(null, new LambdaUpdateWrapper<DocumentTemplateVersion>()
                 .eq(DocumentTemplateVersion::getId, versionId)
                 .eq(DocumentTemplateVersion::getTenantId, requireTenant())
                 .eq(DocumentTemplateVersion::getStatus, "DRAFT")
-                .set(DocumentTemplateVersion::getSchemaVersion, draft.schemaVersion().trim())
-                .set(DocumentTemplateVersion::getTemplateContent, draft.templateContent())
-                .set(DocumentTemplateVersion::getContentHash, sha256(draft.templateContent()))
-                .set(DocumentTemplateVersion::getFieldManifest, normalizeManifest(draft.fieldManifest()))
-                .set(DocumentTemplateVersion::getRemark, draft.remark()));
+                .set(DocumentTemplateVersion::getSchemaVersion, normalizedDraft.schemaVersion().trim())
+                .set(DocumentTemplateVersion::getDesignSchema, normalizedDraft.designSchema())
+                .set(DocumentTemplateVersion::getTemplateContent, normalizedDraft.templateContent())
+                .set(DocumentTemplateVersion::getContentHash, sha256(normalizedDraft.templateContent()))
+                .set(DocumentTemplateVersion::getFieldManifest, normalizeManifest(normalizedDraft.fieldManifest()))
+                .set(DocumentTemplateVersion::getRemark, normalizedDraft.remark()));
         if (changed != 1) {
             throw new BusinessException("DOCUMENT_TEMPLATE_VERSION_IMMUTABLE", "仅草稿版本允许修改");
         }
@@ -149,7 +164,7 @@ public class DocumentTemplateService {
         }
         DocumentTemplate template = requireTemplate(version.getTemplateId());
         validateDraft(template.getBusinessType(), new DraftCommand(version.getSchemaVersion(), version.getTemplateContent(),
-                version.getFieldManifest(), version.getRemark()));
+                version.getFieldManifest(), version.getRemark(), version.getDesignSchema()));
         LocalDateTime now = LocalDateTime.now();
         int changed = versionMapper.update(null, new LambdaUpdateWrapper<DocumentTemplateVersion>()
                 .eq(DocumentTemplateVersion::getId, versionId)
@@ -277,11 +292,12 @@ public class DocumentTemplateService {
     }
 
     public DocumentTemplateFieldCatalog.Catalog getFieldCatalog(String businessType) {
-        return fieldCatalog.require(normalizeBusinessType(businessType));
+        return providerRegistry.require(normalizeBusinessType(businessType)).fieldCatalog();
     }
 
     public TemplateValidationResult validate(String businessType, DraftCommand draft) {
-        return validateDraft(normalizeBusinessType(businessType), draft);
+        String normalized = normalizeBusinessType(businessType);
+        return validateDraft(normalized, normalizeDraft(normalized, draft));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -292,14 +308,15 @@ public class DocumentTemplateService {
             throw new BusinessException("DOCUMENT_TEMPLATE_VERSION_OWNER_INVALID", "仅允许复制同一模板的版本");
         }
         return createNextDraft(templateId, new DraftCommand(source.getSchemaVersion(), source.getTemplateContent(),
-                source.getFieldManifest(), source.getRemark()));
+                source.getFieldManifest(), source.getRemark(), source.getDesignSchema()));
     }
 
     public TemplateExport exportVersion(Long versionId) {
         DocumentTemplateVersion version = requireVersion(versionId);
         DocumentTemplate template = requireTemplate(version.getTemplateId());
         return new TemplateExport(template.getTemplateCode(), template.getTemplateName(), template.getBusinessType(),
-                version.getSchemaVersion(), version.getTemplateContent(), version.getFieldManifest(), version.getRemark());
+                version.getSchemaVersion(), version.getTemplateContent(), version.getFieldManifest(), version.getRemark(),
+                version.getDesignSchema());
     }
 
     public TemplateVersionContext requirePreviewVersionContext(Long versionId) {
@@ -309,8 +326,47 @@ public class DocumentTemplateService {
         }
         DocumentTemplate template = requireTemplate(version.getTemplateId());
         validateDraft(template.getBusinessType(), new DraftCommand(version.getSchemaVersion(), version.getTemplateContent(),
-                version.getFieldManifest(), version.getRemark()));
+                version.getFieldManifest(), version.getRemark(), version.getDesignSchema()));
         return new TemplateVersionContext(template, version);
+    }
+
+    public String renderHtmlPreview(Long versionId, Long businessId) {
+        TemplateVersionContext context = requirePreviewVersionContext(versionId);
+        DocumentDataProvider provider = providerRegistry.require(context.template().getBusinessType());
+        DocumentDataSnapshot snapshot;
+        if (businessId == null) {
+            snapshot = provider.sampleData();
+        } else {
+            businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+            if ("PAYMENT".equals(context.template().getBusinessType())) {
+                businessObjectAuthorizer.checkGeneratedDocumentAccess(context.template().getBusinessType(), businessId);
+            }
+            snapshot = provider.loadPreview(businessId);
+        }
+        if (!context.version().getSchemaVersion().equals(snapshot.schemaVersion())) {
+            throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
+        }
+        return templateEngine.render(context.version().getTemplateContent(), snapshot.values());
+    }
+
+    public String renderCanvasPreview(String businessType, String designSchema, Long businessId) {
+        String normalized = normalizeBusinessType(businessType);
+        DocumentDataProvider provider = providerRegistry.require(normalized);
+        DocumentCanvasCompiler.Compilation compilation = canvasCompiler.compile(designSchema, provider.fieldCatalog());
+        DocumentDataSnapshot snapshot;
+        if (businessId == null) {
+            snapshot = provider.sampleData();
+        } else {
+            businessObjectAuthorizer.checkDocumentQueryAuthority(provider.queryAuthority());
+            if ("PAYMENT".equals(normalized)) {
+                businessObjectAuthorizer.checkGeneratedDocumentAccess(normalized, businessId);
+            }
+            snapshot = provider.loadPreview(businessId);
+        }
+        if (!provider.schemaVersion().equals(snapshot.schemaVersion())) {
+            throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "业务数据与字段目录契约版本不一致");
+        }
+        return templateEngine.render(compilation.html(), snapshot.values());
     }
 
     private DocumentTemplateVersion insertDraft(Long templateId, int versionNo, DraftCommand draft) {
@@ -320,6 +376,7 @@ public class DocumentTemplateService {
         version.setVersionNo(versionNo);
         version.setStatus("DRAFT");
         version.setSchemaVersion(draft.schemaVersion().trim());
+        version.setDesignSchema(draft.designSchema());
         version.setTemplateContent(draft.templateContent());
         version.setContentHash(sha256(draft.templateContent()));
         version.setFieldManifest(normalizeManifest(draft.fieldManifest()));
@@ -328,11 +385,23 @@ public class DocumentTemplateService {
         return version;
     }
 
+    private DraftCommand normalizeDraft(String businessType, DraftCommand draft) {
+        if (draft == null || draft.designSchema() == null || draft.designSchema().isBlank()) return draft;
+        DocumentCanvasCompiler.Compilation compilation = canvasCompiler.compile(draft.designSchema(),
+                providerRegistry.require(businessType).fieldCatalog());
+        try {
+            return new DraftCommand(draft.schemaVersion(), compilation.html(),
+                    objectMapper.writeValueAsString(compilation.fieldManifest()), draft.remark(), draft.designSchema());
+        } catch (Exception exception) {
+            throw new BusinessException("DOCUMENT_TEMPLATE_COMPILE_FAILED", "画布字段清单无法序列化", exception);
+        }
+    }
+
     private TemplateValidationResult validateDraft(String businessType, DraftCommand draft) {
         if (draft == null || draft.schemaVersion() == null || !draft.schemaVersion().matches("[A-Za-z0-9._-]{1,30}")) {
             throw new BusinessException("DOCUMENT_SCHEMA_VERSION_INVALID", "数据契约版本格式非法");
         }
-        DocumentTemplateFieldCatalog.Catalog catalog = fieldCatalog.require(businessType);
+        DocumentTemplateFieldCatalog.Catalog catalog = providerRegistry.require(businessType).fieldCatalog();
         if (!catalog.schemaVersion().equals(draft.schemaVersion().trim())) {
             throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务输出契约版本不一致");
         }
@@ -469,10 +538,11 @@ public class DocumentTemplateService {
     }
 
     private String normalizeBusinessType(String value) {
-        String normalized = value == null ? "" : value.trim().toUpperCase();
-        if (!BUSINESS_TYPES.contains(normalized)) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.matches("[A-Z][A-Z0-9_]{1,79}")) {
             throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "不支持该业务单据类型");
         }
+        providerRegistry.require(normalized);
         return normalized;
     }
 

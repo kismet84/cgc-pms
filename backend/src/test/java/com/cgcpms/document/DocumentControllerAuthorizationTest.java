@@ -37,6 +37,7 @@ class DocumentControllerAuthorizationTest {
         assertPolicy(DocumentTemplateController.class, "list", query);
         assertPolicy(DocumentTemplateController.class, "getTemplate", query);
         assertPolicy(DocumentTemplateController.class, "catalog", query);
+        assertPolicy(DocumentTemplateController.class, "businessTypes", query);
         assertPolicy(DocumentTemplateController.class, "createVersion", edit);
         assertPolicy(DocumentTemplateController.class, "copyVersion", edit);
         assertPolicy(DocumentTemplateController.class, "updateVersion", edit);
@@ -44,6 +45,12 @@ class DocumentControllerAuthorizationTest {
         assertPolicy(DocumentTemplateController.class, "importTemplate", edit);
         assertPolicy(DocumentTemplateController.class, "exportVersion", query);
         assertPolicy(DocumentTemplateController.class, "previewVersion",
+                "(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
+                        + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))");
+        assertPolicy(DocumentTemplateController.class, "previewHtml",
+                "(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
+                        + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))");
+        assertPolicy(DocumentTemplateController.class, "previewCanvas",
                 "(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
                         + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))");
         assertPolicy(DocumentTemplateController.class, "publish", publish);

@@ -119,6 +119,38 @@ public class ProjectCloseoutService {
         return result;
     }
 
+    public Map<String, Object> finalAcceptanceDetail(Long acceptanceId) {
+        Map<String, Object> main = queryOne("""
+                SELECT a.id,a.closeout_id closeoutId,c.closeout_code closeoutCode,
+                 a.project_id projectId,p.project_code projectCode,p.project_name projectName,
+                 a.acceptance_code acceptanceCode,a.acceptance_date acceptanceDate,a.organizer,
+                 a.participant_summary participantSummary,a.conclusion,a.acceptance_summary acceptanceSummary,
+                 a.status,a.approved_at approvedAt,a.remark
+                FROM closeout_final_acceptance a
+                JOIN project_closeout c ON c.id=a.closeout_id AND c.tenant_id=a.tenant_id AND c.deleted_flag=0
+                JOIN pm_project p ON p.id=a.project_id AND p.tenant_id=a.tenant_id AND p.deleted_flag=0
+                WHERE a.id=? AND a.tenant_id=? AND a.deleted_flag=0
+                """, "CLOSEOUT_FINAL_ACCEPTANCE_NOT_FOUND", "竣工验收不存在或无权访问", acceptanceId, tenant());
+        Long projectId = longValue(main.get("projectId"));
+        projectAccessChecker.checkAccess(projectId, "查看竣工验收");
+        List<Map<String, Object>> items = jdbc.queryForList("""
+                SELECT a.id,a.wbs_task_id wbsTaskId,w.task_code taskCode,w.task_name taskName,w.work_area workArea,
+                 a.quality_inspection_id qualityInspectionId,q.inspection_code qualityInspectionCode,
+                 q.inspection_date qualityInspectionDate,q.conclusion qualityConclusion,
+                 a.acceptance_code acceptanceCode,a.acceptance_name acceptanceName,
+                 a.acceptance_date acceptanceDate,a.conclusion,a.status,a.confirmed_at confirmedAt,a.remark
+                FROM closeout_section_acceptance a
+                JOIN project_wbs_task w ON w.id=a.wbs_task_id AND w.tenant_id=a.tenant_id AND w.deleted_flag=0
+                JOIN qs_inspection_record q ON q.id=a.quality_inspection_id AND q.tenant_id=a.tenant_id AND q.deleted_flag=0
+                WHERE a.tenant_id=? AND a.closeout_id=? AND a.project_id=? AND a.deleted_flag=0
+                ORDER BY a.acceptance_date,a.id
+                """, tenant(), main.get("closeoutId"), projectId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("main", main);
+        result.put("items", items);
+        return result;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> initiate(InitiateCommand command) {
         projectAccessChecker.checkAccess(command.projectId(), "发起项目竣工收尾");

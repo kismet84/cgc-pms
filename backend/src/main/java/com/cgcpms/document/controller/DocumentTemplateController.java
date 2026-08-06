@@ -4,11 +4,14 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.document.dto.DocumentTemplateCreateRequest;
 import com.cgcpms.document.dto.DocumentTemplateDraftRequest;
+import com.cgcpms.document.dto.DocumentCanvasPreviewRequest;
+import com.cgcpms.document.dto.DocumentHtmlPreviewResponse;
 import com.cgcpms.document.dto.DocumentTemplateValidationRequest;
 import com.cgcpms.document.entity.DocumentTemplateVersion;
 import com.cgcpms.document.render.RenderedDocument;
 import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
+import com.cgcpms.document.provider.DocumentBusinessTypeService;
 import com.cgcpms.document.service.PaymentSystemTemplateService;
 import com.cgcpms.document.service.SettlementSystemTemplateService;
 import com.cgcpms.document.service.ProcurementSystemTemplateService;
@@ -37,13 +40,15 @@ public class DocumentTemplateController {
     private final PaymentSystemTemplateService paymentSystemTemplateService;
     private final SettlementSystemTemplateService settlementSystemTemplateService;
     private final ProcurementSystemTemplateService procurementSystemTemplateService;
+    private final DocumentBusinessTypeService businessTypeService;
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
     @PreAuthorize("hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<DocumentTemplateVersion> create(@Valid @RequestBody DocumentTemplateCreateRequest request) {
         return ApiResponse.success(service.create(request.templateCode(), request.templateName(), request.businessType(),
-                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark())));
+                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark(),
+                        request.designSchema())));
     }
 
     @GetMapping
@@ -64,6 +69,12 @@ public class DocumentTemplateController {
     public ApiResponse<com.cgcpms.document.catalog.DocumentTemplateFieldCatalog.Catalog> catalog(
             @RequestParam String businessType) {
         return ApiResponse.success(service.getFieldCatalog(businessType));
+    }
+
+    @GetMapping("/business-types")
+    @PreAuthorize("hasAuthority('document:template:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<java.util.List<DocumentBusinessTypeService.BusinessTypeDefinition>> businessTypes() {
+        return ApiResponse.success(businessTypeService.listEnabled());
     }
 
     @PostMapping("/{templateId}/versions")
@@ -97,7 +108,8 @@ public class DocumentTemplateController {
     public ApiResponse<DocumentTemplateService.TemplateValidationResult> validate(
             @Valid @RequestBody DocumentTemplateValidationRequest request) {
         return ApiResponse.success(service.validate(request.businessType(),
-                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark())));
+                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark(),
+                        request.designSchema())));
     }
 
     @PostMapping("/import")
@@ -105,7 +117,8 @@ public class DocumentTemplateController {
     @PreAuthorize("hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<DocumentTemplateVersion> importTemplate(@Valid @RequestBody DocumentTemplateCreateRequest request) {
         return ApiResponse.success(service.create(request.templateCode(), request.templateName(), request.businessType(),
-                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark())));
+                draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark(),
+                        request.designSchema())));
     }
 
     @GetMapping("/versions/{versionId}/export")
@@ -126,6 +139,24 @@ public class DocumentTemplateController {
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=template-preview.pdf")
                 .body(rendered.content());
+    }
+
+    @PostMapping("/versions/{versionId}/preview-html")
+    @AuditedOperation(type = "PREVIEW_HTML", businessType = "DOCUMENT_TEMPLATE_VERSION", businessIdExpression = "#versionId")
+    @PreAuthorize("(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
+            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))")
+    public ApiResponse<DocumentHtmlPreviewResponse> previewHtml(@PathVariable Long versionId,
+                                                                @RequestParam(required = false) Long businessId) {
+        return ApiResponse.success(new DocumentHtmlPreviewResponse(service.renderHtmlPreview(versionId, businessId)));
+    }
+
+    @PostMapping("/preview-html")
+    @AuditedOperation(type = "PREVIEW_HTML", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
+    @PreAuthorize("(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
+            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))")
+    public ApiResponse<DocumentHtmlPreviewResponse> previewCanvas(@Valid @RequestBody DocumentCanvasPreviewRequest request) {
+        return ApiResponse.success(new DocumentHtmlPreviewResponse(service.renderCanvasPreview(
+                request.businessType(), request.designSchema(), request.businessId())));
     }
 
     @PostMapping("/versions/{versionId}/publish")
@@ -188,10 +219,16 @@ public class DocumentTemplateController {
     }
 
     private DocumentTemplateService.DraftCommand draft(DocumentTemplateDraftRequest request) {
-        return draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark());
+        return draft(request.schemaVersion(), request.templateContent(), request.fieldManifest(), request.remark(),
+                request.designSchema());
     }
 
     private DocumentTemplateService.DraftCommand draft(String schemaVersion, String content, String manifest, String remark) {
-        return new DocumentTemplateService.DraftCommand(schemaVersion, content, manifest, remark);
+        return draft(schemaVersion, content, manifest, remark, null);
+    }
+
+    private DocumentTemplateService.DraftCommand draft(String schemaVersion, String content, String manifest,
+                                                        String remark, String designSchema) {
+        return new DocumentTemplateService.DraftCommand(schemaVersion, content, manifest, remark, designSchema);
     }
 }

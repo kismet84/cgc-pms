@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-08-06 主线78：全审批业务单据可视化模板本地完成
+
+- 问题源：`ISSUE-078-001`已关闭；状态`IMPLEMENTED / G0-G5_PASSED / LOCAL_COMPLETE / GIT_DELIVERY_PENDING`。
+- 目标链：`启用审批类型 -> 独立完整详情 Provider -> 语义字段目录/快照 -> A4 画布 -> 服务端受限 HTML -> HTML/PDF 同源预览 -> 版本发布`。
+- 权威分母：当前租户启用 `wf_template` 去重类型；本地 tenant 0 为 28，Handler 注册表仅负责状态回调。
+- 最小方案：复用领域详情 Service、业务对象授权、现有模板版本/受限渲染/OpenHTMLtoPDF 与 V2 组件；不建通用低代码或新渲染引擎。
+- 验证：28/28 Provider、后端2570项、真实MySQL空库/升级、前端484项、PDF跨页、真实分包计量、A4保存重开和窄屏通过；默认模板`SUB_MEASURE_CANVAS_078` V1已发布。
+- 计划：[`第78条主线`](../plans/第78条主线-全审批业务单据可视化模板与完整详情字段任务计划书.md)。
+
 ## 2026-08-06 主线77：通知可靠性与现场履约 PWA 本地完成
 
 - 问题源：`ISSUE-077-001`已关闭；状态 `IMPLEMENTED / G0-G5_PASSED / LOCAL_ONLY / GIT_DELIVERY_PENDING`。

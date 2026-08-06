@@ -75,6 +75,21 @@ public class CostSubjectV2Service {
                 """, tenantId(), versionId);
     }
 
+    public Map<String, Object> mappingVersionDetail(Long versionId) {
+        Map<String, Object> main = one("""
+                SELECT v.id,v.version_code versionCode,v.version_name versionName,v.status,
+                 v.effective_date effectiveDate,u.real_name activatedByName,v.activated_at activatedAt,
+                 v.created_at createdAt,v.remark
+                FROM cost_subject_mapping_version v
+                LEFT JOIN sys_user u ON u.id=v.activated_by AND u.tenant_id=v.tenant_id AND u.deleted_flag=0
+                WHERE v.tenant_id=? AND v.id=?
+                """, versionId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("main", main);
+        result.put("items", mappingItems(versionId));
+        return result;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Long createMappingVersion(MappingVersionCommand command) {
         requireText(command.versionCode(), "映射版本编码不能为空");
@@ -274,6 +289,47 @@ public class CostSubjectV2Service {
                 """.formatted(placeholders(projectIds)), parameters.toArray());
     }
 
+    /** businessId is the workflow's bid_cost_id, not a transfer row id. */
+    public Map<String, Object> bidCostTransferDetail(Long businessId) {
+        Map<String, Object> main = one("""
+                SELECT t.id,t.bid_cost_id bidCostId,b.bid_code bidCode,b.bid_project_name bidProjectName,
+                 t.project_id projectId,p.project_code projectCode,p.project_name projectName,
+                 t.target_id targetId,ct.version_no targetVersionNo,ct.version_name targetVersionName,
+                 t.mapping_version_id mappingVersionId,m.version_code mappingVersionCode,m.version_name mappingVersionName,
+                 t.transfer_code transferCode,t.total_amount totalAmount,t.status,t.posted_at postedAt,t.remark
+                FROM bid_cost_target_transfer t
+                JOIN bid_cost b ON b.id=t.bid_cost_id AND b.tenant_id=t.tenant_id AND b.deleted_flag=0
+                JOIN pm_project p ON p.id=t.project_id AND p.tenant_id=t.tenant_id AND p.deleted_flag=0
+                JOIN cost_target ct ON ct.id=t.target_id AND ct.tenant_id=t.tenant_id AND ct.deleted_flag=0
+                JOIN cost_subject_mapping_version m ON m.id=t.mapping_version_id AND m.tenant_id=t.tenant_id
+                WHERE t.tenant_id=? AND t.bid_cost_id=? AND t.reversal_of_id IS NULL
+                ORDER BY t.posted_at DESC,t.id DESC LIMIT 1
+                """, businessId);
+        requireProject(longValue(main.get("projectId")));
+        return transferDetail(main);
+    }
+
+    /** businessId is the original transfer id used by the reversal workflow. */
+    public Map<String, Object> bidCostTransferReversalDetail(Long businessId) {
+        Map<String, Object> main = one("""
+                SELECT r.id,r.reversal_of_id originalTransferId,o.transfer_code originalTransferCode,
+                 r.bid_cost_id bidCostId,b.bid_code bidCode,b.bid_project_name bidProjectName,
+                 r.project_id projectId,p.project_code projectCode,p.project_name projectName,
+                 r.target_id targetId,ct.version_no targetVersionNo,ct.version_name targetVersionName,
+                 r.mapping_version_id mappingVersionId,m.version_code mappingVersionCode,m.version_name mappingVersionName,
+                 r.transfer_code transferCode,r.total_amount totalAmount,r.status,r.posted_at postedAt,r.remark
+                FROM bid_cost_target_transfer r
+                JOIN bid_cost_target_transfer o ON o.id=r.reversal_of_id AND o.tenant_id=r.tenant_id
+                JOIN bid_cost b ON b.id=r.bid_cost_id AND b.tenant_id=r.tenant_id AND b.deleted_flag=0
+                JOIN pm_project p ON p.id=r.project_id AND p.tenant_id=r.tenant_id AND p.deleted_flag=0
+                JOIN cost_target ct ON ct.id=r.target_id AND ct.tenant_id=r.tenant_id AND ct.deleted_flag=0
+                JOIN cost_subject_mapping_version m ON m.id=r.mapping_version_id AND m.tenant_id=r.tenant_id
+                WHERE r.tenant_id=? AND r.reversal_of_id=?
+                """, businessId);
+        requireProject(longValue(main.get("projectId")));
+        return transferDetail(main);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Long transferBidCost(TransferCommand command) {
         requireText(command.idempotencyKey(), "幂等键不能为空");
@@ -419,6 +475,37 @@ public class CostSubjectV2Service {
                   )
                 GROUP BY b.id,s.subject_code,s.subject_name ORDER BY b.posted_at DESC
                 """.formatted(placeholders(projectIds)), parameters.toArray());
+    }
+
+    /** businessId is the workflow's source_id, not an allocation batch id. */
+    public Map<String, Object> financeAllocationDetail(Long businessId) {
+        Map<String, Object> main = one("""
+                SELECT b.id,b.batch_code batchCode,b.source_type sourceType,b.source_id sourceId,
+                 b.source_amount sourceAmount,b.allocation_basis allocationBasis,b.accounting_period accountingPeriod,
+                 b.cost_subject_id costSubjectId,s.subject_code subjectCode,s.subject_name subjectName,
+                 b.status,b.posted_at postedAt,b.remark
+                FROM finance_cost_allocation_batch b
+                JOIN cost_subject s ON s.id=b.cost_subject_id AND s.tenant_id=b.tenant_id AND s.deleted_flag=0
+                WHERE b.tenant_id=? AND b.source_id=? AND b.reversal_of_id IS NULL
+                ORDER BY b.posted_at DESC,b.id DESC LIMIT 1
+                """, businessId);
+        return financeDetail(main);
+    }
+
+    /** businessId is the original allocation batch id used by the reversal workflow. */
+    public Map<String, Object> financeAllocationReversalDetail(Long businessId) {
+        Map<String, Object> main = one("""
+                SELECT r.id,r.reversal_of_id originalBatchId,o.batch_code originalBatchCode,
+                 r.batch_code batchCode,r.source_type sourceType,r.source_id sourceId,
+                 r.source_amount sourceAmount,r.allocation_basis allocationBasis,r.accounting_period accountingPeriod,
+                 r.cost_subject_id costSubjectId,s.subject_code subjectCode,s.subject_name subjectName,
+                 r.status,r.posted_at postedAt,r.remark
+                FROM finance_cost_allocation_batch r
+                JOIN finance_cost_allocation_batch o ON o.id=r.reversal_of_id AND o.tenant_id=r.tenant_id
+                JOIN cost_subject s ON s.id=r.cost_subject_id AND s.tenant_id=r.tenant_id AND s.deleted_flag=0
+                WHERE r.tenant_id=? AND r.reversal_of_id=?
+                """, businessId);
+        return financeDetail(main);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -567,6 +654,39 @@ public class CostSubjectV2Service {
                     VALUES (?,?,?,?,?,?,?,?,999,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'投标成本V2转入')
                     """, IdWorker.getId(), tenantId(), targetId, projectId, subjectId, amount, amount, amount, userId());
         }
+    }
+
+    private Map<String, Object> transferDetail(Map<String, Object> main) {
+        List<Map<String, Object>> items = jdbc.queryForList("""
+                SELECT l.id,l.source_subject_id sourceSubjectId,ss.subject_code sourceSubjectCode,
+                 ss.subject_name sourceSubjectName,l.target_subject_id targetSubjectId,
+                 ts.subject_code targetSubjectCode,ts.subject_name targetSubjectName,l.amount
+                FROM bid_cost_target_transfer_line l
+                JOIN cost_subject ss ON ss.id=l.source_subject_id AND ss.tenant_id=l.tenant_id AND ss.deleted_flag=0
+                JOIN cost_subject ts ON ts.id=l.target_subject_id AND ts.tenant_id=l.tenant_id AND ts.deleted_flag=0
+                WHERE l.tenant_id=? AND l.transfer_id=? ORDER BY ss.subject_code,l.id
+                """, tenantId(), main.get("id"));
+        if (items.isEmpty()) throw new BusinessException("BUSINESS_SOURCE_NOT_FOUND", "业务来源不存在或不可用");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("main", main);
+        result.put("items", items);
+        return result;
+    }
+
+    private Map<String, Object> financeDetail(Map<String, Object> main) {
+        List<Map<String, Object>> items = jdbc.queryForList("""
+                SELECT l.id,l.project_id projectId,p.project_code projectCode,p.project_name projectName,
+                 l.basis_value basisValue,l.allocated_amount allocatedAmount
+                FROM finance_cost_allocation_line l
+                JOIN pm_project p ON p.id=l.project_id AND p.tenant_id=l.tenant_id AND p.deleted_flag=0
+                WHERE l.tenant_id=? AND l.batch_id=? ORDER BY p.project_code,l.id
+                """, tenantId(), main.get("id"));
+        if (items.isEmpty()) throw new BusinessException("BUSINESS_SOURCE_NOT_FOUND", "业务来源不存在或不可用");
+        items.stream().map(item -> longValue(item.get("projectId"))).distinct().forEach(this::requireProject);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("main", main);
+        result.put("items", items);
+        return result;
     }
 
     private List<BigDecimal> calculateAllocation(BigDecimal total, List<AllocationLine> lines, BigDecimal basisTotal) {

@@ -43,29 +43,18 @@ public class PaymentSystemTemplateService {
               <tr><th>申请事由</th><td colspan="3">{{payment.applyReason}}</td></tr>
             </table>
             <h2>收款信息</h2>
-            <table>
-              <tr><th>收款单位</th><td>{{payee.name}}</td><th>开户行</th><td>{{payee.bankName}}</td></tr>
-              <tr><th>银行账号</th><td>{{payee.bankAccount}}</td><th>联系电话</th><td>{{payee.contactPhone}}</td></tr>
-            </table>
+            <table><tr><th>收款单位</th><td>{{payee.name}}</td><th>费用类别</th><td>{{payment.expenseCategory}}</td></tr></table>
             <h2>付款来源</h2>
-            <table><tr><th>类型</th><th>来源ID</th><th>来源金额</th><th>已付金额</th></tr>
-            {{#each sources}}<tr><td>{{type}}</td><td>{{referenceId}}</td><td class="amount">{{amount}}</td><td class="amount">{{paidAmount}}</td></tr>{{/each}}
+            <table><tr><th>类型</th><th>来源金额</th><th>已付金额</th></tr>
+            {{#each sources}}<tr><td>{{type}}</td><td class="amount">{{amount}}</td><td class="amount">{{paidAmount}}</td></tr>{{/each}}
             </table>
             <h2>付款依据</h2>
-            <table><tr><th>类型</th><th>依据ID</th><th>金额</th></tr>
-            {{#each basis}}<tr><td>{{type}}</td><td>{{referenceId}}</td><td class="amount">{{amount}}</td></tr>{{/each}}
+            <table><tr><th>类型</th><th>金额</th><th>备注</th></tr>
+            {{#each basis}}<tr><td>{{type}}</td><td class="amount">{{amount}}</td><td>{{remark}}</td></tr>{{/each}}
             </table>
             <h2>发票</h2>
             <table><tr><th>发票号</th><th>类型</th><th>日期</th><th>金额</th><th>验真状态</th></tr>
             {{#each invoices}}<tr><td>{{number}}</td><td>{{type}}</td><td>{{date}}</td><td class="amount">{{amount}}</td><td>{{verifyStatus}}</td></tr>{{/each}}
-            </table>
-            <h2>附件清单</h2>
-            <table><tr><th>文件名</th><th>类型</th><th>字节数</th></tr>
-            {{#each attachments}}<tr><td>{{name}}</td><td>{{type}}</td><td class="amount">{{size}}</td></tr>{{/each}}
-            </table>
-            <h2>审批轨迹</h2>
-            <table><tr><th>节点</th><th>动作</th><th>操作人</th><th>时间</th><th>意见</th></tr>
-            {{#each approvalRecords}}<tr><td>{{node}}</td><td>{{action}}</td><td>{{operator}}</td><td>{{time}}</td><td>{{comment}}</td></tr>{{/each}}
             </table>
             <div class="footer">本文件由 CGC-PMS 依据已审批业务数据生成；金额以系统权威字段为准。</div>
             </body></html>
@@ -73,13 +62,12 @@ public class PaymentSystemTemplateService {
 
     private static final String MANIFEST = """
             ["payment.applyCode","payment.approvalStatus","payment.applyAmount","payment.approvedAmount",
-             "payment.payType","payment.createdAt","payment.applyReason","project.name","project.code",
-             "contract.name","contract.code","payee.name","payee.bankName","payee.bankAccount","payee.contactPhone",
-             "sources.type","sources.referenceId","sources.amount","sources.paidAmount",
-             "basis.type","basis.referenceId","basis.amount",
+             "payment.payType","payment.createdAt","payment.applyReason","payment.expenseCategory","project.name","project.code",
+             "contract.name","contract.code","payee.name",
+             "sources.type","sources.amount","sources.paidAmount",
+             "basis.type","basis.amount","basis.remark",
              "invoices.number","invoices.type","invoices.date","invoices.amount","invoices.verifyStatus",
-             "attachments.name","attachments.type","attachments.size",
-             "approvalRecords.node","approvalRecords.action","approvalRecords.operator","approvalRecords.time","approvalRecords.comment"]
+             "invoices.taxAmount","invoices.sellerName","invoices.buyerName"]
             """;
 
     private final DocumentTemplateService templateService;
@@ -96,8 +84,8 @@ public class PaymentSystemTemplateService {
                 .eq(DocumentTemplate::getTemplateCode, TEMPLATE_CODE));
         if (existing == null) {
             DocumentTemplateVersion draft = templateService.create(TEMPLATE_CODE, "系统付款申请单", "PAYMENT",
-                    new DocumentTemplateService.DraftCommand("payment.v1", TEMPLATE, MANIFEST,
-                            "第48条主线M2受控系统模板"));
+                    new DocumentTemplateService.DraftCommand("payment.v2", TEMPLATE, MANIFEST,
+                            "第78条主线安全业务详情模板"));
             DocumentTemplateVersion published = templateService.publish(draft.getId());
             templateService.bindDefault(published.getId(), 0);
             return published;
@@ -112,10 +100,10 @@ public class PaymentSystemTemplateService {
         if (published == null) {
             throw new BusinessException("DOCUMENT_SYSTEM_TEMPLATE_STATE_INVALID", "系统付款模板存在但没有已发布版本");
         }
-        if (!TEMPLATE.equals(published.getTemplateContent())) {
+        if (!"payment.v2".equals(published.getSchemaVersion()) || !TEMPLATE.equals(published.getTemplateContent())) {
             DocumentTemplateVersion draft = templateService.createNextDraft(existing.getId(),
-                    new DocumentTemplateService.DraftCommand("payment.v1", TEMPLATE, MANIFEST,
-                            "第48条主线M2受控系统模板：页码字体修复"));
+                    new DocumentTemplateService.DraftCommand("payment.v2", TEMPLATE, MANIFEST,
+                            "第78条主线安全业务详情模板升级"));
             published = templateService.publish(draft.getId());
         }
 

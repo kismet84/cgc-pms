@@ -141,12 +141,25 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
                 "SELECT action_code FROM cost_corrective_action WHERE id=?", String.class, actionId);
         assertTrue(generatedActionCode.matches("CCA-\\d{8}-\\d{3}"));
         assertNotEquals("CA-IT-001", generatedActionCode);
+        Map<String, Object> correctiveDetail = controlService.correctiveActionDetail(actionId);
+        assertEquals(actionId, id(cast(correctiveDetail.get("main"))));
+        assertEquals("压降措施成本", cast(correctiveDetail.get("main")).get("actionTitle"));
+        assertEquals(forecastRequest.items().size(), ((List<?>) correctiveDetail.get("items")).size());
+        assertFalse(cast(correctiveDetail.get("main")).containsKey("tenant_id"));
+        assertEquals("COST_CORRECTIVE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> controlService.correctiveActionDetail(Long.MAX_VALUE)).getCode());
         UserContext.set(Jwts.claims().subject("reader").add("userId", 2L).add("username", "reader")
                 .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> controlService.correctiveActionDetail(actionId)).getCode());
         BusinessException crossProjectUpdate = assertThrows(BusinessException.class, () -> controlService.updateCorrectiveAction(actionId, 0,
                 new CorrectiveActionRequest(forecastId, "CA-IT-001", "越权修改", "越权根因", "越权计划",
                         new BigDecimal("500.00"), 1L, LocalDate.now().plusDays(5), "越权备注")));
         assertEquals("PROJECT_ACCESS_DENIED", crossProjectUpdate.getCode());
+        UserContext.set(Jwts.claims().subject("other-tenant").add("userId", 1L).add("username", "other-tenant")
+                .add("tenantId", 99L).add("roleCodes", List.of("ADMIN")).build());
+        assertEquals("COST_CORRECTIVE_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> controlService.correctiveActionDetail(actionId)).getCode());
         assertEquals("压降措施成本", jdbc.queryForObject("SELECT action_title FROM cost_corrective_action WHERE id=?", String.class, actionId));
         UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
                 .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());

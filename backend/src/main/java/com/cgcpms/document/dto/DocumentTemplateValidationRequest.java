@@ -6,7 +6,13 @@ import jakarta.validation.constraints.NotBlank;
 public record DocumentTemplateValidationRequest(
         @NotBlank String businessType,
         @NotBlank String schemaVersion,
-        @NotBlank String templateContent,
-        @NotBlank String fieldManifest,
-        String remark) {
+        String templateContent,
+        String fieldManifest,
+        String remark,
+        String designSchema) {
+
+    public DocumentTemplateValidationRequest(String businessType, String schemaVersion, String templateContent,
+                                             String fieldManifest, String remark) {
+        this(businessType, schemaVersion, templateContent, fieldManifest, remark, null);
+    }
 }

@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("286", flyway.info().current().getVersion().getVersion());
+        assertEquals("287", flyway.info().current().getVersion().getVersion());
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='sys_file_object_task'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_catalog'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_version_link'"));
@@ -179,7 +179,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("286", current.info().current().getVersion().getVersion());
+        assertEquals("287", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "sys_menu", """
                 perms='material:dict:delete' AND deleted_flag=0
                 AND parent_id=(SELECT id FROM sys_menu

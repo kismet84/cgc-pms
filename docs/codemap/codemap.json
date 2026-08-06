@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-06T08:21:42.874Z",
-  "generated_from_commit": "c80c5f3aa31e32f397e11dc5ab07acbf1b4d363b",
+  "generated_at": "2026-08-06T11:18:08.745Z",
+  "generated_from_commit": "6caaf895d7996b48b778a503f81ec8031a39ea90",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",
@@ -862,6 +862,58 @@
       ]
     },
     {
+      "id": "document-template-platform",
+      "label": "业务单据模板与生成",
+      "type": "domain",
+      "boundary": "后端与浏览器",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/document",
+      "role": "统一业务单据详情 Provider、A4 可视化画布、服务端编译、模板版本与文件生成。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/controller/DocumentTemplateController.java",
+          "symbol": "@RequestMapping(\"/document-templates\")"
+        },
+        {
+          "path": "frontend-admin-v2/src/pages/system/DocumentTemplatePage.vue",
+          "symbol": "DocumentCanvas"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/document/DocumentDataProviderTest.java",
+          "symbol": "class DocumentDataProviderTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/document/DocumentCanvasCompilerTest.java",
+          "symbol": "class DocumentCanvasCompilerTest"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/document-template-page.test.ts",
+          "symbol": "DocumentTemplatePage"
+        }
+      ],
+      "constraints": [
+        "每个已启用审批业务类型必须由唯一 Provider 返回完整详情和可选字段目录。",
+        "画布只保存受控 JSON；HTML 和 PDF 由服务端编译生成。",
+        "字段目录不得暴露审批记录、内部主键、附件或未授权敏感信息。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/provider/DocumentDataProviderRegistry.java",
+          "symbol": "class DocumentDataProviderRegistry"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/canvas/DocumentCanvasCompiler.java",
+          "symbol": "class DocumentCanvasCompiler"
+        },
+        {
+          "path": "frontend-admin-v2/src/components/document/DocumentCanvas.vue",
+          "symbol": "defineProps"
+        }
+      ]
+    },
+    {
       "id": "repository-governance",
       "label": "仓库执行治理",
       "type": "governance",
@@ -1674,6 +1726,39 @@
         {
           "path": ".github/workflows/ci.yml",
           "symbol": "start-e2e-minio.sh"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "document-template-platform",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/pages/system/DocumentTemplatePage.vue",
+          "symbol": "/document-templates"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "document-template-platform",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/controller/DocumentTemplateController.java",
+          "symbol": "@RequestMapping(\"/document-templates\")"
+        }
+      ]
+    },
+    {
+      "from": "document-template-platform",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/resources/db/migration/V287__add_document_template_canvas_schema.sql",
+          "symbol": "design_schema"
         }
       ]
     }
