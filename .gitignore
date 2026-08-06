@@ -53,6 +53,7 @@ Thumbs.db
 logs/
 *.tmp
 temp/
+/tmp/
 
 # Docker volumes / certs
 deploy/mysql/data/

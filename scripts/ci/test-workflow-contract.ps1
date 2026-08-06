@@ -106,6 +106,9 @@ $sqlSafety = Get-JobBlock $workflow 'sql-safety-scan'
 
 Assert-Contains $workflow @('branches-ignore: [master, main]','pull_request:','branches: [master, main]','workflow_dispatch:') 'workflow triggers'
 Assert-Contains $workflow @(
+  'concurrency:','group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}','cancel-in-progress: true'
+) 'workflow concurrency cancellation'
+Assert-Contains $workflow @(
   'trivyColdCache:','description: Run supply-chain scan with an isolated empty Trivy cache',
   'required: false','default: false','type: boolean'
 ) 'workflow_dispatch Trivy cold-cache input'
@@ -227,16 +230,38 @@ foreach ($name in @('check:boundary','check:route-ledger','check:design-system',
 
 $pushGate = Read-RepoText 'frontend-admin-v2\scripts\run-push-quality-gate.mjs'
 Assert-Contains $pushGate @(
-  "git', ['diff', '--check']",
+  "id: 'diff-check:branch'",
+  "id: 'diff-check:staged'",
+  "args: ['diff', '--check', '--cached']",
+  "id: 'diff-check:unstaged'",
+  "id: 'dependency-audit'",
+  "'--registry=https://registry.npmjs.org'",
   "'lint:check'",
-  "'type-check'",
   "'test:unit'",
   "'build'",
   "'test:e2e:migration-gate'",
-  "startsWith('frontend-admin-v2/src/components/')",
-  "startsWith('frontend-admin-v2/src/styles/')",
-  "startsWith('frontend-admin-v2/e2e/')"
+  "startsWith('frontend-admin-v2/src/pages/')",
+  "startsWith('frontend-admin-v2/')",
+  "startsWith('frontend-admin-v2/patches/')",
+  "startsWith('patches/')",
+  'dependencyFiles.has(file)',
+  "startsWith('.github/workflows/')",
+  'pre-push-quality-gate-v1.json',
+  "['origin/master', 'origin/main']",
+  '`${baseRef}...HEAD`',
+  'nodeVersion: process.version',
+  'process.env.npm_execpath',
+  'executable: process.execPath',
+  'pnpmVersion',
+  'gateEnvironment:',
+  "captureRaw('git', ['diff', '--binary'",
+  'P:${pathBytes.length}:',
+  'C:${content.length}:',
+  'untrackedFilesAreRegular',
+  'cache write skipped:'
 ) 'frontend pre-push quality gate'
+if ($pushGate.Contains("'type-check'")) { throw 'frontend pre-push gate must not repeat the build type check' }
+if ($pushGate.Contains('shell:')) { throw 'frontend pre-push gate must not invoke pnpm through a shell' }
 $prePushHook = Read-RepoText '.githooks\pre-push'
 Assert-Contains $prePushHook @('set -eu','pnpm --dir frontend-admin-v2 check:pre-push') 'versioned pre-push hook'
 
