@@ -20,8 +20,8 @@ export async function login(params: LoginParams): Promise<LoginResult> {
   return { userInfo: result.userInfo }
 }
 
-export async function getCurrentUser(): Promise<UserInfo> {
-  const result = await apiRequest<UserInfo>(AUTH_API.userInfo)
+export async function getCurrentUser(notifyError = true): Promise<UserInfo> {
+  const result = await apiRequest<UserInfo>(AUTH_API.userInfo, { notifyError })
   if (!isUserInfo(result)) throw malformedAuthResponse()
   resetRequestRecoveryState()
   return result

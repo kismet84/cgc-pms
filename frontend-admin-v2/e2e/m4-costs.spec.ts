@@ -4,6 +4,7 @@ import { captureRuntimeErrors } from './runtime-errors'
 import { installShellPreferencesMock } from './shell-session'
 
 const user = {
+  tenantId: '0',
   userId: '1',
   username: 'cost.manager',
   realName: '成本经理',
@@ -20,6 +21,7 @@ const user = {
   ],
 }
 const deniedUser = {
+  tenantId: '0',
   userId: '2',
   username: 'no.cost',
   realName: '无成本权限用户',

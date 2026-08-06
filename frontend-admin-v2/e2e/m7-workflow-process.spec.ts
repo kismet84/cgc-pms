@@ -15,6 +15,7 @@ test('ordinary role stays forbidden even with workflow process permission', asyn
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/api/auth/userinfo')) {
       return success(route, {
+        tenantId: '0',
         userId: '7',
         username: 'ordinary.user',
         roles: ['USER'],
@@ -46,6 +47,7 @@ test('administrator uses the documented admin permission override', async ({ pag
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/api/auth/userinfo')) {
       return success(route, {
+        tenantId: '0',
         userId: '1',
         username: 'admin',
         roles: ['ADMIN'],
@@ -75,6 +77,7 @@ test('administrator with exact permission reads server workflow facts', async ({
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/api/auth/userinfo')) {
       return success(route, {
+        tenantId: '0',
         userId: '1',
         username: 'admin',
         roles: ['ADMIN'],

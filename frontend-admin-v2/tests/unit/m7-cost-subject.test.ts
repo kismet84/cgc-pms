@@ -35,7 +35,7 @@ vi.mock('@/services/cost-subject', () => ({
 }))
 
 function user(permissions: string[]): UserInfo {
-  return { userId: '7', username: 'cost.user', roles: ['USER'], permissions }
+  return { tenantId: '1001', userId: '7', username: 'cost.user', roles: ['USER'], permissions }
 }
 
 beforeEach(() => {

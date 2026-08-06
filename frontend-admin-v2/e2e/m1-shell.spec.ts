@@ -6,6 +6,7 @@ type Identity = 'admin' | 'ordinary' | 'denied' | 'anonymous'
 
 const users = {
   admin: {
+    tenantId: '0',
     userId: '1',
     username: 'admin',
     realName: '平台管理员',
@@ -13,6 +14,7 @@ const users = {
     permissions: ['*'],
   },
   ordinary: {
+    tenantId: '0',
     userId: '2',
     username: 'project.viewer',
     realName: '项目查看人',
@@ -20,6 +22,7 @@ const users = {
     permissions: ['project:query'],
   },
   denied: {
+    tenantId: '0',
     userId: '3',
     username: 'report.viewer',
     realName: '报表查看人',

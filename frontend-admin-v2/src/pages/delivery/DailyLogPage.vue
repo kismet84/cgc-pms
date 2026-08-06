@@ -4,12 +4,14 @@ import { formatDecimal } from '@/pages/dashboard/model'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   DailyProgressCommand,
+  FieldDailyLogCommand,
   SiteDailyLogCommand,
   SiteDailyLogRecord,
   SiteDailyLogStatus,
   SiteDailyQualitySafetyRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
+  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -36,8 +38,16 @@ import {
   submitSiteDailyLog,
   updateSiteDailyLog,
   uploadSiteFile,
+  uploadSiteFileIdempotently,
 } from '@/services/delivery'
-import { useSessionStore } from '@/stores/session'
+import { featureFlags } from '@/services/featureFlags'
+import {
+  FieldDraftRepository,
+  fieldDraftStatusLabel,
+  fieldDraftSyncFailure,
+  type FieldDraft,
+} from '@/services/fieldDrafts'
+import { getSessionNamespaceIdentity, useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
 const SITE_DAILY_LOG = 'SITE_DAILY_LOG'
@@ -47,6 +57,11 @@ interface DailyProgressRow extends DailyProgressCommand {
   taskCode: string
   taskName: string
   included: boolean
+}
+
+interface DailyDraftPayload {
+  command: FieldDailyLogCommand
+  recordId?: string
 }
 
 type PendingDailyAction =
@@ -82,6 +97,9 @@ const qualityFacts = ref<SiteDailyQualitySafetyRecord[]>([])
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
 const detailRequestId = ref(0)
+const localDraft = ref<FieldDraft<DailyDraftPayload> | null>(null)
+const localPhoto = ref<File | null>(null)
+let draftRepository: FieldDraftRepository | null = null
 
 const filter = reactive({
   status: '',
@@ -97,9 +115,12 @@ const form = reactive<SiteDailyLogCommand>({
   expectedUpdatedAt: undefined,
 })
 
-const projectOptions = computed(() =>
-  workspace.projects.map((item) => ({ value: item.value, label: item.label })),
-)
+const projectOptions = computed(() => {
+  const options = workspace.projects.map((item) => ({ value: item.value, label: item.label }))
+  if (form.projectId && !options.some((item) => item.value === form.projectId))
+    options.unshift({ value: form.projectId, label: `本地草稿项目（${form.projectId}）` })
+  return options
+})
 const canEdit = computed(() => hasPermission('site:daily:edit'))
 const canReportProgress = computed(() => hasPermission('schedule:progress'))
 const canViewQuality = computed(() => hasPermission('quality:safety:query'))
@@ -116,6 +137,15 @@ const canSubmitCurrent = computed(
     canEdit.value &&
     activeRecord.value.scheduleManaged &&
     canReportProgress.value,
+)
+const offlineDraftEnabled = computed(
+  () => featureFlags.offlineDraft.enabled && featureFlags.fieldDailyLog.enabled,
+)
+const offlineSyncEnabled = computed(
+  () => offlineDraftEnabled.value && featureFlags.offlineSync.enabled,
+)
+const localDraftLabel = computed(() =>
+  localDraft.value ? fieldDraftStatusLabel(localDraft.value.status) : '未保存本地草稿',
 )
 
 function hasPermission(code: string): boolean {
@@ -220,6 +250,9 @@ function openCreate(): void {
   })
   dialogOpen.value = true
   resetNotices()
+  localDraft.value = null
+  localPhoto.value = null
+  void restoreDailyDraft()
 }
 
 async function openRecord(record: SiteDailyLogRecord, edit = false): Promise<void> {
@@ -247,6 +280,9 @@ async function openRecord(record: SiteDailyLogRecord, edit = false): Promise<voi
       expectedUpdatedAt: detail.updatedAt ?? undefined,
     })
     dialogOpen.value = true
+    localDraft.value = null
+    localPhoto.value = null
+    await restoreDailyDraft()
     await Promise.all([
       loadFiles(detail.id, requestId),
       loadProgress(detail, requestId),
@@ -359,6 +395,123 @@ async function saveRecord(): Promise<void> {
   }
 }
 
+async function saveLocalDailyDraft(status: 'DRAFT' | 'PENDING' = 'DRAFT'): Promise<boolean> {
+  const command = cleanLogCommand(form)
+  if (!command.projectId || !command.reportDate || !command.constructionContent) {
+    errorMessage.value = '请完整填写项目、日报日期和施工内容'
+    return false
+  }
+  try {
+    const repository = localRepository()
+    const id = dailyDraftId(command)
+    const clientRequestId = localDraft.value?.clientRequestId ?? crypto.randomUUID()
+    localDraft.value = await repository.put<DailyDraftPayload>({
+      id,
+      kind: 'DAILY_LOG',
+      clientRequestId,
+      status,
+      payload: {
+        command: {
+          ...command,
+          clientRequestId,
+          expectedVersion: recordVersion(activeRecord.value),
+        },
+        recordId: activeRecord.value?.id,
+      },
+    })
+    if (localPhoto.value) {
+      await repository.putAttachment(id, localPhoto.value)
+      localPhoto.value = null
+    }
+    successMessage.value = status === 'DRAFT' ? '本地草稿已保存。' : '草稿已进入待同步状态。'
+    return true
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '本地草稿保存失败'
+    return false
+  }
+}
+
+async function syncLocalDailyDraft(): Promise<void> {
+  if (!offlineSyncEnabled.value || !(await saveLocalDailyDraft('PENDING')) || !localDraft.value)
+    return
+  const repository = localRepository()
+  const draft = localDraft.value
+  if (!navigator.onLine) {
+    localDraft.value = await repository.put({ ...draft, status: 'RETRYABLE', error: '当前离线' })
+    errorMessage.value = '当前离线，草稿保留为可重试状态'
+    return
+  }
+  saving.value = true
+  resetNotices()
+  try {
+    localDraft.value = await repository.put({ ...draft, status: 'SYNCING' })
+    const payload = draft.payload
+    const recordId = payload.recordId || (await createSiteDailyLog(payload.command))
+    if (payload.recordId) await updateSiteDailyLog(payload.recordId, payload.command)
+    for (const attachment of await repository.attachments(draft.id)) {
+      await uploadSiteFileIdempotently(
+        new File([attachment.file], attachment.name, { type: attachment.type }),
+        SITE_DAILY_LOG,
+        recordId,
+      )
+    }
+    await repository.removeAttachments(draft.id)
+    localDraft.value = await repository.put({ ...draft, status: 'SYNCED' })
+    successMessage.value = '本地日报草稿已同步。'
+    await loadList(true)
+  } catch (error) {
+    const code = isApiClientError(error) ? error.code : undefined
+    const status = isApiClientError(error) ? error.status : undefined
+    localDraft.value = await repository.put({
+      ...draft,
+      status: fieldDraftSyncFailure(code, status),
+      error: message(error, '同步失败'),
+    })
+    errorMessage.value = message(error, '本地日报同步失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function restoreDailyDraft(): Promise<void> {
+  if (!offlineDraftEnabled.value) return
+  try {
+    const repository = localRepository()
+    const draft = (activeRecord.value
+      ? await repository.get<DailyDraftPayload>(dailyDraftId(cleanLogCommand(form)))
+      : (await repository.list('DAILY_LOG')).find((item) => item.status !== 'SYNCED')) as
+      | FieldDraft<DailyDraftPayload>
+      | undefined
+    if (!draft || draft.status === 'SYNCED') return
+    localDraft.value = draft
+    Object.assign(form, draft.payload.command)
+    successMessage.value = `已恢复${fieldDraftStatusLabel(draft.status)}。`
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '本地草稿恢复失败'
+  }
+}
+
+function chooseLocalPhoto(event: Event): void {
+  localPhoto.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+function localRepository(): FieldDraftRepository {
+  if (draftRepository) return draftRepository
+  const identity = getSessionNamespaceIdentity()
+  if (!identity) throw new TypeError('当前会话缺少租户标识，不能使用本地草稿')
+  draftRepository = new FieldDraftRepository(identity.tenantId, identity.userId)
+  return draftRepository
+}
+
+function dailyDraftId(command: SiteDailyLogCommand): string {
+  return `daily:${activeRecord.value?.id || `${command.projectId || 'none'}:${command.reportDate || 'none'}`}`
+}
+
+function recordVersion(record: SiteDailyLogRecord | null): number | undefined {
+  const value = (record as (SiteDailyLogRecord & { version?: unknown }) | null)?.version
+  return typeof value === 'number' ? value : undefined
+}
+
 async function saveProgress(): Promise<boolean> {
   if (!activeRecord.value?.scheduleManaged) {
     errorMessage.value = '项目缺少生效进度计划或已批准周计划，现场日报禁止提交'
@@ -400,11 +553,17 @@ function requestDailySubmit(): void {
 }
 
 async function submitCurrent(record: SiteDailyLogRecord): Promise<void> {
+  if (!navigator.onLine) {
+    errorMessage.value = '日报正式提交必须在线完成'
+    return
+  }
   if (!(await saveProgress())) return
   saving.value = true
   resetNotices()
   try {
-    await submitSiteDailyLog(record.id)
+    const version = recordVersion(record)
+    if (version === undefined) throw new TypeError('日报缺少版本，请刷新后重试')
+    await submitSiteDailyLog(record.id, version)
     dialogOpen.value = false
     successMessage.value = '现场日报已提交。'
     await loadList(true)
@@ -518,6 +677,7 @@ watch(
 onBeforeUnmount(() => {
   listController?.abort()
   detailController?.abort()
+  draftRepository = null
 })
 
 function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
@@ -762,6 +922,14 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             在场人数
             <input v-model.number="form.onSiteHeadcount" type="number" min="0" step="1" />
           </label>
+          <label v-if="offlineDraftEnabled">
+            本地暂存照片
+            <input type="file" accept="image/*" @change="chooseLocalPhoto" />
+          </label>
+          <p v-if="offlineDraftEnabled" class="daily-log-page__span-2" role="status">
+            同步状态：{{ localDraftLabel
+            }}<span v-if="localPhoto"> · 待暂存 {{ localPhoto.name }}</span>
+          </p>
         </form>
       </section>
 
@@ -975,6 +1143,24 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 
       <template v-if="dialogMode !== 'view'" #footer>
         <V2Button type="button" variant="secondary" @click="dialogOpen = false">关闭</V2Button>
+        <V2Button
+          v-if="offlineDraftEnabled"
+          type="button"
+          variant="secondary"
+          :loading="saving"
+          @click="saveLocalDailyDraft()"
+        >
+          保存到本机
+        </V2Button>
+        <V2Button
+          v-if="offlineSyncEnabled"
+          type="button"
+          variant="secondary"
+          :loading="saving"
+          @click="syncLocalDailyDraft"
+        >
+          手动同步
+        </V2Button>
         <V2Button type="button" variant="secondary" :loading="saving" @click="saveRecord">
           保存草稿
         </V2Button>

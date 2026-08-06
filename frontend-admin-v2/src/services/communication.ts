@@ -7,6 +7,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { getSiteFileUrl, uploadSiteFile } from '@/services/delivery'
 import { apiRequest } from '@/services/request'
+import { openResilientStream, type ResilientStream } from '@/services/notificationStream'
 
 const BASE = '/communications'
 
@@ -130,17 +131,13 @@ export function getCommunicationAttachmentUrl(fileId: string) {
 export function openCommunicationStream(
   onEvent: (event: CommunicationEvent) => void,
   onError?: () => void,
-): EventSource {
-  const stream = new EventSource('/api/communications/stream')
-  const receive = (event: MessageEvent<string>) => {
-    try {
-      onEvent(JSON.parse(event.data) as CommunicationEvent)
-    } catch {
-      onError?.()
-    }
-  }
-  stream.addEventListener('connected', receive as EventListener)
-  stream.addEventListener('communication', receive as EventListener)
-  stream.onerror = () => onError?.()
-  return stream
+  onOpen?: () => void,
+): ResilientStream {
+  return openResilientStream(
+    '/communications/stream',
+    ['connected', 'communication'],
+    onOpen ?? (() => undefined),
+    onEvent,
+    onError,
+  )
 }

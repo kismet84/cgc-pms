@@ -2,13 +2,13 @@ import {
   QUALITY_API,
   type QualityConsequenceCommand,
   type QualityConsequenceRecord,
+  type FieldQualityIssueCommand,
+  type FieldQualityRectificationCommand,
   type QualityInspectionCommand,
   type QualityInspectionRecord,
-  type QualityIssueCommand,
   type QualityIssueRecord,
   type QualityPlanCommand,
   type QualityPlanRecord,
-  type QualityRectificationCommand,
   type QualityRectificationRecord,
   type QualityReinspectionCommand,
   type QualityTraceRecord,
@@ -49,8 +49,8 @@ export function createQualityInspection(command: QualityInspectionCommand) {
     body: command,
   })
 }
-export function createQualityIssue(inspectionId: string, command: QualityIssueCommand) {
-  return apiRequest<QualityIssueRecord, QualityIssueCommand>(
+export function createQualityIssue(inspectionId: string, command: FieldQualityIssueCommand) {
+  return apiRequest<QualityIssueRecord, FieldQualityIssueCommand>(
     QUALITY_API.inspectionIssues(id(inspectionId)),
     { method: 'POST', body: command },
   )
@@ -65,8 +65,8 @@ export function loadQualityIssues(projectId: string, status?: string, signal?: A
   if (status?.trim()) query.set('status', status.trim())
   return apiRequest<QualityIssueRecord[]>(`${QUALITY_API.issues}?${query.toString()}`, { signal })
 }
-export function createQualityRectification(command: QualityRectificationCommand) {
-  return apiRequest<QualityRectificationRecord, QualityRectificationCommand>(
+export function createQualityRectification(command: FieldQualityRectificationCommand) {
+  return apiRequest<QualityRectificationRecord, FieldQualityRectificationCommand>(
     QUALITY_API.rectifications,
     { method: 'POST', body: command },
   )

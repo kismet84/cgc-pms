@@ -91,7 +91,9 @@ describe('communication service', () => {
       }),
     )
 
-    expect(FakeEventSource.instance.url).toBe('/api/communications/stream')
+    expect(FakeEventSource.instance.url).toMatch(
+      /^\/api\/communications\/stream\?clientId=[0-9a-f-]+$/,
+    )
     expect(received).toHaveBeenCalledWith({
       action: 'REFRESH',
       conversationId: '9',

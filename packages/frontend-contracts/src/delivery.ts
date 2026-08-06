@@ -271,6 +271,11 @@ export interface SiteDailyLogCommand {
   expectedUpdatedAt?: string;
 }
 
+export interface FieldDailyLogCommand extends SiteDailyLogCommand {
+  clientRequestId?: string;
+  expectedVersion?: number;
+}
+
 export interface SiteDailyLogQuery {
   pageNo?: number;
   pageSize?: number;

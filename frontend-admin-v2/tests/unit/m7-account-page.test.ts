@@ -23,6 +23,7 @@ vi.mock('@/services/account', () => ({
 }))
 
 const initialUser: UserInfo = {
+  tenantId: '1001',
   userId: '7',
   username: 'demo.user',
   realName: '原姓名',

@@ -34,6 +34,7 @@ describe('shared no-UI contracts', () => {
     expect(
       isLoginResult({
         userInfo: {
+          tenantId: '1001',
           userId: '1',
           username: 'admin',
           roles: ['SUPER_ADMIN'],

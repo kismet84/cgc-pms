@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   ContractRecord,
+  FieldQualityIssueCommand,
+  FieldQualityRectificationCommand,
   PartnerRecord,
   QualityConsequenceCommand,
   QualityInspectionCommand,
@@ -31,7 +33,7 @@ import {
   useToastMessage,
 } from '@/components'
 import { loadContractPage, loadPartners } from '@/services/commercial'
-import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
+import { listSiteFiles, uploadSiteFileIdempotently } from '@/services/delivery'
 import {
   activateQualityPlan,
   completeQualityPlan,
@@ -49,8 +51,15 @@ import {
   submitQualityInspection,
   submitQualityRectification,
 } from '@/services/quality'
+import { featureFlags } from '@/services/featureFlags'
+import {
+  FieldDraftRepository,
+  fieldDraftStatusLabel,
+  fieldDraftSyncFailure,
+  type FieldDraft,
+} from '@/services/fieldDrafts'
 import { isApiClientError } from '@/services/request'
-import { useSessionStore } from '@/stores/session'
+import { getSessionNamespaceIdentity, useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import V2Tabs from '@/components/V2Tabs.vue'
 import { deliveryLabel } from './labels'
@@ -72,6 +81,9 @@ interface EvidenceTarget {
   label: string
   issue?: QualityIssueRecord
 }
+type QualityDraftPayload =
+  | { kind: 'ISSUE'; inspectionId: string; command: FieldQualityIssueCommand }
+  | { kind: 'RECTIFICATION'; command: FieldQualityRectificationCommand }
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const route = useRoute()
@@ -104,6 +116,8 @@ let projectController: AbortController | null = null
 let inspectionController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
+const localDraft = ref<FieldDraft<QualityDraftPayload> | null>(null)
+let draftRepository: FieldDraftRepository | null = null
 
 const today = () => new Date().toISOString().slice(0, 10)
 const projectId = computed(() => workspace.selectedProjectId || '')
@@ -190,6 +204,15 @@ const canInspect = computed(
 const canRectify = computed(() => Boolean(projectId.value) && can('quality:safety:rectify'))
 const canReinspect = computed(() => Boolean(projectId.value) && can('quality:safety:reinspect'))
 const canConsequence = computed(() => Boolean(projectId.value) && can('quality:safety:consequence'))
+const offlineDraftEnabled = computed(
+  () => featureFlags.offlineDraft.enabled && featureFlags.fieldQualitySafety.enabled,
+)
+const offlineSyncEnabled = computed(
+  () => offlineDraftEnabled.value && featureFlags.offlineSync.enabled,
+)
+const localDraftLabel = computed(() =>
+  localDraft.value ? fieldDraftStatusLabel(localDraft.value.status) : '未保存本地草稿',
+)
 
 const planForm = reactive<QualityPlanCommand>({
   projectId: '',
@@ -436,6 +459,7 @@ async function show(
       dueDate: today(),
       remark: '',
     })
+    await restoreQualityDraft('ISSUE')
   }
   if (kind === 'rectification' && target) {
     activeIssue.value = target as QualityIssueRecord
@@ -446,6 +470,7 @@ async function show(
       plannedCompleteDate: (target as QualityIssueRecord).dueDate,
       remark: '',
     })
+    await restoreQualityDraft('RECTIFICATION')
   }
   if (kind === 'consequence' && target) {
     activeIssue.value = target as QualityIssueRecord
@@ -502,6 +527,10 @@ async function runWrite(
   success: string,
   issue?: QualityIssueRecord,
 ): Promise<void> {
+  if (!navigator.onLine) {
+    errorMessage.value = '该业务动作必须在线完成；可先保存允许的本地草稿'
+    return
+  }
   if (!projectId.value) {
     errorMessage.value = '请先选择具体项目'
     return
@@ -525,6 +554,152 @@ async function runWrite(
     if (refreshed) await openTrace(refreshed, true)
   } finally {
     saving.value = false
+  }
+}
+
+async function saveQualityDraft(
+  kind: QualityDraftPayload['kind'],
+  status: 'DRAFT' | 'PENDING' = 'DRAFT',
+): Promise<boolean> {
+  const payload = qualityDraftPayload(kind)
+  if (!payload) return false
+  try {
+    const repository = localRepository()
+    const id = qualityDraftId(payload)
+    const clientRequestId = localDraft.value?.clientRequestId ?? crypto.randomUUID()
+    if (payload.kind === 'ISSUE') payload.command.clientRequestId = clientRequestId
+    else payload.command.clientRequestId = clientRequestId
+    localDraft.value = await repository.put({
+      id,
+      kind: payload.kind === 'ISSUE' ? 'QUALITY_ISSUE' : 'QUALITY_RECTIFICATION',
+      clientRequestId,
+      status,
+      payload,
+    })
+    if (evidence.value) await repository.putAttachment(id, evidence.value)
+    successMessage.value = status === 'DRAFT' ? '质量安全草稿已保存到本机' : '草稿已进入待同步状态'
+    return true
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '质量安全草稿保存失败'
+    return false
+  }
+}
+
+async function syncQualityDraft(kind: QualityDraftPayload['kind']): Promise<void> {
+  if (!offlineSyncEnabled.value || !(await saveQualityDraft(kind, 'PENDING')) || !localDraft.value)
+    return
+  const repository = localRepository()
+  const draft = localDraft.value
+  if (!navigator.onLine) {
+    localDraft.value = await repository.put({ ...draft, status: 'RETRYABLE', error: '当前离线' })
+    errorMessage.value = '当前离线，草稿保留为可重试状态'
+    return
+  }
+  const attachments = await repository.attachments(draft.id)
+  if (!attachments.length) {
+    errorMessage.value = '同步质量问题或整改前必须选择证据附件'
+    return
+  }
+  saving.value = true
+  clearNotice()
+  try {
+    localDraft.value = await repository.put({ ...draft, status: 'SYNCING' })
+    if (draft.payload.kind === 'ISSUE') {
+      const created = await createQualityIssue(draft.payload.inspectionId, draft.payload.command)
+      await uploadDraftAttachments(attachments, 'QS_ISSUE', created.id, 'ISSUE_EVIDENCE')
+    } else {
+      const created = await createQualityRectification(draft.payload.command)
+      if (created.status === 'DRAFT') {
+        await uploadDraftAttachments(
+          attachments,
+          'QS_RECTIFICATION',
+          created.id,
+          'RECTIFICATION_EVIDENCE',
+        )
+        await submitQualityRectification(created.id)
+      }
+    }
+    await repository.removeAttachments(draft.id)
+    localDraft.value = await repository.put({ ...draft, status: 'SYNCED' })
+    dialog.value = null
+    successMessage.value = '质量安全本地草稿已同步'
+    await loadProject(true)
+  } catch (error) {
+    const code = isApiClientError(error) ? error.code : undefined
+    const status = isApiClientError(error) ? error.status : undefined
+    localDraft.value = await repository.put({
+      ...draft,
+      status: fieldDraftSyncFailure(code, status),
+      error: errorText(error, '同步失败'),
+    })
+    errorMessage.value = errorText(error, '质量安全本地草稿同步失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function restoreQualityDraft(kind: QualityDraftPayload['kind']): Promise<void> {
+  localDraft.value = null
+  if (!offlineDraftEnabled.value) return
+  try {
+    const payload = qualityDraftPayload(kind)
+    if (!payload) return
+    const draft = await localRepository().get<QualityDraftPayload>(qualityDraftId(payload))
+    if (!draft || draft.status === 'SYNCED') return
+    localDraft.value = draft
+    if (draft.payload.kind === 'ISSUE') Object.assign(issueForm, draft.payload.command)
+    else Object.assign(rectificationForm, draft.payload.command)
+    successMessage.value = `已恢复${fieldDraftStatusLabel(draft.status)}`
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '质量安全草稿恢复失败'
+  }
+}
+
+function qualityDraftPayload(kind: QualityDraftPayload['kind']): QualityDraftPayload | null {
+  if (kind === 'ISSUE') {
+    if (!activeInspection.value) {
+      errorMessage.value = '检查记录不存在'
+      return null
+    }
+    return { kind, inspectionId: activeInspection.value.id, command: { ...issueForm } }
+  }
+  if (!activeIssue.value) {
+    errorMessage.value = '问题单不存在'
+    return null
+  }
+  return {
+    kind,
+    command: { ...rectificationForm },
+  }
+}
+
+function qualityDraftId(payload: QualityDraftPayload): string {
+  return payload.kind === 'ISSUE'
+    ? `quality:issue:${payload.inspectionId}`
+    : `quality:rectification:${payload.command.issueId}`
+}
+
+function localRepository(): FieldDraftRepository {
+  if (draftRepository) return draftRepository
+  const identity = getSessionNamespaceIdentity()
+  if (!identity) throw new TypeError('当前会话缺少租户标识，不能使用本地草稿')
+  draftRepository = new FieldDraftRepository(identity.tenantId, identity.userId)
+  return draftRepository
+}
+
+async function uploadDraftAttachments(
+  attachments: Awaited<ReturnType<FieldDraftRepository['attachments']>>,
+  businessType: string,
+  businessId: string,
+  documentType: string,
+): Promise<void> {
+  for (const attachment of attachments) {
+    await uploadSiteFileIdempotently(
+      new File([attachment.file], attachment.name, { type: attachment.type }),
+      businessType,
+      businessId,
+      documentType,
+    )
   }
 }
 
@@ -650,6 +825,7 @@ onBeforeUnmount(() => {
   projectController?.abort()
   inspectionController?.abort()
   traceController?.abort()
+  draftRepository = null
 })
 </script>
 
@@ -1279,6 +1455,21 @@ onBeforeUnmount(() => {
       </form>
       <template #footer>
         <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <span v-if="offlineDraftEnabled" role="status">同步状态：{{ localDraftLabel }}</span>
+        <V2Button
+          v-if="offlineDraftEnabled"
+          variant="secondary"
+          :loading="saving"
+          @click="saveQualityDraft('ISSUE')"
+          >保存到本机</V2Button
+        >
+        <V2Button
+          v-if="offlineSyncEnabled"
+          variant="secondary"
+          :loading="saving"
+          @click="syncQualityDraft('ISSUE')"
+          >手动同步</V2Button
+        >
         <V2Button type="submit" form="quality-issue-form" :loading="saving">登记问题</V2Button>
       </template></V2Dialog
     >
@@ -1315,6 +1506,21 @@ onBeforeUnmount(() => {
       </form>
       <template #footer>
         <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <span v-if="offlineDraftEnabled" role="status">同步状态：{{ localDraftLabel }}</span>
+        <V2Button
+          v-if="offlineDraftEnabled"
+          variant="secondary"
+          :loading="saving"
+          @click="saveQualityDraft('RECTIFICATION')"
+          >保存到本机</V2Button
+        >
+        <V2Button
+          v-if="offlineSyncEnabled"
+          variant="secondary"
+          :loading="saving"
+          @click="syncQualityDraft('RECTIFICATION')"
+          >手动同步</V2Button
+        >
         <V2Button type="submit" form="quality-rectification-form" :loading="saving"
           >提交整改</V2Button
         >

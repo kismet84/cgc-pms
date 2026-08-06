@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { installShellPreferencesMock } from './shell-session'
 const business = {
+  tenantId: '0',
   userId: '1',
   username: 'commercial.manager',
   realName: '商务经理',

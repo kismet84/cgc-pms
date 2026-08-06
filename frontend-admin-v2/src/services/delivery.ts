@@ -3,6 +3,7 @@ import {
   type CorrectiveActionCommand,
   type CorrectiveActionRecord,
   type DailyProgressCommand,
+  type FieldDailyLogCommand,
   type PeriodPlanCommand,
   type PeriodPlanDetail,
   type PeriodPlanItemCommand,
@@ -12,7 +13,6 @@ import {
   type ScheduleRecord,
   type ScheduleSnapshotRecord,
   type ScheduleTraceRecord,
-  type SiteDailyLogCommand,
   type SiteDailyLogPage,
   type SiteDailyLogQuery,
   type SiteDailyLogRecord,
@@ -21,7 +21,7 @@ import {
   type WbsTaskCommand,
   type WbsTaskRecord,
 } from '@cgc-pms/frontend-contracts'
-import { ApiClientError, apiRequest } from '@/services/request'
+import { ApiClientError, apiRequest, isApiClientError } from '@/services/request'
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
@@ -174,22 +174,27 @@ export function loadSiteDailyQualitySafety(
   )
 }
 
-export function createSiteDailyLog(command: SiteDailyLogCommand): Promise<string> {
-  return apiRequest<string, SiteDailyLogCommand>(DELIVERY_API.siteDailyLogs, {
+export function createSiteDailyLog(command: FieldDailyLogCommand): Promise<string> {
+  return apiRequest<string, FieldDailyLogCommand>(DELIVERY_API.siteDailyLogs, {
     method: 'POST',
     body: command,
   })
 }
 
-export function updateSiteDailyLog(id: string, command: SiteDailyLogCommand): Promise<void> {
-  return apiRequest<void, SiteDailyLogCommand>(DELIVERY_API.siteDailyLog(requiredId(id)), {
+export function updateSiteDailyLog(id: string, command: FieldDailyLogCommand): Promise<void> {
+  return apiRequest<void, FieldDailyLogCommand>(DELIVERY_API.siteDailyLog(requiredId(id)), {
     method: 'PUT',
     body: command,
   })
 }
 
-export function submitSiteDailyLog(id: string): Promise<void> {
-  return apiRequest<void>(DELIVERY_API.siteDailySubmit(requiredId(id)), { method: 'POST' })
+export function submitSiteDailyLog(id: string, expectedVersion: number): Promise<void> {
+  return apiRequest<void>(
+    `${DELIVERY_API.siteDailySubmit(requiredId(id))}?expectedVersion=${expectedVersion}`,
+    {
+      method: 'POST',
+    },
+  )
 }
 
 export function listSiteFiles(
@@ -209,6 +214,7 @@ export function uploadSiteFile(
   businessType: string,
   businessId: string,
   documentType?: string,
+  notifyError = true,
 ): Promise<SiteFileRecord> {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new ApiClientError({ code: 'FILE_TOO_LARGE', message: '文件大小不能超过 20MB' })
@@ -224,7 +230,21 @@ export function uploadSiteFile(
   return apiRequest<SiteFileRecord, FormData>(`${DELIVERY_API.fileUpload}?${params.toString()}`, {
     method: 'POST',
     body: formData,
+    notifyError,
   })
+}
+
+export async function uploadSiteFileIdempotently(
+  file: File,
+  businessType: string,
+  businessId: string,
+  documentType?: string,
+): Promise<void> {
+  try {
+    await uploadSiteFile(file, businessType, businessId, documentType, false)
+  } catch (error) {
+    if (!isApiClientError(error) || error.code !== 'FILE_DUPLICATE') throw error
+  }
 }
 
 export function getSiteFileUrl(id: string): Promise<string> {

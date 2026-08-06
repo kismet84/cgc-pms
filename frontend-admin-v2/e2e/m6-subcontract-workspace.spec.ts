@@ -79,6 +79,7 @@ async function install(page: Page, granted = permissions) {
   const controls = { failMeasureDetail: false }
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, {
+      tenantId: '0',
       userId: '1',
       username: 'subcontractor',
       roles: ['USER'],

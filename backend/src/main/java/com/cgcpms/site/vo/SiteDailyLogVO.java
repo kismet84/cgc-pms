@@ -16,6 +16,8 @@ public class SiteDailyLogVO {
     private String nextDayPlan;
     private String weatherSummary;
     private Integer onSiteHeadcount;
+    private String clientRequestId;
+    private Integer version;
     private List<SiteDailyDeliveryVO> deliveries;
     private List<SiteDailyRequisitionVO> requisitions;
     private List<SiteDailyPlannedTaskVO> plannedTasks;

@@ -7,6 +7,7 @@ type Identity = 'admin' | 'readonly' | 'denied'
 
 const users = {
   admin: {
+    tenantId: '0',
     userId: '1',
     username: 'contract.admin',
     realName: '合同管理员',
@@ -20,6 +21,7 @@ const users = {
     ],
   },
   readonly: {
+    tenantId: '0',
     userId: '2',
     username: 'contract.viewer',
     realName: '合同查看人',
@@ -27,6 +29,7 @@ const users = {
     permissions: ['contract:query'],
   },
   denied: {
+    tenantId: '0',
     userId: '3',
     username: 'no.contract',
     realName: '无权限用户',

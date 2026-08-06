@@ -42,14 +42,28 @@ public final class QualitySafetyModels {
             Long responsiblePartnerId,
             @NotNull Long responsibleUserId,
             @NotNull LocalDate dueDate,
-            @Size(max = 500) String remark) {}
+            @Size(max = 500) String remark,
+            @Size(max = 64) String clientRequestId) {
+        public IssueCommand(Long inspectionId, String category, String severity, String title, String description,
+                            String responsibleKind, Long responsiblePartnerId, Long responsibleUserId,
+                            LocalDate dueDate, String remark) {
+            this(inspectionId, category, severity, title, description, responsibleKind,
+                    responsiblePartnerId, responsibleUserId, dueDate, remark, null);
+        }
+    }
 
     public record RectificationCommand(
             @NotNull Long issueId,
             @NotBlank @Size(max = 2000) String actionDescription,
             @NotNull Long responsibleUserId,
             @NotNull LocalDate plannedCompleteDate,
-            @Size(max = 500) String remark) {}
+            @Size(max = 500) String remark,
+            @Size(max = 64) String clientRequestId) {
+        public RectificationCommand(Long issueId, String actionDescription, Long responsibleUserId,
+                                    LocalDate plannedCompleteDate, String remark) {
+            this(issueId, actionDescription, responsibleUserId, plannedCompleteDate, remark, null);
+        }
+    }
 
     public record ReinspectionCommand(
             @NotBlank String result,

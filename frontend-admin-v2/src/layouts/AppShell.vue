@@ -13,9 +13,11 @@ import {
   loadNotificationSummary,
   markAllNotificationsRead,
   markNotificationRead,
+  openNotificationStream,
 } from '@/services/alerts'
 import { loadPreferences, type UserPreferences } from '@/services/account'
 import { loadCommunicationUnreadCount, openCommunicationStream } from '@/services/communication'
+import type { ResilientStream } from '@/services/notificationStream'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -41,8 +43,9 @@ let mobileMedia: MediaQueryList | null = null
 let removeAfterEach: (() => void) | null = null
 let restoreMenuFocus = false
 let notificationController: AbortController | null = null
+let notificationStream: ResilientStream | null = null
 let communicationController: AbortController | null = null
-let communicationStream: EventSource | null = null
+let communicationStream: ResilientStream | null = null
 
 const navigation = computed(() => visibleNavigation(session.roles, session.permissions))
 const canRequestNotifications = computed(() => canRequestAlertNotifications(session.permissions))
@@ -103,7 +106,7 @@ watch(
 watch(
   canRequestNotifications,
   (allowed) => {
-    if (allowed) void refreshNotifications()
+    if (allowed) startNotifications()
     else clearNotifications()
   },
   { immediate: true },
@@ -197,6 +200,8 @@ onBeforeUnmount(() => {
 
 function clearNotifications(): void {
   notificationController?.abort()
+  notificationStream?.close()
+  notificationStream = null
   notificationItems.value = []
   notificationUnreadCount.value = null
   notificationError.value = ''
@@ -228,12 +233,25 @@ async function refreshCommunicationUnread(): Promise<void> {
 function startCommunication(): void {
   clearCommunication()
   void refreshCommunicationUnread()
-  communicationStream = openCommunicationStream((event) => {
-    void refreshCommunicationUnread()
-    if (event.action !== 'PING') {
-      window.dispatchEvent(new CustomEvent('communication-refresh', { detail: event }))
-    }
-  })
+  communicationStream = openCommunicationStream(
+    (event) => {
+      void refreshCommunicationUnread()
+      if (event.action !== 'PING') {
+        window.dispatchEvent(new CustomEvent('communication-refresh', { detail: event }))
+      }
+    },
+    undefined,
+    () => void refreshCommunicationUnread(),
+  )
+}
+
+function startNotifications(): void {
+  clearNotifications()
+  void refreshNotifications()
+  notificationStream = openNotificationStream(
+    () => void refreshNotifications(),
+    () => void refreshNotifications(),
+  )
 }
 
 async function refreshNotifications(): Promise<void> {

@@ -19,6 +19,7 @@ async function install(page: Page) {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/auth/userinfo') {
       return fulfill(route, {
+        tenantId: '0',
         userId: '1',
         username: 'context.gate',
         realName: '公共上下文门禁',

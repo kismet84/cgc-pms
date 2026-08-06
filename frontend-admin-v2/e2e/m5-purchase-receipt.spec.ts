@@ -141,7 +141,13 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
   await installShellPreferencesMock(page)
   const writes: Array<{ path: string; body: unknown }> = []
   await page.route('**/api/auth/userinfo', (route) =>
-    fulfill(route, { userId: '1', username: 'buyer', roles: ['USER'], permissions: granted }),
+    fulfill(route, {
+      tenantId: '0',
+      userId: '1',
+      username: 'buyer',
+      roles: ['USER'],
+      permissions: granted,
+    }),
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
   await page.route('**/api/project-context/options', (route) =>

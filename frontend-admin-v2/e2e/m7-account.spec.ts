@@ -4,6 +4,7 @@ test('ordinary user completes profile, password, preferences and help self-servi
   page,
 }) => {
   let currentUser = {
+    tenantId: '0',
     userId: '7',
     username: 'demo.user',
     realName: '普通用户',

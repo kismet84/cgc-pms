@@ -16,6 +16,7 @@ vi.mock('@/services/auth', () => ({
 
 function user(permissions: string[], roles: string[] = ['USER']): UserInfo {
   return {
+    tenantId: '1001',
     userId: '1',
     username: 'tester',
     roles,

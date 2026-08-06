@@ -62,6 +62,7 @@ async function mountPage(permissions = ['project:file:query', 'project:file:mana
   await router.push('/project/files')
   await router.isReady()
   useSessionStore().replaceUserInfo({
+    tenantId: '1001',
     userId: '1',
     username: 'tester',
     roles: ['USER'],

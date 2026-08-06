@@ -5,6 +5,7 @@ export interface LoginParams {
 }
 
 export interface UserInfo {
+  tenantId: string;
   userId: string;
   username: string;
   realName?: string;
@@ -32,6 +33,7 @@ export function isUserInfo(value: unknown): value is UserInfo {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<UserInfo>;
   return (
+    typeof candidate.tenantId === "string" &&
     typeof candidate.userId === "string" &&
     typeof candidate.username === "string" &&
     Array.isArray(candidate.roles) &&

@@ -219,7 +219,13 @@ async function install(page: Page) {
     return fulfill(route, null, 500)
   })
   await page.route('**/api/auth/userinfo', (route) =>
-    fulfill(route, { userId: '1', username: 'finance-user', roles: ['USER'], permissions }),
+    fulfill(route, {
+      tenantId: '0',
+      userId: '1',
+      username: 'finance-user',
+      roles: ['USER'],
+      permissions,
+    }),
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
 }

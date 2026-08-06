@@ -52,6 +52,11 @@ rate-limit:
     max-requests: 120
     window-seconds: 60
 
+notification:
+  multi-client:
+    enabled: ${NOTIFICATION_MULTI_CLIENT_ENABLED:true}
+    max-connections-per-user: ${NOTIFICATION_MAX_CONNECTIONS_PER_USER:5}
+
 # Business document generation stays off until tenant-scoped dev/test canary approval.
 document:
   generation:

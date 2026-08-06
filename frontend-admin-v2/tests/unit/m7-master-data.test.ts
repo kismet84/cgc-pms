@@ -37,7 +37,7 @@ vi.mock('@/services/master-data', () => ({
 }))
 
 function user(permissions: string[], roles = ['USER']): UserInfo {
-  return { userId: '7', username: 'master.user', roles, permissions }
+  return { tenantId: '1001', userId: '7', username: 'master.user', roles, permissions }
 }
 
 function confirmOpenDialog(): void {
