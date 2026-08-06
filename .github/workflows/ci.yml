@@ -13,6 +13,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   BACKEND_JAR_ARTIFACT: backend-jar-${{ github.run_number }}-${{ github.sha }}
   BACKEND_COVERAGE_ARTIFACT: backend-coverage-${{ github.run_number }}-${{ github.sha }}

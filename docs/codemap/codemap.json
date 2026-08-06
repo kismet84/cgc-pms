@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-06T03:42:38.190Z",
-  "generated_from_commit": "7d8e271aa874834a5ae0897cf926ca38dd1fea72",
+  "generated_at": "2026-08-06T04:47:11.107Z",
+  "generated_from_commit": "a7e8e5506be8781d4355364be6c38b5cde5d92e1",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",
@@ -814,6 +814,46 @@
       ]
     },
     {
+      "id": "pre-push-quality-gate",
+      "label": "前端预推送质量门禁",
+      "type": "delivery",
+      "boundary": "交付",
+      "layer": 6,
+      "path": "frontend-admin-v2/scripts/run-push-quality-gate.mjs",
+      "role": "由版本化 pre-push hook 调用，按风险分层执行前端验证并复用完整指纹一致的成功结果。",
+      "entrypoints": [
+        {
+          "path": ".githooks/pre-push",
+          "symbol": "pnpm --dir frontend-admin-v2 check:pre-push"
+        },
+        {
+          "path": "frontend-admin-v2/package.json",
+          "symbol": "check:pre-push"
+        }
+      ],
+      "tests": [
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "frontend pre-push quality gate"
+        }
+      ],
+      "constraints": [
+        "未知、共享或基础设施前端输入必须回退全量门禁。",
+        "缓存仅复用 HEAD、基线、原始 diff、未跟踪文件、依赖、运行时、环境与门禁计划均一致的成功结果。",
+        "受禁路径或非常规未跟踪文件变化时禁止读取其内容并禁用缓存。"
+      ],
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/scripts/run-push-quality-gate.mjs",
+          "symbol": "tier"
+        },
+        {
+          "path": "frontend-admin-v2/scripts/run-push-quality-gate.mjs",
+          "symbol": "createFingerprint"
+        }
+      ]
+    },
+    {
       "id": "ci-verification",
       "label": "CI 验证",
       "type": "delivery",
@@ -1409,6 +1449,28 @@
         {
           "path": ".github/workflows/ci.yml",
           "symbol": "frontend-build:"
+        }
+      ]
+    },
+    {
+      "from": "pre-push-quality-gate",
+      "to": "v2-client",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/scripts/run-push-quality-gate.mjs",
+          "symbol": "fullGateScript"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "pre-push-quality-gate",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "frontend pre-push quality gate"
         }
       ]
     },
