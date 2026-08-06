@@ -1,13 +1,13 @@
 # Current Focus
 
-## 2026-08-06 第78条主线：全审批业务单据可视化模板本地完成
+## 2026-08-06 第78条主线：全审批业务单据可视化模板已合并
 
 - 目标：启用审批类型动态目录与完整详情 Provider 达到 100%，交付 A4 纵横向画布、服务端编译、HTML/PDF 一致预览和版本治理。
-- 状态：`IMPLEMENTED / G0-G5_PASSED / ISSUE-078-001_CLOSED / LOCAL_COMPLETE / GIT_DELIVERY_PENDING`；分支 `codex/mainline-78-document-designer`，基线 `6caaf895d7996b48b778a503f81ec8031a39ea90`。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / ISSUE-078-001_CLOSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；PR #400合并SHA为`08fa71d5d906564393daee40faeb5caf064b2334`，post-merge run `31101912189`成功，原实现分支本地和远端均已删除。
 - 计划：[`第78条`](../plans/第78条主线-全审批业务单据可视化模板与完整详情字段任务计划书.md)；契约：[`ReadySpec`](../plans/evidence/issue-078/ready-spec.md)。
 - 当前裁决：动态分母取当前租户启用 `wf_template`；本地28类已由唯一Provider覆盖28/28。`PAYMENT`仅作为显式历史兼容类型，不等同`PAY_REQUEST`。
 - 边界：仅本地 dev/test/demo；不引入第三方设计器、实体反射、脚本表达式、审批意见字段、第二渲染引擎或非本地验收。
-- 证据：后端2570项、真实MySQL空库/升级、前端485项、PDF跨页、真实分包计量，以及“业务模块—模板—HTML预览”三栏和画布编辑器响应式浏览器验收通过；报告见[`ISSUE-078-001`](../quality/2026-08-06-issue-078-全审批业务单据可视化模板与完整详情字段.md)。
+- 证据：后端2570项、真实MySQL空库/升级、前端485项、PDF跨页、真实分包计量，以及“业务模块—模板—HTML预览”三栏和画布编辑器响应式浏览器验收通过；实现SHA `766e8a60fb90805b515a5385ba679bf4e234fe14`的push CI `31100112881`、PR CI `31100974994`均13/13成功；报告见[`ISSUE-078-001`](../quality/2026-08-06-issue-078-全审批业务单据可视化模板与完整详情字段.md)。
 - 零悬空：计划周期新增1、关闭1、净变化`0`；新增后续项0、关闭后续项0、后续项净变化0。
 
 ## 2026-08-06 第77条主线：可靠性加固与现场履约 PWA 本地完成

@@ -1,6 +1,6 @@
 # ISSUE-078-001 G5验收证据
 
-- 裁决：`PASS / LOCAL_COMPLETE / GIT_DELIVERY_PENDING`
+- 裁决：`PASS / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`
 - Provider覆盖：当前tenant 0启用审批类型28，唯一Provider 28，缺失0，重复0；历史兼容`PAYMENT`不计入分母。
 - 后端：2570项，0失败，0错误，18跳过；真实MySQL空库和V180→V287升级2项另行启用并通过。
 - 前端：72文件、485项；类型检查、共享契约、lint和构建退出0。
@@ -10,4 +10,5 @@
 - 默认模板：`SUB_MEASURE_CANVAS_078` V1已发布，默认=是。
 - 回滚：关闭画布入口，保留可空设计事实和旧源码路径；不回滚已生成文档。
 - 失败分类：产品缺陷、测试契约、工具超时和环境前置均已分类、解决并复验。
+- Git：实现SHA `766e8a60fb90805b515a5385ba679bf4e234fe14`的push CI `31100112881`、PR CI `31100974994`均13/13成功；PR #400合并为`master@08fa71d5d906564393daee40faeb5caf064b2334`；post-merge run `31101912189`成功；原实现分支本地和远端均已删除。
 - 零悬空：新增后续项0，关闭后续项0，净变化0，无无载体遗留项。
