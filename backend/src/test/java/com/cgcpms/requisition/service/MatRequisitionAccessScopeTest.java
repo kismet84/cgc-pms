@@ -170,7 +170,7 @@ class MatRequisitionAccessScopeTest {
         MdMaterial material = new MdMaterial();
         material.setTenantId(7L);
         material.setStatus("ENABLE");
-        when(materialMapper.selectById(301L)).thenReturn(material);
+        when(materialMapper.selectByIdForUpdate(301L, 7L)).thenReturn(material);
         MatRequisitionItem item = new MatRequisitionItem();
         item.setWbsTaskId(401L);
         item.setMaterialId(301L);

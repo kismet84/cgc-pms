@@ -9,6 +9,8 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     private final CtContractItemMapper mapper;
     private final CtContractMapper ctContractMapper;
+    private final MdMaterialMapper mdMaterialMapper;
     private final ProjectAccessChecker projectAccessChecker;
 
     /**
@@ -63,6 +66,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractItem item) {
         CtContract contract = requireDraftParentContract(item.getContractId(), "编辑合同清单");
+        requireEnabledMaterials(List.of(item));
         deriveFinancials(contract, List.of(item));
         item.setTenantId(UserContext.getCurrentTenantId());
         mapper.insert(item);
@@ -72,6 +76,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
     @Transactional(rollbackFor = Exception.class)
     public void batchSave(Long contractId, List<CtContractItem> items) {
         CtContract contract = requireDraftParentContract(contractId, "编辑合同清单");
+        requireEnabledMaterials(items);
         deriveFinancials(contract, items);
         LambdaQueryWrapper<CtContractItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CtContractItem::getContractId, contractId);
@@ -94,6 +99,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         if (existing == null || !existing.getContractId().equals(item.getContractId())) {
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
         }
+        requireEnabledMaterials(List.of(item));
         deriveFinancials(contract, List.of(item));
         item.setTenantId(UserContext.getCurrentTenantId());
         mapper.updateById(item);
@@ -107,6 +113,22 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
         }
         mapper.deleteById(id);
+    }
+
+    private void requireEnabledMaterials(List<CtContractItem> items) {
+        if (items == null) return;
+        Long tenantId = UserContext.getCurrentTenantId();
+        for (Long materialId : items.stream()
+                .map(CtContractItem::getMaterialId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList()) {
+            MdMaterial material = mdMaterialMapper.selectByIdForUpdate(materialId, tenantId);
+            if (material == null || !"ENABLE".equals(material.getStatus())) {
+                throw new BusinessException("MATERIAL_INVALID", "合同清单材料不存在或已停用");
+            }
+        }
     }
 
     void deriveFinancials(CtContract contract, List<CtContractItem> items) {

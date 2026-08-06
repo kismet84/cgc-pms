@@ -9,6 +9,7 @@ import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.material.service.MdMaterialService;
 import com.cgcpms.material.vo.MdMaterialVO;
 import io.jsonwebtoken.Jwts;
+import org.apache.ibatis.annotations.Select;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -318,6 +319,89 @@ class MdMaterialServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> mdMaterialService.updateStatus(material.getId(), "DISABLE"));
         assertEquals("MATERIAL_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("delete → 无业务引用时逻辑删除")
+    void testDelete_Success() {
+        MdMaterial material = material("DELETE-MAT-001", "待删除材料");
+        Long id = mdMaterialService.create(material);
+
+        mdMaterialService.delete(id);
+
+        assertNull(mdMaterialMapper.selectById(id));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT deleted_flag FROM md_material WHERE id = ?", Integer.class, id));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("delete → 存在有效业务引用时拒绝")
+    void testDelete_Referenced() {
+        Long id = mdMaterialService.create(material("DELETE-REF-001", "被引用材料"));
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract_item
+                  (id,tenant_id,contract_id,material_id,item_name,quantity,unit_price,amount,
+                   tax_rate,tax_amount,amount_without_tax,deleted_flag)
+                VALUES (880001,0,880000,?,'被引用材料',1,1,1,0,0,1,0)
+                """, id);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> mdMaterialService.delete(id));
+
+        assertEquals("MATERIAL_REFERENCED", error.getCode());
+        assertNotNull(mdMaterialMapper.selectById(id));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("delete → 跨租户材料不可删除")
+    void testDelete_TenantIsolation() {
+        MdMaterial material = material("TENANT-DELETE-001", "跨租户待删除材料");
+        material.setTenantId(999L);
+        material.setCategoryId(null);
+        mdMaterialMapper.insert(material);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> mdMaterialService.delete(material.getId()));
+
+        assertEquals("MATERIAL_NOT_FOUND", error.getCode());
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT id FROM md_material WHERE id = ?", Long.class, material.getId()));
+    }
+
+    @Test
+    @DisplayName("active reference query covers all ten material business tables")
+    void activeReferenceQueryCoversAllKnownMaterialReferences() throws Exception {
+        Select select = MdMaterialMapper.class
+                .getMethod("hasActiveReferences", Long.class, Long.class)
+                .getAnnotation(Select.class);
+        String sql = String.join(" ", select.value()).replaceAll("\\s+", " ");
+
+        List.of(
+                "ct_contract_item",
+                "mat_purchase_request_item",
+                "mat_purchase_order_item",
+                "mat_receipt_item",
+                "mat_requisition_item",
+                "mat_material_return_item",
+                "mat_stock",
+                "mat_stock_transfer",
+                "mat_stock_txn",
+                "sp_supplier_return_item"
+        ).forEach(table -> assertTrue(sql.contains(
+                "FROM " + table + " WHERE tenant_id=#{tenantId} AND material_id=#{id} AND deleted_flag=0"),
+                table));
+    }
+
+    private MdMaterial material(String code, String name) {
+        MdMaterial material = new MdMaterial();
+        material.setMaterialCode(code);
+        material.setMaterialName(name);
+        material.setCategoryId(100L);
+        material.setStatus("ENABLE");
+        return material;
     }
 
     private void setAdminContext() {

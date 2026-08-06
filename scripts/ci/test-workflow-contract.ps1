@@ -137,8 +137,9 @@ Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
-  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest',
-  'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true'''
+  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest',
+  'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true''',
+  'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: ''true'''
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'

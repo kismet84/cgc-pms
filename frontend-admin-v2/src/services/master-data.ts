@@ -249,6 +249,10 @@ export function updateMaterialStatus(id: string, status: 'ENABLE' | 'DISABLE'): 
   })
 }
 
+export function deleteMaterial(id: string): Promise<void> {
+  return apiRequest<void>(`/materials/${requiredId(id)}`, { method: 'DELETE' })
+}
+
 export function downloadMaterialImportTemplate(): Promise<Blob> {
   return apiRequest<Blob>('/materials/import-template', {
     headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },

@@ -84,4 +84,11 @@ public class MdMaterialController {
         mdMaterialService.updateStatus(id, status);
         return ApiResponse.success();
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:delete')")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        mdMaterialService.delete(id);
+        return ApiResponse.success();
+    }
 }

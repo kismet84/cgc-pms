@@ -31,6 +31,7 @@ vi.mock('@/services/master-data', () => ({
   createMaterial: vi.fn(),
   updateMaterial: vi.fn(),
   updateMaterialStatus: vi.fn(),
+  deleteMaterial: vi.fn(),
   downloadMaterialImportTemplate: vi.fn(),
   importMaterials: vi.fn(),
 }))
@@ -173,6 +174,7 @@ beforeEach(() => {
     status: 'ENABLE',
   })
   vi.mocked(masterData.downloadMaterialImportTemplate).mockResolvedValue(new Blob(['xlsx']))
+  vi.mocked(masterData.deleteMaterial).mockResolvedValue(undefined)
   vi.mocked(masterData.importMaterials).mockResolvedValue({
     total: 3,
     created: 1,
@@ -439,6 +441,25 @@ describe('M7 master-data pages', () => {
 
     expect(masterData.updateMaterialStatus).toHaveBeenCalledWith('8', 'DISABLE')
     expect(masterData.loadMaterial).toHaveBeenCalledWith('8')
+    expect(masterData.loadMaterials).toHaveBeenCalledTimes(2)
+  })
+
+  it('requires delete authority, confirms material deletion and reloads the server list', async () => {
+    useSessionStore().replaceUserInfo(user(['material:dict:list', 'material:dict:delete']))
+    const wrapper = mount(MaterialDictionaryPage, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((item) => item.text() === '编辑')).toBe(false)
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '删除')!
+      .trigger('click')
+    expect(masterData.deleteMaterial).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('存在业务引用时服务端会拒绝')
+    confirmOpenDialog()
+    await flushPromises()
+
+    expect(masterData.deleteMaterial).toHaveBeenCalledWith('8')
     expect(masterData.loadMaterials).toHaveBeenCalledTimes(2)
   })
 

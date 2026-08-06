@@ -350,7 +350,17 @@ public class MatPurchaseRequestService {
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
             // Auto-create material if name provided but no existing materialId
-            resolveMaterial(item, tenantId);
+            resolveMaterialId(item, tenantId);
+        }
+        for (Long materialId : items.stream()
+                .map(MatPurchaseRequestItem::getMaterialId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList()) {
+            requireEnabledMaterialForUpdate(materialId, tenantId);
+        }
+        for (MatPurchaseRequestItem item : items) {
             validatePlanningReferences(item, request.getProjectId(), tenantId);
             item.setBudgetLineId(null);
             item.setEstimatedUnitPrice(null);
@@ -388,15 +398,8 @@ public class MatPurchaseRequestService {
     /**
      * 自定义物料：name + unit -> 自动查找或创建 MdMaterial
      */
-    private void resolveMaterial(MatPurchaseRequestItem item, Long tenantId) {
+    private void resolveMaterialId(MatPurchaseRequestItem item, Long tenantId) {
         if (item.getMaterialId() != null) {
-            MdMaterial material = mdMaterialMapper.selectById(item.getMaterialId());
-            if (material == null || !Objects.equals(material.getTenantId(), tenantId)) {
-                throw new BusinessException("MATERIAL_NOT_FOUND", "物料不存在");
-            }
-            if (!"ENABLE".equals(material.getStatus())) {
-                throw new BusinessException("MATERIAL_DISABLED", "物料已停用");
-            }
             return;
         }
         if (item.getMaterialName() == null || item.getMaterialName().isBlank()) return;
@@ -406,9 +409,6 @@ public class MatPurchaseRequestService {
                         .eq(MdMaterial::getMaterialName, item.getMaterialName().trim())
                         .eq(MdMaterial::getTenantId, tenantId));
         if (existing != null) {
-            if (!"ENABLE".equals(existing.getStatus())) {
-                throw new BusinessException("MATERIAL_DISABLED", "物料已停用");
-            }
             item.setMaterialId(existing.getId());
             if (item.getUnit() == null || item.getUnit().isBlank()) {
                 item.setUnit(existing.getUnit());
@@ -424,6 +424,17 @@ public class MatPurchaseRequestService {
         material.setStatus("ENABLE");
         mdMaterialMapper.insert(material);
         item.setMaterialId(material.getId());
+    }
+
+    private MdMaterial requireEnabledMaterialForUpdate(Long materialId, Long tenantId) {
+        MdMaterial material = mdMaterialMapper.selectByIdForUpdate(materialId, tenantId);
+        if (material == null) {
+            throw new BusinessException("MATERIAL_NOT_FOUND", "物料不存在");
+        }
+        if (!"ENABLE".equals(material.getStatus())) {
+            throw new BusinessException("MATERIAL_DISABLED", "物料已停用");
+        }
+        return material;
     }
 
     private void validatePlanningReferences(MatPurchaseRequestItem item, Long projectId, Long tenantId) {

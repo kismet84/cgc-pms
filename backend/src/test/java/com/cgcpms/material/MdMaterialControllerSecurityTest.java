@@ -21,6 +21,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -63,7 +64,7 @@ class MdMaterialControllerSecurityTest {
     }
 
     @Test
-    void listPermissionCannotCreateEditOrChangeStatus() throws Exception {
+    void listPermissionCannotCreateEditChangeStatusOrDelete() throws Exception {
         Cookie reader = authCookie(List.of("material:dict:list"), List.of("USER"));
         mockMvc.perform(withCsrf(postApi("/materials").cookie(reader).content(MATERIAL_JSON)))
                 .andExpect(status().isForbidden());
@@ -71,9 +72,21 @@ class MdMaterialControllerSecurityTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(withCsrf(putApi("/materials/101/status").cookie(reader).param("status", "DISABLE")))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(withCsrf(deleteApi("/materials/101").cookie(reader)))
+                .andExpect(status().isForbidden());
         mockMvc.perform(withCsrf(multipart("/api/materials/import").file(
                                 "file", new byte[]{1}).contextPath("/api").cookie(reader)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteRequiresDedicatedPermissionForOrdinaryUser() throws Exception {
+        Cookie editor = authCookie(List.of("material:dict:edit"), List.of("USER"));
+        Cookie deleter = authCookie(List.of("material:dict:delete"), List.of("USER"));
+        mockMvc.perform(withCsrf(deleteApi("/materials/101").cookie(editor)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(withCsrf(deleteApi("/materials/101").cookie(deleter)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -97,6 +110,8 @@ class MdMaterialControllerSecurityTest {
                 .andExpect(status().isOk());
         mockMvc.perform(withCsrf(putApi("/materials/101/status").cookie(administrator).param("status", "DISABLE")))
                 .andExpect(status().isOk());
+        mockMvc.perform(withCsrf(deleteApi("/materials/101").cookie(administrator)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -116,6 +131,10 @@ class MdMaterialControllerSecurityTest {
 
     private MockHttpServletRequestBuilder putApi(String path) {
         return put("/api" + path).contextPath("/api").contentType(MediaType.APPLICATION_JSON);
+    }
+
+    private MockHttpServletRequestBuilder deleteApi(String path) {
+        return delete("/api" + path).contextPath("/api");
     }
 
     private MockHttpServletRequestBuilder withCsrf(MockHttpServletRequestBuilder request) {

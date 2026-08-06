@@ -16,6 +16,7 @@ import {
 } from '@/components'
 import {
   createMaterial,
+  deleteMaterial,
   downloadMaterialImportTemplate,
   importMaterials,
   loadMaterial,
@@ -34,6 +35,7 @@ const session = useSessionStore()
 const loading = ref(false)
 const saving = ref(false)
 const changingStatus = ref(false)
+const deleting = ref(false)
 const error = ref('')
 const records = ref<MaterialRecord[]>([])
 const categories = ref<MaterialCategory[]>([])
@@ -43,6 +45,7 @@ const pageSize = ref(10)
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const statusTarget = ref<MaterialRecord | null>(null)
+const deleteTarget = ref<MaterialRecord | null>(null)
 const editingDetail = ref<MaterialRecord | null>(null)
 const importOpen = ref(false)
 const importFile = ref<File | null>(null)
@@ -68,6 +71,7 @@ const can = (permission: string) =>
   session.hasPermission(permission)
 const canAdd = computed(() => can('material:dict:add'))
 const canEdit = computed(() => can('material:dict:edit'))
+const canDelete = computed(() => can('material:dict:delete'))
 const canImport = computed(() => canAdd.value && canEdit.value)
 const categoryOptions = computed(() =>
   categories.value
@@ -305,6 +309,21 @@ async function confirmStatus(): Promise<void> {
   }
 }
 
+async function confirmDelete(): Promise<void> {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await deleteMaterial(deleteTarget.value.id)
+    deleteTarget.value = null
+    await load()
+    showToast('success', '材料已删除', '列表已刷新。')
+  } catch (value) {
+    showToast('error', '删除失败', messageOf(value))
+  } finally {
+    deleting.value = false
+  }
+}
+
 onMounted(load)
 onBeforeUnmount(() => loadController?.abort())
 </script>
@@ -402,13 +421,25 @@ onBeforeUnmount(() => loadController?.abort())
               </td>
               <td class="v2-table-cell--actions">
                 <V2ActionMenu
-                  v-if="canEdit"
+                  v-if="canEdit || canDelete"
                   :label="`${record.materialCode || record.materialName}更多操作`"
                   :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
                 >
-                  <V2Button size="small" variant="secondary" @click="openEdit(record)"
+                  <V2Button
+                    v-if="canEdit"
+                    size="small"
+                    variant="secondary"
+                    @click="openEdit(record)"
                     >编辑</V2Button
                   >
+                  <V2Button
+                    v-if="canDelete"
+                    size="small"
+                    variant="danger"
+                    @click="deleteTarget = record"
+                  >
+                    删除
+                  </V2Button>
                 </V2ActionMenu>
               </td>
             </tr>
@@ -547,6 +578,18 @@ onBeforeUnmount(() => loadController?.abort())
       :loading="changingStatus"
       @close="statusTarget = null"
       @confirm="confirmStatus"
+    />
+
+    <V2ConfirmDialog
+      :open="Boolean(deleteTarget)"
+      title="删除材料"
+      :description="
+        deleteTarget ? `确认删除“${deleteTarget.materialName}”？存在业务引用时服务端会拒绝。` : ''
+      "
+      danger
+      :loading="deleting"
+      @close="deleteTarget = null"
+      @confirm="confirmDelete"
     />
   </V2Stack>
 </template>

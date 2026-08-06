@@ -312,17 +312,25 @@ public class MatRequisitionService {
         // Insert new items
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatRequisitionItem item : items) {
+            if (item.getMaterialId() == null)
+                throw new BusinessException("REQUISITION_ITEM_NO_MATERIAL", "领料申请明细物料不能为空");
+        }
+        for (Long materialId : items.stream()
+                .map(MatRequisitionItem::getMaterialId)
+                .distinct()
+                .sorted()
+                .toList()) {
+            MdMaterial material = materialMapper.selectByIdForUpdate(materialId, tenantId);
+            if (material == null || !"ENABLE".equals(material.getStatus())) {
+                throw new BusinessException("MATERIAL_INVALID", "领料物料不存在或已停用");
+            }
+        }
+        for (MatRequisitionItem item : items) {
             item.setRequisitionId(requisitionId);
             item.setTenantId(tenantId);
             projectExecutionGuard.requireActiveWbs(requisition.getProjectId(), item.getWbsTaskId(), "保存领料申请明细");
-            if (item.getMaterialId() == null)
-                throw new BusinessException("REQUISITION_ITEM_NO_MATERIAL", "领料申请明细物料不能为空");
             if (item.getQuantity() == null || item.getQuantity().signum() <= 0)
                 throw new BusinessException("REQUISITION_QUANTITY_INVALID", "领料数量必须大于0");
-            MdMaterial material = materialMapper.selectById(item.getMaterialId());
-            if (material == null || !tenantId.equals(material.getTenantId()) || !"ENABLE".equals(material.getStatus())) {
-                throw new BusinessException("MATERIAL_INVALID", "领料物料不存在或已停用");
-            }
             if (item.getUnitPrice() == null) item.setUnitPrice(BigDecimal.ZERO);
             if (item.getUnitPrice().signum() < 0)
                 throw new BusinessException("REQUISITION_PRICE_INVALID", "领料参考单价不能为负数");
