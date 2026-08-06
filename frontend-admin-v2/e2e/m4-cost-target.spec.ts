@@ -7,6 +7,7 @@ type Identity = 'business' | 'readonly' | 'denied'
 
 const users = {
   business: {
+    tenantId: '0',
     userId: '1',
     username: 'cost.manager',
     realName: '目标成本经理',
@@ -21,6 +22,7 @@ const users = {
     ],
   },
   readonly: {
+    tenantId: '0',
     userId: '2',
     username: 'cost.viewer',
     realName: '目标成本查看人',
@@ -28,6 +30,7 @@ const users = {
     permissions: ['cost:target:query'],
   },
   denied: {
+    tenantId: '0',
     userId: '3',
     username: 'no.cost',
     realName: '无权限用户',

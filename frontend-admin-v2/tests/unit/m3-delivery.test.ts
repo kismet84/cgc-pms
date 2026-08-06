@@ -5,8 +5,10 @@ import {
   loadSchedules,
   loadScheduleTrace,
   replaceWbsTasks,
+  submitSiteDailyLog,
   updateSiteDailyLog,
   uploadSiteFile,
+  uploadSiteFileIdempotently,
 } from '@/services/delivery'
 import { deliveryLabel } from '@/pages/delivery/labels'
 
@@ -97,6 +99,36 @@ describe('M3 delivery request and service contracts', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('uploads same-name different content and treats a content duplicate as an idempotent replay', async () => {
+    fetchMock
+      .mockResolvedValueOnce(apiResponse({ id: '1', originalName: 'photo.jpg' }))
+      .mockResolvedValueOnce(apiResponse({ id: '2', originalName: 'photo.jpg' }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 'FILE_DUPLICATE', message: '文件已存在' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+
+    await uploadSiteFileIdempotently(
+      new File(['first'], 'photo.jpg', { type: 'image/jpeg' }),
+      'SITE_DAILY_LOG',
+      '99',
+    )
+    await uploadSiteFileIdempotently(
+      new File(['second'], 'photo.jpg', { type: 'image/jpeg' }),
+      'SITE_DAILY_LOG',
+      '99',
+    )
+    await uploadSiteFileIdempotently(
+      new File(['second'], 'photo.jpg', { type: 'image/jpeg' }),
+      'SITE_DAILY_LOG',
+      '99',
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
   it('sends expectedVersion and expectedUpdatedAt on controlled writes', async () => {
     fetchMock
       .mockResolvedValueOnce(
@@ -157,6 +189,15 @@ describe('M3 delivery request and service contracts', () => {
       constructionContent: '完成开挖',
       expectedUpdatedAt: '2026-07-21T10:00:00',
     })
+  })
+
+  it('sends the server version when submitting a daily log', async () => {
+    fetchMock.mockResolvedValueOnce(apiResponse(null))
+
+    await submitSiteDailyLog('77', 4)
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/site-daily-logs/77/submit?expectedVersion=4')
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST')
   })
 
   it('normalizes mixed snake_case and camelCase schedule detail payloads into strict V2 shape', async () => {

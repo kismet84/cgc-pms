@@ -69,7 +69,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-20','完成基础施工','DRAFT',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
         service.replaceDailyProgress(DAILY_LOG, new DailyProgressBatch(List.of(
                 new DailyProgressRequest(task, new BigDecimal("20"), new BigDecimal("20"), "基础工程累计完成20%"))));
-        dailyLogService.submit(DAILY_LOG);
+        dailyLogService.submit(DAILY_LOG, 0);
 
         assertEquals("SUBMITTED", jdbc.queryForObject("SELECT status FROM site_daily_log WHERE id=?", String.class, DAILY_LOG));
         assertEquals(new BigDecimal("20.00"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, task));
@@ -136,7 +136,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         service.replaceDailyProgress(DAILY_LOG,
                 new DailyProgressBatch(List.of(new DailyProgressRequest(taskId, new BigDecimal("20"), new BigDecimal("20"), "并发填报"))));
         jdbc.update("UPDATE project_wbs_task SET actual_progress=30 WHERE id=?", taskId);
-        BusinessException concurrent = assertThrows(BusinessException.class, () -> dailyLogService.submit(DAILY_LOG));
+        BusinessException concurrent = assertThrows(BusinessException.class, () -> dailyLogService.submit(DAILY_LOG, 0));
         assertEquals("SITE_DAILY_PROGRESS_CONCURRENT_ROLLBACK", concurrent.getCode());
         assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM site_daily_log WHERE id=?", String.class, DAILY_LOG));
         assertEquals(new BigDecimal("30.00"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, taskId));

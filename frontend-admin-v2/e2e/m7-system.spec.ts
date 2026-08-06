@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 
 type Identity = {
+  tenantId: string
   userId: string
   username: string
   roles: string[]
@@ -9,6 +10,7 @@ type Identity = {
 }
 
 const superAdmin: Identity = {
+  tenantId: '0',
   userId: '1',
   username: 'super.admin',
   roles: ['SUPER_ADMIN'],
@@ -216,6 +218,7 @@ async function installMocks(page: Page, identity: Identity) {
 
 test('system admin routes fail closed before business requests', async ({ page }) => {
   const ordinaryTraffic = await installMocks(page, {
+    tenantId: '0',
     userId: '7',
     username: 'ordinary.user',
     roles: ['USER'],
@@ -227,6 +230,7 @@ test('system admin routes fail closed before business requests', async ({ page }
 
   const adminPage = await page.context().newPage()
   const adminTraffic = await installMocks(adminPage, {
+    tenantId: '0',
     userId: '8',
     username: 'admin.no.permission',
     roles: ['ADMIN'],
@@ -239,6 +243,7 @@ test('system admin routes fail closed before business requests', async ({ page }
 
 test('audit stays read-only and requires only its exact permission', async ({ page }) => {
   const traffic = await installMocks(page, {
+    tenantId: '0',
     userId: '9',
     username: 'auditor',
     roles: ['USER'],
@@ -253,6 +258,7 @@ test('audit stays read-only and requires only its exact permission', async ({ pa
 
   const denied = await page.context().newPage()
   const deniedTraffic = await installMocks(denied, {
+    tenantId: '0',
     userId: '10',
     username: 'not.auditor',
     roles: ['USER'],
@@ -292,6 +298,7 @@ test('data maintenance rejects ADMIN and remains accessible at three viewports f
   page,
 }) => {
   const adminTraffic = await installMocks(page, {
+    tenantId: '0',
     userId: '11',
     username: 'admin',
     roles: ['ADMIN'],

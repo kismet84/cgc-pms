@@ -115,6 +115,7 @@ public class ProfileService {
         List<String> roleCodes = authService.getRoleCodes(user.getId());
         List<String> permCodes = authService.getPermissionCodes(user.getId());
         return UserInfo.builder()
+                .tenantId(String.valueOf(user.getTenantId()))
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
                 .realName(user.getRealName())

@@ -1,0 +1,16 @@
+{
+  "name": "CGC-PMS 现场履约",
+  "short_name": "CGC-PMS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#12344d",
+  "icons": [
+    {
+      "src": "/icons/cgc-pms.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

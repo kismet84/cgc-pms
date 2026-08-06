@@ -10,6 +10,7 @@ import {
   type PageResult,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
+import { openResilientStream, type ResilientStream } from '@/services/notificationStream'
 
 function search(query: Record<string, unknown>): string {
   const params = new URLSearchParams()
@@ -81,4 +82,12 @@ export function markNotificationRead(id: string) {
 
 export function markAllNotificationsRead() {
   return apiRequest(NOTIFICATION_API.markAllRead, { method: 'PUT' })
+}
+
+export function openNotificationStream(
+  onOpen: () => void,
+  onEvent: () => void,
+  onError?: () => void,
+): ResilientStream {
+  return openResilientStream('/notifications/stream', ['notification'], onOpen, onEvent, onError)
 }

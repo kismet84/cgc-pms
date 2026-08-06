@@ -15,6 +15,7 @@ test('cost-subject deep links render server facts and preserve root redirect sta
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/api/auth/userinfo')) {
       return success(route, {
+        tenantId: '0',
         userId: '7',
         username: 'cost.user',
         roles: ['USER'],

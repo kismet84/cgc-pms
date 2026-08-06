@@ -55,6 +55,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
   useSessionStore().replaceUserInfo({
+    tenantId: '1001',
     userId: '1',
     username: 'tester',
     roles: ['USER'],

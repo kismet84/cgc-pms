@@ -132,12 +132,20 @@ export interface QualityIssueCommand {
   remark?: string;
 }
 
+export interface FieldQualityIssueCommand extends QualityIssueCommand {
+  clientRequestId?: string;
+}
+
 export interface QualityRectificationCommand {
   issueId: string;
   actionDescription: string;
   responsibleUserId: string;
   plannedCompleteDate: string;
   remark?: string;
+}
+
+export interface FieldQualityRectificationCommand extends QualityRectificationCommand {
+  clientRequestId?: string;
 }
 
 export interface QualityReinspectionCommand {

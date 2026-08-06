@@ -48,7 +48,7 @@ beforeEach(() => {
     userId: '1',
     username: 'admin',
     realName: '管理员',
-    tenantId: '0',
+    tenantId: '1001',
     roles: ['ADMIN'],
     permissions: ['system:dict:list', 'system:dict:add', 'system:dict:edit', 'system:dict:delete'],
   })
@@ -116,7 +116,7 @@ describe('系统字典三级管理', () => {
       userId: '2',
       username: 'auditor',
       realName: '审计员',
-      tenantId: '0',
+      tenantId: '1001',
       roles: ['AUDITOR'],
       permissions: [
         'system:dict:list',

@@ -153,7 +153,7 @@ class SiteDailyLogServiceTest {
         submitted.setId(34L); submitted.setTenantId(11L); submitted.setProjectId(21L); submitted.setStatus("SUBMITTED");
         when(mapper.selectByIdForUpdate(34L, 11L)).thenReturn(submitted);
 
-        BusinessException error = assertThrows(BusinessException.class, () -> service.submit(34L));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.submit(34L, 0));
 
         assertEquals("SITE_DAILY_LOG_SUBMITTED_IMMUTABLE", error.getCode());
         verifyNoInteractions(scheduleService);
@@ -389,6 +389,65 @@ class SiteDailyLogServiceTest {
         AuditedOperation createAudit = SiteDailyLogController.class
                 .getMethod("create", SiteDailyLog.class).getAnnotation(AuditedOperation.class);
         assertEquals("#log.id", createAudit.businessIdExpression());
+    }
+
+    @Test
+    void createReplaysSameClientRequestAndRejectsDifferentBody() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        SiteDailyLogService service = service(mapper, mock(PmProjectMapper.class), checker);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+
+        SiteDailyLog created = dailyCommand("request-1", "施工内容");
+        doAnswer(invocation -> {
+            created.setId(41L);
+            created.setCreatedBy(7L);
+            return 1;
+        }).when(mapper).insert(created);
+        when(mapper.selectOne(any())).thenReturn(null, created, created);
+
+        assertEquals(41L, service.create(created));
+        assertEquals(41L, service.create(dailyCommand("request-1", "施工内容")));
+        BusinessException conflict = assertThrows(BusinessException.class,
+                () -> service.create(dailyCommand("request-1", "不同内容")));
+        assertEquals("IDEMPOTENCY_CONFLICT", conflict.getCode());
+        verify(mapper, times(1)).insert(any(SiteDailyLog.class));
+    }
+
+    @Test
+    void updateAndSubmitRejectStaleVersion() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        SiteDailyLogService service = service(mapper, mock(PmProjectMapper.class), mock(ProjectAccessChecker.class));
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+        SiteDailyLog existing = dailyCommand(null, "当前内容");
+        existing.setId(42L);
+        existing.setTenantId(11L);
+        existing.setStatus("DRAFT");
+        existing.setVersion(2);
+        existing.setUpdatedAt(LocalDateTime.of(2099, 1, 1, 8, 0));
+        when(mapper.selectByIdForUpdate(42L, 11L)).thenReturn(existing);
+
+        SiteDailyLog stale = dailyCommand(null, "陈旧内容");
+        stale.setId(42L);
+        stale.setExpectedVersion(1);
+        assertEquals("SITE_DAILY_LOG_VERSION_CONFLICT",
+                assertThrows(BusinessException.class, () -> service.update(stale)).getCode());
+        assertEquals("SITE_DAILY_LOG_VERSION_CONFLICT",
+                assertThrows(BusinessException.class, () -> service.submit(42L, 1)).getCode());
+        assertEquals("SITE_DAILY_LOG_VERSION_CONFLICT",
+                assertThrows(BusinessException.class, () -> service.submit(42L, null)).getCode());
+        assertEquals("SITE_DAILY_LOG_VERSION_CONFLICT",
+                assertThrows(BusinessException.class, () -> service.submit(42L, -1)).getCode());
+        verify(mapper, never()).update(any(), any());
+    }
+
+    private SiteDailyLog dailyCommand(String clientRequestId, String content) {
+        SiteDailyLog log = new SiteDailyLog();
+        log.setProjectId(21L);
+        log.setReportDate(LocalDate.of(2099, 1, 2));
+        log.setConstructionContent(content);
+        log.setClientRequestId(clientRequestId);
+        return log;
     }
 
     private SiteDailyLogService service(SiteDailyLogMapper mapper, PmProjectMapper projectMapper,

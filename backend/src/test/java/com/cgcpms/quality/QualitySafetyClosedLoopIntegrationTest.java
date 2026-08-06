@@ -320,6 +320,43 @@ class QualitySafetyClosedLoopIntegrationTest {
                 "QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE"));
     }
 
+    @Test
+    void replaysOfflineIssueAndRectificationRequestsIdempotently() {
+        QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-OFFLINE")).getId());
+        QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
+                plan.getId(), null, "QS-CHK-OFFLINE", LocalDate.now(), "E区", 1L, "离线幂等检查", null));
+        IssueCommand issueCommand = new IssueCommand(
+                inspection.getId(), "临边防护", "HIGH", "防护栏缺失", "局部防护栏未安装",
+                "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(3), null, "issue-replay");
+
+        QualitySafetyIssue issue = service.createIssue(inspection.getId(), issueCommand);
+        assertEquals(issue.getId(), service.createIssue(inspection.getId(), issueCommand).getId());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM qs_issue WHERE tenant_id=0 AND created_by=1 AND client_request_id='issue-replay'",
+                Integer.class));
+        IssueCommand changedIssue = new IssueCommand(
+                inspection.getId(), "临边防护", "HIGH", "防护栏缺失", "内容已变更",
+                "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(3), null, "issue-replay");
+        assertEquals("IDEMPOTENCY_CONFLICT", assertThrows(BusinessException.class,
+                () -> service.createIssue(inspection.getId(), changedIssue)).getCode());
+
+        evidence("QS_INSPECTION", inspection.getId(), "INSPECTION_EVIDENCE");
+        evidence("QS_ISSUE", issue.getId(), "ISSUE_EVIDENCE");
+        service.submitInspection(inspection.getId());
+        RectificationCommand rectificationCommand = new RectificationCommand(
+                issue.getId(), "补齐防护栏并固定", 1L, LocalDate.now().plusDays(2), null, "rect-replay");
+
+        QualityRectification rectification = service.createRectification(rectificationCommand);
+        assertEquals(rectification.getId(), service.createRectification(rectificationCommand).getId());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM qs_rectification WHERE tenant_id=0 AND created_by=1 AND client_request_id='rect-replay'",
+                Integer.class));
+        RectificationCommand changedRectification = new RectificationCommand(
+                issue.getId(), "整改内容已变更", 1L, LocalDate.now().plusDays(2), null, "rect-replay");
+        assertEquals("IDEMPOTENCY_CONFLICT", assertThrows(BusinessException.class,
+                () -> service.createRectification(changedRectification)).getCode());
+    }
+
     private PlanCommand planCommand(String code) {
         return new PlanCommand(PROJECT, code, "专项质量安全检查", "SAFETY", "SINGLE",
                 LocalDate.now(), LocalDate.now().plusDays(30), 1L, null);

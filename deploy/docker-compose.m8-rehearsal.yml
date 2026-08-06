@@ -5,6 +5,12 @@ services:
       dockerfile: frontend-admin-v2/Dockerfile
       args:
         VITE_BASE_PATH: /
+        VITE_FEATURE_PWA: "true"
+        VITE_FEATURE_OFFLINE_DRAFT: "true"
+        VITE_FEATURE_OFFLINE_SYNC: "true"
+        VITE_FEATURE_FIELD_DAILY_LOG: "true"
+        VITE_FEATURE_FIELD_QUALITY_SAFETY: "true"
+        VITE_FEATURE_NOTIFICATION_MULTI_CLIENT: "true"
     environment:
       BACKEND_URL: backend:8080
     volumes:

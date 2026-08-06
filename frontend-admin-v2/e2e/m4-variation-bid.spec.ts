@@ -7,6 +7,7 @@ type Identity = 'business' | 'readonly' | 'denied'
 
 const users = {
   business: {
+    tenantId: '0',
     userId: '1',
     username: 'demo.business',
     realName: '商务经理',
@@ -29,6 +30,7 @@ const users = {
     ],
   },
   readonly: {
+    tenantId: '0',
     userId: '2',
     username: 'commercial.viewer',
     realName: '商务查看人',
@@ -36,6 +38,7 @@ const users = {
     permissions: ['variation:order:query', 'bid:query'],
   },
   denied: {
+    tenantId: '0',
     userId: '3',
     username: 'no.commercial',
     realName: '无权限用户',

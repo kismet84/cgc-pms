@@ -312,7 +312,13 @@ async function install(page: Page, writes: string[]) {
     return fulfill(route, null, 500)
   })
   await page.route('**/api/auth/userinfo', (route) =>
-    fulfill(route, { userId: '1', username: 'finance-user', roles: ['SUPER_ADMIN'], permissions }),
+    fulfill(route, {
+      tenantId: '0',
+      userId: '1',
+      username: 'finance-user',
+      roles: ['SUPER_ADMIN'],
+      permissions,
+    }),
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
   await installShellPreferencesMock(page)

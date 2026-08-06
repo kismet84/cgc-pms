@@ -104,6 +104,7 @@ async function installApprovalMock(page: Page): Promise<void> {
   await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, {
+      tenantId: '0',
       userId: '1',
       username: 'approver',
       realName: '审批人',

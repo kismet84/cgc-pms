@@ -69,8 +69,9 @@ public class SiteDailyLogController {
     @PostMapping("/{id}/submit")
     @AuditedOperation(type = "SUBMIT", businessType = "SITE_DAILY_LOG", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit')")
-    public ApiResponse<Void> submit(@PathVariable Long id) {
-        service.submit(id);
+    public ApiResponse<Void> submit(@PathVariable Long id,
+                                    @RequestParam Integer expectedVersion) {
+        service.submit(id, expectedVersion);
         return ApiResponse.success();
     }
 }

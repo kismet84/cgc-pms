@@ -49,6 +49,7 @@ async function install(page: Page, permissions = allPermissions) {
   const evaluations: Array<Record<string, unknown>> = []
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, {
+      tenantId: '0',
       userId: '1',
       username: 'supplier.user',
       roles: ['USER'],

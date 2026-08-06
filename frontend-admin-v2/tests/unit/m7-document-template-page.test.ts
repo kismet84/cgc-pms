@@ -84,7 +84,7 @@ beforeEach(() => {
     userId: '1',
     username: 'admin',
     realName: '管理员',
-    tenantId: '0',
+    tenantId: '1001',
     roles: ['ADMIN'],
     permissions: ['document:template:edit', 'document:template:publish'],
   })

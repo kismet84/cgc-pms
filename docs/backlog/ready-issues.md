@@ -2,7 +2,9 @@
 
 ## v1.6 当前队列
 
-当前 Ready 为 0。
+当前 Ready 为 0，执行中为 0。
+
+- `ISSUE-077-001`已完成 G0～G5 并关闭，不进入 AutoPilot Ready。
 
 - `ISSUE-069-001`、`ISSUE-070-001`、`ISSUE-071-001`均已关闭，不进入AutoPilot Ready。
 - v1.5 Ready 与执行历史：[Backlog 快照](../archive/v1.5/backlog-snapshot/ready-issues.md)

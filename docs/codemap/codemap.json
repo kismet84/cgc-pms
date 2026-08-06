@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-06T04:47:11.107Z",
-  "generated_from_commit": "a7e8e5506be8781d4355364be6c38b5cde5d92e1",
+  "generated_at": "2026-08-06T08:21:42.874Z",
+  "generated_from_commit": "c80c5f3aa31e32f397e11dc5ab07acbf1b4d363b",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",
@@ -414,18 +414,31 @@
       "role": "站内通知、预警规则求值与计划任务。",
       "entrypoints": [
         {
+          "path": "backend/src/main/java/com/cgcpms/notification/controller/NotificationController.java",
+          "symbol": "@RequestMapping(\"/notifications\")"
+        },
+        {
           "path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java",
           "symbol": "@Scheduled"
         }
       ],
       "tests": [
         {
+          "path": "backend/src/test/java/com/cgcpms/notification/NotificationServiceTest.java",
+          "symbol": "class NotificationServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/notification/NotificationControllerIntegrationTest.java",
+          "symbol": "class NotificationControllerIntegrationTest"
+        },
+        {
           "path": "backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java",
           "symbol": "class AlertEvaluationServiceTest"
         }
       ],
       "constraints": [
-        "当前图只确认站内通知与服务端预警；浏览器实时订阅未取得源码证据。"
+        "通知事实按租户和用户持久化；SSE 只承载可丢失提示，客户端必须通过列表或未读数补读。",
+        "浏览器订阅使用认证 Cookie，不得把 clientId 当成授权依据。"
       ],
       "evidence": [
         {
@@ -470,6 +483,73 @@
         {
           "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationEventService.java",
           "symbol": "public SseEmitter subscribe"
+        }
+      ]
+    },
+    {
+      "id": "field-delivery",
+      "label": "现场日报与质量安全",
+      "type": "domain",
+      "boundary": "业务域",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/site",
+      "role": "现场日报草稿提交、质量安全检查整改复验及 V2 现场履约入口。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/site/controller/SiteDailyLogController.java",
+          "symbol": "@RequestMapping(\"/site-daily-logs\")"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/controller/QualitySafetyController.java",
+          "symbol": "@RequestMapping(\"/quality-safety\")"
+        },
+        {
+          "path": "frontend-admin-v2/src/router.ts",
+          "symbol": "/site/daily-log and /quality-safety"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/sitedaily/SiteDailyLogServiceTest.java",
+          "symbol": "class SiteDailyLogServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/quality/QualitySafetyClosedLoopIntegrationTest.java",
+          "symbol": "class QualitySafetyClosedLoopIntegrationTest"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/m3-delivery.test.ts",
+          "symbol": "describe"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/m3-quality-safety.test.ts",
+          "symbol": "describe"
+        },
+        {
+          "path": "frontend-admin-v2/e2e/m3-delivery.spec.ts",
+          "symbol": "test"
+        }
+      ],
+      "constraints": [
+        "数据库仍是日报、问题、整改和复验的唯一事实源；本地草稿不得扩张服务端权限或状态机。",
+        "日报写入受项目范围和草稿状态保护；质量安全复用既有职责分离、乐观锁和 CLEAN 附件证据。"
+      ],
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/pages/delivery/DailyLogPage.vue",
+          "symbol": "site:daily:edit"
+        },
+        {
+          "path": "frontend-admin-v2/src/pages/delivery/QualitySafetyPage.vue",
+          "symbol": "quality:safety"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/site/service/SiteDailyLogService.java",
+          "symbol": "public Long create"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
+          "symbol": "public QualitySafetyIssue createIssue"
         }
       ]
     },
@@ -939,6 +1019,21 @@
       ]
     },
     {
+      "from": "v2-client",
+      "to": "field-delivery",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/delivery.ts",
+          "symbol": "loadDailyLogs"
+        },
+        {
+          "path": "frontend-admin-v2/src/services/quality.ts",
+          "symbol": "loadQualitySafetyTrace"
+        }
+      ]
+    },
+    {
       "from": "spring-api",
       "to": "project-file-center",
       "type": "calls",
@@ -957,6 +1052,51 @@
         {
           "path": "backend/src/main/java/com/cgcpms/communication/controller/CommunicationController.java",
           "symbol": "@RequestMapping(\"/communications\")"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "field-delivery",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/site/controller/SiteDailyLogController.java",
+          "symbol": "service"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/controller/QualitySafetyController.java",
+          "symbol": "service"
+        }
+      ]
+    },
+    {
+      "from": "field-delivery",
+      "to": "file-document",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
+          "symbol": "requireEvidenceFiles"
+        },
+        {
+          "path": "frontend-admin-v2/src/services/delivery.ts",
+          "symbol": "uploadSiteFile"
+        }
+      ]
+    },
+    {
+      "from": "field-delivery",
+      "to": "mysql-flyway",
+      "type": "writes",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/site/service/SiteDailyLogService.java",
+          "symbol": "mapper.insert"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
+          "symbol": "issueMapper.insert"
         }
       ]
     },
@@ -1704,6 +1844,37 @@
         "mysql-flyway"
       ],
       "outcome": "会话行锁生成唯一序号，消息提交后只向当前有效成员发布最小 SSE 事件。"
+    },
+    {
+      "id": "field-daily-submit",
+      "name": "现场日报草稿到提交",
+      "trigger": "有项目范围和日报编辑权限的用户保存或提交现场日报",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "field-delivery",
+        "file-document",
+        "mysql-flyway"
+      ],
+      "outcome": "项目范围、草稿状态和附件事实通过后，日报由服务端写入并回读。"
+    },
+    {
+      "id": "quality-safety-close-loop",
+      "name": "质量安全发现到复验",
+      "trigger": "质量安全角色创建问题、责任人整改、独立角色复验",
+      "steps": [
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "field-delivery",
+        "file-document",
+        "notification-alert",
+        "mysql-flyway"
+      ],
+      "outcome": "既有职责分离、乐观锁、附件证据和状态机形成可审计关闭链。"
     }
   ]
 }

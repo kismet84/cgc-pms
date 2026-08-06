@@ -15,6 +15,7 @@ test('master-data deep links render server facts and preserve material redirect 
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/api/auth/userinfo')) {
       return success(route, {
+        tenantId: '0',
         userId: '7',
         username: 'master.user',
         roles: ['USER'],

@@ -281,6 +281,7 @@ describe('M7 system management contracts', () => {
       throw new Error(`unexpected request: ${path}`)
     })
     useSessionStore().replaceUserInfo({
+      tenantId: '1001',
       userId: '1',
       username: 'admin',
       roles: ['SUPER_ADMIN'],
@@ -426,6 +427,7 @@ describe('M7 system management contracts', () => {
       throw new Error(`unexpected request: ${path}`)
     })
     useSessionStore().replaceUserInfo({
+      tenantId: '1001',
       userId: '1',
       username: 'admin',
       roles: ['SUPER_ADMIN'],
@@ -505,6 +507,7 @@ describe('M7 system management contracts', () => {
     )
 
     useSessionStore().replaceUserInfo({
+      tenantId: '1001',
       userId: '3',
       username: 'viewer',
       roles: ['USER'],
@@ -546,6 +549,7 @@ describe('M7 system management contracts', () => {
       throw new Error(`unexpected request: ${path}`)
     })
     useSessionStore().replaceUserInfo({
+      tenantId: '1001',
       userId: '1',
       username: 'admin',
       roles: ['SUPER_ADMIN'],
@@ -628,6 +632,7 @@ describe('M7 system management contracts', () => {
       throw new Error(`unexpected request: ${path}`)
     })
     useSessionStore().replaceUserInfo({
+      tenantId: '1001',
       userId: '1',
       username: 'admin',
       roles: ['SUPER_ADMIN'],

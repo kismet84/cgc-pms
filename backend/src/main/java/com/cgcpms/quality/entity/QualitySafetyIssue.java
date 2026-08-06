@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
@@ -32,6 +33,8 @@ public class QualitySafetyIssue extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class) private Long responsiblePartnerId;
     @JsonSerialize(using = ToStringSerializer.class) private Long responsibleUserId;
     private LocalDate dueDate;
+    private String clientRequestId;
+    @JsonIgnore private String requestHash;
     private String status;
     @JsonSerialize(using = ToStringSerializer.class) private Long closedBy;
     private LocalDateTime closedAt;

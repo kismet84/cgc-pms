@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.common.util.RequestFingerprint;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -45,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashMap;
 import java.util.stream.Collectors;
@@ -117,7 +119,14 @@ public class SiteDailyLogService {
     public Long create(SiteDailyLog log) {
         projectAccessChecker.checkAccess(log.getProjectId(), "创建现场日报");
         projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "创建现场日报");
+        String clientRequestId = normalizeClientRequestId(log.getClientRequestId());
+        String requestHash = requestHash(log);
+        SiteDailyLog replay = findByClientRequest(clientRequestId);
+        if (replay != null) return resolveReplay(replay, requestHash);
         log.setTenantId(UserContext.getCurrentTenantId());
+        log.setClientRequestId(clientRequestId);
+        log.setRequestHash(clientRequestId == null ? null : requestHash);
+        log.setVersion(0);
         log.setStatus(DRAFT);
         log.setSubmittedBy(null);
         log.setSubmittedAt(null);
@@ -125,6 +134,8 @@ public class SiteDailyLogService {
         try {
             mapper.insert(log);
         } catch (DuplicateKeyException e) {
+            replay = findByClientRequest(clientRequestId);
+            if (replay != null) return resolveReplay(replay, requestHash);
             throw duplicateDate();
         }
         return log.getId();
@@ -137,10 +148,13 @@ public class SiteDailyLogService {
         projectAccessChecker.checkAccess(command.getProjectId(), "修改现场日报");
         projectExecutionGuard.requireActiveSchedule(command.getProjectId(), "修改现场日报");
         requireDraft(existing);
-        if (command.getExpectedUpdatedAt() == null)
-            throw new BusinessException("SITE_DAILY_LOG_PRECONDITION_REQUIRED", "修改现场日报必须携带最新更新时间");
-        if (!command.getExpectedUpdatedAt().withNano(0).equals(existing.getUpdatedAt().withNano(0)))
-            throw new BusinessException("SITE_DAILY_LOG_VERSION_CONFLICT", "现场日报已被其他用户修改，请刷新后重试");
+        if (command.getExpectedVersion() == null && command.getExpectedUpdatedAt() == null)
+            throw new BusinessException("SITE_DAILY_LOG_PRECONDITION_REQUIRED", "修改现场日报必须携带最新版本");
+        if (command.getExpectedVersion() != null && !Objects.equals(command.getExpectedVersion(), existing.getVersion()))
+            throw versionConflict();
+        if (command.getExpectedUpdatedAt() != null
+                && !command.getExpectedUpdatedAt().withNano(0).equals(existing.getUpdatedAt().withNano(0)))
+            throw versionConflict();
         requireUniqueDate(command.getProjectId(), command.getReportDate(), existing.getId());
         LocalDateTime now = LocalDateTime.now().withNano(0);
         LocalDateTime nextUpdatedAt = now.isAfter(existing.getUpdatedAt()) ? now : existing.getUpdatedAt().plusSeconds(1);
@@ -149,6 +163,7 @@ public class SiteDailyLogService {
                     .eq(SiteDailyLog::getId, existing.getId())
                     .eq(SiteDailyLog::getTenantId, existing.getTenantId())
                     .eq(SiteDailyLog::getStatus, DRAFT)
+                    .eq(SiteDailyLog::getVersion, existing.getVersion())
                     .set(SiteDailyLog::getProjectId, command.getProjectId())
                     .set(SiteDailyLog::getReportDate, command.getReportDate())
                     .set(SiteDailyLog::getConstructionContent, command.getConstructionContent())
@@ -156,29 +171,35 @@ public class SiteDailyLogService {
                     .set(SiteDailyLog::getNextDayPlan, command.getNextDayPlan())
                     .set(SiteDailyLog::getWeatherSummary, command.getWeatherSummary())
                     .set(SiteDailyLog::getOnSiteHeadcount, command.getOnSiteHeadcount())
+                    .set(SiteDailyLog::getVersion, existing.getVersion() + 1)
                     .set(SiteDailyLog::getUpdatedBy, UserContext.getCurrentUserId())
                     .set(SiteDailyLog::getUpdatedAt, nextUpdatedAt));
-            if (updated != 1) throw submittedImmutable();
+            if (updated != 1) throw versionConflict();
         } catch (DuplicateKeyException e) {
             throw duplicateDate();
         }
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void submit(Long id) {
+    public void submit(Long id, Integer expectedVersion) {
         SiteDailyLog log = requireLogForUpdate(id);
         projectAccessChecker.checkAccess(log.getProjectId(), "提交现场日报");
         projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "提交现场日报");
         requireDraft(log);
+        if (expectedVersion == null || expectedVersion < 0 || !Objects.equals(expectedVersion, log.getVersion())) {
+            throw versionConflict();
+        }
         projectScheduleService.onDailyLogSubmitted(log);
         int updated = mapper.update(null, new LambdaUpdateWrapper<SiteDailyLog>()
                 .eq(SiteDailyLog::getId, id)
                 .eq(SiteDailyLog::getTenantId, log.getTenantId())
                 .eq(SiteDailyLog::getStatus, DRAFT)
+                .eq(SiteDailyLog::getVersion, log.getVersion())
                 .set(SiteDailyLog::getStatus, SUBMITTED)
+                .set(SiteDailyLog::getVersion, log.getVersion() + 1)
                 .set(SiteDailyLog::getSubmittedBy, UserContext.getCurrentUserId())
                 .set(SiteDailyLog::getSubmittedAt, LocalDateTime.now()));
-        if (updated != 1) throw submittedImmutable();
+        if (updated != 1) throw versionConflict();
     }
 
     private SiteDailyLog requireLog(Long id) {
@@ -205,6 +226,34 @@ public class SiteDailyLogService {
 
     private BusinessException duplicateDate() {
         return new BusinessException("SITE_DAILY_LOG_DUPLICATE_DATE", "同一项目同一天只能有一份现场日报");
+    }
+
+    private SiteDailyLog findByClientRequest(String clientRequestId) {
+        if (clientRequestId == null) return null;
+        return mapper.selectOne(new LambdaQueryWrapper<SiteDailyLog>()
+                .eq(SiteDailyLog::getTenantId, UserContext.getCurrentTenantId())
+                .eq(SiteDailyLog::getCreatedBy, UserContext.getCurrentUserId())
+                .eq(SiteDailyLog::getClientRequestId, clientRequestId));
+    }
+
+    private Long resolveReplay(SiteDailyLog existing, String requestHash) {
+        projectAccessChecker.checkAccess(existing.getProjectId(), "读取现场日报幂等结果");
+        if (!Objects.equals(existing.getRequestHash(), requestHash))
+            throw new BusinessException("IDEMPOTENCY_CONFLICT", "客户端请求标识已用于不同的现场日报");
+        return existing.getId();
+    }
+
+    private String requestHash(SiteDailyLog log) {
+        return RequestFingerprint.sha256(log.getProjectId(), log.getReportDate(), log.getConstructionContent(),
+                log.getIssuesDelays(), log.getNextDayPlan(), log.getWeatherSummary(), log.getOnSiteHeadcount());
+    }
+
+    private String normalizeClientRequestId(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private BusinessException versionConflict() {
+        return new BusinessException("SITE_DAILY_LOG_VERSION_CONFLICT", "现场日报已被其他用户修改，请刷新后重试");
     }
 
     private void requireDraft(SiteDailyLog log) {
@@ -236,6 +285,8 @@ public class SiteDailyLogService {
         vo.setNextDayPlan(log.getNextDayPlan());
         vo.setWeatherSummary(log.getWeatherSummary());
         vo.setOnSiteHeadcount(log.getOnSiteHeadcount());
+        vo.setClientRequestId(log.getClientRequestId());
+        vo.setVersion(log.getVersion());
         vo.setStatus(log.getStatus());
         vo.setSubmittedBy(log.getSubmittedBy() == null ? null : log.getSubmittedBy().toString());
         vo.setSubmittedAt(log.getSubmittedAt() == null ? null : log.getSubmittedAt().format(DateTimeUtils.DTF));

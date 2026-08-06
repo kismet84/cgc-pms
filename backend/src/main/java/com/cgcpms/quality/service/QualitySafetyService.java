@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.BusinessCodeGenerator;
+import com.cgcpms.common.util.RequestFingerprint;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -212,6 +213,10 @@ public class QualitySafetyService {
             throw new BusinessException("QS_INSPECTION_ID_MISMATCH", "路径检查记录与请求数据不一致");
         QualityInspectionRecord inspection = requireInspection(inspectionId);
         projectAccessChecker.checkAccess(inspection.getProjectId(), "创建质量安全问题单");
+        String clientRequestId = normalizeClientRequestId(command.clientRequestId());
+        String requestHash = issueRequestHash(command);
+        QualitySafetyIssue replay = findIssueByClientRequest(clientRequestId);
+        if (replay != null) return resolveIssueReplay(replay, requestHash);
         requireActiveProjectMember(inspection.getProjectId(), command.responsibleUserId());
         if (!"DRAFT".equals(inspection.getStatus())) throw immutable("已提交检查记录不能新增问题单");
         String severity = upper(command.severity());
@@ -243,12 +248,16 @@ public class QualitySafetyService {
         issue.setResponsiblePartnerId(partnerId);
         issue.setResponsibleUserId(command.responsibleUserId());
         issue.setDueDate(command.dueDate());
+        issue.setClientRequestId(clientRequestId);
+        issue.setRequestHash(clientRequestId == null ? null : requestHash);
         issue.setStatus("OPEN");
         issue.setVersion(0);
         issue.setRemark(command.remark());
         try {
             issueMapper.insert(issue);
         } catch (DuplicateKeyException e) {
+            replay = findIssueByClientRequest(clientRequestId);
+            if (replay != null) return resolveIssueReplay(replay, requestHash);
             throw new BusinessException("QS_ISSUE_CREATE_CONFLICT", "问题单编号冲突，请重试");
         }
         return requireIssue(issue.getId());
@@ -301,6 +310,10 @@ public class QualitySafetyService {
     public QualityRectification createRectification(RectificationCommand command) {
         QualitySafetyIssue issue = requireIssue(command.issueId());
         projectAccessChecker.checkAccess(issue.getProjectId(), "创建质量安全整改记录");
+        String clientRequestId = normalizeClientRequestId(command.clientRequestId());
+        String requestHash = rectificationRequestHash(command);
+        QualityRectification replay = findRectificationByClientRequest(clientRequestId);
+        if (replay != null) return resolveRectificationReplay(replay, requestHash);
         requireActiveProjectMember(issue.getProjectId(), command.responsibleUserId());
         if (!"RECTIFYING".equals(issue.getStatus())) throw new BusinessException("QS_ISSUE_NOT_RECTIFYING", "当前问题单不在整改状态");
         if (!Objects.equals(issue.getResponsibleUserId(), command.responsibleUserId()))
@@ -323,12 +336,16 @@ public class QualitySafetyService {
         rectification.setActionDescription(command.actionDescription().trim());
         rectification.setResponsibleUserId(command.responsibleUserId());
         rectification.setPlannedCompleteDate(command.plannedCompleteDate());
+        rectification.setClientRequestId(clientRequestId);
+        rectification.setRequestHash(clientRequestId == null ? null : requestHash);
         rectification.setStatus("DRAFT");
         rectification.setVersion(0);
         rectification.setRemark(command.remark());
         try {
             rectificationMapper.insert(rectification);
         } catch (DuplicateKeyException e) {
+            replay = findRectificationByClientRequest(clientRequestId);
+            if (replay != null) return resolveRectificationReplay(replay, requestHash);
             throw new BusinessException("QS_RECTIFICATION_ROUND_CONFLICT", "整改轮次冲突，请刷新后重试");
         }
         return requireRectification(rectification.getId());
@@ -625,6 +642,51 @@ public class QualitySafetyService {
         long count = issueMapper.selectCount(new LambdaQueryWrapper<QualitySafetyIssue>()
                 .eq(QualitySafetyIssue::getTenantId, tenantId()).eq(QualitySafetyIssue::getInspectionId, inspection.getId()));
         return normalizeCode(inspection.getInspectionCode()) + "-ISS-" + String.format("%03d", count + 1);
+    }
+
+    private QualitySafetyIssue findIssueByClientRequest(String clientRequestId) {
+        if (clientRequestId == null) return null;
+        return issueMapper.selectOne(new LambdaQueryWrapper<QualitySafetyIssue>()
+                .eq(QualitySafetyIssue::getTenantId, tenantId())
+                .eq(QualitySafetyIssue::getCreatedBy, userId())
+                .eq(QualitySafetyIssue::getClientRequestId, clientRequestId));
+    }
+
+    private QualitySafetyIssue resolveIssueReplay(QualitySafetyIssue existing, String requestHash) {
+        projectAccessChecker.checkAccess(existing.getProjectId(), "读取质量安全问题幂等结果");
+        if (!Objects.equals(existing.getRequestHash(), requestHash))
+            throw new BusinessException("IDEMPOTENCY_CONFLICT", "客户端请求标识已用于不同的质量安全问题");
+        return existing;
+    }
+
+    private QualityRectification findRectificationByClientRequest(String clientRequestId) {
+        if (clientRequestId == null) return null;
+        return rectificationMapper.selectOne(new LambdaQueryWrapper<QualityRectification>()
+                .eq(QualityRectification::getTenantId, tenantId())
+                .eq(QualityRectification::getCreatedBy, userId())
+                .eq(QualityRectification::getClientRequestId, clientRequestId));
+    }
+
+    private QualityRectification resolveRectificationReplay(QualityRectification existing, String requestHash) {
+        projectAccessChecker.checkAccess(existing.getProjectId(), "读取质量安全整改幂等结果");
+        if (!Objects.equals(existing.getRequestHash(), requestHash))
+            throw new BusinessException("IDEMPOTENCY_CONFLICT", "客户端请求标识已用于不同的质量安全整改");
+        return existing;
+    }
+
+    private String issueRequestHash(IssueCommand command) {
+        return RequestFingerprint.sha256(command.inspectionId(), command.category(), command.severity(),
+                command.title(), command.description(), command.responsibleKind(), command.responsiblePartnerId(),
+                command.responsibleUserId(), command.dueDate(), command.remark());
+    }
+
+    private String rectificationRequestHash(RectificationCommand command) {
+        return RequestFingerprint.sha256(command.issueId(), command.actionDescription(), command.responsibleUserId(),
+                command.plannedCompleteDate(), command.remark());
+    }
+
+    private String normalizeClientRequestId(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private QualityInspectionPlan requirePlan(Long id) {

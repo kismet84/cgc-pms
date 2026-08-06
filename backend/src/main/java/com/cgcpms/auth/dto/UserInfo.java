@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class UserInfo {
 
+    private String tenantId;
     private String userId;
     private String username;
     private String realName;

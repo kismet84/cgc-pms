@@ -24,5 +24,10 @@ export async function installShellPreferencesMock(page: Page): Promise<void> {
       body: JSON.stringify({ code: '0', message: 'success', data: { count: 0 } }),
     }),
   )
-  await page.route('**/api/communications/stream', (route) => route.fulfill({ status: 204 }))
+  await page.route(/\/api\/communications\/stream(?:\?.*)?$/, (route) =>
+    route.fulfill({ status: 204 }),
+  )
+  await page.route(/\/api\/notifications\/stream(?:\?.*)?$/, (route) =>
+    route.fulfill({ status: 204 }),
+  )
 }

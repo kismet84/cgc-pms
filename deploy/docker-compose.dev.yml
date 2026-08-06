@@ -231,6 +231,12 @@ services:
       # Tell Vite proxy to forward /api → backend container (not localhost)
       VITE_API_TARGET: "http://backend:8080"
       VITE_BASE_PATH: "/"
+      VITE_FEATURE_PWA: "true"
+      VITE_FEATURE_OFFLINE_DRAFT: "true"
+      VITE_FEATURE_OFFLINE_SYNC: "true"
+      VITE_FEATURE_FIELD_DAILY_LOG: "true"
+      VITE_FEATURE_FIELD_QUALITY_SAFETY: "true"
+      VITE_FEATURE_NOTIFICATION_MULTI_CLIENT: "true"
     command: >
       sh /app/scripts/docker-dev-entrypoint.sh
     healthcheck:

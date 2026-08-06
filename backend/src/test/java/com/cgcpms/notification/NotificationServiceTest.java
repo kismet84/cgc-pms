@@ -14,7 +14,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +39,9 @@ class NotificationServiceTest {
 
     @Autowired
     private SysNotificationMapper notificationMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Long createdNotificationId;
 
@@ -446,5 +454,91 @@ class NotificationServiceTest {
         tenantOneEmitter.complete();
         tenantTwoEmitter.complete();
         System.out.println("✅ TC17 通过: cross-tenant SSE emitter isolation");
+    }
+
+    @Test
+    @Order(18)
+    @DisplayName("SSE多客户端: 同租户同用户两个clientId同时保留，重连不误删新连接")
+    void subscribeKeepsMultipleClientsAndSafelyReplacesSameClient() {
+        long isolatedUser = 10_018L;
+        SseEmitter first = notificationService.subscribe(isolatedUser, TENANT_0, "tab-a");
+        SseEmitter second = notificationService.subscribe(isolatedUser, TENANT_0, "tab-b");
+        assertEquals(2, notificationService.activeConnectionCount(TENANT_0, isolatedUser));
+
+        SseEmitter replacement = notificationService.subscribe(isolatedUser, TENANT_0, "tab-a");
+        assertNotSame(first, replacement);
+        assertEquals(2, notificationService.activeConnectionCount(TENANT_0, isolatedUser));
+
+        replacement.complete();
+        second.complete();
+    }
+
+    @Test
+    @Order(19)
+    @DisplayName("SSE连接限制: 拒绝第六个连接和非法clientId")
+    void subscribeEnforcesConnectionLimitAndClientIdBoundary() {
+        long isolatedUser = 10_019L;
+        for (int index = 0; index < 5; index++) {
+            notificationService.subscribe(isolatedUser, TENANT_0, "tab-" + index);
+        }
+        BusinessException limit = assertThrows(BusinessException.class,
+                () -> notificationService.subscribe(isolatedUser, TENANT_0, "tab-5"));
+        assertEquals("SSE_CONNECTION_LIMIT", limit.getCode());
+
+        BusinessException invalid = assertThrows(BusinessException.class,
+                () -> notificationService.subscribe(10_020L, TENANT_0, "bad/client"));
+        assertEquals("SSE_CLIENT_ID_INVALID", invalid.getCode());
+    }
+
+    @Test
+    @Order(20)
+    @DisplayName("通知SSE心跳清理已断开的客户端")
+    void heartbeatRemovesDisconnectedClient() {
+        AtomicInteger sends = new AtomicInteger();
+        NotificationService capturing = new NotificationService(notificationMapper) {
+            @Override
+            protected SseEmitter newEmitter() {
+                return new SseEmitter() {
+                    @Override
+                    public void send(SseEmitter.SseEventBuilder builder) throws IOException {
+                        if (sends.incrementAndGet() > 1) throw new IOException("disconnected");
+                    }
+                };
+            }
+        };
+        capturing.subscribe(10_021L, TENANT_0, "stale-tab");
+        capturing.heartbeat();
+        assertEquals(0, capturing.activeConnectionCount(TENANT_0, 10_021L));
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("通知SSE仅在事务提交后发送，回滚不发送")
+    void notificationFanOutRunsOnlyAfterCommit() {
+        AtomicInteger sends = new AtomicInteger();
+        NotificationService capturing = new NotificationService(notificationMapper) {
+            @Override
+            protected SseEmitter newEmitter() {
+                return new SseEmitter() {
+                    @Override
+                    public void send(SseEmitter.SseEventBuilder builder) throws IOException {
+                        sends.incrementAndGet();
+                    }
+                };
+            }
+        };
+        capturing.subscribe(USER_1, TENANT_0, "tx-tab");
+        assertEquals(1, sends.get(), "订阅时只有connected事件");
+
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        assertThrows(IllegalStateException.class, () -> transaction.executeWithoutResult(status -> {
+            capturing.create(TENANT_0, USER_1, "回滚通知", "不得推送", "SYSTEM", null);
+            throw new IllegalStateException("rollback");
+        }));
+        assertEquals(1, sends.get(), "回滚不得发送notification事件");
+
+        transaction.executeWithoutResult(status ->
+                capturing.create(TENANT_0, USER_1, "提交通知", "提交后推送", "SYSTEM", null));
+        assertEquals(2, sends.get(), "提交后发送一次notification事件");
     }
 }

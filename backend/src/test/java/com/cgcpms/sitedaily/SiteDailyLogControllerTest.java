@@ -117,6 +117,9 @@ class SiteDailyLogControllerTest {
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/site-daily-logs/" + id + "/submit").contextPath("/api")
                         .cookie(adminCookie()))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/site-daily-logs/" + id + "/submit").contextPath("/api")
+                        .cookie(adminCookie()).param("expectedVersion", "1"))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/site-daily-logs/" + id).contextPath("/api").cookie(adminCookie()))
                 .andExpect(status().isOk())
@@ -128,7 +131,7 @@ class SiteDailyLogControllerTest {
                         .content("{\"projectId\":" + PROJECT_ID + ",\"reportDate\":\"2099-01-01\",\"constructionContent\":\"禁止修改\"}"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/site-daily-logs/" + id + "/submit").contextPath("/api")
-                        .cookie(adminCookie()))
+                        .cookie(adminCookie()).param("expectedVersion", "2"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/api/site-daily-logs").contextPath("/api").cookie(adminCookie())
                         .param("projectId", String.valueOf(PROJECT_ID)).param("status", "SUBMITTED"))

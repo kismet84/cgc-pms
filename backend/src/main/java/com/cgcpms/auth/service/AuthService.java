@@ -177,6 +177,7 @@ public class AuthService {
 
     private UserInfo buildUserInfo(SysUser user, List<String> roleCodes, List<String> permCodes) {
         return UserInfo.builder()
+                .tenantId(String.valueOf(user.getTenantId()))
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
                 .realName(user.getRealName())

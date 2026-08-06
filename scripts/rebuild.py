@@ -125,6 +125,27 @@ def build_backend_test_env() -> dict[str, str]:
     }
 
 
+def build_compose_env() -> dict[str, str]:
+    """Keep legacy local MinIO names compatible with the dev compose contract."""
+    values: dict[str, str] = {}
+    env_file = DEPLOY_DIR / ".env"
+    if env_file.exists():
+        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return {
+        "MINIO_ACCESS_KEY": os.environ.get("MINIO_ACCESS_KEY")
+        or values.get("MINIO_ACCESS_KEY")
+        or values.get("MINIO_ROOT_USER", ""),
+        "MINIO_SECRET_KEY": os.environ.get("MINIO_SECRET_KEY")
+        or values.get("MINIO_SECRET_KEY")
+        or values.get("MINIO_ROOT_PASSWORD", ""),
+    }
+
+
 def check_docker() -> bool:
     """Check if Docker is running."""
     try:
@@ -154,7 +175,7 @@ def build_backend(test: bool = False) -> bool:
     print(f"\n[2/2] 重启后端容器...")
     try:
         run(["docker", "compose", "-f", COMPOSE_FILE, "restart", "backend"],
-            cwd=DEPLOY_DIR, timeout=60)
+            cwd=DEPLOY_DIR, timeout=60, env=build_compose_env())
         print("  \033[32m[OK] 后端容器已重启\033[0m")
     except subprocess.CalledProcessError:
         print("  \033[31m[ERROR] 容器重启失败\033[0m")
@@ -187,7 +208,7 @@ def build_frontend(test: bool = False) -> bool:
         print("  前端容器未运行，正在启动...")
         try:
             run(["docker", "compose", "-f", COMPOSE_FILE, "up", "-d", "frontend"],
-                cwd=DEPLOY_DIR, timeout=120)
+                cwd=DEPLOY_DIR, timeout=120, env=build_compose_env())
             print("  \033[32m[OK] 前端容器已启动\033[0m")
         except subprocess.CalledProcessError:
             print("  \033[31m[ERROR] 前端容器启动失败\033[0m")
@@ -196,7 +217,7 @@ def build_frontend(test: bool = False) -> bool:
         print("[1/1] 重启前端容器 (触发 pnpm install + vite dev)...")
         try:
             run(["docker", "compose", "-f", COMPOSE_FILE, "restart", "frontend"],
-                cwd=DEPLOY_DIR, timeout=120)
+                cwd=DEPLOY_DIR, timeout=120, env=build_compose_env())
             print("  \033[32m[OK] 前端容器已重启\033[0m")
         except subprocess.CalledProcessError:
             print("  \033[31m[ERROR] 容器重启失败\033[0m")
@@ -229,7 +250,7 @@ def show_status() -> None:
     step_header("服务状态")
     try:
         run(["docker", "compose", "-f", COMPOSE_FILE, "ps"],
-            cwd=DEPLOY_DIR, check=False)
+            cwd=DEPLOY_DIR, check=False, env=build_compose_env())
     except Exception:
         pass
 

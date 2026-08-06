@@ -98,6 +98,7 @@ describe('V2 same-origin request core', () => {
         refreshCalls += 1
         return apiResponse({
           userInfo: {
+            tenantId: '1001',
             userId: '1',
             username: 'admin',
             roles: ['SUPER_ADMIN'],
@@ -161,6 +162,7 @@ describe('V2 same-origin request core', () => {
         return apiResponse({
           token: 'exposed-secret',
           userInfo: {
+            tenantId: '1001',
             userId: '1',
             username: 'admin',
             roles: ['SUPER_ADMIN'],
