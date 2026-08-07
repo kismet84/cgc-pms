@@ -53,9 +53,7 @@ function Test-PrPushCiEvidence {
       $path -eq 'backend/pom.xml' -or
       $path -eq 'frontend-admin-v2/package.json' -or
       $path -eq 'frontend-admin-v2/playwright.config.ts' -or
-      $path -eq 'frontend-admin-v2/scripts/e2e-spec-groups.mjs' -or
-      $path -eq 'frontend-admin-v2/scripts/run-migration-ui-gate.mjs' -or
-      $path -eq 'frontend-admin-v2/scripts/run-push-quality-gate.mjs' -or
+      $path.StartsWith('frontend-admin-v2/scripts/') -or
       $path.StartsWith('scripts/ci/') -or
       $path -eq 'scripts/codex-autopilot/verify-pre-pr-ci.ps1' -or
       $path -eq 'scripts/codex-autopilot/codex-autopilot.config.json' -or

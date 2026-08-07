@@ -58,6 +58,8 @@ $controlPlane = $arguments.Clone(); $controlPlane.ChangedFiles = @([pscustomobje
 Assert-Rejected { Test-PrPushCiEvidence @controlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
 $selectorControlPlane = $arguments.Clone(); $selectorControlPlane.ChangedFiles = @([pscustomobject]@{ filename='frontend-admin-v2/scripts/e2e-spec-groups.mjs' })
 Assert-Rejected { Test-PrPushCiEvidence @selectorControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
+$frontendScriptControlPlane = $arguments.Clone(); $frontendScriptControlPlane.ChangedFiles = @([pscustomobject]@{ filename='frontend-admin-v2/scripts/generate-route-ledger.mjs' })
+Assert-Rejected { Test-PrPushCiEvidence @frontendScriptControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
 $wrongHead = $arguments.Clone(); $wrongHead.PullRequest = New-PullRequest ('c' * 40) $baseSha
 Assert-Rejected { Test-PrPushCiEvidence @wrongHead } 'PR_PUSH_CI_HEAD_MISMATCH'
 $wrongBase = $arguments.Clone(); $wrongBase.PullRequest = New-PullRequest $headSha ('d' * 40)
