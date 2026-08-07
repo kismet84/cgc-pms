@@ -1,7 +1,7 @@
 {
-  "current_commit": "8b8badf6bde0fd176dd7c00f67ca1d13d6187cf7",
+  "current_commit": "8f69b503d2fb06cc25daea1ce9c90114215c10f3",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-07T09:03:10.133Z",
+  "generation_time": "2026-08-07T10:11:18.667Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -53,13 +53,14 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 3810,
-  "repository_file_count": 3810,
-  "included_file_count": 2540,
+  "repository_file_count": 3814,
+  "included_file_count": 2544,
   "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "frontend_v2"
+      "agent_platform",
+      "delivery_tooling"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -72,7 +73,7 @@
         "plugins/**"
       ],
       "file_count": 80,
-      "fingerprint": "5c8f92f5bade892eb65392a53ce550d517381820bf416f2a85ea5fc5b5ced07f"
+      "fingerprint": "fdd342d2be3e3d076d970735de97ae2e278bca9fbc0dd0a4a51b28bea219dd12"
     },
     {
       "id": "backend",
@@ -91,8 +92,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 260,
-      "fingerprint": "97eb5b76382ad99f0ffa0bc62884ffe00a048b7f433e66ef717910c46e791152"
+      "file_count": 264,
+      "fingerprint": "59d99d6b61955e8ab87d5dcddbf2469707cf4f3860dffe5b8e1fb0477920cb02"
     },
     {
       "id": "documentation",

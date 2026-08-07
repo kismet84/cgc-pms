@@ -58,6 +58,8 @@ function Get-JobBlock([string]$Workflow,[string]$JobName) {
 
 $workflow = Read-RepoText '.github\workflows\ci.yml'
 $postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
+$postMergeVerifier = Read-RepoText 'scripts\ci\verify-post-merge-ci.ps1'
+$codeOwners = Read-RepoText '.github\CODEOWNERS'
 $backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
 $frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
 $dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
@@ -88,13 +90,14 @@ $actualJobs = @([regex]::Matches($jobsText,'(?m)^  ([a-z0-9][a-z0-9-]*):\r?$') |
 $prePrGatePath = Join-Path $RepoRoot 'scripts\codex-autopilot\verify-pre-pr-ci.ps1'
 . $prePrGatePath
 $requiredJobs = @($script:PrePrRequiredJobs)
-Assert-SetEqual $actualJobs $requiredJobs 'workflow jobs versus pre-PR evidence jobs'
+Assert-SetEqual $actualJobs @($requiredJobs + 'pr-push-evidence') 'workflow jobs versus pre-PR evidence jobs'
 
 $summary = Get-JobBlock $workflow 'build-summary'
 $summaryNeeds = @([regex]::Matches($summary,'(?m)^      - ([a-z0-9][a-z0-9-]*)\r?$') | ForEach-Object { $_.Groups[1].Value })
-Assert-SetEqual $summaryNeeds @($requiredJobs | Where-Object { $_ -ne 'build-summary' }) 'build-summary needs versus gate jobs'
-Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.sql-safety-scan.result') 'build-summary'
+Assert-SetEqual $summaryNeeds @(($requiredJobs | Where-Object { $_ -ne 'build-summary' }) + 'pr-push-evidence') 'build-summary needs versus gate jobs'
+Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.sql-safety-scan.result','PR push evidence: ${{ needs.pr-push-evidence.result }}') 'build-summary'
 
+$prPushEvidence = Get-JobBlock $workflow 'pr-push-evidence'
 $backendTest = Get-JobBlock $workflow 'backend-test'
 $backendMySql = Get-JobBlock $workflow 'backend-test-mysql'
 $backendDependency = Get-JobBlock $workflow 'backend-dependency-scan'
@@ -105,19 +108,39 @@ $e2e = Get-JobBlock $workflow 'e2e'
 $sqlSafety = Get-JobBlock $workflow 'sql-safety-scan'
 
 Assert-Contains $workflow @('branches-ignore: [master, main]','pull_request:','branches: [master, main]','workflow_dispatch:') 'workflow triggers'
+Assert-Contains $workflow @('run-name: CI ${{ github.event_name }} ${{ github.event.pull_request.number || github.sha }}') 'workflow run identity'
 Assert-Contains $workflow @(
   'concurrency:','group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}','cancel-in-progress: true'
 ) 'workflow concurrency cancellation'
+Assert-Contains $prPushEvidence @(
+  'actions: read','contents: read','pull-requests: read',
+  'if: github.event_name == ''pull_request'' && github.event.pull_request.head.repo.full_name == github.repository',
+  'continue-on-error: true','ref: ${{ github.event.pull_request.base.sha }}','persist-credentials: false',
+  'scripts/ci/verify-pr-push-evidence.ps1','run-full: ${{ steps.mode.outputs.run-full }}',
+  'REUSE_ENABLED: ${{ vars.CI_PR_PUSH_REUSE_ENABLED }}',
+  "`$mode = 'bootstrap-full'","`$mode = 'reuse-disabled-full'","`$mode = 'evidence-failed-full'",
+  "`$mode = 'fork-full'","`$mode = 'reused-push-ci'"
+) 'PR push evidence reuse'
 Assert-Contains $workflow @(
   'trivyColdCache:','description: Run supply-chain scan with an isolated empty Trivy cache',
   'required: false','default: false','type: boolean'
 ) 'workflow_dispatch Trivy cold-cache input'
 if ($workflow.Contains("branches: ['**']")) { throw 'full CI must not rerun after protected default-branch merges' }
 Assert-Contains $postMergeWorkflow @(
-  'name: Post-merge verification','branches: [master, main]','contents: read','checks: read','pull-requests: read',
+  'name: Post-merge verification','branches: [master, main]','actions: read','contents: read','pull-requests: read',
   'post-merge-verification:','./scripts/ci/verify-post-merge-ci.ps1',
   './scripts/ci/test-workflow-contract.ps1','./scripts/codex-autopilot/test-codex-task-execution-policy.ps1'
 ) 'post-merge workflow'
+Assert-Contains $postMergeVerifier @(
+  "'--event', 'push'","'--event', 'pull_request'",'Test-PrePrCiEvidence',
+  'displayTitle','pr-push-evidence','POST_MERGE_PR_CI_EVIDENCE_MISSING',
+  'POST_MERGE_PR_PUSH_EVIDENCE_MISSING','POST_MERGE_TREE_MISMATCH','FORK_FULL_PR_CI'
+) 'post-merge exact-run evidence'
+Assert-Contains $codeOwners @(
+  '/.github/CODEOWNERS @kismet84','/.github/workflows/ @kismet84',
+  '/.github/actions/ @kismet84','/scripts/ci/ @kismet84',
+  '/scripts/codex-autopilot/verify-pre-pr-ci.ps1 @kismet84'
+) 'CI control-plane CODEOWNERS'
 $postMergeJobsMatch = [regex]::Match($postMergeWorkflow,'(?m)^jobs:\r?$')
 if (!$postMergeJobsMatch.Success) { throw 'post-merge workflow jobs mapping is missing' }
 $postMergeJobsText = $postMergeWorkflow.Substring($postMergeJobsMatch.Index + $postMergeJobsMatch.Length)
@@ -127,8 +150,24 @@ $postMergeStepCount = [regex]::Matches($postMergeWorkflow,'(?m)^      - (?:name|
 if ($postMergeStepCount -ne 4) { throw "post-merge workflow must remain lightweight: steps=$postMergeStepCount" }
 if ([regex]::IsMatch($postMergeWorkflow,'(?m)^\s+[a-z-]+: write\s*$')) { throw 'post-merge workflow permissions must remain read-only' }
 if ([regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^permissions:')) { throw 'workflow added global permissions' }
-if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 2) { throw 'job-level permissions declaration count changed' }
+if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 3) { throw 'job-level permissions declaration count changed' }
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
+
+foreach ($jobName in @($requiredJobs | Where-Object { $_ -notin @('build-summary','supply-chain-security','e2e') })) {
+  $job = Get-JobBlock $workflow $jobName
+  Assert-Contains $job @(
+    'needs: pr-push-evidence',
+    "if: needs.pr-push-evidence.outputs.run-full == 'true'"
+  ) "$jobName evidence reuse"
+}
+Assert-Contains $supplyChain @(
+  '[pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]',
+  "if: needs.pr-push-evidence.outputs.run-full == 'true'"
+) 'supply-chain evidence reuse'
+Assert-Contains $e2e @(
+  '[pr-push-evidence, backend-test-mysql, frontend-build]',
+  "if: needs.pr-push-evidence.outputs.run-full == 'true'"
+) 'e2e evidence reuse'
 
 Assert-Contains $backendTest @(
   'Install CJK font for PDF tests','fonts-arphic-gbsn00lp','test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
@@ -141,8 +180,8 @@ Assert-Contains $backendMySql @(
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
   '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest',
-  'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true''',
-  'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: ''true'''
+  'CGCPMS_M52_MYSQL_BASELINE: "true"','CGCPMS_M70_MYSQL_CONCURRENCY: "true"',
+  'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: "true"'
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'
@@ -151,7 +190,7 @@ Assert-Contains $frontendV2 @(
   'pnpm check:boundary','pnpm check:route-ledger','pnpm check:design-system'
 ) 'frontend-v2-gate'
 Assert-Contains $supplyChain @(
-  'needs: [backend-test, backend-dependency-scan, frontend-build]',
+  '[pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]',
   'contents: read','id-token: write','attestations: write',
   'run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"',
   'run: |','mkdir -p .trivy-cache',
@@ -178,7 +217,7 @@ if ([regex]::Matches($supplyChain,'uses: actions/cache@[0-9a-f]{40}').Count -ne 
   throw 'supply-chain-security must have exactly one conditional shared-cache restore'
 }
 Assert-Contains $e2e @(
-  'needs: [backend-test-mysql, frontend-build]',
+  '[pr-push-evidence, backend-test-mysql, frontend-build]',
   'image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
   'image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
@@ -186,7 +225,11 @@ Assert-Contains $e2e @(
   'pnpm test:e2e:migration-gate','PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173',
   'PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173','if: failure()'
 ) 'e2e'
-Assert-Contains $sqlSafety @('./scripts/ci/test-workflow-contract.ps1','./scripts/check-sql-safety.ps1') 'sql-safety-scan'
+Assert-Contains $sqlSafety @(
+  './scripts/ci/test-workflow-contract.ps1',
+  './scripts/ci/test-pr-push-evidence.ps1',
+  './scripts/check-sql-safety.ps1'
+) 'sql-safety-scan'
 
 if ([regex]::Matches($workflow,'uses: actions/upload-artifact@[0-9a-f]{40}').Count -ne 9) { throw 'artifact upload count changed' }
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@[0-9a-f]{40}').Count -ne 3) { throw 'artifact download count changed' }
@@ -265,13 +308,16 @@ if ($pushGate.Contains('shell:')) { throw 'frontend pre-push gate must not invok
 $prePushHook = Read-RepoText '.githooks\pre-push'
 Assert-Contains $prePushHook @('set -eu','pnpm --dir frontend-admin-v2 check:pre-push') 'versioned pre-push hook'
 
+& (Join-Path $RepoRoot 'scripts\ci\test-pr-push-evidence.ps1')
+& (Join-Path $RepoRoot 'scripts\ci\test-post-merge-ci-evidence.ps1')
+
 [pscustomobject]@{
   ok = $true
   jobs = @($actualJobs)
   requiredJobCount = $requiredJobs.Count
   artifactUploads = 9
   artifactDownloads = 3
-  permissionBlocks = 2
+  permissionBlocks = 3
   postMergeJobs = $postMergeJobs.Count
   postMergeSteps = $postMergeStepCount
 } | ConvertTo-Json -Depth 4
