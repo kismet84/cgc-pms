@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Each test method uses {@code @Transactional} so seed data is rolled back.
  * Seed codes use unique suffixes per test (MyBatis-Plus snowflake IDs guarantee uniqueness).
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("DashboardService — 6 views business correctness")
 abstract class DashboardServiceTestSupport {

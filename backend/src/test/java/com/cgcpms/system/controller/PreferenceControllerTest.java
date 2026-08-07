@@ -26,9 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TDD RED phase — tests for user preference CRUD APIs.
  * Tests MUST fail initially since PreferenceController and PreferenceService do not exist yet.
  */
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "auth.csrf.enabled=true"
+@SpringBootTest(properties = {"auth.csrf.enabled=true"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

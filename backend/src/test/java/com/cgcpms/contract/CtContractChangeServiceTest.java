@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 覆盖: 分页查询、按ID查询、创建、更新、删除、提交审批等核心操作。
  * 使用 H2 内存数据库，以 contract 30001 (tenant_id=0, project_id=10001) 作为关联合同。
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("CtContractChangeService — 合同变更 CRUD 与审批测试")
 class CtContractChangeServiceTest {

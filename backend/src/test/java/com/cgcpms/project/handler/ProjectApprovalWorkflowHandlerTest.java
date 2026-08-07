@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("ProjectApprovalWorkflowHandler")
 class ProjectApprovalWorkflowHandlerTest {

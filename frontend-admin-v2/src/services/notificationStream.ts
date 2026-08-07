@@ -4,7 +4,30 @@ export interface ResilientStream {
   close(): void
 }
 
-const clientId = featureFlags.notificationMultiClient.enabled ? crypto.randomUUID() : 'default'
+const CLIENT_ID_KEY = 'cgc-pms-stream-client-id'
+const CLIENT_DOCUMENT_KEY = 'cgc-pms-stream-document'
+const CLIENT_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/
+
+function resolveClientId(): string {
+  if (!featureFlags.notificationMultiClient.enabled) return 'default'
+  const existing = sessionStorage.getItem(CLIENT_ID_KEY)
+  const documentId = String(performance.timeOrigin)
+  const navigation = performance.getEntriesByType('navigation')[0] as
+    | PerformanceNavigationTiming
+    | undefined
+  const sameDocument = sessionStorage.getItem(CLIENT_DOCUMENT_KEY) === documentId
+  const reloadedDocument = navigation?.type === 'reload' || navigation?.type === 'back_forward'
+  if (existing && CLIENT_ID_PATTERN.test(existing) && (sameDocument || reloadedDocument)) {
+    sessionStorage.setItem(CLIENT_DOCUMENT_KEY, documentId)
+    return existing
+  }
+  const created = crypto.randomUUID()
+  sessionStorage.setItem(CLIENT_ID_KEY, created)
+  sessionStorage.setItem(CLIENT_DOCUMENT_KEY, documentId)
+  return created
+}
+
+const clientId = resolveClientId()
 
 export function currentStreamClientId(): string {
   return clientId

@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * PayRecordController integration tests for list, getById, and writeback.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("PayRecordController integration tests")

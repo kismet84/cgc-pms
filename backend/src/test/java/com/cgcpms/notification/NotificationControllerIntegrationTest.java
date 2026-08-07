@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>Uses {@code @SpringBootTest} with full application context and
  * {@code MockMvc} to exercise the real servlet filters.</p>
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("通知控制器 SSE 集成测试（全 Security 链路）")

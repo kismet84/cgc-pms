@@ -42,9 +42,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=pay-application-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=pay-application-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

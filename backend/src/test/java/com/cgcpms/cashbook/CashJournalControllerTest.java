@@ -21,9 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=cash-journal-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=cash-journal-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true", "spring.main.lazy-initialization=true"})
+@SpringBootTest(properties = {"spring.main.lazy-initialization=true"})
 @ActiveProfiles("local")
 @DisplayName("CostSummaryService — 成本汇总引擎测试")
 class CostSummaryServiceTest {

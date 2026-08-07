@@ -51,9 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * VUL-019 settlement desensitization tests plus submit workflow baseline.
  */
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=settlement-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=settlement-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

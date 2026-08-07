@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for {@link WfCcService} (createCc + getMyCc).
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("WfCcService 抄送测试")
 class WfCcServiceTest {

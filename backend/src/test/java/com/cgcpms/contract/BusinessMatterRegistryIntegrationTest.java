@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 @Transactional
 class BusinessMatterRegistryIntegrationTest {

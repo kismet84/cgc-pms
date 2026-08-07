@@ -21,9 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=issue-040-019-test-secret-at-least-32-chars"
+@SpringBootTest(properties = {"jwt.secret=issue-040-019-test-secret-at-least-32-chars"
 })
 @AutoConfigureMockMvc @ActiveProfiles("local")
 @DisplayName("SysMenuController integration tests")

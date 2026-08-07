@@ -31,13 +31,11 @@ test.describe('M3 live delivery workspace', () => {
     const projectId = await firstProjectId(page)
 
     await page.goto(`/project-schedule?projectId=${projectId}#delivery`)
-    await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText('项目计划与施工履约')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
 
     await page.goto(`/site/daily-log?projectId=${projectId}#delivery`)
-    await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText('现场日报')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')

@@ -32,9 +32,7 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=sub-measure-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=sub-measure-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

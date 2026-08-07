@@ -32,9 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
+@SpringBootTest(properties = {"management.endpoints.web.exposure.include=health,info,metrics,prometheus",
         "management.prometheus.metrics.export.enabled=true"
 })
 @AutoConfigureMockMvc

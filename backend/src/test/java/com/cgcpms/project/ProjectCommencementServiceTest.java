@@ -28,7 +28,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 @Transactional
 @DisplayName("项目开工准入服务端闭环")

@@ -22,9 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.hamcrest.Matchers.nullValue;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=site-daily-log-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=site-daily-log-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

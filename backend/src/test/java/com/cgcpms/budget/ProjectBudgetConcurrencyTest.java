@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 class ProjectBudgetConcurrencyTest {
     private static final long PROJECT = 99191001L;

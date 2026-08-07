@@ -7,6 +7,7 @@ const anonymous = {
   data: null,
 }
 const userInfo = {
+  tenantId: '1001',
   userId: '1',
   username: 'admin',
   realName: '平台管理员',

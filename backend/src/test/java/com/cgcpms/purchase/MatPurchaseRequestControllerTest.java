@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * MatPurchaseRequestController integration tests covering list, getById, create,
  * update, delete, submit, getItems, and saveItemsBatch.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("MatPurchaseRequestController integration tests")

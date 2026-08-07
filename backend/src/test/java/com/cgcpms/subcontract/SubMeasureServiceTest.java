@@ -39,9 +39,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "minio.enabled=true",
+@SpringBootTest(properties = {"minio.enabled=true",
         "minio.endpoint=http://127.0.0.1:9000",
         "minio.access-key=test",
         "minio.secret-key=test",

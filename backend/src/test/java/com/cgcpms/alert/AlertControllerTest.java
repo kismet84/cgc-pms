@@ -36,9 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "jwt.secret=alert-controller-test-secret-key-at-least-sixty-four-characters-long"
+@SpringBootTest(properties = {"jwt.secret=alert-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc @ActiveProfiles("local")
 @DisplayName("AlertController integration tests")

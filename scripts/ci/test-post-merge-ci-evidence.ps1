@@ -50,13 +50,13 @@ $missingPrEvidence = $arguments.Clone(); $missingPrEvidence.PullRequestJobs = @(
 Assert-Rejected { Test-PostMergeCiEvidence @missingPrEvidence } 'POST_MERGE_PR_PUSH_EVIDENCE_MISSING'
 $failedPr = $arguments.Clone(); $failedPr.PullRequestRuns = @((New-Run $headSha 'pull_request' 202 'CI pull_request 9')); $failedPr.PullRequestRuns[0].conclusion = 'failure'
 Assert-Rejected { Test-PostMergeCiEvidence @failedPr } 'POST_MERGE_PR_CI_NOT_GREEN'
-$missingPushJob = $arguments.Clone(); $missingPushJob.PushJobs = @(New-PushJobs | Where-Object { $_.name -ne 'frontend-v2-gate' })
-Assert-Rejected { Test-PostMergeCiEvidence @missingPushJob } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*frontend-v2-gate'
+$missingPushJob = $arguments.Clone(); $missingPushJob.PushJobs = @(New-PushJobs | Where-Object { $_.name -ne 'backend-order-sensitive' })
+Assert-Rejected { Test-PostMergeCiEvidence @missingPushJob } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*backend-order-sensitive'
 $wrongPr = $arguments.Clone(); $wrongPr.PullRequestRuns = @((New-Run $headSha 'pull_request' 202 'CI pull_request 10'))
 Assert-Rejected { Test-PostMergeCiEvidence @wrongPr } 'POST_MERGE_PR_CI_EVIDENCE_MISSING'
 $wrongTree = $arguments.Clone(); $wrongTree.SourceTreeSha = 'd' * 40
 Assert-Rejected { Test-PostMergeCiEvidence @wrongTree } 'POST_MERGE_TREE_MISMATCH'
-$fork = $arguments.Clone(); $fork.MergedPull = $pull.PSObject.Copy(); $fork.MergedPull.head = $pull.head.PSObject.Copy(); $fork.MergedPull.head.repo = [pscustomobject]@{ full_name='outside/fork' }; $fork.PushRuns=@(); $fork.PushJobs=@(); $fork.PullRequestJobs=@((New-PushJobs) + [pscustomobject]@{ name='pr-push-evidence'; status='completed'; conclusion='success' })
+$fork = $arguments.Clone(); $fork.MergedPull = $pull.PSObject.Copy(); $fork.MergedPull.head = $pull.head.PSObject.Copy(); $fork.MergedPull.head.repo = [pscustomobject]@{ full_name='outside/fork' }; $fork.PushRuns=@(); $fork.PushJobs=@(); $fork.PullRequestJobs=@(New-PushJobs)
 $forkResult = Test-PostMergeCiEvidence @fork
 if ($forkResult.mode -ne 'FORK_FULL_PR_CI' -or $null -ne $forkResult.pushRunId) { throw 'fork full PR CI evidence was rejected' }
 

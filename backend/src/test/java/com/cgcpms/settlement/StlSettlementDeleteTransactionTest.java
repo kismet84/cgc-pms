@@ -22,9 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "minio.enabled=true"
+@SpringBootTest(properties = {"minio.enabled=true"
 })
 @ActiveProfiles("local")
 @DisplayName("结算删除级联事务故障注入回归")

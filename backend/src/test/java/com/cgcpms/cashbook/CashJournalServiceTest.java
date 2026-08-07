@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 @Transactional
 class CashJournalServiceTest {

@@ -31,7 +31,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 class ProductionMeasurementClosedLoopIntegrationTest {
     private static final long PROJECT = 99175001L;

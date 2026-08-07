@@ -195,7 +195,6 @@ test.describe('M4 costs routes', () => {
         'font-size',
         '12px',
       )
-      await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

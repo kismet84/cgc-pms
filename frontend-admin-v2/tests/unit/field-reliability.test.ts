@@ -79,6 +79,15 @@ describe('field reliability contracts', () => {
   })
 
   it('uses one client id per tab and closing one SSE client does not close another', async () => {
+    sessionStorage.clear()
+    let navigationType = 'navigate'
+    let timeOrigin = 100
+    vi.stubGlobal('performance', {
+      get timeOrigin() {
+        return timeOrigin
+      },
+      getEntriesByType: () => [{ type: navigationType }],
+    })
     const streams: Array<{ url: string; closed: boolean }> = []
     class FakeEventSource {
       onopen: (() => void) | null = null
@@ -104,9 +113,24 @@ describe('field reliability contracts', () => {
     expect(streams.every((item) => item.url.includes(`clientId=${currentStreamClientId()}`))).toBe(
       true,
     )
+    const firstClientId = currentStreamClientId()
+    vi.resetModules()
+    const reloaded = await import('@/services/notificationStream')
+    expect(reloaded.currentStreamClientId()).toBe(firstClientId)
+    timeOrigin = 200
+    navigationType = 'reload'
+    vi.resetModules()
+    const browserReload = await import('@/services/notificationStream')
+    expect(browserReload.currentStreamClientId()).toBe(firstClientId)
+    timeOrigin = 300
+    navigationType = 'navigate'
+    vi.resetModules()
+    const duplicatedTab = await import('@/services/notificationStream')
+    expect(duplicatedTab.currentStreamClientId()).not.toBe(firstClientId)
     first.close()
     expect(streams.map((item) => item.closed)).toEqual([true, false])
     second.close()
+    sessionStorage.clear()
     vi.unstubAllGlobals()
   })
 

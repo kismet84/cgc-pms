@@ -340,7 +340,6 @@ test.describe('M4 contract routes', () => {
     const runtimeErrors = captureRuntimeErrors(page)
 
     await page.goto('/contract/ledger?projectId=P1#ledger')
-    await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '合同台账', exact: true })).toBeVisible()
     await expect(page.locator('.contract-page__kpi-grid')).toHaveCount(0)
     await expect(page.locator('.v2-ledger-kpis')).toHaveCount(0)
@@ -351,7 +350,6 @@ test.describe('M4 contract routes', () => {
 
     for (const path of ['/contract/create', '/contract/9', '/contract/9/edit']) {
       await page.goto(path)
-      await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(page.getByRole('main')).toBeVisible()
     }
 

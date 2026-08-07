@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long PROJECT = 99191001L;

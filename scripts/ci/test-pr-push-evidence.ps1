@@ -56,13 +56,15 @@ $behind = $arguments.Clone(); $behind.Comparison = [pscustomobject]@{ behind_by=
 Assert-Rejected { Test-PrPushCiEvidence @behind } 'PR_PUSH_CI_HEAD_BEHIND_BASE'
 $controlPlane = $arguments.Clone(); $controlPlane.ChangedFiles = @([pscustomobject]@{ filename='.github/workflows/ci.yml' })
 Assert-Rejected { Test-PrPushCiEvidence @controlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
+$selectorControlPlane = $arguments.Clone(); $selectorControlPlane.ChangedFiles = @([pscustomobject]@{ filename='frontend-admin-v2/scripts/e2e-spec-groups.mjs' })
+Assert-Rejected { Test-PrPushCiEvidence @selectorControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
 $wrongHead = $arguments.Clone(); $wrongHead.PullRequest = New-PullRequest ('c' * 40) $baseSha
 Assert-Rejected { Test-PrPushCiEvidence @wrongHead } 'PR_PUSH_CI_HEAD_MISMATCH'
 $wrongBase = $arguments.Clone(); $wrongBase.PullRequest = New-PullRequest $headSha ('d' * 40)
 Assert-Rejected { Test-PrPushCiEvidence @wrongBase } 'PR_PUSH_CI_BASE_MISMATCH'
 $wrongEvent = $arguments.Clone(); $wrongEvent.Runs = @((New-Run $headSha 'codex/example' 'pull_request'))
 Assert-Rejected { Test-PrPushCiEvidence @wrongEvent } 'PRE_PR_CI_EVIDENCE_MISSING'
-$missingJob = $arguments.Clone(); $missingJob.Jobs = @(New-Jobs | Where-Object { $_.name -ne 'e2e' })
-Assert-Rejected { Test-PrPushCiEvidence @missingJob } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*e2e'
+$missingJob = $arguments.Clone(); $missingJob.Jobs = @(New-Jobs | Where-Object { $_.name -ne 'backend-order-sensitive' })
+Assert-Rejected { Test-PrPushCiEvidence @missingJob } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*backend-order-sensitive'
 
 Write-Host 'PR push CI evidence self-test passed'

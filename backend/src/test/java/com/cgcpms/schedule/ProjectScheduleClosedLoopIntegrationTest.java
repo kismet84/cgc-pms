@@ -29,7 +29,7 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 class ProjectScheduleClosedLoopIntegrationTest {
     private static final long PROJECT = 99185001L;

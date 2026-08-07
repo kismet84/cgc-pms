@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for {@link WorkflowTaskService} (transfer + addSign).
  * Uses real H2 database with Spring transactions rolled back after each test.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("WorkflowTaskService 转办与加签测试")
 class WorkflowTaskServiceTest {

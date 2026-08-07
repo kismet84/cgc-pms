@@ -40,9 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "spring.main.lazy-initialization=true",
+@SpringBootTest(properties = {"spring.main.lazy-initialization=true",
         "jwt.secret=issue-040-024-controller-test-secret-key-at-least-sixty-four-characters-long"
 })
 @AutoConfigureMockMvc

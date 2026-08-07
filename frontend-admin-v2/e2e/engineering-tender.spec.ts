@@ -7,6 +7,7 @@ type Identity = 'management' | 'ordinary'
 
 const users = {
   management: {
+    tenantId: '0',
     userId: '269',
     username: 'management',
     realName: '管理层',
@@ -24,6 +25,7 @@ const users = {
     ],
   },
   ordinary: {
+    tenantId: '0',
     userId: '300',
     username: 'ordinary',
     realName: '普通用户',
@@ -75,19 +77,38 @@ async function installMocks(page: Page, identity: () => Identity) {
   )
   await page.route('**/api/system/dict/data/by-code/*', (route) => {
     const code = new URL(route.request().url()).pathname.split('/').at(-1)
-    const rows = {
-      bid_status: [
-        { id: '1', dictTypeId: '11', dictLabel: '注册', dictValue: 'PREPARING', status: 'ENABLE' },
-        { id: '2', dictTypeId: '11', dictLabel: '投标', dictValue: 'SUBMITTED', status: 'ENABLE' },
-      ],
-      bid_document_type: [
-        { id: '3', dictTypeId: '12', dictLabel: '招标文件', dictValue: 'TENDER_DOCUMENT', status: 'ENABLE' },
-      ],
-      cash_direction: [
-        { id: '4', dictTypeId: '13', dictLabel: '收入', dictValue: 'IN', status: 'ENABLE' },
-        { id: '5', dictTypeId: '13', dictLabel: '支出', dictValue: 'OUT', status: 'ENABLE' },
-      ],
-    }[code ?? ''] ?? []
+    const rows =
+      {
+        bid_status: [
+          {
+            id: '1',
+            dictTypeId: '11',
+            dictLabel: '注册',
+            dictValue: 'PREPARING',
+            status: 'ENABLE',
+          },
+          {
+            id: '2',
+            dictTypeId: '11',
+            dictLabel: '投标',
+            dictValue: 'SUBMITTED',
+            status: 'ENABLE',
+          },
+        ],
+        bid_document_type: [
+          {
+            id: '3',
+            dictTypeId: '12',
+            dictLabel: '招标文件',
+            dictValue: 'TENDER_DOCUMENT',
+            status: 'ENABLE',
+          },
+        ],
+        cash_direction: [
+          { id: '4', dictTypeId: '13', dictLabel: '收入', dictValue: 'IN', status: 'ENABLE' },
+          { id: '5', dictTypeId: '13', dictLabel: '支出', dictValue: 'OUT', status: 'ENABLE' },
+        ],
+      }[code ?? ''] ?? []
     return route.fulfill({
       status: 200,
       contentType: 'application/json',

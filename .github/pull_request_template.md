@@ -10,13 +10,13 @@
 - 同 SHA、`push` 事件、成功 CI URL：
 
 - [ ] 已运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1`，输出 `status=PASS`
-- [ ] 后端全量测试 `mvnw -C verify` 通过
-- [ ] 后端测试顺序复验 `mvnw -C -Ptest-order-independence test` 通过
+- [ ] 后端全量 H2/JaCoCo `mvnw -C verify` 通过
+- [ ] 历史顺序敏感类复验 `mvnw -C -Ptest-order-independence -Djacoco.skip=true test` 通过
 - [ ] MySQL 非 root、库级最小权限迁移与基线 smoke 通过
 - [ ] 前端 lint、test、type-check、build 通过
 - [ ] 后端依赖、前端依赖、SQL 与制品供应链安全扫描通过
 - [ ] V2 门禁通过
-- [ ] E2E 通过
+- [ ] 浏览器 contract E2E 通过且 `skipped=0`
 - [ ] 新增测试使用独立 ID/编码/单号，未修改共享演示数据或 `sys_user.id = 1`
 - [ ] 测试在前后置阶段按外键反向顺序物理清理本类数据
 

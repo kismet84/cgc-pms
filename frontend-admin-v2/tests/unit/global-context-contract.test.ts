@@ -63,13 +63,23 @@ describe('full V2 public context contract', () => {
       resolve(import.meta.dirname, '../../scripts/run-migration-ui-gate.mjs'),
       'utf-8',
     )
+    const specGroups = readFileSync(
+      resolve(import.meta.dirname, '../../scripts/e2e-spec-groups.mjs'),
+      'utf-8',
+    )
 
     expect(baseline).toContain('全 V2 强制退出门')
     expect(baseline).toContain('不得维护会遗漏新路由的第二份手工页面清单')
     expect(browserGate).toContain("await select(page, '#global-project', 'P1')")
     expect(browserGate).toContain("await select(page, '#global-project', '')")
     expect(browserGate).toContain("await select(page, '#global-report-period', '')")
-    expect(migrationGate).toContain('/^m\\d.*\\.spec\\.ts$/')
+    expect(migrationGate).toContain("from './e2e-spec-groups.mjs'")
+    expect(migrationGate).toContain('E2E classification drift')
+    expect(migrationGate).toContain('stats.skipped > 0')
+    expect(migrationGate).toMatch(
+      /if \(!existsSync\(reportPath\)\) \{[\s\S]*?process\.exit\(1\)/,
+    )
+    expect(specGroups.match(/\.spec\.ts'/g)).toHaveLength(37)
     expect(migrationGate).toContain('PLAYWRIGHT_MIGRATION_WORKERS')
     expect(migrationGate).toContain("'--workers', workers")
   })

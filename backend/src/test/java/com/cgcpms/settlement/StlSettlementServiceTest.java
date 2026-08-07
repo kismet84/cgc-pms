@@ -51,9 +51,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 
  * Demo data: contract 30001 (tenant_id=0, project_id=10001).
  */
-@SpringBootTest(properties = {
-        "spring.main.allow-circular-references=true",
-        "minio.enabled=true"
+@SpringBootTest(properties = {"minio.enabled=true"
 })
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

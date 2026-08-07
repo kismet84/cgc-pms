@@ -158,8 +158,8 @@ public class CommunicationController {
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize(VIEW)
-    public SseEmitter stream() {
-        return eventService.subscribe(UserContext.getCurrentTenantId(), UserContext.getCurrentUserId());
+    public SseEmitter stream(@RequestParam(required = false) String clientId) {
+        return eventService.subscribe(UserContext.getCurrentTenantId(), UserContext.getCurrentUserId(), clientId);
     }
 
     public record ConversationRequest(String type, String name, List<Long> memberIds) {}

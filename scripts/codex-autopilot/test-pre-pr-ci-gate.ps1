@@ -21,10 +21,10 @@ function Assert-Rejected([scriptblock]$Action,[string]$Pattern) {
 $sha = 'a' * 40
 $branch = 'codex/example'
 $result = Test-PrePrCiEvidence -ExpectedHeadSha $sha -ExpectedHeadBranch $branch -Runs @((New-Run $sha)) -Jobs (New-Jobs)
-if ($result.status -ne 'PASS' -or $result.headSha -ne $sha -or @($result.requiredJobs).Count -ne 13) { throw 'valid pre-PR CI evidence was rejected or incomplete' }
+if ($result.status -ne 'PASS' -or $result.headSha -ne $sha -or @($result.requiredJobs).Count -ne 14) { throw 'valid pre-PR CI evidence was rejected or incomplete' }
 
-$missingJobs = @(New-Jobs | Where-Object { $_.name -ne 'e2e' })
-Assert-Rejected { Test-PrePrCiEvidence -ExpectedHeadSha $sha -ExpectedHeadBranch $branch -Runs @((New-Run $sha)) -Jobs $missingJobs } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*e2e'
+$missingJobs = @(New-Jobs | Where-Object { $_.name -ne 'backend-order-sensitive' })
+Assert-Rejected { Test-PrePrCiEvidence -ExpectedHeadSha $sha -ExpectedHeadBranch $branch -Runs @((New-Run $sha)) -Jobs $missingJobs } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*backend-order-sensitive'
 
 $failedJobs = @(New-Jobs)
 ($failedJobs | Where-Object { $_.name -eq 'frontend-v2-gate' }).conclusion = 'failure'

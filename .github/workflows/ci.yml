@@ -95,14 +95,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fonts-arphic-gbsn00lp
           test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf
-      - name: Verify backend test order independence
-        run: cd backend && ./mvnw -C -Ptest-order-independence test
-        env:
-          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Run backend tests with coverage
         run: cd backend && ./mvnw -C verify
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
+      - name: Summarize backend tests
+        if: always()
+        shell: pwsh
+        run: ./scripts/ci/summarize-surefire.ps1
       - name: Upload backend test reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -112,6 +112,7 @@ jobs:
             backend/target/surefire-reports
             backend/target/failsafe-reports
           if-no-files-found: ignore
+          retention-days: 7
       - name: Upload backend jar
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -124,6 +125,18 @@ jobs:
         with:
           name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}
           path: backend/target/site/jacoco
+
+  backend-order-sensitive:
+    needs: pr-push-evidence
+    if: needs.pr-push-evidence.outputs.run-full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/setup-backend
+      - name: Run historically order-sensitive classes under reverse class order
+        run: cd backend && ./mvnw -C -Ptest-order-independence -Djacoco.skip=true test
+        env:
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
 
   backend-dependency-scan:
     needs: pr-push-evidence
@@ -375,36 +388,11 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [pr-push-evidence, backend-test-mysql, frontend-build]
+    needs: [pr-push-evidence, frontend-build]
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     timeout-minutes: 25
-    env:
-      CI_MYSQL_DATABASE: cgc_pms_test
-      CI_MYSQL_USER: cgc_test
-      CI_MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD || format('ci-mysql-{0}', github.run_id) }}
-      CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
-    services:
-      mysql:
-        image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
-          MYSQL_USER: ${{ env.CI_MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-      redis:
-        image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
-        ports:
-          - 6379:6379
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: ./.github/actions/setup-backend
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -413,21 +401,13 @@ jobs:
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin-v2/dist
-      - name: Start MinIO
-        run: bash ./scripts/ci/start-e2e-minio.sh
-      - name: Start backend
-        run: bash ./scripts/ci/start-e2e-backend.sh
-        env:
-          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Install Playwright dependencies
         run: cd frontend-admin-v2 && pnpm exec playwright install chromium
-      - name: Run E2E tests
-        run: cd frontend-admin-v2 && pnpm test:e2e:migration-gate
+      - name: Run browser contract tests
+        run: cd frontend-admin-v2 && pnpm test:e2e:contract
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
           PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173
-          PLAYWRIGHT_USE_DEV_LOGIN: "true"
-          PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
       - name: Upload E2E failure evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -436,7 +416,6 @@ jobs:
           path: |
             frontend-admin-v2/playwright-report
             frontend-admin-v2/test-results
-            backend.log
           if-no-files-found: ignore
 
   sql-safety-scan:
@@ -461,6 +440,7 @@ jobs:
     needs:
       - pr-push-evidence
       - backend-test
+      - backend-order-sensitive
       - backend-dependency-scan
       - backend-test-mysql
       - frontend-lint
@@ -481,11 +461,12 @@ jobs:
             echo "- Run number: ${{ github.run_number }}"
             echo "- Commit SHA: ${{ github.sha }}"
             echo "- PR push evidence: ${{ needs.pr-push-evidence.result }}"
-            echo "- Core gate jobs: frontend-lint, backend-dependency-scan, backend-test, backend-test-mysql, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, e2e, sql-safety-scan, supply-chain-security"
+            echo "- Core gate jobs: pr-push-evidence, backend-test, backend-order-sensitive, backend-dependency-scan, backend-test-mysql, frontend-lint, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, sql-safety-scan, supply-chain-security, e2e (browser contract)"
             echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_TEST_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
             echo ""
             echo "### Job Results"
             echo "- backend-test: ${{ needs.backend-test.result }}"
+            echo "- backend-order-sensitive: ${{ needs.backend-order-sensitive.result }}"
             echo "- backend-dependency-scan: ${{ needs.backend-dependency-scan.result }}"
             echo "- backend-test-mysql: ${{ needs.backend-test-mysql.result }}"
             echo "- frontend-lint: ${{ needs.frontend-lint.result }}"

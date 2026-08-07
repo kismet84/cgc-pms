@@ -62,12 +62,12 @@ description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI �
 ## 首次非 Draft PR 门禁
 
 1. 功能分支最终提交先 push，并在 `event=push`、`headSha=git rev-parse HEAD` 的同一 SHA 上取得完整成功 CI；任何新提交使旧证据失效。
-2. 必须覆盖：后端全量与顺序复验、MySQL 最小权限迁移、前端 lint/test/type-check/build、安全扫描、V2 门禁、E2E 与 `build-summary`。
+2. 必须覆盖：`pr-push-evidence`、后端完整 H2/JaCoCo、历史顺序敏感类复验、MySQL 最小权限迁移、前端 lint/test/type-check/build、安全扫描、V2 门禁与 browser contract E2E；`build-summary` 只展示，不是证据。
 3. 运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1` 绑定分支、SHA、tracked 工作区和全部 job。缺任一证据时禁止创建/转为非 Draft PR，也禁止声明“可提 PR”。
-4. 同仓 PR 创建后的首次 CI 运行独立 `pr-push-evidence`：基分支受信脚本必须证明 PR 精确 HEAD 已有完整成功 push CI、13 个 required jobs 全绿且不落后于事件基线；成功后不重复全量 jobs。任何 SHA 或基线变化使证据失效。
+4. 同仓 PR 创建后的首次 CI 运行独立 `pr-push-evidence`：基分支受信脚本必须证明 PR 精确 HEAD 已有完整成功 push CI、14 个 required jobs 全绿且不落后于事件基线；成功后不重复全量 jobs。任何 SHA 或基线变化使证据失效。
 5. 仅当仓库变量 `CI_PR_PUSH_REUSE_ENABLED=true` 且 `pr-push-evidence` 已配置为受 GitHub Actions App 约束的 required context 时启用复用；verifier 尚未进入基分支、变量未启用、CI 控制面变化或 fork PR，必须自动回退完整 PR CI。
 6. `PR 首次 CI 通过率`以首次 PR run 的 `pr-push-evidence` 与 workflow 终态独立计入；本地成功、push CI 或后续重跑转绿不能追溯改写。
-7. 默认分支合并后只运行轻量 post-merge 证据核验；必须分别绑定 source HEAD 的 push run、带 PR 编号的 PR run、`pr-push-evidence`，并证明 merge tree 与 source tree 一致；fork 则要求 PR run 自身完整 13 jobs。无法证明时 fail-close，并通过 `workflow_dispatch` 补跑完整 CI。
+7. 默认分支合并后只运行轻量 post-merge 证据核验；必须分别绑定 source HEAD 的 push run、带 PR 编号的 PR run、`pr-push-evidence`，并证明 merge tree 与 source tree 一致；fork 则要求 PR run 自身完整 14 jobs。无法证明时 fail-close，并通过 `workflow_dispatch` 补跑完整 CI。
 
 ## 最小回报
 
