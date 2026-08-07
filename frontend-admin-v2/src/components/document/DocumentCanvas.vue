@@ -1618,7 +1618,7 @@ function round(value: number): number {
 .document-canvas__table-content {
   width: 100%;
   min-height: 100%;
-  color: #000;
+  color: black;
   font-family: sans-serif;
   font-size: 12pt;
   table-layout: fixed;
@@ -1629,7 +1629,7 @@ function round(value: number): number {
 .document-canvas__table-content td {
   box-sizing: content-box;
   padding: 1mm;
-  border: 0.2mm solid #333;
+  border: 0.2mm solid rgb(51 51 51);
 }
 .document-canvas__table-content code {
   font-family: inherit;
