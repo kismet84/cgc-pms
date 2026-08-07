@@ -18,6 +18,7 @@ vi.mock('@/services/system-management', () => ({
   loadDocumentTemplates: vi.fn(),
   publishDocumentVersion: vi.fn(),
   previewDocumentTemplateHtml: vi.fn(),
+  previewDocumentTemplateVersionHtml: vi.fn(),
   updateDocumentVersion: vi.fn(),
 }))
 
@@ -111,7 +112,7 @@ beforeEach(() => {
     realName: '管理员',
     tenantId: '1001',
     roles: ['ADMIN'],
-    permissions: ['document:template:edit', 'document:template:publish'],
+    permissions: ['document:template:edit', 'document:template:publish', 'document:generate'],
   })
   vi.mocked(service.loadDocumentTemplates).mockImplementation(async (businessType) =>
     businessType === 'SETTLEMENT' ? [settlementTemplate] : [paymentTemplate],
@@ -158,11 +159,14 @@ beforeEach(() => {
     ],
   }))
   vi.mocked(service.previewDocumentTemplateHtml).mockResolvedValue({ html: '<p>preview</p>' })
+  vi.mocked(service.previewDocumentTemplateVersionHtml).mockImplementation(async (versionId) => ({
+    html: `<p>rendered-${versionId}</p>`,
+  }))
   vi.mocked(service.deleteDocumentTemplate).mockResolvedValue()
 })
 
 describe('M7 document template page', () => {
-  it('loads three selection columns and changes versions without another request', async () => {
+  it('loads server-rendered HTML and changes versions without reloading template details', async () => {
     const wrapper = mount(DocumentTemplatePage)
     await flushPromises()
 
@@ -192,17 +196,87 @@ describe('M7 document template page', () => {
     expect(wrapper.text()).not.toContain('PAYMENT-001')
     expect(wrapper.text()).toContain('hash-v1')
     expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
-      '<p>v1</p>',
+      '<p>rendered-version-1</p>',
     )
+    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('version-1')
 
     const requestCount = vi.mocked(service.loadDocumentTemplate).mock.calls.length
     await wrapper
       .get('.document-template-page__version-button[aria-pressed="false"]')
       .trigger('click')
+    await flushPromises()
 
     expect(wrapper.text()).toContain('hash-v2')
     expect(wrapper.text()).toContain('payment.amount')
     expect(service.loadDocumentTemplate).toHaveBeenCalledTimes(requestCount)
+    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenLastCalledWith('version-2')
+    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
+      '<p>rendered-version-2</p>',
+    )
+    wrapper.unmount()
+  })
+
+  it('keeps the newest version preview when requests finish out of order', async () => {
+    let resolveV1!: (value: { html: string }) => void
+    let resolveV2!: (value: { html: string }) => void
+    vi.mocked(service.previewDocumentTemplateVersionHtml).mockImplementation(
+      (versionId) =>
+        new Promise((resolve) => {
+          if (versionId === 'version-1') resolveV1 = resolve
+          else resolveV2 = resolve
+        }),
+    )
+    const wrapper = mount(DocumentTemplatePage)
+    await flushPromises()
+    await wrapper
+      .get('.document-template-page__version-button[aria-pressed="false"]')
+      .trigger('click')
+    resolveV2({ html: '<p>newest</p>' })
+    await flushPromises()
+    resolveV1({ html: '<p>stale</p>' })
+    await flushPromises()
+
+    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toBe(
+      '<p>newest</p>',
+    )
+    wrapper.unmount()
+  })
+
+  it('does not request or expose template source without preview permissions', async () => {
+    useSessionStore().replaceUserInfo({
+      userId: '2',
+      username: 'reader',
+      realName: '只读用户',
+      tenantId: '1001',
+      roles: [],
+      permissions: ['document:template:query'],
+    })
+    const wrapper = mount(DocumentTemplatePage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('无 HTML 预览权限')
+    expect(service.previewDocumentTemplateVersionHtml).not.toHaveBeenCalled()
+    expect(wrapper.find('iframe[title="选中模板版本 HTML 预览"]').exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('&lt;p&gt;v1&lt;/p&gt;')
+    wrapper.unmount()
+  })
+
+  it('allows an admin role to use server preview without explicit permission codes', async () => {
+    useSessionStore().replaceUserInfo({
+      userId: '1',
+      username: 'admin',
+      realName: '管理员',
+      tenantId: '1001',
+      roles: ['ADMIN'],
+      permissions: [],
+    })
+    const wrapper = mount(DocumentTemplatePage)
+    await flushPromises()
+
+    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('version-1')
+    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
+      '<p>rendered-version-1</p>',
+    )
     wrapper.unmount()
   })
 

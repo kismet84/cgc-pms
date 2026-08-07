@@ -58,6 +58,10 @@ if ($PlanPath) {
   $text = Get-Content -LiteralPath $resolvedPlan -Raw -Encoding UTF8
   $missingPatterns = @(Get-MissingPlanProfilePatterns -Text $text -Name $Profile)
   if ($missingPatterns.Count -gt 0) { throw "plan profile $Profile is missing required content: $($missingPatterns -join ', ')" }
+  $statusLines = @($text -split "\r?\n" | Where-Object { $_ -match '^(?:>\s*)?(?:状态|计划状态|最终状态|当前裁决)\s*[：:]' })
+  if (($statusLines -match 'GIT_DELIVERY_MERGED') -and ($statusLines -match 'GIT_DELIVERY_PENDING')) {
+    throw 'merged mainline status still contains GIT_DELIVERY_PENDING'
+  }
   if ($text -match '(?im)^.*(?:run id|临时日志路径|截图名)\s*[=:：].+$') { throw 'plan contains session-only temporary artifact identifiers' }
 }
 

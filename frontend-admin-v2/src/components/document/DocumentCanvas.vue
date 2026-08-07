@@ -200,6 +200,7 @@ const overflowIds = computed(() => {
     .map((item) => item.id)
   return [...elementIds, ...tableIds]
 })
+const layoutConflict = computed(() => flowLayoutConflict(props.modelValue))
 
 function commit(patch: Partial<DocumentDesignSchema>): void {
   const value = { ...props.modelValue, ...patch }
@@ -230,8 +231,31 @@ function valid(value: DocumentDesignSchema): boolean {
         item.yMm >= margin.top &&
         item.xMm + item.widthMm <= size.width - margin.right &&
         item.yMm + item.heightMm <= size.height - margin.bottom,
-    )
+    ) &&
+    !flowLayoutConflict(value)
   )
+}
+
+function flowLayoutConflict(value: DocumentDesignSchema): string {
+  const tables = [...value.tables].sort((a, b) => a.yMm - b.yMm)
+  for (let index = 1; index < tables.length; index += 1) {
+    const previous = tables[index - 1]!
+    const current = tables[index]!
+    if (current.yMm < previous.yMm + previous.heightMm) {
+      return `明细表 ${current.id} 与 ${previous.id} 的设计占位重叠`
+    }
+  }
+  for (const table of tables) {
+    const conflict = value.elements.find(
+      (element) =>
+        (element.repeat ?? 'BODY') === 'BODY' &&
+        table.xMm < element.xMm + element.widthMm &&
+        table.xMm + table.widthMm > element.xMm &&
+        element.yMm + element.heightMm > table.yMm,
+    )
+    if (conflict) return `流式明细表 ${table.id} 可能与正文元素 ${conflict.id} 重叠`
+  }
+  return ''
 }
 
 watch(
@@ -492,6 +516,21 @@ function primaryItem(): CanvasItem | undefined {
 
 function canApplyLayout(action: LayoutAction): boolean {
   const count = selectedItems.value.length
+  if (
+    selectedItems.value.some((item) =>
+      props.modelValue.tables.some((table) => table.id === item.id),
+    ) &&
+    ![
+      'LEFT',
+      'CENTER',
+      'RIGHT',
+      'DISTRIBUTE_HORIZONTAL',
+      'SPACE_HORIZONTAL',
+      'ATTACH_HORIZONTAL',
+      'EQUAL_WIDTH',
+    ].includes(action)
+  )
+    return false
   if (action === 'ROUND_MM') return count > 0
   if (action.startsWith('DISTRIBUTE_')) return count >= 3
   if (
@@ -898,6 +937,9 @@ function round(value: number): number {
       <p v-if="overflowIds.length" class="document-canvas__warning" role="alert">
         {{ overflowIds.length }} 个元素越出页面安全区域，保存已阻止。
       </p>
+      <p v-else-if="layoutConflict" class="document-canvas__warning" role="alert">
+        {{ layoutConflict }}，保存已阻止。
+      </p>
       <div class="document-canvas__viewport" :class="{ 'is-preview': viewMode === 'PREVIEW' }">
         <div
           v-if="viewMode === 'DESIGN'"
@@ -1006,12 +1048,28 @@ function round(value: number): number {
             @pointercancel="stopInteraction"
             @focus="focusItem(table.id)"
           >
-            <strong>{{ table.collectionPath }} 明细表</strong>
-            <div class="document-canvas__table-columns">
-              <span v-for="column in table.columns" :key="column.fieldPath">{{
-                column.header
-              }}</span>
-            </div>
+            <table class="document-canvas__table-content">
+              <thead>
+                <tr>
+                  <th
+                    v-for="column in table.columns"
+                    :key="column.fieldPath"
+                    :style="{ width: `${column.widthMm}mm` }"
+                  >
+                    {{ column.header }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td v-for="column in table.columns" :key="column.fieldPath">
+                    <code
+                      v-text="'{{' + column.fieldPath.slice(table.collectionPath.length + 1) + '}}'"
+                    ></code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
             <button
               type="button"
               class="document-canvas__resize"
@@ -1240,6 +1298,9 @@ function round(value: number): number {
         </template>
         <template v-else-if="viewMode === 'DESIGN' && selectedTable">
           <p>{{ selectedTable.collectionPath }} 明细列</p>
+          <p class="document-canvas__hint">
+            Y 为首表锚点或表间设计间距；高度为最小占位，实际行数会向后推流式表格。
+          </p>
           <div
             v-for="(column, index) in selectedTable.columns"
             :key="column.fieldPath"
@@ -1525,11 +1586,11 @@ function round(value: number): number {
 .document-canvas__table {
   position: absolute;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
   cursor: move;
   user-select: none;
   background: var(--v2-color-primary-soft);
-  border: 1px solid var(--v2-color-primary);
+  outline: 1px solid var(--v2-color-primary);
 }
 .document-canvas__element {
   display: grid;
@@ -1554,20 +1615,24 @@ function round(value: number): number {
   border: 0;
   border-top: 0.3mm solid var(--v2-color-text);
 }
-.document-canvas__table strong {
-  display: block;
-  padding: 1mm;
-  font-size: 10px;
+.document-canvas__table-content {
+  width: 100%;
+  min-height: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: white;
 }
-.document-canvas__table-columns {
-  display: flex;
-  height: calc(100% - 6mm);
-}
-.document-canvas__table-columns span {
-  flex: 1;
+.document-canvas__table-content th,
+.document-canvas__table-content td {
+  box-sizing: border-box;
   padding: 1mm;
-  font-size: 9px;
-  border: 1px solid var(--v2-color-border);
+  font-size: 10pt;
+  text-align: left;
+  vertical-align: top;
+  border: 0.2mm solid var(--v2-color-text);
+}
+.document-canvas__table-content code {
+  font-size: inherit;
 }
 .document-canvas__element.is-selected,
 .document-canvas__table.is-selected {
@@ -1581,7 +1646,7 @@ function round(value: number): number {
 .document-canvas__element.is-overflow,
 .document-canvas__table.is-overflow {
   background: var(--v2-color-danger-soft);
-  border-color: var(--v2-color-danger);
+  outline-color: var(--v2-color-danger);
 }
 .document-canvas__resize {
   position: absolute;

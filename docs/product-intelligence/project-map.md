@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-08-07 主线79：单据渲染一致性与交付状态校准待 Git 交付
+
+- 问题源：`ISSUE-079-001`；状态 `IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_PENDING`。
+- 目标链：`tables[] → 单一流式布局契约 → HTML/PDF`；`版本选择 → 服务端版本预览API → sandbox iframe`；`PR #399 → 第77条载体一致`。
+- 最小方案：复用编译器、模板引擎、PDF引擎、现有版本API与状态机；不建第二渲染链。
+- 数据边界：历史 V1 保持不可变并停用；tenant 0 已新建、发布并默认绑定 V2。
+- 证据：后端2577、前端499测试，服务端HTML/PDF、三档浏览器视口、状态机金丝雀和治理门均通过。
+- 计划：[`第79条主线`](../plans/第79条主线-单据渲染一致性与交付状态校准任务计划书.md)。
+
 ## 2026-08-06 主线78：全审批业务单据可视化模板已合并
 
 - 问题源：`ISSUE-078-001`已关闭；状态`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`。PR #400合并SHA为`08fa71d5d906564393daee40faeb5caf064b2334`，post-merge run `31101912189`成功。
@@ -9,9 +18,9 @@
 - 验证：28/28 Provider、后端2570项、真实MySQL空库/升级、前端485项、PDF跨页、真实分包计量、A4保存重开、“业务模块—模板—HTML预览”三栏及画布编辑器窄屏通过；实现SHA的push CI `31100112881`、PR CI `31100974994`均13/13成功；默认模板`SUB_MEASURE_CANVAS_078` V1已发布。
 - 计划：[`第78条主线`](../plans/第78条主线-全审批业务单据可视化模板与完整详情字段任务计划书.md)。
 
-## 2026-08-06 主线77：通知可靠性与现场履约 PWA 本地完成
+## 2026-08-06 主线77：通知可靠性与现场履约 PWA 已合并
 
-- 问题源：`ISSUE-077-001`已关闭；状态 `IMPLEMENTED / G0-G5_PASSED / LOCAL_ONLY / GIT_DELIVERY_PENDING`。
+- 问题源：`ISSUE-077-001`已关闭；状态 `IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`。PR #399 合并 SHA `6caaf895d7996b48b778a503f81ec8031a39ea90`，post-merge run `31086766657` 成功。
 - 目标链：`服务端事实提交 → 多客户端最小通知 → 列表补读`；`V2登录/项目范围 → 本地草稿 → 显式同步 → 服务端幂等/冲突 → 读回权威事实`。
 - 复用：既有日报、质量安全、文件 CLEAN、项目访问、职责分离和 V2 页面；不建平行业务表或第二移动前端。
 - 计划：[`第77条主线`](../plans/第77条主线-v1.6可靠性加固与现场履约PWA本地试点任务计划书.md)。
