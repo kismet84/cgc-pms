@@ -147,7 +147,7 @@ services:
       clamav:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       # Bind-mount source code — build JAR on host first: cd backend && ./mvnw clean package -DskipTests
       - ../backend:/app
@@ -216,7 +216,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       # Bind-mount source code — edit on host, HMR updates browser instantly
       - ../frontend-admin-v2:/app
@@ -240,7 +240,7 @@ services:
     command: >
       sh /app/scripts/docker-dev-entrypoint.sh
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173/api/actuator/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 12
