@@ -1,12 +1,13 @@
 # CGC-PMS 项目地图
 
-## 2026-08-07 主线79：单据渲染一致性与交付状态校准待 Git 交付
+## 2026-08-07 主线79：单据渲染一致性与交付状态校准已合并
 
-- 问题源：`ISSUE-079-001`；状态 `IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_PENDING`。
+- 问题源：`ISSUE-079-001`已关闭；状态 `IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`。
 - 目标链：`tables[] → 单一流式布局契约 → HTML/PDF`；`版本选择 → 服务端版本预览API → sandbox iframe`；`PR #399 → 第77条载体一致`。
 - 最小方案：复用编译器、模板引擎、PDF引擎、现有版本API与状态机；不建第二渲染链。
 - 数据边界：历史 V1 保持不可变并停用；tenant 0 已新建、发布并默认绑定 V2。
 - 证据：后端2577、前端499测试，服务端HTML/PDF、三档浏览器视口、状态机金丝雀和治理门均通过。
+- Git：PR #404，merge SHA `6cb8cedabe17bce1e22593aad89cabf4ba66e828`；post-merge run `31153245541` 成功。
 - 计划：[`第79条主线`](../plans/第79条主线-单据渲染一致性与交付状态校准任务计划书.md)。
 
 ## 2026-08-06 主线78：全审批业务单据可视化模板已合并
