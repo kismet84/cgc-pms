@@ -66,6 +66,8 @@ server {
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
         proxy_buffering on;
+        proxy_buffer_size 16k;
+        proxy_buffers 8 16k;
     }
 
     location / {

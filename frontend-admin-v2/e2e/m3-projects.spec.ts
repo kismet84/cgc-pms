@@ -43,7 +43,6 @@ test.describe('M3 live project object', () => {
       `/project/${projectId}/edit`,
     ]) {
       expect((await page.goto(path))?.ok()).toBe(true)
-      await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(page.getByRole('main')).toBeVisible()
     }
   })

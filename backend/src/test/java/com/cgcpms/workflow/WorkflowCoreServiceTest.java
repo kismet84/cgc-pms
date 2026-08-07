@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>Template enabled/disabled behavior</li>
  * </ul>
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("WorkflowCoreService 内部核心逻辑测试")
 class WorkflowCoreServiceTest {

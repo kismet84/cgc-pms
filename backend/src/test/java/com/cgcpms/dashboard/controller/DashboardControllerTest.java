@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * DashboardController integration tests — routing, auth, and parameter binding.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("DashboardController — routing, auth, parameter binding")

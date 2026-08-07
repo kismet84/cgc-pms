@@ -31,7 +31,7 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("SubMeasureWorkflowHandler — approval lifecycle tests")
 class SubMeasureWorkflowHandlerTest {

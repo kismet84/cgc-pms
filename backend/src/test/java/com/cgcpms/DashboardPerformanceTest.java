@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * instead of looping per-project {@code getProjectSummary()} calls,
  * reducing SQL queries from ~42 (N+1) to ≤20 for 5 active projects.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 class DashboardPerformanceTest {
 

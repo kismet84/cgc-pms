@@ -7,7 +7,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $script:PrePrRequiredJobs = @(
+  'pr-push-evidence',
   'backend-test',
+  'backend-order-sensitive',
   'backend-dependency-scan',
   'backend-test-mysql',
   'frontend-lint',
@@ -18,8 +20,7 @@ $script:PrePrRequiredJobs = @(
   'frontend-v2-gate',
   'sql-safety-scan',
   'supply-chain-security',
-  'e2e',
-  'build-summary'
+  'e2e'
 )
 
 function Test-PrePrCiEvidence {

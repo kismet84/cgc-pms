@@ -32,7 +32,7 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true", "spring.main.lazy-initialization=true"})
+@SpringBootTest(properties = {"spring.main.lazy-initialization=true"})
 @ActiveProfiles("local")
 @DisplayName("PaymentWriteback — 付款写回幂等/超付/级联测试")
 class PaymentWritebackTest {

@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TDD tests for VarOrderController listItems fix.
  * Validates that GET /var-orders/{id}/items returns item list (array), not parent VO.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("VarOrderController — listItems fix")

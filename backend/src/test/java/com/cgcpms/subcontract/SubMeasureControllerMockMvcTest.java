@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TDD tests for SubMeasureController listItems fix.
  * Validates that GET /sub-measures/{id}/items returns item list (array), not parent VO.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("SubMeasureController — listItems fix")

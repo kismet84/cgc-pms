@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>getMyCc — my carbon copies (pagination, empty page, cc from submit)</li>
  * </ul>
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("WorkflowQueryService 查询服务测试")
 class WorkflowQueryServiceTest {

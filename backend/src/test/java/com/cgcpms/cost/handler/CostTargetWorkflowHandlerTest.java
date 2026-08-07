@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("CostTargetWorkflowHandler — approval lifecycle tests")
 class CostTargetWorkflowHandlerTest {

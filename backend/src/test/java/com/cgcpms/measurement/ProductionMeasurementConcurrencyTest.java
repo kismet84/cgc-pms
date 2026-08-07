@@ -30,7 +30,7 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true","minio.enabled=true"})
+@SpringBootTest(properties = {"minio.enabled=true"})
 @ActiveProfiles("local")
 class ProductionMeasurementConcurrencyTest {
     private static final long PROJECT=99192001L, PARTNER=99192002L, CONTRACT=99192003L, PERIOD=99192004L;

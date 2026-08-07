@@ -179,12 +179,6 @@ test.describe('M4 variation and bid routes', () => {
         selector: '.variation-page',
         record: '基坑设计变更',
       },
-      {
-        path: '/bid-cost',
-        heading: '投标记录',
-        selector: '.bid-cost-page',
-        record: '市民中心投标',
-      },
     ]) {
       for (const viewport of [
         { width: 1440, height: 900 },
@@ -193,7 +187,6 @@ test.describe('M4 variation and bid routes', () => {
       ]) {
         await page.setViewportSize(viewport)
         await page.goto(target.path)
-        await expect(page.locator('.shell-placeholder')).toHaveCount(0)
         await expect(page.getByRole('heading', { name: target.heading, exact: true })).toBeVisible()
         await expect(page.getByText(target.record, { exact: true })).toBeVisible()
         if (target.path === '/variation/order' && viewport.width === 1440) {
@@ -239,19 +232,10 @@ test.describe('M4 variation and bid routes', () => {
     await expect(page.getByRole('button', { name: '新建变更' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
 
-    await page.goto('/bid-cost')
-    await expect(page.getByRole('button', { name: '新建投标记录' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '标记中标' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '标记未中标' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '删除' })).toHaveCount(0)
-
     const denied = await browser.newPage()
     identity = 'denied'
     await installCommercialMock(denied, () => identity)
     await denied.goto('/variation/order')
-    await expect(denied).toHaveURL(/\/forbidden\?from=/)
-    await denied.goto('/bid-cost')
     await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()
   })

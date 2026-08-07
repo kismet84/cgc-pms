@@ -83,7 +83,7 @@ Assert-Contains 'mainline skill' $mainline @('**Goal:**','**Architecture:**','�
 $canonicalCategories = @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')
 Assert-Contains 'CI skill categories' $ci $canonicalCategories
 Assert-Contains 'CI evidence reuse policy' $ci @(
-  'pr-push-evidence','精确 HEAD','13 个 required jobs','CI_PR_PUSH_REUSE_ENABLED=true','fork PR','push run、带 PR 编号的 PR run','merge tree'
+  'pr-push-evidence','精确 HEAD','14 个 required jobs','CI_PR_PUSH_REUSE_ENABLED=true','fork PR','push run、带 PR 编号的 PR run','merge tree'
 )
 Assert-Contains 'PowerShell ripgrep invocation' $ci @(
   'PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号',
@@ -215,7 +215,7 @@ foreach ($relativePath in $trackedSkillPaths) {
   }
 }
 
-Assert-Contains 'pre-PR gate' $prePrGate @('headBranch','TRACKED_WORKTREE_DIRTY','event','push','PRE_PR_CI_EVIDENCE_MISSING','build-summary','frontend-v2-gate','supply-chain-security','e2e')
+Assert-Contains 'pre-PR gate' $prePrGate @('headBranch','TRACKED_WORKTREE_DIRTY','event','push','PRE_PR_CI_EVIDENCE_MISSING','pr-push-evidence','backend-order-sensitive','frontend-v2-gate','supply-chain-security','e2e')
 Assert-Contains 'CI workflow' $ciWorkflow @(
   'branches-ignore: [master, main]','workflow_dispatch:','pr-push-evidence',
   'verify-pr-push-evidence.ps1','Verify MySQL migration user scope','frontend-v2-gate','supply-chain-security','e2e'

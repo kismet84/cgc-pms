@@ -32,7 +32,7 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = "spring.main.allow-circular-references=true")
+@SpringBootTest
 @ActiveProfiles("local")
 class FinancialAccountingMonthEndClosedLoopIntegrationTest {
     private static final long TENANT = 88192L;

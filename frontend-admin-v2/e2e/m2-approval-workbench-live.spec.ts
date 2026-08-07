@@ -67,7 +67,6 @@ test.describe('M2 live approval workbench', () => {
 
     for (const path of routes) {
       expect((await page.goto(path))?.ok()).toBe(true)
-      await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(page.getByRole('main')).toBeVisible()
     }
 

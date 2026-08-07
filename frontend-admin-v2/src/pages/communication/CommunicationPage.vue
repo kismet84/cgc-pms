@@ -703,7 +703,7 @@ function scanStatusLabel(value: string): string {
 .communication-page__status,
 .communication-page small,
 .communication-page__chat-header p {
-  color: var(--v2-color-text-muted);
+  color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
 }
 .communication-page__alert {

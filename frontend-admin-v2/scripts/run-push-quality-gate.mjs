@@ -2,10 +2,12 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { contractSpecs } from './e2e-spec-groups.mjs'
 
 const frontendRoot = resolve(process.cwd())
 const repositoryRoot = resolve(frontendRoot, '..')
-const fullGateScript = 'test:e2e:migration-gate'
+const fullGateScript = 'test:e2e:contract'
+const contractSpecSet = new Set(contractSpecs.map((name) => `e2e/${name}`))
 const pnpmCli = process.env.npm_execpath
 
 function resolveCommand(command, args) {
@@ -30,7 +32,7 @@ function captureRaw(command, args, cwd = repositoryRoot) {
 const capture = (command, args, cwd = repositoryRoot) => captureRaw(command, args, cwd).trim()
 
 function gitNames(args) {
-  return capture('git', args)
+  return capture('git', ['-c', 'core.quotepath=false', ...args])
     .split(/\r?\n/)
     .map((name) => name.trim().replaceAll('\\', '/'))
     .filter(Boolean)
@@ -101,19 +103,11 @@ const pageE2eSpecs = new Map([
     ],
   ],
   ['dashboard', ['e2e/m1-shell.spec.ts']],
-  [
-    'delivery',
-    [
-      'e2e/m3-closeout.spec.ts',
-      'e2e/m3-delivery.spec.ts',
-      'e2e/m3-quality-safety.spec.ts',
-      'e2e/m3-technical.spec.ts',
-    ],
-  ],
+  ['communication', ['e2e/communication.spec.ts']],
   ['errors', ['e2e/m1-shell.spec.ts']],
   ['finance', ['e2e/m6-finance-control.spec.ts', 'e2e/m6-payment-revenue-invoice.spec.ts']],
   ['master-data', ['e2e/m7-cost-subject.spec.ts', 'e2e/m7-master-data.spec.ts']],
-  ['projects', ['e2e/m3-projects.spec.ts']],
+  ['project', ['e2e/project-file-center.spec.ts']],
   ['settlement', ['e2e/m6-settlement.spec.ts']],
   ['shell', ['e2e/m1-shell.spec.ts']],
   ['subcontract', ['e2e/m6-subcontract-workspace.spec.ts']],
@@ -149,13 +143,20 @@ const unitTests = affected.filter(isUnitTest)
 const changedE2eSpecs = affected
   .filter(isE2eSpec)
   .map((file) => file.replace('frontend-admin-v2/', ''))
+const changedNonContractSpecs = changedE2eSpecs.filter((spec) => !contractSpecSet.has(spec))
 const pages = affected.filter(isPage)
 const fullGateFiles = affected.filter(
   (file) => !isUnitTest(file) && !isE2eSpec(file) && !isPage(file),
 )
 const mappedPageSpecs = relatedSpecs(pages)
-const fullGate = fullGateFiles.length > 0 || mappedPageSpecs === null
-const selectedE2eSpecs = [...new Set([...(mappedPageSpecs ?? []), ...changedE2eSpecs])].sort()
+const fullGate =
+  fullGateFiles.length > 0 || mappedPageSpecs === null || changedNonContractSpecs.length > 0
+const selectedE2eSpecs = [
+  ...new Set([
+    ...(mappedPageSpecs ?? []),
+    ...changedE2eSpecs.filter((spec) => contractSpecSet.has(spec)),
+  ]),
+].sort()
 const dependencyChanged = affected.some(
   (file) =>
     dependencyFiles.has(file) ||

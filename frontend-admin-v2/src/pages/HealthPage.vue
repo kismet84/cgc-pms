@@ -17,17 +17,13 @@ onMounted(async () => {
 <template>
   <main class="health-page">
     <section class="health-card" aria-labelledby="health-title">
-      <p class="eyebrow">CGC-PMS / CLEAN-ROOM V2</p>
-      <h1 id="health-title">隔离底座已启动</h1>
-      <p class="description">当前仅提供静态健康检查。业务页面、旧组件和旧样式尚未接入。</p>
+      <p class="eyebrow">CGC-PMS / V2 管理端</p>
+      <h1 id="health-title">系统健康检查</h1>
+      <p class="description">检查管理端静态资源与后端 API 代理状态。</p>
       <dl class="status-list">
         <div>
-          <dt>V2 静态应用</dt>
+          <dt>V2 管理端</dt>
           <dd class="status-up">可用</dd>
-        </div>
-        <div>
-          <dt>Legacy UI 依赖</dt>
-          <dd class="status-up">0</dd>
         </div>
         <div>
           <dt>API 代理</dt>

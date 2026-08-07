@@ -48,7 +48,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true", "spring.main.lazy-initialization=true"})
+@SpringBootTest(properties = {"spring.main.lazy-initialization=true"})
 @ActiveProfiles("local")
 @DisplayName("AlertEvaluationService — 告警评估引擎测试")
 class AlertEvaluationServiceTest {

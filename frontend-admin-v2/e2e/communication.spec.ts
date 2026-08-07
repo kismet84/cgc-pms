@@ -32,6 +32,7 @@ async function installApi(page: Page) {
     }
     if (pathname === '/api/auth/userinfo') {
       await json(route, {
+        tenantId: '1001',
         userId: '1',
         username: 'tester',
         realName: '测试用户',

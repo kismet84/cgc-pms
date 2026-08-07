@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Demo data: contract 30001 (tenant_id=0, project_id=10001).
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 class StlSettlementQueryServiceTest {
 

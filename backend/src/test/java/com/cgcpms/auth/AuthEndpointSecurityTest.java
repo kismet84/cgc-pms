@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Security test: ensures endpoints annotated with
  * {@code @PreAuthorize("isAuthenticated()")} reject unauthenticated requests.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("Auth endpoint security — unauthenticated → 401")

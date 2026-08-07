@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
  * 使用 H2 内存库（"local" profile）+ 种子数据（V90__h2_integration_test_seed_data.sql）：
  * contract 30001 / partner 20001,20002 / project 10001。
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true", "spring.main.lazy-initialization=true"})
+@SpringBootTest(properties = {"spring.main.lazy-initialization=true"})
 @ActiveProfiles("local")
 @DisplayName("PayApplicationService -- 核心方法测试")
 class PayApplicationServiceTest {

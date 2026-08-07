@@ -3,6 +3,7 @@ FROM node:22-alpine@sha256:9385cd9f3001dfc3431e8ead12c43e9e1f87cc1b9b5c6cfd0f738
 
 # Install pnpm via Node.js corepack (version pinned from packageManager)
 RUN corepack enable && corepack prepare pnpm@11.0.9 --activate
+RUN pnpm config set fetch-timeout 600000
 
 WORKDIR /app
 
@@ -11,7 +12,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches/ ./patches/
 
 # --ignore-scripts: pnpm v10+ requires explicit build approval per package; skip scripts for speed
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,id=cgc-pms-legacy-pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts \
+    && test -x node_modules/.pnpm/@esbuild+linux-x64@0.25.0/node_modules/@esbuild/linux-x64/bin/esbuild
 
 # Copy source and configs
 COPY vite.config.ts tsconfig*.json index.html ./

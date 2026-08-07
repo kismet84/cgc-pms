@@ -1,0 +1,43 @@
+export const contractSpecs = [
+  'auth.spec.ts',
+  'communication.spec.ts',
+  'design-system-preview.spec.ts',
+  'engineering-tender.spec.ts',
+  'health.spec.ts',
+  'm1-global-context-contract.spec.ts',
+  'm1-shell.spec.ts',
+  'm4-1-approval-workbench.spec.ts',
+  'm4-budget-measurement.spec.ts',
+  'm4-contracts.spec.ts',
+  'm4-cost-target.spec.ts',
+  'm4-costs.spec.ts',
+  'm4-variation-bid.spec.ts',
+  'm5-inventory-ledger.spec.ts',
+  'm5-purchase-receipt.spec.ts',
+  'm5-requisition-return.spec.ts',
+  'm5-supplier-sourcing.spec.ts',
+  'm6-finance-control.spec.ts',
+  'm6-payment-revenue-invoice.spec.ts',
+  'm6-settlement.spec.ts',
+  'm6-subcontract-workspace.spec.ts',
+  'm7-account.spec.ts',
+  'm7-cost-subject.spec.ts',
+  'm7-master-data.spec.ts',
+  'm7-system.spec.ts',
+  'm7-workflow-process.spec.ts',
+  'project-file-center.spec.ts',
+]
+
+export const liveSpecs = [
+  'auth-live.spec.ts',
+  'm2-approval-workbench-live.spec.ts',
+  'm2-dashboard-live.spec.ts',
+  'm3-closeout.spec.ts',
+  'm3-delivery.spec.ts',
+  'm3-projects.spec.ts',
+  'm3-quality-safety.spec.ts',
+  'm3-technical.spec.ts',
+  'shell-live.spec.ts',
+]
+
+export const specialSpecs = ['m8-root-rehearsal.spec.ts']

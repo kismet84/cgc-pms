@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 使用 H2 内存数据库，以 contract 30001 (tenant_id=0, project_id=10001) 作为关联合同。
  * update/delete/batchSave 需要 DRAFT 状态的合同，会在 @BeforeEach 中创建。
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @Transactional
 @DisplayName("CtContractItemService — 合同清单项 CRUD 测试")

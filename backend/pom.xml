@@ -411,7 +411,7 @@
         <profile>
             <id>test-order-independence</id>
             <properties>
-                <!-- Re-run the historically state-sensitive tests in the opposite order and sequentially. -->
+                <!-- Re-run 12 historically state-sensitive classes in reverse class order and sequentially. -->
                 <test>AlertEvaluationServiceTest,AuthServiceTest,DashboardPerformanceTest,InvoiceValidationTest,PaymentFinancialConsistencyTest,Phase3IntegrationTest,ProductionMeasurementClosedLoopIntegrationTest,ProfileControllerTest,StlSettlementQueryServiceTest,StlSettlementServiceTest,SysUserServiceTest,WorkflowTemplateManagementTest</test>
                 <surefire.runOrder>reversealphabetical</surefire.runOrder>
                 <surefire.threadCount>1</surefire.threadCount>

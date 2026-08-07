@@ -90,15 +90,16 @@ $actualJobs = @([regex]::Matches($jobsText,'(?m)^  ([a-z0-9][a-z0-9-]*):\r?$') |
 $prePrGatePath = Join-Path $RepoRoot 'scripts\codex-autopilot\verify-pre-pr-ci.ps1'
 . $prePrGatePath
 $requiredJobs = @($script:PrePrRequiredJobs)
-Assert-SetEqual $actualJobs @($requiredJobs + 'pr-push-evidence') 'workflow jobs versus pre-PR evidence jobs'
+Assert-SetEqual $actualJobs @($requiredJobs + 'build-summary') 'workflow jobs versus pre-PR evidence jobs'
 
 $summary = Get-JobBlock $workflow 'build-summary'
 $summaryNeeds = @([regex]::Matches($summary,'(?m)^      - ([a-z0-9][a-z0-9-]*)\r?$') | ForEach-Object { $_.Groups[1].Value })
-Assert-SetEqual $summaryNeeds @(($requiredJobs | Where-Object { $_ -ne 'build-summary' }) + 'pr-push-evidence') 'build-summary needs versus gate jobs'
+Assert-SetEqual $summaryNeeds $requiredJobs 'build-summary needs versus gate jobs'
 Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.sql-safety-scan.result','PR push evidence: ${{ needs.pr-push-evidence.result }}') 'build-summary'
 
 $prPushEvidence = Get-JobBlock $workflow 'pr-push-evidence'
 $backendTest = Get-JobBlock $workflow 'backend-test'
+$backendOrder = Get-JobBlock $workflow 'backend-order-sensitive'
 $backendMySql = Get-JobBlock $workflow 'backend-test-mysql'
 $backendDependency = Get-JobBlock $workflow 'backend-dependency-scan'
 $frontendBuild = Get-JobBlock $workflow 'frontend-build'
@@ -153,7 +154,7 @@ if ([regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^permissions:'
 if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 3) { throw 'job-level permissions declaration count changed' }
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
 
-foreach ($jobName in @($requiredJobs | Where-Object { $_ -notin @('build-summary','supply-chain-security','e2e') })) {
+foreach ($jobName in @($requiredJobs | Where-Object { $_ -notin @('pr-push-evidence','supply-chain-security','e2e') })) {
   $job = Get-JobBlock $workflow $jobName
   Assert-Contains $job @(
     'needs: pr-push-evidence',
@@ -165,16 +166,22 @@ Assert-Contains $supplyChain @(
   "if: needs.pr-push-evidence.outputs.run-full == 'true'"
 ) 'supply-chain evidence reuse'
 Assert-Contains $e2e @(
-  '[pr-push-evidence, backend-test-mysql, frontend-build]',
+  '[pr-push-evidence, frontend-build]',
   "if: needs.pr-push-evidence.outputs.run-full == 'true'"
 ) 'e2e evidence reuse'
 
 Assert-Contains $backendTest @(
   'Install CJK font for PDF tests','fonts-arphic-gbsn00lp','test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
-  './mvnw -C -Ptest-order-independence test','./mvnw -C verify',
+  './mvnw -C verify','./scripts/ci/summarize-surefire.ps1','retention-days: 7',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: backend/target/cgc-pms-backend.jar',
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'
 ) 'backend-test'
+if ($backendTest.Contains('-Ptest-order-independence')) { throw 'backend-test must not serialize the order-sensitive profile' }
+Assert-Contains $backendOrder @(
+  'needs: pr-push-evidence',"if: needs.pr-push-evidence.outputs.run-full == 'true'",
+  'Run historically order-sensitive classes under reverse class order',
+  './mvnw -C -Ptest-order-independence -Djacoco.skip=true test'
+) 'backend-order-sensitive'
 Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
@@ -217,14 +224,14 @@ if ([regex]::Matches($supplyChain,'uses: actions/cache@[0-9a-f]{40}').Count -ne 
   throw 'supply-chain-security must have exactly one conditional shared-cache restore'
 }
 Assert-Contains $e2e @(
-  '[pr-push-evidence, backend-test-mysql, frontend-build]',
-  'image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
-  'image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
+  '[pr-push-evidence, frontend-build]',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
-  'bash ./scripts/ci/start-e2e-minio.sh','bash ./scripts/ci/start-e2e-backend.sh',
-  'pnpm test:e2e:migration-gate','PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173',
+  'pnpm test:e2e:contract','PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173',
   'PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173','if: failure()'
 ) 'e2e'
+foreach ($forbidden in @('services:','setup-backend','start-e2e-minio.sh','start-e2e-backend.sh','PLAYWRIGHT_USE_DEV_LOGIN','PLAYWRIGHT_DEV_LOGIN_PATH')) {
+  if ($e2e.Contains($forbidden)) { throw "browser contract job contains obsolete runtime dependency: $forbidden" }
+}
 Assert-Contains $sqlSafety @(
   './scripts/ci/test-workflow-contract.ps1',
   './scripts/ci/test-pr-push-evidence.ps1',
@@ -267,7 +274,7 @@ Assert-Contains $dependencyScanScript @(
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'
 $frontendPackage = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
-foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:migration-gate','check:pre-push')) {
+foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:contract','test:e2e:migration-gate','check:pre-push')) {
   if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
 }
 
@@ -282,7 +289,7 @@ Assert-Contains $pushGate @(
   "'lint:check'",
   "'test:unit'",
   "'build'",
-  "'test:e2e:migration-gate'",
+  "'test:e2e:contract'",
   "startsWith('frontend-admin-v2/src/pages/')",
   "startsWith('frontend-admin-v2/')",
   "startsWith('frontend-admin-v2/patches/')",
@@ -291,6 +298,7 @@ Assert-Contains $pushGate @(
   "startsWith('.github/workflows/')",
   'pre-push-quality-gate-v1.json',
   "['origin/master', 'origin/main']",
+  'core.quotepath=false',
   '`${baseRef}...HEAD`',
   'nodeVersion: process.version',
   'process.env.npm_execpath',
@@ -310,6 +318,7 @@ Assert-Contains $prePushHook @('set -eu','pnpm --dir frontend-admin-v2 check:pre
 
 & (Join-Path $RepoRoot 'scripts\ci\test-pr-push-evidence.ps1')
 & (Join-Path $RepoRoot 'scripts\ci\test-post-merge-ci-evidence.ps1')
+& (Join-Path $RepoRoot 'scripts\ci\test-surefire-summary.ps1')
 
 [pscustomobject]@{
   ok = $true

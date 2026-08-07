@@ -1,7 +1,7 @@
 {
-  "current_commit": "8f69b503d2fb06cc25daea1ce9c90114215c10f3",
+  "current_commit": "5ad3c86d459cbb9846f03198165a29119a5903a5",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-07T10:11:18.667Z",
+  "generation_time": "2026-08-07T14:26:44.250Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,15 +52,14 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3810,
-  "repository_file_count": 3814,
-  "included_file_count": 2544,
+  "tracked_file_count": 3820,
+  "repository_file_count": 3820,
+  "included_file_count": 2550,
   "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "agent_platform",
-      "delivery_tooling"
+      "documentation"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -73,7 +72,7 @@
         "plugins/**"
       ],
       "file_count": 80,
-      "fingerprint": "fdd342d2be3e3d076d970735de97ae2e278bca9fbc0dd0a4a51b28bea219dd12"
+      "fingerprint": "f0437114f01badf5150186b75e74e7b52aff21a70e51530f23c1ec7da34b4a81"
     },
     {
       "id": "backend",
@@ -81,7 +80,7 @@
         "backend/**"
       ],
       "file_count": 1795,
-      "fingerprint": "b7edbe5e31e2468d1d0c8d8d8d4c9fed9d084ec2c03a4ae429556d742164ba4a"
+      "fingerprint": "7b3b484b8b6ae536332ccce96f9fd18a3d30a10bd0465f3aa90f33b6236e665d"
     },
     {
       "id": "delivery_tooling",
@@ -92,24 +91,24 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 264,
-      "fingerprint": "59d99d6b61955e8ab87d5dcddbf2469707cf4f3860dffe5b8e1fb0477920cb02"
+      "file_count": 266,
+      "fingerprint": "9b449108e34a19cef8c7416faa75baa9ec56df4857b52f31a7968f22f32b800d"
     },
     {
       "id": "documentation",
       "scope": [
         "docs/**"
       ],
-      "file_count": 112,
-      "fingerprint": "fdbdea4e1d3922dfd83f3607850b750b9a9d1e0144b8fa71037d136e5b1583a9"
+      "file_count": 114,
+      "fingerprint": "8b1098642944ed52a78c321302a496687dbe62068e721297a4be19d957bd0018"
     },
     {
       "id": "frontend_v2",
       "scope": [
         "frontend-admin-v2/**"
       ],
-      "file_count": 266,
-      "fingerprint": "8ea7522e9cc58fcb070e9b77052abdc1a4fb1939f74bb8349e7fdd986d092dde"
+      "file_count": 268,
+      "fingerprint": "73296f9b929bb980a79f44fe05b3ffe10f1e9898f3b9aaf43dab71896658e8ef"
     },
     {
       "id": "mobile",

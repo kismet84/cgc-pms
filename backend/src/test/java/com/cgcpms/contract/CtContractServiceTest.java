@@ -61,7 +61,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 使用 H2 内存数据库，V90 seed 提供 contract 30001/30002/30003。
  * 写入类测试通过 @BeforeEach 创建 DRAFT 合同，确保事务隔离。
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("CtContractService — 合同 CRUD 与审批测试")
 class CtContractServiceTest {

@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Project archive guard tests — verify that active dependencies block archiving
  * and that physical delete is restricted to SUPER_ADMIN on empty projects.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PmProjectArchiveTest {
