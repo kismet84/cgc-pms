@@ -59,7 +59,7 @@ async function enterDemo(): Promise<void> {
     )
   } catch {
     demoSubmitting.value = false
-    errorMessage.value = '示例环境暂时不可用，请检查本地示例库'
+    errorMessage.value = '本地示例登录失败，请检查后端与代理运行状态'
   }
 }
 

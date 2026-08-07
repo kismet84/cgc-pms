@@ -24,6 +24,8 @@ export default defineConfig({
             // Browser Origin describes the Vite origin, not the upstream hop.
             // Dropping it keeps this development reverse proxy same-origin to Spring.
             proxyRequest.removeHeader('origin')
+            // Keep Docker DNS routing while avoiding Tomcat's rejected service-name authority.
+            proxyRequest.setHeader('host', '127.0.0.1:8080')
           })
         },
       },

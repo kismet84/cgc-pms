@@ -5,12 +5,25 @@ import { describe, expect, it } from 'vitest'
 describe('V2 示例环境入口', () => {
   const loginPage = readFileSync(resolve('src/pages/auth/LoginPage.vue'), 'utf-8')
   const appShell = readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8')
+  const viteConfig = readFileSync(resolve('vite.config.ts'), 'utf-8')
+  const devCompose = readFileSync(resolve('../deploy/docker-compose.dev.yml'), 'utf-8')
 
   it('仅在开发环境提供受控免密码入口', () => {
     expect(loginPage).toContain('const showDemoEntry = import.meta.env.DEV')
     expect(loginPage).toContain('/api/auth/dev-login?username=admin')
     expect(loginPage).toContain('免密码进入示例环境')
     expect(loginPage).toContain("credentials: 'same-origin'")
+    expect(loginPage).toContain('本地示例登录失败，请检查后端与代理运行状态')
+    expect(loginPage).not.toContain('请检查本地示例库')
+  })
+
+  it('仅通过本机端口提供代理并覆盖后端健康检查', () => {
+    expect(viteConfig).toContain("proxyRequest.setHeader('host', '127.0.0.1:8080')")
+    expect(devCompose).toContain('- "127.0.0.1:8080:8080"')
+    expect(devCompose).toContain('- "127.0.0.1:5173:5173"')
+    expect(devCompose).toContain(
+      'wget -qO- http://127.0.0.1:5173/api/actuator/health >/dev/null || exit 1',
+    )
   })
 
   it('将账号切换明确呈现为演示角色', () => {
