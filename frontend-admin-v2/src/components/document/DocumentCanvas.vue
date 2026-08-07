@@ -1618,20 +1618,21 @@ function round(value: number): number {
 .document-canvas__table-content {
   width: 100%;
   min-height: 100%;
+  color: black;
+  font-family: sans-serif;
+  font-size: 12pt;
   table-layout: fixed;
   border-collapse: collapse;
   background: white;
 }
 .document-canvas__table-content th,
 .document-canvas__table-content td {
-  box-sizing: border-box;
+  box-sizing: content-box;
   padding: 1mm;
-  font-size: 10pt;
-  text-align: left;
-  vertical-align: top;
-  border: 0.2mm solid var(--v2-color-text);
+  border: 0.2mm solid rgb(51 51 51);
 }
 .document-canvas__table-content code {
+  font-family: inherit;
   font-size: inherit;
 }
 .document-canvas__element.is-selected,
