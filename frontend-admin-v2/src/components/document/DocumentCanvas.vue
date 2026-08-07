@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { V2Button, V2Input } from '@/components'
+import { V2ActionMenu, V2Button, V2Input } from '@/components'
 import type {
   DocumentCanvasElement,
   DocumentCanvasTable,
@@ -36,8 +36,18 @@ const emit = defineEmits<{
 const search = ref('')
 const zoom = ref('75')
 const selectedId = ref('')
+const selectedIds = ref<string[]>([])
 const viewMode = ref<'DESIGN' | 'PREVIEW'>('DESIGN')
 const gridVisible = ref(true)
+const snapToGrid = ref(false)
+const smartGuides = ref(true)
+const alignmentReference = ref<'SELECTION' | 'CANVAS' | 'KEY'>('SELECTION')
+const spacingMm = ref('5')
+const alignmentReferences = [
+  ['SELECTION', '选区'],
+  ['CANVAS', '画布'],
+  ['KEY', '主组件'],
+] as const
 const componentPresets = [
   { key: 'TITLE', label: '标题', description: '居中大标题' },
   { key: 'TEXT', label: '文本', description: '普通说明文字' },
@@ -47,6 +57,68 @@ const componentPresets = [
   { key: 'FOOTER', label: '页脚', description: '每页重复' },
 ] as const
 type ComponentPreset = (typeof componentPresets)[number]['key']
+type CanvasItem = DocumentCanvasElement | DocumentCanvasTable
+type ComponentAlignment = 'TOP' | 'MIDDLE' | 'BOTTOM' | 'LEFT' | 'CENTER' | 'RIGHT'
+type LayoutAction =
+  | ComponentAlignment
+  | 'DISTRIBUTE_HORIZONTAL'
+  | 'DISTRIBUTE_VERTICAL'
+  | 'SPACE_HORIZONTAL'
+  | 'SPACE_VERTICAL'
+  | 'ATTACH_HORIZONTAL'
+  | 'ATTACH_VERTICAL'
+  | 'EQUAL_WIDTH'
+  | 'EQUAL_HEIGHT'
+  | 'EQUAL_SIZE'
+  | 'ARRANGE_HORIZONTAL'
+  | 'ARRANGE_VERTICAL'
+  | 'ARRANGE_GRID'
+  | 'ROUND_MM'
+type ItemRect = { xMm: number; yMm: number; widthMm: number; heightMm: number }
+const layoutGroups = [
+  {
+    label: '对齐',
+    options: [
+      ['TOP', '上'],
+      ['MIDDLE', '垂直居中'],
+      ['BOTTOM', '下'],
+      ['LEFT', '左'],
+      ['CENTER', '水平居中'],
+      ['RIGHT', '右'],
+    ],
+  },
+  {
+    label: '分布与间距',
+    options: [
+      ['DISTRIBUTE_HORIZONTAL', '水平分布'],
+      ['DISTRIBUTE_VERTICAL', '垂直分布'],
+      ['SPACE_HORIZONTAL', '水平定距'],
+      ['SPACE_VERTICAL', '垂直定距'],
+      ['ATTACH_HORIZONTAL', '水平贴边'],
+      ['ATTACH_VERTICAL', '垂直贴边'],
+    ],
+  },
+  {
+    label: '尺寸',
+    options: [
+      ['EQUAL_WIDTH', '等宽'],
+      ['EQUAL_HEIGHT', '等高'],
+      ['EQUAL_SIZE', '等尺寸'],
+    ],
+  },
+  {
+    label: '批量排列',
+    options: [
+      ['ARRANGE_HORIZONTAL', '横向'],
+      ['ARRANGE_VERTICAL', '纵向'],
+      ['ARRANGE_GRID', '网格'],
+    ],
+  },
+  { label: '精度', options: [['ROUND_MM', '整数毫米']] },
+] as const satisfies readonly {
+  label: string
+  options: readonly (readonly [LayoutAction, string])[]
+}[]
 let sequence = 0
 let interaction:
   | {
@@ -55,9 +127,19 @@ let interaction:
       startX: number
       startY: number
       initial: { xMm: number; yMm: number; widthMm: number; heightMm?: number }
+      initialItems: CanvasItem[]
       pxPerMm: number
     }
   | undefined
+let boxSelection:
+  | {
+      startX: number
+      startY: number
+      pageRect: DOMRect
+    }
+  | undefined
+const selectionBox = ref<{ xMm: number; yMm: number; widthMm: number; heightMm: number }>()
+const guideLines = ref<{ xMm?: number; yMm?: number }>({})
 
 const pageSize = computed(() =>
   props.modelValue.page.orientation === 'PORTRAIT'
@@ -87,6 +169,13 @@ const selectedElement = computed(
 )
 const selectedTable = computed(
   () => props.modelValue.tables.find((item) => item.id === selectedId.value) ?? null,
+)
+const canvasItems = computed<CanvasItem[]>(() => [
+  ...props.modelValue.elements,
+  ...props.modelValue.tables,
+])
+const selectedItems = computed(() =>
+  canvasItems.value.filter((item) => selectedIds.value.includes(item.id)),
 )
 const firstCollectionField = computed(() => props.fields.find((field) => field.collectionPath))
 const overflowIds = computed(() => {
@@ -169,6 +258,15 @@ function updateMargin(value: string): void {
   })
 }
 
+function selectOnly(id: string): void {
+  selectedId.value = id
+  selectedIds.value = id ? [id] : []
+}
+
+function focusItem(id: string): void {
+  if (!selectedIds.value.includes(id)) selectOnly(id)
+}
+
 function addField(field: DocumentCatalogField, position?: { xMm: number; yMm: number }): void {
   if (props.disabled) return
   if (field.collectionPath) {
@@ -177,7 +275,7 @@ function addField(field: DocumentCatalogField, position?: { xMm: number; yMm: nu
   }
   const existing = props.modelValue.elements.find((item) => item.fieldPath === field.path)
   if (existing) {
-    selectedId.value = existing.id
+    selectOnly(existing.id)
     return
   }
   const offset = props.modelValue.elements.length * 8
@@ -195,7 +293,7 @@ function addField(field: DocumentCatalogField, position?: { xMm: number; yMm: nu
     repeat: 'BODY',
     zIndex: props.modelValue.elements.length,
   }
-  selectedId.value = element.id
+  selectOnly(element.id)
   commit({
     elements: [...props.modelValue.elements, element],
   })
@@ -232,7 +330,7 @@ function addComponent(preset: ComponentPreset): void {
     repeat: header ? 'HEADER' : footer ? 'FOOTER' : 'BODY',
     zIndex: props.modelValue.elements.length,
   }
-  selectedId.value = element.id
+  selectOnly(element.id)
   commit({ elements: [...props.modelValue.elements, element] })
 }
 
@@ -243,7 +341,7 @@ function addTableColumn(
   const collectionPath = field.collectionPath!
   const table = props.modelValue.tables.find((item) => item.collectionPath === collectionPath)
   if (table?.columns.some((column) => column.fieldPath === field.path)) {
-    selectedId.value = table.id
+    selectOnly(table.id)
     return
   }
   const columnCount = (table?.columns.length ?? 0) + 1
@@ -273,7 +371,7 @@ function addTableColumn(
         heightMm: 38,
         columns,
       }
-  selectedId.value = next.id
+  selectOnly(next.id)
   commit({
     tables: table
       ? props.modelValue.tables.map((item) => (item.id === table.id ? next : item))
@@ -304,6 +402,8 @@ function startInteraction(
 ): void {
   if (props.disabled) return
   const page = (event.currentTarget as HTMLElement).closest('.document-canvas__page') as HTMLElement
+  const initialItems =
+    kind === 'move' && selectedIds.value.includes(item.id) ? selectedItems.value : [item]
   interaction = {
     id: item.id,
     kind,
@@ -315,23 +415,308 @@ function startInteraction(
       widthMm: item.widthMm,
       heightMm: 'heightMm' in item ? item.heightMm : undefined,
     },
+    initialItems: initialItems.map((candidate) => ({ ...candidate })),
     pxPerMm: page.getBoundingClientRect().width / pageSize.value.width,
   }
-  selectedId.value = item.id
-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  if (kind === 'resize' || !selectedIds.value.includes(item.id)) selectOnly(item.id)
+  ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+}
+
+function startBoxSelection(event: PointerEvent): void {
+  if (props.disabled) return
+  const page = event.currentTarget as HTMLElement
+  const pageRect = page.getBoundingClientRect()
+  const point = pagePoint(event, pageRect)
+  boxSelection = { startX: point.xMm, startY: point.yMm, pageRect }
+  selectionBox.value = { xMm: point.xMm, yMm: point.yMm, widthMm: 0, heightMm: 0 }
+  selectOnly('')
+  page.setPointerCapture?.(event.pointerId)
+}
+
+function moveBoxSelection(event: PointerEvent): void {
+  if (!boxSelection) return
+  const point = pagePoint(event, boxSelection.pageRect)
+  const box = {
+    xMm: Math.min(boxSelection.startX, point.xMm),
+    yMm: Math.min(boxSelection.startY, point.yMm),
+    widthMm: Math.abs(point.xMm - boxSelection.startX),
+    heightMm: Math.abs(point.yMm - boxSelection.startY),
+  }
+  selectionBox.value = box
+  const ids = canvasItems.value
+    .filter(
+      (item) =>
+        item.xMm < box.xMm + box.widthMm &&
+        item.xMm + item.widthMm > box.xMm &&
+        item.yMm < box.yMm + box.heightMm &&
+        item.yMm + item.heightMm > box.yMm,
+    )
+    .map((item) => item.id)
+  selectedIds.value = ids
+  selectedId.value = ids.at(-1) ?? ''
+}
+
+function stopBoxSelection(): void {
+  boxSelection = undefined
+  selectionBox.value = undefined
+}
+
+function pagePoint(event: PointerEvent, rect: DOMRect): { xMm: number; yMm: number } {
+  return {
+    xMm: ((event.clientX - rect.left) / rect.width) * pageSize.value.width,
+    yMm: ((event.clientY - rect.top) / rect.height) * pageSize.value.height,
+  }
+}
+
+function itemBounds(items: CanvasItem[]): ItemRect {
+  const left = Math.min(...items.map((item) => item.xMm))
+  const top = Math.min(...items.map((item) => item.yMm))
+  const right = Math.max(...items.map((item) => item.xMm + item.widthMm))
+  const bottom = Math.max(...items.map((item) => item.yMm + item.heightMm))
+  return { xMm: left, yMm: top, widthMm: right - left, heightMm: bottom - top }
+}
+
+function safeBounds(): ItemRect {
+  const margin = props.modelValue.page.marginMm
+  return {
+    xMm: margin.left,
+    yMm: margin.top,
+    widthMm: pageSize.value.width - margin.left - margin.right,
+    heightMm: pageSize.value.height - margin.top - margin.bottom,
+  }
+}
+
+function primaryItem(): CanvasItem | undefined {
+  return selectedItems.value.find((item) => item.id === selectedId.value) ?? selectedItems.value[0]
+}
+
+function canApplyLayout(action: LayoutAction): boolean {
+  const count = selectedItems.value.length
+  if (action === 'ROUND_MM') return count > 0
+  if (action.startsWith('DISTRIBUTE_')) return count >= 3
+  if (
+    ['TOP', 'MIDDLE', 'BOTTOM', 'LEFT', 'CENTER', 'RIGHT'].includes(action) &&
+    alignmentReference.value === 'CANVAS'
+  )
+    return count > 0
+  return count >= 2
+}
+
+function scaleTableColumns(table: DocumentCanvasTable): DocumentCanvasTable {
+  if (!table.columns.length) return table
+  const total = table.columns.reduce((sum, column) => sum + column.widthMm, 0) || 1
+  const columns = table.columns.map((column) => ({
+    ...column,
+    widthMm: round((column.widthMm / total) * table.widthMm),
+  }))
+  columns[columns.length - 1]!.widthMm = round(
+    table.widthMm - columns.slice(0, -1).reduce((sum, column) => sum + column.widthMm, 0),
+  )
+  return { ...table, columns }
+}
+
+function commitItems(items: CanvasItem[]): void {
+  const updates = new Map(items.map((item) => [item.id, item]))
+  commit({
+    elements: props.modelValue.elements.map(
+      (item) => (updates.get(item.id) as DocumentCanvasElement | undefined) ?? item,
+    ),
+    tables: props.modelValue.tables.map((item) => {
+      const updated = updates.get(item.id) as DocumentCanvasTable | undefined
+      return updated && updated.widthMm !== item.widthMm
+        ? scaleTableColumns(updated)
+        : (updated ?? item)
+    }),
+  })
+}
+
+function alignItems(alignment: ComponentAlignment): CanvasItem[] {
+  const reference =
+    alignmentReference.value === 'CANVAS'
+      ? safeBounds()
+      : alignmentReference.value === 'KEY' && primaryItem()
+        ? itemBounds([primaryItem()!])
+        : itemBounds(selectedItems.value)
+  const right = reference.xMm + reference.widthMm
+  const bottom = reference.yMm + reference.heightMm
+  return selectedItems.value.map((item) => ({
+    ...item,
+    xMm:
+      alignment === 'LEFT'
+        ? reference.xMm
+        : alignment === 'CENTER'
+          ? round(reference.xMm + (reference.widthMm - item.widthMm) / 2)
+          : alignment === 'RIGHT'
+            ? round(right - item.widthMm)
+            : item.xMm,
+    yMm:
+      alignment === 'TOP'
+        ? reference.yMm
+        : alignment === 'MIDDLE'
+          ? round(reference.yMm + (reference.heightMm - item.heightMm) / 2)
+          : alignment === 'BOTTOM'
+            ? round(bottom - item.heightMm)
+            : item.yMm,
+  }))
+}
+
+function sequenceItems(axis: 'x' | 'y', gap: number, align: boolean): CanvasItem[] {
+  const key = axis === 'x' ? 'xMm' : 'yMm'
+  const size = axis === 'x' ? 'widthMm' : 'heightMm'
+  const ordered = [...selectedItems.value].sort((a, b) => a[key] - b[key])
+  const bounds = itemBounds(ordered)
+  let cursor = axis === 'x' ? bounds.xMm : bounds.yMm
+  return ordered.map((item) => {
+    const next = {
+      ...item,
+      [key]: round(cursor),
+      ...(align ? (axis === 'x' ? { yMm: bounds.yMm } : { xMm: bounds.xMm }) : {}),
+    }
+    cursor += item[size] + gap
+    return next
+  })
+}
+
+function distributeItems(axis: 'x' | 'y'): CanvasItem[] {
+  const key = axis === 'x' ? 'xMm' : 'yMm'
+  const size = axis === 'x' ? 'widthMm' : 'heightMm'
+  const ordered = [...selectedItems.value].sort((a, b) => a[key] - b[key])
+  const first = ordered[0]!
+  const last = ordered.at(-1)!
+  const span = last[key] + last[size] - first[key]
+  const total = ordered.reduce((sum, item) => sum + item[size], 0)
+  const gap = (span - total) / (ordered.length - 1)
+  let cursor = first[key]
+  return ordered.map((item) => {
+    const next = { ...item, [key]: round(cursor) }
+    cursor += item[size] + gap
+    return next
+  })
+}
+
+function applyLayout(action: LayoutAction): void {
+  if (!canApplyLayout(action)) return
+  const gap = Math.max(0, Math.min(50, Number(spacingMm.value) || 0))
+  let next: CanvasItem[]
+  if (['TOP', 'MIDDLE', 'BOTTOM', 'LEFT', 'CENTER', 'RIGHT'].includes(action)) {
+    next = alignItems(action as ComponentAlignment)
+  } else if (action === 'DISTRIBUTE_HORIZONTAL' || action === 'DISTRIBUTE_VERTICAL') {
+    next = distributeItems(action.endsWith('HORIZONTAL') ? 'x' : 'y')
+  } else if (action === 'SPACE_HORIZONTAL' || action === 'SPACE_VERTICAL') {
+    next = sequenceItems(action.endsWith('HORIZONTAL') ? 'x' : 'y', gap, false)
+  } else if (action === 'ATTACH_HORIZONTAL' || action === 'ATTACH_VERTICAL') {
+    next = sequenceItems(action.endsWith('HORIZONTAL') ? 'x' : 'y', 0, false)
+  } else if (action === 'ARRANGE_HORIZONTAL' || action === 'ARRANGE_VERTICAL') {
+    next = sequenceItems(action.endsWith('HORIZONTAL') ? 'x' : 'y', gap, true)
+  } else if (action === 'ARRANGE_GRID') {
+    const bounds = itemBounds(selectedItems.value)
+    const columns = Math.ceil(Math.sqrt(selectedItems.value.length))
+    const width = Math.max(...selectedItems.value.map((item) => item.widthMm))
+    const height = Math.max(...selectedItems.value.map((item) => item.heightMm))
+    next = selectedItems.value.map((item, index) => ({
+      ...item,
+      xMm: round(bounds.xMm + (index % columns) * (width + gap)),
+      yMm: round(bounds.yMm + Math.floor(index / columns) * (height + gap)),
+    }))
+  } else if (action === 'ROUND_MM') {
+    next = selectedItems.value.map((item) => ({
+      ...item,
+      xMm: Math.round(item.xMm),
+      yMm: Math.round(item.yMm),
+      widthMm: Math.max(12, Math.round(item.widthMm)),
+      heightMm: Math.max(8, Math.round(item.heightMm)),
+    }))
+  } else {
+    const primary = primaryItem()!
+    next = selectedItems.value.map((item) => ({
+      ...item,
+      widthMm: action === 'EQUAL_WIDTH' || action === 'EQUAL_SIZE' ? primary.widthMm : item.widthMm,
+      heightMm:
+        action === 'EQUAL_HEIGHT' || action === 'EQUAL_SIZE' ? primary.heightMm : item.heightMm,
+    }))
+  }
+  commitItems(next)
+}
+
+function snapMove(
+  dx: number,
+  dy: number,
+  moving: CanvasItem[],
+  pxPerMm: number,
+): { dx: number; dy: number } {
+  const bounds = itemBounds(moving)
+  if (snapToGrid.value) {
+    dx = Math.round((bounds.xMm + dx) / 5) * 5 - bounds.xMm
+    dy = Math.round((bounds.yMm + dy) / 5) * 5 - bounds.yMm
+  }
+  guideLines.value = {}
+  if (!smartGuides.value) return { dx, dy }
+  const movingIds = new Set(moving.map((item) => item.id))
+  const references = [safeBounds(), ...canvasItems.value.filter((item) => !movingIds.has(item.id))]
+  const xTargets = references.flatMap((item) => [
+    item.xMm,
+    item.xMm + item.widthMm / 2,
+    item.xMm + item.widthMm,
+  ])
+  const yTargets = references.flatMap((item) => [
+    item.yMm,
+    item.yMm + item.heightMm / 2,
+    item.yMm + item.heightMm,
+  ])
+  const threshold = 6 / pxPerMm
+  const nearest = (anchors: number[], targets: number[]) => {
+    let match: { delta: number; target: number } | undefined
+    for (const anchor of anchors)
+      for (const target of targets) {
+        const delta = target - anchor
+        if (Math.abs(delta) <= threshold && (!match || Math.abs(delta) < Math.abs(match.delta)))
+          match = { delta, target }
+      }
+    return match
+  }
+  const xMatch = nearest(
+    [bounds.xMm + dx, bounds.xMm + bounds.widthMm / 2 + dx, bounds.xMm + bounds.widthMm + dx],
+    xTargets,
+  )
+  const yMatch = nearest(
+    [bounds.yMm + dy, bounds.yMm + bounds.heightMm / 2 + dy, bounds.yMm + bounds.heightMm + dy],
+    yTargets,
+  )
+  if (xMatch) {
+    dx += xMatch.delta
+    guideLines.value.xMm = xMatch.target
+  }
+  if (yMatch) {
+    dy += yMatch.delta
+    guideLines.value.yMm = yMatch.target
+  }
+  return { dx, dy }
 }
 
 function moveInteraction(event: PointerEvent): void {
   if (!interaction) return
-  const dx = (event.clientX - interaction.startX) / interaction.pxPerMm
-  const dy = (event.clientY - interaction.startY) / interaction.pxPerMm
-  const itemPatch =
-    interaction.kind === 'move'
-      ? { xMm: round(interaction.initial.xMm + dx), yMm: round(interaction.initial.yMm + dy) }
-      : {
-          widthMm: Math.max(12, round(interaction.initial.widthMm + dx)),
-          heightMm: Math.max(8, round((interaction.initial.heightMm ?? 8) + dy)),
-        }
+  let dx = (event.clientX - interaction.startX) / interaction.pxPerMm
+  let dy = (event.clientY - interaction.startY) / interaction.pxPerMm
+  if (interaction.kind === 'move') {
+    ;({ dx, dy } = snapMove(dx, dy, interaction.initialItems, interaction.pxPerMm))
+    commitItems(
+      interaction.initialItems.map((item) => ({
+        ...item,
+        xMm: round(item.xMm + dx),
+        yMm: round(item.yMm + dy),
+      })),
+    )
+    return
+  }
+  const itemPatch = snapToGrid.value
+    ? {
+        widthMm: Math.max(12, Math.round((interaction.initial.widthMm + dx) / 5) * 5),
+        heightMm: Math.max(8, Math.round(((interaction.initial.heightMm ?? 8) + dy) / 5) * 5),
+      }
+    : {
+        widthMm: Math.max(12, round(interaction.initial.widthMm + dx)),
+        heightMm: Math.max(8, round((interaction.initial.heightMm ?? 8) + dy)),
+      }
   if (props.modelValue.elements.some((item) => item.id === interaction!.id)) {
     commit({
       elements: props.modelValue.elements.map((item) =>
@@ -350,20 +735,12 @@ function moveInteraction(event: PointerEvent): void {
 }
 
 function resizeTableColumns(table: DocumentCanvasTable): DocumentCanvasTable {
-  if (interaction?.kind !== 'resize') return table
-  const total = table.columns.reduce((sum, column) => sum + column.widthMm, 0) || 1
-  const columns = table.columns.map((column) => ({
-    ...column,
-    widthMm: round((column.widthMm / total) * table.widthMm),
-  }))
-  columns[columns.length - 1]!.widthMm = round(
-    table.widthMm - columns.slice(0, -1).reduce((sum, column) => sum + column.widthMm, 0),
-  )
-  return { ...table, columns }
+  return interaction?.kind === 'resize' ? scaleTableColumns(table) : table
 }
 
 function stopInteraction(): void {
   interaction = undefined
+  guideLines.value = {}
 }
 
 function updateSelected(key: keyof DocumentCanvasElement, value: string): void {
@@ -385,11 +762,12 @@ function updateSelected(key: keyof DocumentCanvasElement, value: string): void {
 }
 
 function removeSelected(): void {
+  const ids = new Set(selectedIds.value)
   commit({
-    elements: props.modelValue.elements.filter((item) => item.id !== selectedId.value),
-    tables: props.modelValue.tables.filter((item) => item.id !== selectedId.value),
+    elements: props.modelValue.elements.filter((item) => !ids.has(item.id)),
+    tables: props.modelValue.tables.filter((item) => !ids.has(item.id)),
   })
-  selectedId.value = ''
+  selectOnly('')
 }
 
 function updateTableColumn(index: number, patch: { header?: string; widthMm?: number }): void {
@@ -502,18 +880,169 @@ function round(value: number): number {
           class="document-canvas__field"
           draggable="true"
           :disabled="disabled"
-          :title="field.path"
           @click="addField(field)"
           @dragstart="onFieldDrag($event, field)"
         >
           <span>{{ field.label }}</span>
-          <code>{{ field.path }}</code>
         </button>
       </section>
     </aside>
 
     <section class="document-canvas__workspace" aria-label="A4 设计画布">
-      <div class="document-canvas__toolbar">
+      <div class="document-canvas__status" aria-live="polite">
+        <span>{{ viewMode === 'DESIGN' ? '设计模式' : 'HTML 预览' }}</span>
+        <span>{{ pageSize.width }} × {{ pageSize.height }} mm</span>
+        <span>{{ zoom }}%</span>
+        <span v-if="selectedIds.length">已选 {{ selectedIds.length }} 个</span>
+      </div>
+      <p v-if="overflowIds.length" class="document-canvas__warning" role="alert">
+        {{ overflowIds.length }} 个元素越出页面安全区域，保存已阻止。
+      </p>
+      <div class="document-canvas__viewport" :class="{ 'is-preview': viewMode === 'PREVIEW' }">
+        <div
+          v-if="viewMode === 'DESIGN'"
+          class="document-canvas__page"
+          :class="{ 'has-grid': gridVisible }"
+          :style="{
+            width: `${pageSize.width}mm`,
+            height: `${pageSize.height}mm`,
+            transform: `scale(${scale})`,
+            '--margin-top': `${modelValue.page.marginMm.top}mm`,
+            '--margin-right': `${modelValue.page.marginMm.right}mm`,
+            '--margin-bottom': `${modelValue.page.marginMm.bottom}mm`,
+            '--margin-left': `${modelValue.page.marginMm.left}mm`,
+          }"
+          @dragover.prevent
+          @drop.prevent="onDrop"
+          @pointerdown.self="startBoxSelection"
+          @pointermove="moveBoxSelection"
+          @pointerup="stopBoxSelection"
+          @pointercancel="stopBoxSelection"
+        >
+          <div class="document-canvas__safe-area" aria-hidden="true"></div>
+          <div
+            v-if="guideLines.xMm !== undefined"
+            class="document-canvas__guide is-vertical"
+            aria-hidden="true"
+            :style="{ left: `${guideLines.xMm}mm` }"
+          ></div>
+          <div
+            v-if="guideLines.yMm !== undefined"
+            class="document-canvas__guide is-horizontal"
+            aria-hidden="true"
+            :style="{ top: `${guideLines.yMm}mm` }"
+          ></div>
+          <div
+            v-if="selectionBox"
+            class="document-canvas__selection-box"
+            aria-hidden="true"
+            :style="{
+              left: `${selectionBox.xMm}mm`,
+              top: `${selectionBox.yMm}mm`,
+              width: `${selectionBox.widthMm}mm`,
+              height: `${selectionBox.heightMm}mm`,
+            }"
+          ></div>
+          <div
+            v-for="element in modelValue.elements"
+            :key="element.id"
+            class="document-canvas__element"
+            :class="{
+              'is-selected': selectedIds.includes(element.id),
+              'is-primary': selectedId === element.id && selectedIds.length > 1,
+              'is-overflow': overflowIds.includes(element.id),
+              'is-divider': element.type === 'DIVIDER',
+            }"
+            :style="{
+              left: `${element.xMm}mm`,
+              top: `${element.yMm}mm`,
+              width: `${element.widthMm}mm`,
+              height: `${element.heightMm}mm`,
+              fontSize: `${element.fontSizePt ?? 12}pt`,
+              textAlign: (element.align ?? 'LEFT').toLowerCase(),
+              zIndex: element.zIndex ?? 0,
+            }"
+            tabindex="0"
+            @pointerdown="startInteraction($event, element, 'move')"
+            @pointermove="moveInteraction"
+            @pointerup="stopInteraction"
+            @pointercancel="stopInteraction"
+            @focus="focusItem(element.id)"
+          >
+            <hr v-if="element.type === 'DIVIDER'" />
+            <template v-else>
+              <span>{{ element.text }}</span
+              ><code v-if="element.fieldPath" v-text="'{{' + element.fieldPath + '}}'"></code>
+            </template>
+            <button
+              type="button"
+              class="document-canvas__resize"
+              aria-label="调整元素尺寸"
+              @pointerdown.stop="startInteraction($event, element, 'resize')"
+              @pointermove.stop="moveInteraction"
+              @pointerup.stop="stopInteraction"
+              @pointercancel.stop="stopInteraction"
+            ></button>
+          </div>
+          <div
+            v-for="table in modelValue.tables"
+            :key="table.id"
+            class="document-canvas__table"
+            :class="{
+              'is-selected': selectedIds.includes(table.id),
+              'is-primary': selectedId === table.id && selectedIds.length > 1,
+              'is-overflow': overflowIds.includes(table.id),
+            }"
+            :style="{
+              left: `${table.xMm}mm`,
+              top: `${table.yMm}mm`,
+              width: `${table.widthMm}mm`,
+              height: `${table.heightMm}mm`,
+            }"
+            tabindex="0"
+            @pointerdown="startInteraction($event, table, 'move')"
+            @pointermove="moveInteraction"
+            @pointerup="stopInteraction"
+            @pointercancel="stopInteraction"
+            @focus="focusItem(table.id)"
+          >
+            <strong>{{ table.collectionPath }} 明细表</strong>
+            <div class="document-canvas__table-columns">
+              <span v-for="column in table.columns" :key="column.fieldPath">{{
+                column.header
+              }}</span>
+            </div>
+            <button
+              type="button"
+              class="document-canvas__resize"
+              aria-label="调整明细表尺寸"
+              @pointerdown.stop="startInteraction($event, table, 'resize')"
+              @pointermove.stop="moveInteraction"
+              @pointerup.stop="stopInteraction"
+              @pointercancel.stop="stopInteraction"
+            ></button>
+          </div>
+        </div>
+        <div
+          v-else
+          class="document-canvas__preview-page"
+          :style="{
+            width: `${pageSize.width}mm`,
+            height: `${pageSize.height}mm`,
+            transform: `scale(${scale})`,
+          }"
+        >
+          <p v-if="previewLoading" class="document-canvas__preview-state">正在生成预览…</p>
+          <p v-else-if="previewError" class="document-canvas__preview-state is-error" role="alert">
+            {{ previewError }}
+          </p>
+          <iframe v-else title="业务单据 HTML 预览" sandbox="" :srcdoc="previewHtml"></iframe>
+        </div>
+      </div>
+    </section>
+
+    <aside class="document-canvas__properties" aria-label="元素属性">
+      <section class="document-canvas__toolbar" aria-label="画布工具">
         <V2Button
           data-testid="orientation-toggle"
           size="small"
@@ -546,7 +1075,81 @@ function round(value: number): number {
             <option value="100">100%</option>
           </select></label
         >
-        <span class="document-canvas__toolbar-spacer"></span>
+        <label v-if="viewMode === 'DESIGN'"
+          >间距(mm)<input
+            v-model="spacingMm"
+            data-testid="layout-spacing"
+            type="number"
+            min="0"
+            max="50"
+        /></label>
+        <V2ActionMenu
+          v-if="viewMode === 'DESIGN'"
+          class="document-canvas__alignment"
+          label="组件排版"
+          :trigger-text="selectedIds.length > 1 ? `排版（${selectedIds.length}）` : '排版'"
+        >
+          <section class="document-canvas__alignment-group">
+            <strong>对齐基准</strong>
+            <div>
+              <V2Button
+                v-for="reference in alignmentReferences"
+                :key="reference[0]"
+                size="small"
+                :variant="alignmentReference === reference[0] ? 'primary' : 'secondary'"
+                :aria-pressed="alignmentReference === reference[0]"
+                :data-testid="`align-reference-${reference[0].toLowerCase()}`"
+                @click="alignmentReference = reference[0]"
+              >
+                {{ reference[1] }}
+              </V2Button>
+            </div>
+          </section>
+          <section
+            v-for="group in layoutGroups"
+            :key="group.label"
+            class="document-canvas__alignment-group"
+          >
+            <strong>{{ group.label }}</strong>
+            <div>
+              <V2Button
+                v-for="option in group.options"
+                :key="option[0]"
+                size="small"
+                variant="secondary"
+                :disabled="!canApplyLayout(option[0])"
+                :data-testid="`layout-${option[0].toLowerCase().replaceAll('_', '-')}`"
+                :aria-label="option[1]"
+                @click="applyLayout(option[0])"
+              >
+                {{ option[1] }}
+              </V2Button>
+            </div>
+          </section>
+          <section class="document-canvas__alignment-group">
+            <strong>移动辅助</strong>
+            <div>
+              <V2Button
+                data-testid="snap-grid"
+                size="small"
+                :variant="snapToGrid ? 'primary' : 'secondary'"
+                :aria-pressed="snapToGrid"
+                @click="snapToGrid = !snapToGrid"
+              >
+                5mm 吸附
+              </V2Button>
+              <V2Button
+                data-testid="smart-guides"
+                size="small"
+                :variant="smartGuides ? 'primary' : 'secondary'"
+                :aria-pressed="smartGuides"
+                @click="smartGuides = !smartGuides"
+              >
+                智能参考线
+              </V2Button>
+            </div>
+          </section>
+        </V2ActionMenu>
         <V2Button
           data-testid="preview-toggle"
           size="small"
@@ -556,243 +1159,126 @@ function round(value: number): number {
         >
           {{ viewMode === 'DESIGN' ? '预览' : '返回设计' }}
         </V2Button>
-      </div>
-      <div class="document-canvas__status" aria-live="polite">
-        <span>{{ viewMode === 'DESIGN' ? '设计模式' : 'HTML 预览' }}</span>
-        <span>{{ pageSize.width }} × {{ pageSize.height }} mm</span>
-        <span>{{ zoom }}%</span>
-      </div>
-      <p v-if="overflowIds.length" class="document-canvas__warning" role="alert">
-        {{ overflowIds.length }} 个元素越出页面安全区域，保存已阻止。
-      </p>
-      <div class="document-canvas__viewport" :class="{ 'is-preview': viewMode === 'PREVIEW' }">
-        <div
-          v-if="viewMode === 'DESIGN'"
-          class="document-canvas__page"
-          :class="{ 'has-grid': gridVisible }"
-          :style="{
-            width: `${pageSize.width}mm`,
-            height: `${pageSize.height}mm`,
-            transform: `scale(${scale})`,
-            '--margin-top': `${modelValue.page.marginMm.top}mm`,
-            '--margin-right': `${modelValue.page.marginMm.right}mm`,
-            '--margin-bottom': `${modelValue.page.marginMm.bottom}mm`,
-            '--margin-left': `${modelValue.page.marginMm.left}mm`,
-          }"
-          @dragover.prevent
-          @drop.prevent="onDrop"
-        >
-          <div class="document-canvas__safe-area" aria-hidden="true"></div>
-          <div
-            v-for="element in modelValue.elements"
-            :key="element.id"
-            class="document-canvas__element"
-            :class="{
-              'is-selected': element.id === selectedId,
-              'is-overflow': overflowIds.includes(element.id),
-              'is-divider': element.type === 'DIVIDER',
-            }"
-            :style="{
-              left: `${element.xMm}mm`,
-              top: `${element.yMm}mm`,
-              width: `${element.widthMm}mm`,
-              height: `${element.heightMm}mm`,
-              fontSize: `${element.fontSizePt ?? 12}pt`,
-              textAlign: (element.align ?? 'LEFT').toLowerCase(),
-              zIndex: element.zIndex ?? 0,
-            }"
-            tabindex="0"
-            @pointerdown="startInteraction($event, element, 'move')"
-            @pointermove="moveInteraction"
-            @pointerup="stopInteraction"
-            @focus="selectedId = element.id"
-          >
-            <hr v-if="element.type === 'DIVIDER'" />
-            <template v-else>
-              <span>{{ element.text }}</span
-              ><code v-if="element.fieldPath" v-text="'{{' + element.fieldPath + '}}'"></code>
-            </template>
-            <button
-              type="button"
-              class="document-canvas__resize"
-              aria-label="调整元素尺寸"
-              @pointerdown.stop="startInteraction($event, element, 'resize')"
-              @pointermove.stop="moveInteraction"
-              @pointerup.stop="stopInteraction"
-            ></button>
-          </div>
-          <div
-            v-for="table in modelValue.tables"
-            :key="table.id"
-            class="document-canvas__table"
-            :class="{
-              'is-selected': table.id === selectedId,
-              'is-overflow': overflowIds.includes(table.id),
-            }"
-            :style="{
-              left: `${table.xMm}mm`,
-              top: `${table.yMm}mm`,
-              width: `${table.widthMm}mm`,
-              height: `${table.heightMm}mm`,
-            }"
-            tabindex="0"
-            @pointerdown="startInteraction($event, table, 'move')"
-            @pointermove="moveInteraction"
-            @pointerup="stopInteraction"
-            @focus="selectedId = table.id"
-          >
-            <strong>{{ table.collectionPath }} 明细表</strong>
-            <div class="document-canvas__table-columns">
-              <span v-for="column in table.columns" :key="column.fieldPath">{{
-                column.header
-              }}</span>
-            </div>
-            <button
-              type="button"
-              class="document-canvas__resize"
-              aria-label="调整明细表尺寸"
-              @pointerdown.stop="startInteraction($event, table, 'resize')"
-              @pointermove.stop="moveInteraction"
-              @pointerup.stop="stopInteraction"
-            ></button>
-          </div>
-        </div>
-        <div
-          v-else
-          class="document-canvas__preview-page"
-          :style="{
-            width: `${pageSize.width}mm`,
-            height: `${pageSize.height}mm`,
-            transform: `scale(${scale})`,
-          }"
-        >
-          <p v-if="previewLoading" class="document-canvas__preview-state">正在生成预览…</p>
-          <p v-else-if="previewError" class="document-canvas__preview-state is-error" role="alert">
-            {{ previewError }}
-          </p>
-          <iframe v-else title="业务单据 HTML 预览" sandbox="" :srcdoc="previewHtml"></iframe>
-        </div>
-      </div>
-    </section>
-
-    <aside class="document-canvas__properties" aria-label="元素属性">
-      <template v-if="viewMode === 'PREVIEW'">
-        <h3>预览设置</h3>
-        <V2Input
-          :model-value="previewBusinessId"
-          label="真实业务对象 ID"
-          type="number"
-          placeholder="留空使用示例数据"
-          @update:model-value="emit('update:previewBusinessId', $event)"
-        />
-        <p class="document-canvas__hint">预览与正式生成使用同一服务端编译链。</p>
-      </template>
-      <template v-else>
-        <h3>属性</h3>
-      </template>
-      <template v-if="viewMode === 'DESIGN' && selectedElement">
-        <V2Input
-          :model-value="selectedElement.text"
-          label="显示名称"
-          @update:model-value="updateSelected('text', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.xMm)"
-          type="number"
-          label="X(mm)"
-          @update:model-value="updateSelected('xMm', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.yMm)"
-          type="number"
-          label="Y(mm)"
-          @update:model-value="updateSelected('yMm', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.widthMm)"
-          type="number"
-          label="宽(mm)"
-          @update:model-value="updateSelected('widthMm', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.heightMm)"
-          type="number"
-          label="高(mm)"
-          @update:model-value="updateSelected('heightMm', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.fontSizePt ?? 12)"
-          type="number"
-          label="字号(pt)"
-          @update:model-value="updateSelected('fontSizePt', $event)"
-        />
-        <V2Input
-          :model-value="String(selectedElement.zIndex ?? 0)"
-          type="number"
-          label="层级"
-          @update:model-value="updateSelected('zIndex', $event)"
-        />
-        <label
-          >对齐<select
-            :value="selectedElement.align"
-            @change="updateSelected('align', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="LEFT">左</option>
-            <option value="CENTER">中</option>
-            <option value="RIGHT">右</option>
-          </select></label
-        >
-        <label
-          >跨页区域<select
-            :value="selectedElement.repeat ?? 'BODY'"
-            @change="updateSelected('repeat', ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="BODY">正文</option>
-            <option value="HEADER">重复页眉</option>
-            <option value="FOOTER">重复页脚</option>
-          </select></label
-        >
-      </template>
-      <template v-else-if="viewMode === 'DESIGN' && selectedTable">
-        <p>{{ selectedTable.collectionPath }} 明细列</p>
-        <div
-          v-for="(column, index) in selectedTable.columns"
-          :key="column.fieldPath"
-          class="document-canvas__column-property"
-        >
-          <code>{{ column.fieldPath }}</code>
+      </section>
+      <div class="document-canvas__property-fields">
+        <template v-if="viewMode === 'PREVIEW'">
+          <h3>预览设置</h3>
           <V2Input
-            :model-value="column.header"
-            label="列标题"
-            @update:model-value="updateTableColumn(index, { header: $event })"
-          />
-          <V2Input
-            :model-value="String(column.widthMm)"
+            :model-value="previewBusinessId"
+            label="真实业务对象 ID"
             type="number"
-            label="列宽(mm)"
-            @update:model-value="updateTableColumn(index, { widthMm: Number($event) })"
+            placeholder="留空使用示例数据"
+            @update:model-value="emit('update:previewBusinessId', $event)"
           />
-          <div>
-            <V2Button size="small" variant="secondary" @click="moveTableColumn(index, -1)"
-              >前移</V2Button
+          <p class="document-canvas__hint">预览与正式生成使用同一服务端编译链。</p>
+        </template>
+        <template v-else>
+          <h3>属性</h3>
+        </template>
+        <template v-if="viewMode === 'DESIGN' && selectedElement">
+          <V2Input
+            :model-value="selectedElement.text"
+            label="显示名称"
+            @update:model-value="updateSelected('text', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.xMm)"
+            type="number"
+            label="X(mm)"
+            @update:model-value="updateSelected('xMm', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.yMm)"
+            type="number"
+            label="Y(mm)"
+            @update:model-value="updateSelected('yMm', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.widthMm)"
+            type="number"
+            label="宽(mm)"
+            @update:model-value="updateSelected('widthMm', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.heightMm)"
+            type="number"
+            label="高(mm)"
+            @update:model-value="updateSelected('heightMm', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.fontSizePt ?? 12)"
+            type="number"
+            label="字号(pt)"
+            @update:model-value="updateSelected('fontSizePt', $event)"
+          />
+          <V2Input
+            :model-value="String(selectedElement.zIndex ?? 0)"
+            type="number"
+            label="层级"
+            @update:model-value="updateSelected('zIndex', $event)"
+          />
+          <label
+            >对齐<select
+              :value="selectedElement.align"
+              @change="updateSelected('align', ($event.target as HTMLSelectElement).value)"
             >
-            <V2Button size="small" variant="secondary" @click="moveTableColumn(index, 1)"
-              >后移</V2Button
+              <option value="LEFT">左</option>
+              <option value="CENTER">中</option>
+              <option value="RIGHT">右</option>
+            </select></label
+          >
+          <label
+            >跨页区域<select
+              :value="selectedElement.repeat ?? 'BODY'"
+              @change="updateSelected('repeat', ($event.target as HTMLSelectElement).value)"
             >
-            <V2Button size="small" variant="danger" @click="removeTableColumn(index)"
-              >删除列</V2Button
-            >
+              <option value="BODY">正文</option>
+              <option value="HEADER">重复页眉</option>
+              <option value="FOOTER">重复页脚</option>
+            </select></label
+          >
+        </template>
+        <template v-else-if="viewMode === 'DESIGN' && selectedTable">
+          <p>{{ selectedTable.collectionPath }} 明细列</p>
+          <div
+            v-for="(column, index) in selectedTable.columns"
+            :key="column.fieldPath"
+            class="document-canvas__column-property"
+          >
+            <code>{{ column.fieldPath }}</code>
+            <V2Input
+              :model-value="column.header"
+              label="列标题"
+              @update:model-value="updateTableColumn(index, { header: $event })"
+            />
+            <V2Input
+              :model-value="String(column.widthMm)"
+              type="number"
+              label="列宽(mm)"
+              @update:model-value="updateTableColumn(index, { widthMm: Number($event) })"
+            />
+            <div>
+              <V2Button size="small" variant="secondary" @click="moveTableColumn(index, -1)"
+                >前移</V2Button
+              >
+              <V2Button size="small" variant="secondary" @click="moveTableColumn(index, 1)"
+                >后移</V2Button
+              >
+              <V2Button size="small" variant="danger" @click="removeTableColumn(index)"
+                >删除列</V2Button
+              >
+            </div>
           </div>
-        </div>
-      </template>
-      <p v-else-if="viewMode === 'DESIGN'">选择画布元素后编辑属性</p>
-      <V2Button
-        v-if="viewMode === 'DESIGN' && selectedId"
-        size="small"
-        variant="danger"
-        @click="removeSelected"
-        >删除所选</V2Button
-      >
+        </template>
+        <p v-else-if="viewMode === 'DESIGN'">选择画布元素后编辑属性</p>
+        <V2Button
+          v-if="viewMode === 'DESIGN' && selectedId"
+          size="small"
+          variant="danger"
+          @click="removeSelected"
+          >删除所选</V2Button
+        >
+      </div>
     </aside>
   </div>
 </template>
@@ -800,12 +1286,12 @@ function round(value: number): number {
 <style scoped>
 .document-canvas {
   display: grid;
-  grid-template-columns: 16rem minmax(32rem, 1fr) 14rem;
+  grid-template-columns: 16rem minmax(32rem, 1fr) 18rem;
   gap: var(--v2-space-3);
   min-height: 38rem;
 }
 .document-canvas__fields,
-.document-canvas__properties {
+.document-canvas__property-fields {
   display: grid;
   align-content: start;
   gap: var(--v2-space-2);
@@ -815,6 +1301,25 @@ function round(value: number): number {
 .document-canvas__fields section {
   display: grid;
   gap: var(--v2-space-1);
+}
+.document-canvas__fields > section:not(.document-canvas__library) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.document-canvas__fields > section:not(.document-canvas__library) > h3 {
+  grid-column: 1 / -1;
+}
+.document-canvas__properties {
+  display: grid;
+  align-content: start;
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+.document-canvas__property-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: calc(70vh - 13rem);
+}
+.document-canvas__property-fields > :is(h3, p, .document-canvas__column-property, .v2-button) {
+  grid-column: 1 / -1;
 }
 .document-canvas__library {
   padding-bottom: var(--v2-space-3);
@@ -864,27 +1369,53 @@ function round(value: number): number {
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-sm);
 }
-.document-canvas__field code {
-  overflow: hidden;
-  color: var(--v2-color-text-muted);
-  font-size: 0.7rem;
-  text-overflow: ellipsis;
-}
 .document-canvas__workspace {
   min-width: 0;
 }
 .document-canvas__toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: flex-end;
   gap: var(--v2-space-2);
-  padding: var(--v2-space-2);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md) var(--v2-radius-md) 0 0;
+  padding-bottom: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-color-border);
 }
-.document-canvas__toolbar-spacer {
-  flex: 1;
+.document-canvas__toolbar > :deep(.v2-button),
+.document-canvas__alignment,
+.document-canvas__alignment :deep(.v2-action-menu__trigger) {
+  width: 100%;
+}
+.document-canvas__alignment {
+  align-self: flex-end;
+}
+.document-canvas__alignment :deep(.v2-action-menu__trigger) {
+  min-height: 2rem;
+}
+.document-canvas__alignment :deep(.v2-action-menu__content) {
+  min-width: 20rem;
+  max-height: clamp(12rem, calc(100vh - 21rem), 28rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.document-canvas__alignment-group {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+.document-canvas__alignment-group + .document-canvas__alignment-group {
+  padding-top: var(--v2-space-2);
+  border-top: 1px solid var(--v2-color-border);
+}
+.document-canvas__alignment-group > strong {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+}
+.document-canvas__alignment-group > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-1);
+}
+.document-canvas__alignment-group :deep(.v2-button) {
+  justify-content: center;
 }
 .document-canvas__status {
   display: flex;
@@ -893,9 +1424,8 @@ function round(value: number): number {
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-11);
   background: var(--v2-color-surface-subtle);
-  border-right: 1px solid var(--v2-color-border);
-  border-bottom: 1px solid var(--v2-color-border);
-  border-left: 1px solid var(--v2-color-border);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md) var(--v2-radius-md) 0 0;
 }
 .document-canvas__toolbar label,
 .document-canvas__properties label {
@@ -906,7 +1436,9 @@ function round(value: number): number {
 .document-canvas__toolbar input,
 .document-canvas__toolbar select,
 .document-canvas__properties select {
+  width: 100%;
   min-height: 2rem;
+  box-sizing: border-box;
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-sm);
 }
@@ -965,6 +1497,30 @@ function round(value: number): number {
   pointer-events: none;
   border: 1px dashed var(--v2-color-text-muted);
 }
+.document-canvas__selection-box {
+  position: absolute;
+  z-index: 999;
+  box-sizing: border-box;
+  pointer-events: none;
+  background: var(--v2-color-primary-soft);
+  border: 1px dashed var(--v2-color-primary);
+}
+.document-canvas__guide {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--v2-color-danger);
+}
+.document-canvas__guide.is-vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.document-canvas__guide.is-horizontal {
+  right: 0;
+  left: 0;
+  height: 1px;
+}
 .document-canvas__element,
 .document-canvas__table {
   position: absolute;
@@ -1017,6 +1573,11 @@ function round(value: number): number {
 .document-canvas__table.is-selected {
   outline: 2px solid var(--v2-color-primary);
 }
+.document-canvas__element.is-primary,
+.document-canvas__table.is-primary {
+  outline-style: double;
+  outline-width: 3px;
+}
 .document-canvas__element.is-overflow,
 .document-canvas__table.is-overflow {
   background: var(--v2-color-danger-soft);
@@ -1065,6 +1626,12 @@ function round(value: number): number {
   }
   .document-canvas__properties {
     grid-column: auto;
+  }
+  .document-canvas__property-fields {
+    grid-template-columns: 1fr;
+  }
+  .document-canvas__fields > section:not(.document-canvas__library) {
+    grid-template-columns: 1fr;
   }
   .document-canvas__viewport {
     padding: var(--v2-space-2);
