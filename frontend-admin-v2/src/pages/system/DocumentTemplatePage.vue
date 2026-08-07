@@ -29,6 +29,7 @@ import {
   loadDocumentTemplates,
   publishDocumentVersion,
   previewDocumentTemplateHtml,
+  previewDocumentTemplateVersionHtml,
   updateDocumentVersion,
   type DocumentBusinessType,
   type DocumentBusinessTypeOption,
@@ -75,10 +76,15 @@ const conversionNotices = ref<string[]>([])
 const previewHtml = ref('')
 const previewError = ref('')
 const previewLoading = ref(false)
+const versionPreviewHtml = ref('')
+const versionPreviewError = ref('')
+const versionPreviewLoading = ref(false)
 const versionAction = ref<VersionAction | null>(null)
 const deleteOpen = ref(false)
 let controller: AbortController | null = null
 let previewTimer: ReturnType<typeof setTimeout> | undefined
+let previewRequest = 0
+let versionPreviewRequest = 0
 
 const form = reactive({
   templateCode: '',
@@ -107,8 +113,11 @@ const businessGroups = computed(() => {
 const selectedBusiness = computed(() =>
   businessTypes.value.find((item) => item.businessType === businessType.value),
 )
-const canEdit = computed(() => session.hasPermission('document:template:edit'))
-const canPublish = computed(() => session.hasPermission('document:template:publish'))
+const canEdit = computed(() => session.hasAdminOrPermission('document:template:edit'))
+const canPublish = computed(() => session.hasAdminOrPermission('document:template:publish'))
+const canPreviewVersion = computed(
+  () => canEdit.value && session.hasAdminOrPermission('document:generate'),
+)
 const selectedVersion = computed(
   () => detail.value?.versions.find((item) => item.id === selectedVersionId.value) ?? null,
 )
@@ -537,6 +546,7 @@ function legacyPlaceholderLabel(path: string): string {
 }
 
 async function refreshPreview(): Promise<void> {
+  const request = ++previewRequest
   if (!editorOpen.value || !businessType.value || !canvasValid.value) {
     previewHtml.value = ''
     previewError.value = ''
@@ -546,18 +556,43 @@ async function refreshPreview(): Promise<void> {
   previewLoading.value = true
   previewError.value = ''
   try {
-    previewHtml.value = (
+    const html = (
       await previewDocumentTemplateHtml({
         businessType: businessType.value,
         designSchema: JSON.stringify(form.designSchema),
         businessId: form.previewBusinessId.trim() || undefined,
       })
     ).html
+    if (request === previewRequest) previewHtml.value = html
   } catch (value) {
-    previewHtml.value = ''
-    previewError.value = messageOf(value)
+    if (request === previewRequest) {
+      previewHtml.value = ''
+      previewError.value = messageOf(value)
+    }
   } finally {
-    previewLoading.value = false
+    if (request === previewRequest) previewLoading.value = false
+  }
+}
+
+async function refreshVersionPreview(): Promise<void> {
+  const request = ++versionPreviewRequest
+  versionPreviewHtml.value = ''
+  versionPreviewError.value = ''
+  versionPreviewLoading.value = false
+  const versionId = selectedVersionId.value
+  if (!versionId || !canPreviewVersion.value) return
+  versionPreviewLoading.value = true
+  try {
+    const html = (await previewDocumentTemplateVersionHtml(versionId)).html
+    if (request === versionPreviewRequest && versionId === selectedVersionId.value) {
+      versionPreviewHtml.value = html
+    }
+  } catch (value) {
+    if (request === versionPreviewRequest && versionId === selectedVersionId.value) {
+      versionPreviewError.value = messageOf(value)
+    }
+  } finally {
+    if (request === versionPreviewRequest) versionPreviewLoading.value = false
   }
 }
 
@@ -573,6 +608,12 @@ watch(
     clearTimeout(previewTimer)
     previewTimer = setTimeout(() => void refreshPreview(), 250)
   },
+)
+
+watch(
+  () => [selectedVersionId.value, canPreviewVersion.value],
+  () => void refreshVersionPreview(),
+  { immediate: true },
 )
 
 function requiredTemplateId(): string {
@@ -604,6 +645,8 @@ function versionActionLabel(kind: VersionAction['kind']): string {
 onMounted(() => void refresh())
 onBeforeUnmount(() => {
   controller?.abort()
+  previewRequest += 1
+  versionPreviewRequest += 1
   clearTimeout(previewTimer)
 })
 </script>
@@ -794,6 +837,30 @@ onBeforeUnmount(() => {
           title="请选择模板版本"
           description="选择模板和版本后查看服务端HTML。"
         />
+        <V2PageState
+          v-else-if="!canPreviewVersion"
+          kind="empty"
+          title="无 HTML 预览权限"
+          description="需要模板编辑和单据生成权限。"
+        />
+        <V2PageState
+          v-else-if="versionPreviewLoading"
+          kind="loading"
+          title="正在生成 HTML 预览"
+          description="请稍候。"
+        />
+        <V2PageState
+          v-else-if="versionPreviewError"
+          kind="error"
+          title="HTML 预览失败"
+          :description="versionPreviewError"
+        />
+        <V2PageState
+          v-else-if="!versionPreviewHtml"
+          kind="empty"
+          title="暂无 HTML 预览"
+          description="服务端未返回可预览内容。"
+        />
         <div v-else class="document-template-page__html-preview">
           <div class="document-template-page__preview-meta">
             <strong>V{{ selectedVersion.versionNo }}</strong>
@@ -802,11 +869,7 @@ onBeforeUnmount(() => {
             </V2Badge>
             <span>{{ selectedVersion.schemaVersion }}</span>
           </div>
-          <iframe
-            title="选中模板版本 HTML 预览"
-            sandbox=""
-            :srcdoc="selectedVersion.templateContent"
-          ></iframe>
+          <iframe title="选中模板版本 HTML 预览" sandbox="" :srcdoc="versionPreviewHtml"></iframe>
           <details class="document-template-page__version-detail">
             <summary>版本信息</summary>
             <strong>内容哈希</strong>

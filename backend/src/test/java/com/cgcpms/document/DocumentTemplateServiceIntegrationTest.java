@@ -13,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -171,5 +172,19 @@ class DocumentTemplateServiceIntegrationTest {
         BusinessException immutable = assertThrows(BusinessException.class,
                 () -> service.updateDraft(published.getId(), command));
         assertEquals("DOCUMENT_TEMPLATE_VERSION_IMMUTABLE", immutable.getCode());
+    }
+
+    @Test
+    void rendersVersionHtmlWithProviderSampleData() {
+        DocumentTemplateVersion draft = service.create(
+                "PAYMENT_HTML_PREVIEW", "付款HTML预览", "PAYMENT",
+                new DocumentTemplateService.DraftCommand(
+                        "payment.v2", "<html><body>申请编号={{payment.applyCode}}</body></html>",
+                        "[\"payment.applyCode\"]", "preview"));
+
+        String html = service.renderHtmlPreview(draft.getId(), null);
+
+        assertTrue(html.contains("申请编号="));
+        assertFalse(html.contains("{{payment.applyCode}}"));
     }
 }

@@ -77,6 +77,55 @@ describe('document canvas', () => {
         columns: [{ fieldPath: 'items.name', header: '清单项名称', widthMm: 170 }],
       }),
     ])
+
+    await wrapper.setProps({ modelValue: collection })
+    expect(wrapper.get('.document-canvas__table-content th').text()).toBe('清单项名称')
+    expect(wrapper.get('.document-canvas__table-content td code').text()).toBe('{{name}}')
+    expect(wrapper.text()).toContain('高度为最小占位')
+  })
+
+  it('blocks overlapping flow anchors and body elements below a table', async () => {
+    const schema = blank()
+    schema.tables = [
+      {
+        id: 'table-a',
+        collectionPath: 'items',
+        xMm: 12,
+        yMm: 80,
+        widthMm: 100,
+        heightMm: 40,
+        columns: [{ fieldPath: 'items.name', header: 'A', widthMm: 100 }],
+      },
+      {
+        id: 'table-b',
+        collectionPath: 'items',
+        xMm: 12,
+        yMm: 100,
+        widthMm: 100,
+        heightMm: 30,
+        columns: [{ fieldPath: 'items.name', header: 'B', widthMm: 100 }],
+      },
+    ]
+    const wrapper = mount(DocumentCanvas, { props: { modelValue: schema, fields } })
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('table-b 与 table-a')
+    expect(wrapper.emitted('update:valid')!.at(-1)![0]).toBe(false)
+
+    schema.tables = [schema.tables[0]!]
+    schema.elements = [
+      {
+        id: 'body-after',
+        type: 'TEXT',
+        text: '签字',
+        xMm: 12,
+        yMm: 140,
+        widthMm: 40,
+        heightMm: 10,
+      },
+    ]
+    await wrapper.setProps({ modelValue: { ...schema } })
+    expect(wrapper.get('[role="alert"]').text()).toContain('body-after')
+    expect(wrapper.emitted('update:valid')!.at(-1)![0]).toBe(false)
   })
 
   it('keeps millimetre positions unchanged on orientation switch and blocks overflow', async () => {

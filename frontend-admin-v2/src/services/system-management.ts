@@ -628,6 +628,18 @@ export function previewDocumentTemplateHtml(command: {
   })
 }
 
+export function previewDocumentTemplateVersionHtml(
+  versionId: string,
+  businessId?: string,
+  signal?: AbortSignal,
+): Promise<{ html: string }> {
+  const query = params({ businessId }).toString()
+  return apiRequest<{ html: string }>(
+    `/document-templates/versions/${requiredId(versionId)}/preview-html${query ? `?${query}` : ''}`,
+    { method: 'POST', signal },
+  )
+}
+
 export function loadDocumentTemplate(id: string): Promise<DocumentTemplateDetail> {
   return apiRequest<DocumentTemplateDetail>(`/document-templates/${requiredId(id)}`).then(
     normalizeDocumentDetail,

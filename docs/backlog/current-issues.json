@@ -1,8 +1,27 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-06T15:31:00+08:00",
+  "updatedAt": "2026-08-07T13:29:33+08:00",
   "issues": [
+    {
+      "issueKey": "ISSUE-079-001",
+      "title": "单据渲染一致性与交付状态校准",
+      "status": "IN_PROGRESS",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P2",
+      "blocking": true,
+      "summary": "动态明细表画布坐标与服务端流式HTML/PDF语义不一致，模板主页面版本预览绕过真实服务端渲染链，第77条已合并事实未同步到全部现行载体。",
+      "acceptanceCriteria": "明细表流式布局在设计器、HTML和真实PDF一致并覆盖多表、跨页、碰撞与历史版本替换；版本预览使用现有服务端API且无占位符、串版或权限回归；第77条载体与PR #399及post-merge事实一致；本地G0至G5和受保护Git交付完成。",
+      "deferReason": "本地G0至G5已通过；等待同SHA CI、PR合并、post-merge验真与任务分支清理后关闭。",
+      "sourceRefs": [
+        "docs/plans/第79条主线-单据渲染一致性与交付状态校准任务计划书.md",
+        "docs/quality/2026-08-07-issue-079-单据渲染一致性与交付状态校准.md",
+        "backend/src/main/java/com/cgcpms/document/canvas/DocumentCanvasCompiler.java",
+        "frontend-admin-v2/src/pages/system/DocumentTemplatePage.vue",
+        "docs/backlog/current-focus.md",
+        "docs/product-intelligence/project-map.md"
+      ]
+    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

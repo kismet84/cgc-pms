@@ -1,5 +1,16 @@
 # Current Focus
 
+## 2026-08-07 第79条主线：单据渲染一致性与交付状态校准待 Git 交付
+
+- 目标：统一明细表画布/HTML/PDF流式布局，主页面版本预览接入服务端真实渲染链，并校准第77条Git终态。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_PENDING`；唯一问题源 `ISSUE-079-001`。
+- 计划：[`第79条`](../plans/第79条主线-单据渲染一致性与交付状态校准任务计划书.md)。
+- 基线：独立分支 `codex/mainline-79-document-render@c24dc4646`；原 `master` 工作区他人画布/codemap差异保持不动。
+- 数据：tenant 0 的 `SUB_MEASURE_CANVAS_078` 已由历史 V1 新建、发布并默认绑定 V2；V1 保持停用且未改写。
+- 边界：仅本地dev/test/demo；不新增schema类型、migration、第二渲染器或前端模板引擎。
+- 验证：后端2577、前端499测试通过；浏览器三档视口、服务端HTML、PDF 0/3/60行和状态机金丝雀通过。
+- 零悬空：新增1、关闭0、净变化`+1`；仅剩该 Issue 自身 Git 交付终态，未制造新后续项。
+
 ## 2026-08-06 第78条主线：全审批业务单据可视化模板已合并
 
 - 目标：启用审批类型动态目录与完整详情 Provider 达到 100%，交付 A4 纵横向画布、服务端编译、HTML/PDF 一致预览和版本治理。
@@ -10,10 +21,10 @@
 - 证据：后端2570项、真实MySQL空库/升级、前端485项、PDF跨页、真实分包计量，以及“业务模块—模板—HTML预览”三栏和画布编辑器响应式浏览器验收通过；实现SHA `766e8a60fb90805b515a5385ba679bf4e234fe14`的push CI `31100112881`、PR CI `31100974994`均13/13成功；报告见[`ISSUE-078-001`](../quality/2026-08-06-issue-078-全审批业务单据可视化模板与完整详情字段.md)。
 - 零悬空：计划周期新增1、关闭1、净变化`0`；新增后续项0、关闭后续项0、后续项净变化0。
 
-## 2026-08-06 第77条主线：可靠性加固与现场履约 PWA 本地完成
+## 2026-08-06 第77条主线：可靠性加固与现场履约 PWA 已合并
 
 - 目标：通知事务提交后多客户端提示；普通 API/SSE/文件代理分流；现有 V2 日报和质量安全形成可关闭、有界、服务端权威的 PWA 本地闭环。
-- 状态：`IMPLEMENTED / G0-G5_PASSED / ISSUE-077-001_CLOSED / LOCAL_ONLY / GIT_DELIVERY_PENDING`；实施分支 `codex/mainline-77-pwa-reliability`，基线 `535526eb1021db522fa18e57f07999cfbbeab757`。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / ISSUE-077-001_CLOSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；PR #399 合并 SHA `6caaf895d7996b48b778a503f81ec8031a39ea90`，post-merge run `31086766657` 成功。
 - 计划：[`第77条`](../plans/第77条主线-v1.6可靠性加固与现场履约PWA本地试点任务计划书.md)；契约：[`ReadySpec`](../plans/evidence/issue-077/ready-spec.md)。
 - 裁决：不建设通用可靠任务平台；现有文件任务和文档生成记录已持久化，其他异步任务可补算或仅为提示。
 - 边界：仅本地 dev/test/demo；不启用 `mobile/` 第二产品线，不新增外部系统、消息中间件或非本地验收。

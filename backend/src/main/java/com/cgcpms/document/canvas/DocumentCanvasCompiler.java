@@ -7,10 +7,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.Iterator;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 @Component
 public class DocumentCanvasCompiler {
@@ -50,12 +54,19 @@ public class DocumentCanvasCompiler {
 
         Set<String> ids = new LinkedHashSet<>();
         Set<String> fields = new LinkedHashSet<>();
+        List<BodyElement> bodyElements = new ArrayList<>();
         StringBuilder body = new StringBuilder();
         for (int i = 0; i < elements.size(); i++) {
-            compileElement(elements.get(i), i, page, catalog, ids, fields, body);
+            compileElement(elements.get(i), i, page, catalog, ids, fields, body, bodyElements);
         }
-        for (int i = 0; i < tables.size(); i++) {
-            compileTable(tables.get(i), i, page, catalog, ids, fields, body);
+        double tableBottomMm = 0;
+        List<Integer> tableIndexes = IntStream.range(0, tables.size()).boxed()
+                .sorted(Comparator.comparingDouble(index -> tables.get(index).path("yMm")
+                        .asDouble(Double.POSITIVE_INFINITY)))
+                .toList();
+        for (int index : tableIndexes) {
+            tableBottomMm = compileTable(tables.get(index), index, page, catalog, ids, fields, body,
+                    bodyElements, tableBottomMm);
         }
 
         String html = "<html><head><meta charset=\"UTF-8\"/><style>"
@@ -72,11 +83,13 @@ public class DocumentCanvasCompiler {
     }
 
     private void compileElement(JsonNode node, int index, Page page, DocumentTemplateFieldCatalog.Catalog catalog,
-                                Set<String> ids, Set<String> fields, StringBuilder html) {
+                                Set<String> ids, Set<String> fields, StringBuilder html,
+                                List<BodyElement> bodyElements) {
         String path = "$.elements[" + index + "]";
         requireObject(node, path);
         rejectUnknown(node, ELEMENT_FIELDS, path);
-        uniqueId(requireText(node, "id", path), ids, path + ".id");
+        String id = requireText(node, "id", path);
+        uniqueId(id, ids, path + ".id");
         String type = requireText(node, "type", path).toUpperCase(Locale.ROOT);
         if (!ELEMENT_TYPES.contains(type)) invalid(path + ".type", "仅支持TEXT、FIELD或DIVIDER");
         Rect rect = rect(node, path, page);
@@ -87,6 +100,7 @@ public class DocumentCanvasCompiler {
         if (!ALIGNMENTS.contains(align)) invalid(path + ".align", "仅支持LEFT、CENTER或RIGHT");
         String repeat = optionalText(node, "repeat", "BODY", path).toUpperCase(Locale.ROOT);
         if (!REPEATS.contains(repeat)) invalid(path + ".repeat", "仅支持BODY、HEADER或FOOTER");
+        if ("BODY".equals(repeat)) bodyElements.add(new BodyElement(id, rect));
 
         String content;
         if ("FIELD".equals(type)) {
@@ -113,8 +127,9 @@ public class DocumentCanvasCompiler {
                 .append("\">").append(content).append("</div>");
     }
 
-    private void compileTable(JsonNode node, int index, Page page, DocumentTemplateFieldCatalog.Catalog catalog,
-                              Set<String> ids, Set<String> fields, StringBuilder html) {
+    private double compileTable(JsonNode node, int index, Page page, DocumentTemplateFieldCatalog.Catalog catalog,
+                                Set<String> ids, Set<String> fields, StringBuilder html,
+                                List<BodyElement> bodyElements, double previousBottomMm) {
         String path = "$.tables[" + index + "]";
         requireObject(node, path);
         rejectUnknown(node, TABLE_FIELDS, path);
@@ -124,6 +139,15 @@ public class DocumentCanvasCompiler {
             throw new BusinessException("DOCUMENT_FIELD_CONTEXT_INVALID", "集合上下文不存在: " + collectionPath);
         }
         Rect rect = rect(node, path, page);
+        if (rect.yMm() < previousBottomMm - 0.0001) {
+            invalid(path, "流式表格设计占位不得重叠");
+        }
+        for (BodyElement element : bodyElements) {
+            if (rect.overlapsHorizontally(element.rect())
+                    && element.rect().yMm() + element.rect().heightMm() > rect.yMm() + 0.0001) {
+                invalid(path, "流式表格可能与正文元素重叠: " + element.id());
+            }
+        }
         JsonNode columns = requireArray(node, "columns", path);
         if (columns.isEmpty() || columns.size() > 30) invalid(path + ".columns", "表格列数必须为1到30");
 
@@ -149,9 +173,15 @@ public class DocumentCanvasCompiler {
         if (Math.abs(totalWidth - rect.widthMm()) > 0.01) invalid(path + ".columns", "列宽总和必须等于表格宽度");
         headers.append("</tr>");
         cells.append("</tr>");
+        double gapMm = rect.yMm() - previousBottomMm;
+        if (gapMm > 0) {
+            html.append("<div class=\"canvas-table-spacer\" style=\"height:")
+                    .append(number(gapMm)).append("mm\"></div>");
+        }
         html.append("<table style=\"").append(rect.tableCss()).append("\"><thead>").append(headers)
                 .append("</thead><tbody>{{#each ").append(collectionPath).append("}}")
                 .append(cells).append("{{/each}}</tbody></table>");
+        return rect.yMm() + rect.heightMm();
     }
 
     private Page page(JsonNode node) {
@@ -277,12 +307,19 @@ public class DocumentCanvasCompiler {
         }
 
         String tableCss() {
-            return "margin-left:" + value(xMm) + "mm;margin-top:" + value(yMm) + "mm;width:"
-                    + value(widthMm) + "mm;";
+            return "margin-left:" + value(xMm) + "mm;width:" + value(widthMm) + "mm;min-height:"
+                    + value(heightMm) + "mm;";
+        }
+
+        boolean overlapsHorizontally(Rect other) {
+            return xMm < other.xMm + other.widthMm && xMm + widthMm > other.xMm;
         }
 
         private static String value(double value) {
             return Double.toString(value).replaceAll("\\.0$", "");
         }
+    }
+
+    private record BodyElement(String id, Rect rect) {
     }
 }
