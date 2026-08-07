@@ -1,15 +1,16 @@
 # Current Focus
 
-## 2026-08-07 第79条主线：单据渲染一致性与交付状态校准待 Git 交付
+## 2026-08-07 第79条主线：单据渲染一致性与交付状态校准已合并
 
 - 目标：统一明细表画布/HTML/PDF流式布局，主页面版本预览接入服务端真实渲染链，并校准第77条Git终态。
-- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_PENDING`；唯一问题源 `ISSUE-079-001`。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；`ISSUE-079-001` 已关闭。
 - 计划：[`第79条`](../plans/第79条主线-单据渲染一致性与交付状态校准任务计划书.md)。
 - 基线：独立分支 `codex/mainline-79-document-render@c24dc4646`；原 `master` 工作区他人画布/codemap差异保持不动。
 - 数据：tenant 0 的 `SUB_MEASURE_CANVAS_078` 已由历史 V1 新建、发布并默认绑定 V2；V1 保持停用且未改写。
 - 边界：仅本地dev/test/demo；不新增schema类型、migration、第二渲染器或前端模板引擎。
 - 验证：后端2577、前端499测试通过；浏览器三档视口、服务端HTML、PDF 0/3/60行和状态机金丝雀通过。
-- 零悬空：新增1、关闭0、净变化`+1`；仅剩该 Issue 自身 Git 交付终态，未制造新后续项。
+- Git：PR #404，merge SHA `6cb8cedabe17bce1e22593aad89cabf4ba66e828`；post-merge run `31153245541` 成功；实现源分支本地/远端已删除。
+- 零悬空：本轮新增0、关闭1、净变化`-1`；计划全周期累计净变化0，无无载体遗留项。
 
 ## 2026-08-06 第78条主线：全审批业务单据可视化模板已合并
 
