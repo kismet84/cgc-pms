@@ -41,7 +41,7 @@ const domains = [
   { id: 'delivery', label: '项目履约' },
   { id: 'commercial', label: '商务合约' },
   { id: 'supply', label: '供应链与物资' },
-  { id: 'subcontract-settlement', label: '分包与结算' },
+  { id: 'subcontract-settlement', label: '分包结算' },
   { id: 'finance', label: '资金财务' },
   { id: 'master-data', label: '基础资料' },
   { id: 'system-management', label: '系统管理' },

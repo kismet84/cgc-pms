@@ -303,7 +303,7 @@ export const navigationDomains: NavigationDomain[] = [
   },
   {
     id: 'subcontract-settlement',
-    label: '分包与结算',
+    label: '分包结算',
     badge: '分',
     workspaces: [
       {

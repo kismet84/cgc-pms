@@ -3,7 +3,7 @@ package com.cgcpms.document.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public record DocumentTemplateCreateRequest(
-        @NotBlank String templateCode,
+        String templateCode,
         @NotBlank String templateName,
         @NotBlank String businessType,
         @NotBlank String schemaVersion,

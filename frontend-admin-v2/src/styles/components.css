@@ -905,6 +905,16 @@
   width: min(72rem, 100%);
 }
 
+.v2-dialog__panel.v2-dialog__panel--fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+}
+
 .v2-dialog__panel.v2-dialog-overflow,
 .v2-dialog__panel.v2-dialog-overflow .v2-dialog__body {
   overflow: visible;

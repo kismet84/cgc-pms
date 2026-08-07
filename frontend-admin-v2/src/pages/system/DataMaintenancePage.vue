@@ -147,7 +147,7 @@ onMounted(loadPreview)
 <style scoped>
 .data-maintenance-page__facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--v2-space-4);
   margin: 0 0 var(--v2-space-4);
 }
@@ -155,6 +155,7 @@ onMounted(loadPreview)
 .data-maintenance-page__facts div,
 .data-maintenance-page__list li {
   display: grid;
+  min-width: 0;
   gap: var(--v2-space-1);
 }
 
@@ -168,11 +169,17 @@ onMounted(loadPreview)
   font-weight: 650;
 }
 
+.data-maintenance-page__facts code {
+  overflow-wrap: anywhere;
+}
+
 .data-maintenance-page__list {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--v2-space-3);
   margin: 0;
-  padding-left: var(--v2-space-5);
+  padding: 0;
+  list-style: none;
 }
 
 .data-maintenance-page__list span {
@@ -199,5 +206,19 @@ onMounted(loadPreview)
 .data-maintenance-page__command code {
   flex: 1 1 24rem;
   user-select: all;
+}
+
+@media (max-width: 64rem) {
+  .data-maintenance-page__facts,
+  .data-maintenance-page__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .data-maintenance-page__facts,
+  .data-maintenance-page__list {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

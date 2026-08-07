@@ -179,7 +179,7 @@ export type DocumentPageOrientation = 'PORTRAIT' | 'LANDSCAPE'
 
 export interface DocumentCanvasElement {
   id: string
-  type: 'TEXT' | 'FIELD'
+  type: 'TEXT' | 'FIELD' | 'DIVIDER'
   xMm: number
   yMm: number
   widthMm: number
@@ -263,7 +263,6 @@ export interface DocumentDraft {
 }
 
 export interface DocumentCreateCommand extends DocumentDraft {
-  templateCode: string
   templateName: string
   businessType: DocumentBusinessType
 }
@@ -674,6 +673,17 @@ export function disableDocumentVersion(id: string): Promise<void> {
   return apiRequest<void>(`/document-templates/versions/${requiredId(id)}/disable`, {
     method: 'POST',
   })
+}
+
+export function enableDocumentVersion(id: string): Promise<DocumentTemplateVersion> {
+  return apiRequest<DocumentTemplateVersion>(
+    `/document-templates/versions/${requiredId(id)}/enable`,
+    { method: 'POST' },
+  ).then(normalizeDocumentVersion)
+}
+
+export function deleteDocumentTemplate(id: string): Promise<void> {
+  return apiRequest<void>(`/document-templates/${requiredId(id)}`, { method: 'DELETE' })
 }
 
 export function bindDefaultDocumentVersion(id: string, expectedLockVersion: number): Promise<void> {

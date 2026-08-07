@@ -53,6 +53,45 @@ class DocumentTemplateServiceIntegrationTest {
         BusinessException immutable = assertThrows(BusinessException.class,
                 () -> service.updateDraft(published.getId(), command));
         assertEquals("DOCUMENT_TEMPLATE_VERSION_IMMUTABLE", immutable.getCode());
+
+        service.disablePublishedVersion(published.getId());
+        BusinessException disabledDefault = assertThrows(BusinessException.class,
+                () -> service.bindDefault(published.getId(), 0));
+        assertEquals("DOCUMENT_TEMPLATE_NOT_PUBLISHED", disabledDefault.getCode());
+        assertEquals("PUBLISHED", service.enableDisabledVersion(published.getId()).getStatus());
+    }
+
+    @Test
+    void automaticallyGeneratesStableTemplateCode() {
+        DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
+                "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",
+                "[\"payment.applyCode\"]", "generated code");
+
+        DocumentTemplateVersion draft = service.createAuto("自动编码模板", "PAYMENT", command);
+
+        String code = service.getTemplateDetail(draft.getTemplateId()).template().getTemplateCode();
+        assertTrue(code.matches("TPL-\\d{8}-\\d{3}"));
+    }
+
+    @Test
+    void deletesDraftTemplateButPreservesPublishedHistory() {
+        DocumentTemplateService.DraftCommand command = new DocumentTemplateService.DraftCommand(
+                "payment.v2", "<html><body>{{payment.applyCode}}</body></html>",
+                "[\"payment.applyCode\"]", "delete test");
+        DocumentTemplateVersion draft = service.create(
+                "PAYMENT_DELETE_DRAFT", "待删除模板", "PAYMENT", command);
+        service.createNextDraft(draft.getTemplateId(), command);
+
+        service.deleteTemplate(draft.getTemplateId());
+
+        assertTrue(service.listTemplates("PAYMENT").stream()
+                .noneMatch(template -> "PAYMENT_DELETE_DRAFT".equals(template.templateCode())));
+
+        DocumentTemplateVersion published = service.publish(service.create(
+                "PAYMENT_KEEP_PUBLISHED", "已发布模板", "PAYMENT", command).getId());
+        BusinessException protectedHistory = assertThrows(BusinessException.class,
+                () -> service.deleteTemplate(published.getTemplateId()));
+        assertEquals("DOCUMENT_TEMPLATE_DELETE_FORBIDDEN", protectedHistory.getCode());
     }
 
     @Test

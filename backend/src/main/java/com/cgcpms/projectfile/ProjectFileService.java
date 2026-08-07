@@ -104,10 +104,10 @@ public class ProjectFileService {
                 .contains(businessType) || alreadyLinked(file.getTenantId(), file.getId())) return;
         HistoricalResolution resolution = resolveHistoricalProject(businessType, file.getBusinessId(), file.getTenantId());
         if (resolution.projectId() == null) return;
-        ProjectLock project = lockProject(resolution.projectId());
+        lockProject(resolution.projectId());
         long catalogId = IdWorker.getId();
         LocalDateTime createdAt = file.getCreatedAt();
-        String fileCode = nextFileCode(project, createdAt == null ? LocalDate.now() : createdAt.toLocalDate());
+        String fileCode = nextFileCode(createdAt == null ? LocalDate.now() : createdAt.toLocalDate());
         String category = categoryFor(businessType, file.getDocumentType());
         jdbcTemplate.update("""
                 INSERT INTO project_file_catalog(
@@ -136,9 +136,9 @@ public class ProjectFileService {
                 """, Long.class, file.getTenantId(), bidCostId, logicalName);
         long catalogId;
         if (catalogs.isEmpty()) {
-            ProjectLock project = lockProject(projectId);
+            lockProject(projectId);
             catalogId = IdWorker.getId();
-            String fileCode = nextFileCode(project, LocalDate.now());
+            String fileCode = nextFileCode(LocalDate.now());
             jdbcTemplate.update("""
                     INSERT INTO project_file_catalog(
                         id,tenant_id,project_id,file_code,display_name,category_code,source_kind,
@@ -233,9 +233,9 @@ public class ProjectFileService {
         projectAccessChecker.checkAccess(projectId, "新建项目文件");
         requireEnabledCategory(safeCategory);
 
-        ProjectLock project = lockProject(projectId);
+        lockProject(projectId);
         long catalogId = IdWorker.getId();
-        String fileCode = nextFileCode(project, LocalDate.now());
+        String fileCode = nextFileCode(LocalDate.now());
         Long tenantId = requireTenantId();
         Long userId = UserContext.getCurrentUserId();
         jdbcTemplate.update("""
@@ -437,9 +437,9 @@ public class ProjectFileService {
         long businessId = number(file.get("business_id"));
         long catalogId = IdWorker.getId();
         try {
-            ProjectLock project = lockProject(candidate.projectId());
+            lockProject(candidate.projectId());
             LocalDateTime createdAt = candidate.createdAt();
-            String fileCode = nextFileCode(project, createdAt == null ? LocalDate.now() : createdAt.toLocalDate());
+            String fileCode = nextFileCode(createdAt == null ? LocalDate.now() : createdAt.toLocalDate());
             Long createdBy = nullableNumber(file.get("created_by"));
             jdbcTemplate.update("""
                     INSERT INTO project_file_catalog(
@@ -463,7 +463,7 @@ public class ProjectFileService {
     }
 
     private void preflightHistoricalCapacity(long tenantId) {
-        Map<ProjectDate, Integer> pending = new HashMap<>();
+        Map<LocalDate, Integer> pending = new HashMap<>();
         List<Map<String, Object>> files = jdbcTemplate.queryForList("""
                 SELECT f.id,f.business_type,f.business_id,f.created_at
                 FROM sys_file f
@@ -479,8 +479,7 @@ public class ProjectFileService {
                     Objects.toString(file.get("business_type"), null), number(file.get("business_id")), tenantId);
             if (resolution.projectId() == null) continue;
             LocalDateTime createdAt = localDateTime(file.get("created_at"));
-            pending.merge(new ProjectDate(resolution.projectId(),
-                    createdAt == null ? LocalDate.now() : createdAt.toLocalDate()), 1, Integer::sum);
+            pending.merge(createdAt == null ? LocalDate.now() : createdAt.toLocalDate(), 1, Integer::sum);
         }
         List<Map<String, Object>> bidChains = jdbcTemplate.queryForList("""
                 SELECT b.project_id,MIN(f.created_at) AS created_at
@@ -495,19 +494,14 @@ public class ProjectFileService {
                 """, tenantId);
         for (Map<String, Object> chain : bidChains) {
             LocalDateTime createdAt = localDateTime(chain.get("created_at"));
-            pending.merge(new ProjectDate(number(chain.get("project_id")),
-                    createdAt == null ? LocalDate.now() : createdAt.toLocalDate()), 1, Integer::sum);
+            pending.merge(createdAt == null ? LocalDate.now() : createdAt.toLocalDate(), 1, Integer::sum);
         }
-        for (Map.Entry<ProjectDate, Integer> entry : pending.entrySet()) {
-            ProjectDate key = entry.getKey();
-            ProjectLock project = lockProject(key.projectId());
-            String prefix = "FILE-" + requiredText(project.projectCode(), 50,
-                    "PROJECT_FILE_CODE_INVALID", "项目编码为空，无法生成文件编号")
-                    + '-' + DATE_CODE.format(key.date()) + '-';
+        for (Map.Entry<LocalDate, Integer> entry : pending.entrySet()) {
+            String prefix = "FILE-" + DATE_CODE.format(entry.getKey()) + '-';
             Long existing = jdbcTemplate.queryForObject("""
                     SELECT COUNT(*) FROM project_file_catalog
-                    WHERE tenant_id=? AND project_id=? AND file_code LIKE ?
-                    """, Long.class, tenantId, key.projectId(), prefix + "%");
+                    WHERE tenant_id=? AND file_code LIKE ?
+                    """, Long.class, tenantId, prefix + "%");
             if (Objects.requireNonNullElse(existing, 0L) + entry.getValue() > 999) {
                 throw new BusinessException("PROJECT_FILE_CODE_EXHAUSTED",
                         "项目日期历史文件超过999条，当前批次未写入");
@@ -538,9 +532,9 @@ public class ProjectFileService {
         long catalogId = newCatalog ? IdWorker.getId() : existingCatalogs.getFirst();
         try {
             if (newCatalog) {
-                ProjectLock project = lockProject(projectId);
+                lockProject(projectId);
                 LocalDateTime chainCreatedAt = localDateTime(chain.get("created_at"));
-                String fileCode = nextFileCode(project,
+                String fileCode = nextFileCode(
                         chainCreatedAt == null ? LocalDate.now() : chainCreatedAt.toLocalDate());
                 Long createdBy = nullableNumber(versions.getFirst().get("created_by"));
                 jdbcTemplate.update("""
@@ -849,13 +843,12 @@ public class ProjectFileService {
         return new QueryParts(where.toString(), args);
     }
 
-    private ProjectLock lockProject(long projectId) {
+    private void lockProject(long projectId) {
         try {
-            return jdbcTemplate.queryForObject("""
-                    SELECT id,project_code FROM pm_project
+            jdbcTemplate.queryForObject("""
+                    SELECT id FROM pm_project
                     WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE
-                    """, (rs, rowNum) -> new ProjectLock(rs.getLong("id"), rs.getString("project_code")),
-                    projectId, requireTenantId());
+                    """, Long.class, projectId, requireTenantId());
         } catch (org.springframework.dao.EmptyResultDataAccessException exception) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
@@ -874,14 +867,23 @@ public class ProjectFileService {
         }
     }
 
-    private String nextFileCode(ProjectLock project, LocalDate date) {
-        String projectCode = requiredText(project.projectCode(), 50,
-                "PROJECT_FILE_CODE_INVALID", "项目编码为空，无法生成文件编号");
-        String prefix = "FILE-" + projectCode + '-' + DATE_CODE.format(date) + '-';
+    private String nextFileCode(LocalDate date) {
+        long tenantId = requireTenantId();
+        jdbcTemplate.update("""
+                INSERT INTO project_file_code_scope(tenant_id) VALUES(?)
+                ON DUPLICATE KEY UPDATE tenant_id=tenant_id
+                """, tenantId);
+        Long lockedTenant = jdbcTemplate.queryForObject("""
+                SELECT tenant_id FROM project_file_code_scope WHERE tenant_id=? FOR UPDATE
+                """, Long.class, tenantId);
+        if (lockedTenant == null) {
+            throw new BusinessException("PROJECT_FILE_CODE_SCOPE_UNAVAILABLE", "文件编号锁定范围不可用");
+        }
+        String prefix = "FILE-" + DATE_CODE.format(date) + '-';
         String last = jdbcTemplate.queryForObject("""
                 SELECT MAX(file_code) FROM project_file_catalog
-                WHERE tenant_id=? AND project_id=? AND file_code LIKE ?
-                """, String.class, requireTenantId(), project.id(), prefix + "%");
+                WHERE tenant_id=? AND file_code LIKE ?
+                """, String.class, tenantId, prefix + "%");
         int next = 1;
         if (last != null && last.length() == prefix.length() + 3) {
             try {
@@ -1048,8 +1050,6 @@ public class ProjectFileService {
     private record HistoricalResolution(Long projectId, String reason) {}
     private record HistoricalCandidate(String kind, Map<String, Object> row, long markerId,
                                        LocalDateTime createdAt, long projectId) {}
-    private record ProjectLock(long id, String projectCode) {}
-    private record ProjectDate(long projectId, LocalDate date) {}
     private record CatalogLock(long id, long projectId, String sourceKind, String maintainMode) {}
     private record PreviewRow(long id, long tenantId, long catalogId, long projectId, long sysFileId,
                               String originalName, String contentType, String virusScanStatus,
