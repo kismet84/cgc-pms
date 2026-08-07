@@ -1096,7 +1096,7 @@ onBeforeUnmount(() => {
 
 .document-template-page__form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--v2-space-4);
 }
 
@@ -1133,6 +1133,12 @@ onBeforeUnmount(() => {
 @media (max-width: 1180px) {
   .document-template-page__columns {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .document-template-page__form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

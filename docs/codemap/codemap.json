@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-06T23:45:15.102Z",
-  "generated_from_commit": "e6e86fc4021f2cc28d0f203ad4b88d1938da3d56",
+  "generated_at": "2026-08-07T00:34:21.200Z",
+  "generated_from_commit": "d6830e8ba701f4037a27ec60f6426d653a0f9036",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",

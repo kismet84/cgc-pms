@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import DocumentCanvas from '@/components/document/DocumentCanvas.vue'
 import type { DocumentDesignSchema, DocumentCatalogField } from '@/services/system-management'
 
@@ -36,6 +36,30 @@ const fields: DocumentCatalogField[] = [
 ]
 
 describe('document canvas', () => {
+  it('shows only Chinese business field labels while keeping path search', async () => {
+    const wrapper = mount(DocumentCanvas, { props: { modelValue: blank(), fields } })
+    const fieldButtons = wrapper.findAll('.document-canvas__field')
+
+    expect(wrapper.find('.document-canvas__workspace > .document-canvas__toolbar').exists()).toBe(
+      false,
+    )
+    expect(wrapper.find('.document-canvas__properties > .document-canvas__toolbar').exists()).toBe(
+      true,
+    )
+    expect(
+      wrapper.get('.document-canvas__properties').element.firstElementChild?.classList,
+    ).toContain('document-canvas__toolbar')
+    expect(wrapper.get('.document-canvas__property-fields h3').text()).toBe('属性')
+    expect(fieldButtons.map((item) => item.text())).toEqual(['计量编号', '清单项名称'])
+    expect(fieldButtons.every((item) => item.attributes('title') === undefined)).toBe(true)
+    expect(wrapper.text()).not.toContain('measure.code')
+
+    await wrapper.get('input[type="search"]').setValue('measure.code')
+    expect(wrapper.findAll('.document-canvas__field').map((item) => item.text())).toEqual([
+      '计量编号',
+    ])
+  })
+
   it('adds scalar fields and creates a detail table for collection fields', async () => {
     const wrapper = mount(DocumentCanvas, { props: { modelValue: blank(), fields } })
 
@@ -116,5 +140,183 @@ describe('document canvas', () => {
       'server preview',
     )
     expect(wrapper.get('.document-canvas__viewport').findAll('iframe')).toHaveLength(1)
+  })
+
+  it('box-selects multiple components and aligns them', async () => {
+    const schema = blank()
+    schema.elements = [
+      {
+        id: 'field-1',
+        type: 'FIELD',
+        text: '字段一',
+        xMm: 20,
+        yMm: 30,
+        widthMm: 20,
+        heightMm: 10,
+      },
+      {
+        id: 'field-2',
+        type: 'FIELD',
+        text: '字段二',
+        xMm: 60,
+        yMm: 50,
+        widthMm: 20,
+        heightMm: 20,
+      },
+      {
+        id: 'field-3',
+        type: 'FIELD',
+        text: '字段三',
+        xMm: 150,
+        yMm: 100,
+        widthMm: 20,
+        heightMm: 10,
+      },
+    ]
+    const wrapper = mount(DocumentCanvas, { props: { modelValue: schema, fields } })
+    const page = wrapper.get('.document-canvas__page')
+    vi.spyOn(page.element, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 210,
+      height: 297,
+      right: 210,
+      bottom: 297,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+
+    page.element.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20 }),
+    )
+    page.element.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 100, clientY: 90 }),
+    )
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('.is-selected')).toHaveLength(2)
+    expect(wrapper.text()).toContain('已选 2 个')
+    expect(wrapper.get('.v2-action-menu__trigger').text()).toBe('排版（2）')
+    expect(
+      wrapper.findAll('.document-canvas__alignment-group > strong').map((group) => group.text()),
+    ).toEqual(['对齐基准', '对齐', '分布与间距', '尺寸', '批量排列', '精度', '移动辅助'])
+    expect(wrapper.findAll('[data-testid^="layout-"]')).toHaveLength(20)
+
+    await wrapper.get('[data-testid="layout-top"]').trigger('click')
+    const alignedTop = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(alignedTop.elements.slice(0, 2).map((item) => item.yMm)).toEqual([30, 30])
+
+    await wrapper.setProps({ modelValue: alignedTop })
+    await wrapper.get('[data-testid="layout-right"]').trigger('click')
+    const alignedRight = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(alignedRight.elements.slice(0, 2).map((item) => item.xMm)).toEqual([60, 60])
+    expect(alignedRight.elements[2]?.xMm).toBe(150)
+  })
+
+  it('distributes, sizes, arranges, and aligns selected components by reference', async () => {
+    const schema = blank()
+    schema.elements = [
+      { id: 'a', type: 'FIELD', text: 'A', xMm: 20, yMm: 30, widthMm: 20, heightMm: 10 },
+      { id: 'b', type: 'FIELD', text: 'B', xMm: 60, yMm: 50, widthMm: 30, heightMm: 20 },
+      { id: 'c', type: 'FIELD', text: 'C', xMm: 150, yMm: 80, widthMm: 20, heightMm: 12 },
+    ]
+    const wrapper = mount(DocumentCanvas, { props: { modelValue: schema, fields } })
+    const page = wrapper.get('.document-canvas__page')
+    vi.spyOn(page.element, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 210,
+      height: 297,
+      right: 210,
+      bottom: 297,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    page.element.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20 }),
+    )
+    page.element.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 190, clientY: 110 }),
+    )
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-testid="layout-distribute-horizontal"]').trigger('click')
+    const distributed = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(distributed.elements.map((item) => item.xMm)).toEqual([20, 80, 150])
+
+    await wrapper.setProps({ modelValue: distributed })
+    await wrapper.get('[data-testid="layout-equal-size"]').trigger('click')
+    const equal = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(equal.elements.map((item) => [item.widthMm, item.heightMm])).toEqual([
+      [20, 12],
+      [20, 12],
+      [20, 12],
+    ])
+
+    await wrapper.setProps({ modelValue: equal })
+    await wrapper.get('[data-testid="layout-spacing"]').setValue('7')
+    await wrapper.get('[data-testid="layout-arrange-horizontal"]').trigger('click')
+    const arranged = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(arranged.elements.map((item) => [item.xMm, item.yMm])).toEqual([
+      [20, 30],
+      [47, 30],
+      [74, 30],
+    ])
+
+    await wrapper.setProps({ modelValue: arranged })
+    await wrapper.get('[data-testid="align-reference-canvas"]').trigger('click')
+    await wrapper.get('[data-testid="layout-top"]').trigger('click')
+    const canvasAligned = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(canvasAligned.elements.map((item) => item.yMm)).toEqual([12, 12, 12])
+    expect(wrapper.get('[data-testid="snap-grid"]').attributes('aria-pressed')).toBe('false')
+    await wrapper.get('[data-testid="snap-grid"]').trigger('click')
+    expect(wrapper.get('[data-testid="snap-grid"]').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('snaps movement to the grid and shows smart guides', async () => {
+    const schema = blank()
+    schema.elements = [
+      { id: 'a', type: 'FIELD', text: 'A', xMm: 22, yMm: 33, widthMm: 20, heightMm: 10 },
+      { id: 'b', type: 'FIELD', text: 'B', xMm: 60, yMm: 70, widthMm: 20, heightMm: 10 },
+    ]
+    const wrapper = mount(DocumentCanvas, { props: { modelValue: schema, fields } })
+    const page = wrapper.get('.document-canvas__page')
+    vi.spyOn(page.element, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 210,
+      height: 297,
+      right: 210,
+      bottom: 297,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    const first = wrapper.findAll('.document-canvas__element')[0]!
+    await wrapper.get('[data-testid="snap-grid"]').trigger('click')
+    first.element.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0 }),
+    )
+    first.element.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 2, clientY: 1 }),
+    )
+    await wrapper.vm.$nextTick()
+    const snapped = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(snapped.elements[0]).toMatchObject({ xMm: 25, yMm: 35 })
+
+    await wrapper.setProps({ modelValue: schema })
+    await wrapper.get('[data-testid="snap-grid"]').trigger('click')
+    first.element.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0 }),
+    )
+    first.element.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 38, clientY: 0 }),
+    )
+    await wrapper.vm.$nextTick()
+    const guided = wrapper.emitted('update:modelValue')!.at(-1)![0] as DocumentDesignSchema
+    expect(guided.elements[0]?.xMm).toBe(60)
+    expect(wrapper.get('.document-canvas__guide.is-vertical').attributes('style')).toContain('60mm')
   })
 })
