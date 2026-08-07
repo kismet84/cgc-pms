@@ -1,16 +1,17 @@
 # Current Focus
 
-## 2026-08-07 第80条主线：CI 全量验证分层与后端测试门禁提效待 G5
+## 2026-08-07 第80条主线：CI 全量验证分层与后端测试门禁提效已合并
 
 - 目标：显式分离 browser contract、live 与 M8 special；并行完整后端和历史顺序敏感复验；保持 MySQL、coverage 与同 SHA 安全边界。
-- 状态：`IMPLEMENTED / G0-G4_PASSED / G5_PENDING`；`ISSUE-080-001` 尚未关闭。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；`ISSUE-080-001` 已关闭。
 - 计划：[`第80条`](../plans/第80条主线-CI全量验证分层与后端测试门禁提效任务计划书.md)。
 - 前端：27 个 contract spec 共 98 项全部通过，0 skipped；9 个 live 与 1 个 M8 special 保持显式入口。
 - 后端：2577 项基线完整验证连续 5 次通过，中位 437 秒；全部阻塞修复后最终完整验证 2580 项、423.4 秒通过；order 183 项独立并行且不生成 JaCoCo；MySQL 15 项通过。
 - 运行态：M8 V2 root、legacy rollback、V2 restore 三阶段通过；live 隔离演示库前置不成立，当前数据库未重置且不伪造业务裁决。
-- 安全裁决：缺少独立 reviewer，PR push reuse 保持关闭并 fail-close 到 full CI；不降低评审独立性。
-- G5：待同 SHA push/PR CI、合并、post-merge、14 项 branch protection 回读与源分支清理。
-- 零悬空：本轮新增0、关闭0、净变化0；计划全周期暂为新增1、关闭0、净变化`+1`。
+- 性能裁决：连续 5 次远端成功；browser job 中位 128 秒达标；backend job 中位 527 秒未达 500 秒，但较基线 648 秒下降约 18.7%，核心 verify step 中位 475 秒。按退出规则关闭继续盲调假设，不删测试、不降覆盖、不新增无价值 backlog。
+- 安全裁决：master 14 项 required checks 均绑定 `app_id=15368`；缺少独立 reviewer，PR push reuse 保持关闭并 fail-close 到 full CI。
+- G5：源 SHA `8b1449f6` 的 push/PR CI 通过；PR #408 合并为 `fbbb0592a5365c299b59eb3017d45d044d9051da`，post-merge run `31191656447` 成功；实现源分支本地、远端均已删除。
+- 零悬空：本轮新增0、关闭0、净变化0；计划全周期问题源新增1、关闭1、净变化0。
 
 ## 2026-08-07 第79条主线：单据渲染一致性与交付状态校准已合并
 
