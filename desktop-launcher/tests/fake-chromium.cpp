@@ -1,6 +1,7 @@
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -11,8 +12,8 @@ namespace fs = std::filesystem;
 
 constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 
-LONG gLastNormalWidth = 0;
-LONG gLastNormalHeight = 0;
+LONG gFixedNormalWidth = 0;
+LONG gFixedNormalHeight = 0;
 
 std::string Utf8(const std::wstring& value) {
   int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
@@ -27,11 +28,16 @@ std::string Utf8(const std::wstring& value) {
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
   if (message == WM_WINDOWPOSCHANGED) {
     const auto* position = reinterpret_cast<const WINDOWPOS*>(lParam);
-    const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
-    if (position && (position->flags & SWP_NOSIZE) == 0 && (style & WS_MAXIMIZE) == 0 &&
-        position->cx > 0 && position->cy > 0) {
-      gLastNormalWidth = position->cx;
-      gLastNormalHeight = position->cy;
+    const UINT dpi = GetDpiForWindow(window);
+    const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                     USER_DEFAULT_SCREEN_DPI);
+    const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                      USER_DEFAULT_SCREEN_DPI);
+    if (position && (position->flags & SWP_NOSIZE) == 0 &&
+        std::abs(position->cx - expectedWidth) <= 2 &&
+        std::abs(position->cy - expectedHeight) <= 2) {
+      gFixedNormalWidth = position->cx;
+      gFixedNormalHeight = position->cy;
     }
   }
   if (message == WM_DESTROY) {
@@ -72,9 +78,9 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   placement.length = sizeof(placement);
   const bool hasPlacement = GetWindowPlacement(window, &placement) != FALSE;
   RECT normal{};
-  if (initialMaximized && gLastNormalWidth > 0 && gLastNormalHeight > 0) {
-    normal.right = gLastNormalWidth;
-    normal.bottom = gLastNormalHeight;
+  if (initialMaximized && gFixedNormalWidth > 0 && gFixedNormalHeight > 0) {
+    normal.right = gFixedNormalWidth;
+    normal.bottom = gFixedNormalHeight;
   } else if (initialMaximized && hasPlacement) {
     normal.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
     normal.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
@@ -84,9 +90,9 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
   const bool maximizeSupported = (style & WS_MAXIMIZEBOX) != 0;
   RECT restored{};
-  if (gLastNormalWidth > 0 && gLastNormalHeight > 0) {
-    restored.right = gLastNormalWidth;
-    restored.bottom = gLastNormalHeight;
+  if (gFixedNormalWidth > 0 && gFixedNormalHeight > 0) {
+    restored.right = gFixedNormalWidth;
+    restored.bottom = gFixedNormalHeight;
   } else if (hasPlacement) {
     restored.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
     restored.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
