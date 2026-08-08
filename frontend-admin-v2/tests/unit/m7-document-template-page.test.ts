@@ -170,10 +170,13 @@ describe('M7 document template page', () => {
     const wrapper = mount(DocumentTemplatePage)
     await flushPromises()
 
-    expect(wrapper.findAll('.document-template-page__columns > .v2-card')).toHaveLength(3)
+    expect(wrapper.findAll('.document-template-page__workbench')).toHaveLength(1)
     expect(
-      wrapper.findAll('.document-template-page__columns > .v2-card h2').map((item) => item.text()),
-    ).toEqual(['业务模块', '模板', 'HTML预览'])
+      wrapper.findAll('.document-template-page__columns > section').map((item) => item.text()),
+    ).toHaveLength(3)
+    expect(
+      wrapper.findAll('.document-template-page__column-heading h2').map((item) => item.text()),
+    ).toEqual(['1.业务模块', '2.模板与版本', '3.HTML预览'])
     expect(
       wrapper
         .findAll('.document-template-page__business-group-heading h3')

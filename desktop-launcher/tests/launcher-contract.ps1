@@ -34,6 +34,8 @@ function Assert-True([bool]$Condition, [string]$Message) {
 
 $sourceText = Get-Content -Raw -LiteralPath (Join-Path $launcherRoot 'src\main.cpp')
 Assert-True ($sourceText.Contains('WinHttpCloseHandle(value)')) 'WinHTTP handles must use WinHttpCloseHandle.'
+Assert-True ($sourceText.Contains('availableWidth < width || availableHeight < height')) 'Small work areas must use the maximize fallback.'
+Assert-True ($sourceText.Contains('ShowWindow(window, SW_MAXIMIZE)')) 'Small work area fallback must maximize the app window.'
 $packageText = Get-Content -Raw -LiteralPath (Join-Path $launcherRoot 'scripts\package.ps1')
 $stageVerify = $packageText.IndexOf("verify-package.ps1') -PackagePath `$stagedPackage", [StringComparison]::Ordinal)
 $publishMove = $packageText.IndexOf('Move-Item -LiteralPath $stagedPackage -Destination $package', [StringComparison]::Ordinal)
@@ -111,6 +113,23 @@ try {
   $argsText = Get-Content -Raw -LiteralPath $argsPath
   Assert-True ($argsText.Contains('--app=http://127.0.0.1:5173/')) 'Application URL is not fixed.'
   Assert-True ($argsText.Contains('--user-data-dir=')) 'Dedicated profile argument missing.'
+  Assert-True ($argsText.Contains('--window-size=1440,900')) 'Fixed Chromium window size argument missing.'
+  $windowPath = Join-Path $evidenceRoot 'fake-window.txt'
+  Assert-True (Test-Path -LiteralPath $windowPath) 'Fake browser window evidence missing.'
+  $windowEvidence = @{}
+  Get-Content -LiteralPath $windowPath | ForEach-Object {
+    $parts = $_ -split '=', 2
+    if ($parts.Count -eq 2) { $windowEvidence[$parts[0]] = [long]$parts[1] }
+  }
+  Assert-Equal 1 $windowEvidence.configured 'Launcher must configure browser frame.'
+  Assert-True (($windowEvidence.style -band 0x00040000) -eq 0) 'Resizable WS_THICKFRAME must be removed.'
+  Assert-True (($windowEvidence.style -band 0x00010000) -ne 0) 'WS_MAXIMIZEBOX must remain enabled.'
+  Assert-True (($windowEvidence.style -band 0x00020000) -ne 0) 'WS_MINIMIZEBOX must remain enabled.'
+  Assert-True ([Math]::Abs($windowEvidence.width - 1440) -le 2) 'Normal window width must be 1440 logical pixels.'
+  Assert-True ([Math]::Abs($windowEvidence.height - 900) -le 2) 'Normal window height must be 900 logical pixels.'
+  Assert-Equal 1 $windowEvidence.maximized 'Window must support maximize.'
+  Assert-True ([Math]::Abs($windowEvidence.restoredWidth - 1440) -le 2) 'Restore width must return to 1440 logical pixels.'
+  Assert-True ([Math]::Abs($windowEvidence.restoredHeight - 900) -le 2) 'Restore height must return to 900 logical pixels.'
   foreach ($forbidden in '--disable-web-security', '--ignore-certificate-errors', '--no-sandbox', '--remote-debugging-port') {
     Assert-True (!$argsText.Contains($forbidden)) "Forbidden Chromium flag present: $forbidden"
   }
@@ -153,6 +172,7 @@ try {
   try { $orphanLauncher = Start-LauncherProcess } finally { Remove-Item Env:CGCPMS_PROCESS_HARNESS_PID_FILE -ErrorAction SilentlyContinue }
   Wait-For { Test-Path -LiteralPath $harnessPidPath } 'Harness did not record launcher child PID.'
   Wait-For { Test-Path -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') } 'Orphan fixture browser did not start.'
+  Wait-For { Test-Path -LiteralPath (Join-Path $stateRoot 'launcher-state.json') } 'Launcher did not persist browser state.'
   $fakePid = [int](Get-Content -Raw -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt'))
   $launcherPid = [int](Get-Content -Raw -LiteralPath $harnessPidPath)
   Stop-Process -Id $launcherPid -Force

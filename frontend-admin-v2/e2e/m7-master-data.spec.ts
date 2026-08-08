@@ -128,12 +128,21 @@ test('master-data deep links render server facts and preserve material redirect 
 
   await page.goto('/partner?source=e2e#list')
   await expect(page).toHaveURL(/\/partner\?source=e2e#list$/)
-  await expect(page.getByRole('heading', { level: 1, name: '客户管理' })).toBeVisible()
-  await expect(page.getByText('服务端合作方')).toBeVisible()
-  await expect(page.getByText('13800000000')).toHaveCount(0)
-  await page.getByRole('button', { name: '打开合作方 PTN-101' }).click()
-  const partnerDetail = page.getByRole('dialog', { name: '合作方详情' })
-  await expect(partnerDetail).toContainText('13800000000')
+  await expect(page.getByRole('heading', { level: 1, name: '合作方管理' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: '1. 类型' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: '2. 合作方' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: '3. 详情' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '全部类型' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByLabel('详情').getByText('服务端合作方', { exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: '选择合作方 PTN-101' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(page.getByText('13800000000')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '合作方详情' })).toHaveCount(0)
   await expect(page).toHaveURL(/\/partner\?source=e2e#list$/)
 
   await page.goto('/org?view=tree')

@@ -31,6 +31,10 @@ namespace fs = std::filesystem;
 
 constexpr wchar_t kAppUrl[] = L"http://127.0.0.1:5173/";
 constexpr wchar_t kHealthPath[] = L"/api/actuator/health";
+constexpr int kWindowWidth = 1440;
+constexpr int kWindowHeight = 900;
+constexpr DWORD kWindowWaitMs = 10000;
+constexpr DWORD kWindowStabilizeMs = 750;
 #ifdef CGCPMS_CONTRACT_TEST
 constexpr wchar_t kMutexName[] = L"Local\\CGCPMS.Desktop.Launcher.Contract";
 constexpr wchar_t kRuntimeDir[] = L"contract-runtime";
@@ -366,6 +370,80 @@ bool WriteState(const fs::path& statePath, DWORD pid, uint64_t created, int majo
   }
 }
 
+struct WindowSearch {
+  DWORD pid = 0;
+  HWND window = nullptr;
+};
+
+BOOL CALLBACK FindChromiumWindow(HWND window, LPARAM parameter) {
+  auto* search = reinterpret_cast<WindowSearch*>(parameter);
+  DWORD pid = 0;
+  GetWindowThreadProcessId(window, &pid);
+  if (pid != search->pid) return TRUE;
+  wchar_t className[64]{};
+  if (!GetClassNameW(window, className, static_cast<int>(std::size(className)))) return TRUE;
+  if (wcsncmp(className, L"Chrome_WidgetWin_", 17) != 0) return TRUE;
+  search->window = window;
+  return FALSE;
+}
+
+HWND WaitForChromiumWindow(DWORD pid, HANDLE process) {
+  const ULONGLONG deadline = GetTickCount64() + kWindowWaitMs;
+  do {
+    WindowSearch search{pid, nullptr};
+    EnumWindows(FindChromiumWindow, reinterpret_cast<LPARAM>(&search));
+    if (search.window) return search.window;
+    if (WaitForSingleObject(process, 50) != WAIT_TIMEOUT) return nullptr;
+  } while (GetTickCount64() < deadline);
+  return nullptr;
+}
+
+bool ConfigureChromiumWindow(DWORD pid, HANDLE process) {
+  HWND window = WaitForChromiumWindow(pid, process);
+  if (!window) return false;
+  if (WaitForSingleObject(process, kWindowStabilizeMs) != WAIT_TIMEOUT) return false;
+
+  SetLastError(ERROR_SUCCESS);
+  LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  if (!style && GetLastError() != ERROR_SUCCESS) return false;
+  const LONG_PTR fixedStyle = (style & ~static_cast<LONG_PTR>(WS_THICKFRAME)) |
+                              WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  SetLastError(ERROR_SUCCESS);
+  if (!SetWindowLongPtrW(window, GWL_STYLE, fixedStyle) && GetLastError() != ERROR_SUCCESS) {
+    return false;
+  }
+
+  const UINT dpi = GetDpiForWindow(window);
+  if (!dpi) return false;
+  const int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  const int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  if (!monitor || !GetMonitorInfoW(monitor, &info)) return false;
+  const int availableWidth = info.rcWork.right - info.rcWork.left;
+  const int availableHeight = info.rcWork.bottom - info.rcWork.top;
+  const int left = availableWidth >= width
+                       ? info.rcWork.left + (availableWidth - width) / 2
+                       : info.rcWork.left;
+  const int top = availableHeight >= height
+                      ? info.rcWork.top + (availableHeight - height) / 2
+                      : info.rcWork.top;
+
+  if (availableWidth < width || availableHeight < height) {
+    if (!SetWindowPos(window, nullptr, left, top, width, height,
+                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) {
+      return false;
+    }
+    ShowWindow(window, SW_MAXIMIZE);
+    return IsZoomed(window) != FALSE;
+  }
+
+  ShowWindow(window, SW_RESTORE);
+  return SetWindowPos(window, nullptr, left, top, width, height,
+                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
+}
+
 int RunLauncher(int argc) {
   if (argc != 1) {
     Inform(L"CGC-PMS 启动器不接受命令行参数。", MB_OK | MB_ICONERROR);
@@ -426,6 +504,7 @@ int RunLauncher(int argc) {
       L"--no-first-run",
       L"--no-default-browser-check",
       L"--disable-sync",
+      L"--window-size=1440,900",
   };
   std::wstring command;
   for (const auto& arg : args) {
@@ -448,6 +527,14 @@ int RunLauncher(int argc) {
   }
   UniqueHandle processHandle(process.hProcess);
   UniqueHandle threadHandle(process.hThread);
+  if (!ConfigureChromiumWindow(process.dwProcessId, processHandle.value)) {
+    TerminateProcess(processHandle.value, kLaunchFailed);
+    WaitForSingleObject(processHandle.value, 5000);
+    Inform(L"无法配置 CGC-PMS 窗口。请校验 Chromium 运行时。", MB_OK | MB_ICONERROR);
+    Log(dataRoot, "window", "configure_failed", GetLastError(), process.dwProcessId);
+    return kLaunchFailed;
+  }
+  Log(dataRoot, "window", "configured", 0, process.dwProcessId);
   FILETIME created{}, exited{}, kernel{}, user{};
   uint64_t createdValue = GetProcessTimes(processHandle.value, &created, &exited, &kernel, &user)
                               ? FileTimeValue(created) : 0;

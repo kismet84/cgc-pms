@@ -9,6 +9,18 @@
   text-rendering: optimizeLegibility;
 }
 
+@media (min-width: 120rem) and (min-height: 60rem) {
+  :root {
+    font-size: 108%;
+  }
+}
+
+@media (min-width: 160rem) and (min-height: 80rem) {
+  :root {
+    font-size: 112%;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

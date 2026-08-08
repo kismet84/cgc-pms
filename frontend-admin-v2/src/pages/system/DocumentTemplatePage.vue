@@ -670,150 +670,161 @@ onBeforeUnmount(() => {
     <V2PageState v-else-if="error" kind="error" title="业务模板加载失败" :description="error">
       <template #actions><V2Button @click="refresh()">重试</V2Button></template>
     </V2PageState>
-    <div v-else class="document-template-page__columns">
-      <V2Card title="业务模块" title-id="document-business-types-title">
-        <div
-          class="document-template-page__business-list"
+    <V2Card v-else class="document-template-page__workbench">
+      <div class="document-template-page__columns">
+        <section
+          class="document-template-page__column"
           aria-labelledby="document-business-types-title"
         >
-          <section
-            v-for="group in businessGroups"
-            :key="group.key"
-            class="document-template-page__business-group"
-          >
-            <div class="document-template-page__business-group-heading">
-              <h3>{{ group.label }}</h3>
-              <span>{{ group.options.length }}</span>
-            </div>
-            <div class="document-template-page__business-options">
-              <button
-                v-for="option in group.options"
-                :key="option.value"
-                type="button"
-                class="document-template-page__business-option"
-                :class="{ 'is-selected': option.value === businessType }"
-                :aria-pressed="option.value === businessType"
-                @click="selectBusinessType(option.value)"
-              >
-                <span>{{ option.label }}</span>
-              </button>
-            </div>
-          </section>
-        </div>
-      </V2Card>
-
-      <V2Card title="模板">
-        <template #actions>
-          <V2Button v-if="canEdit && selectedVersion" size="small" @click="openTemplateEditor">
-            编辑模板
-          </V2Button>
-          <V2Button v-if="canEdit && detail" size="small" @click="openNewVersion">
-            新建版本
-          </V2Button>
-          <V2Button
-            v-if="canEdit && detail"
-            size="small"
-            variant="danger"
-            @click="deleteOpen = true"
-          >
-            删除模板
-          </V2Button>
-        </template>
-        <V2PageState
-          v-if="!templates.length"
-          kind="empty"
-          title="暂无模板"
-          description="当前业务类型没有模板。"
-        />
-        <div v-else class="document-template-page__list">
-          <V2Button
-            v-for="item in pagedTemplates"
-            :key="item.id"
-            variant="ghost"
-            :class="{ 'is-selected': item.id === selectedTemplateId }"
-            :aria-pressed="item.id === selectedTemplateId"
-            @click="selectTemplate(item.id)"
-          >
-            <strong>{{ item.templateName }}</strong>
-            <V2Badge :tone="item.enabled === 1 ? 'success' : 'neutral'">
-              {{ item.enabled === 1 ? '启用' : '停用' }}
-            </V2Badge>
-          </V2Button>
-        </div>
-        <section v-if="detail" class="document-template-page__versions" aria-label="模板版本">
-          <h3>版本</h3>
+          <header class="document-template-page__column-heading">
+            <h2 id="document-business-types-title">1.业务模块</h2>
+          </header>
           <div
-            v-for="(version, index) in detail.versions"
-            :key="version.id"
-            class="document-template-page__version-row"
-            :class="{ 'is-selected': version.id === selectedVersionId }"
+            class="document-template-page__business-list"
+            aria-labelledby="document-business-types-title"
           >
-            <button
-              type="button"
-              class="document-template-page__version-button"
-              :aria-pressed="version.id === selectedVersionId"
-              @click="selectedVersionId = version.id"
+            <section
+              v-for="group in businessGroups"
+              :key="group.key"
+              class="document-template-page__business-group"
             >
-              <span>
-                <strong>V{{ version.versionNo }}</strong>
-                <V2Badge :tone="statusTone(version.status)">
-                  {{ versionStatusLabel(version.status) }}
-                </V2Badge>
-              </span>
-              <small>
-                {{ version.schemaVersion }} ·
-                {{
-                  detail.defaultBinding?.templateVersionId === version.id ? '默认版本' : '普通版本'
-                }}
-              </small>
-            </button>
-            <V2ActionMenu
-              v-if="(canEdit && version.status === 'DRAFT') || canPublish"
-              :label="`${detail.template.templateCode} V${version.versionNo}更多操作`"
-              :placement="index >= detail.versions.length - 3 ? 'top-end' : 'bottom-end'"
-            >
-              <V2Button
-                v-if="canEdit && version.status === 'DRAFT'"
-                size="small"
-                variant="ghost"
-                @click="openEdit(version)"
-              >
-                编辑
-              </V2Button>
-              <V2Button
-                v-if="canPublish && version.status === 'DRAFT'"
-                size="small"
-                @click="versionAction = { kind: 'publish', version }"
-              >
-                发布
-              </V2Button>
-              <V2Button
-                v-if="canPublish && version.status === 'PUBLISHED'"
-                size="small"
-                variant="secondary"
-                @click="versionAction = { kind: 'default', version }"
-              >
-                设为默认
-              </V2Button>
-              <V2Button
-                v-if="canPublish && version.status === 'PUBLISHED'"
-                size="small"
-                variant="danger"
-                @click="versionAction = { kind: 'disable', version }"
-              >
-                停用
-              </V2Button>
-              <V2Button
-                v-if="canPublish && version.status === 'DISABLED'"
-                size="small"
-                @click="versionAction = { kind: 'enable', version }"
-              >
-                启用
-              </V2Button>
-            </V2ActionMenu>
+              <div class="document-template-page__business-group-heading">
+                <h3>{{ group.label }}</h3>
+                <span>{{ group.options.length }}</span>
+              </div>
+              <div class="document-template-page__business-options">
+                <button
+                  v-for="option in group.options"
+                  :key="option.value"
+                  type="button"
+                  class="document-template-page__business-option"
+                  :class="{ 'is-selected': option.value === businessType }"
+                  :aria-pressed="option.value === businessType"
+                  @click="selectBusinessType(option.value)"
+                >
+                  <span>{{ option.label }}</span>
+                </button>
+              </div>
+            </section>
           </div>
         </section>
-        <template #footer>
+
+        <section class="document-template-page__column" aria-labelledby="document-templates-title">
+          <header class="document-template-page__column-heading">
+            <h2 id="document-templates-title">2.模板与版本</h2>
+            <div class="document-template-page__column-actions">
+              <V2Button v-if="canEdit && selectedVersion" size="small" @click="openTemplateEditor">
+                编辑模板
+              </V2Button>
+              <V2Button v-if="canEdit && detail" size="small" @click="openNewVersion">
+                新建版本
+              </V2Button>
+              <V2Button
+                v-if="canEdit && detail"
+                size="small"
+                variant="danger"
+                @click="deleteOpen = true"
+              >
+                删除模板
+              </V2Button>
+            </div>
+          </header>
+          <V2PageState
+            v-if="!templates.length"
+            kind="empty"
+            title="暂无模板"
+            description="当前业务类型没有模板。"
+          />
+          <div v-else class="document-template-page__list">
+            <V2Button
+              v-for="item in pagedTemplates"
+              :key="item.id"
+              variant="ghost"
+              :class="{ 'is-selected': item.id === selectedTemplateId }"
+              :aria-pressed="item.id === selectedTemplateId"
+              @click="selectTemplate(item.id)"
+            >
+              <strong>{{ item.templateName }}</strong>
+              <V2Badge :tone="item.enabled === 1 ? 'success' : 'neutral'">
+                {{ item.enabled === 1 ? '启用' : '停用' }}
+              </V2Badge>
+            </V2Button>
+          </div>
+          <section v-if="detail" class="document-template-page__versions" aria-label="模板版本">
+            <h3>版本</h3>
+            <div
+              v-for="(version, index) in detail.versions"
+              :key="version.id"
+              class="document-template-page__version-row"
+              :class="{ 'is-selected': version.id === selectedVersionId }"
+            >
+              <button
+                type="button"
+                class="document-template-page__version-button"
+                :aria-pressed="version.id === selectedVersionId"
+                @click="selectedVersionId = version.id"
+              >
+                <span>
+                  <strong>V{{ version.versionNo }}</strong>
+                  <V2Badge :tone="statusTone(version.status)">
+                    {{ versionStatusLabel(version.status) }}
+                  </V2Badge>
+                </span>
+                <small>
+                  {{ version.schemaVersion }} ·
+                  {{
+                    detail.defaultBinding?.templateVersionId === version.id
+                      ? '默认版本'
+                      : '普通版本'
+                  }}
+                </small>
+              </button>
+              <V2ActionMenu
+                v-if="(canEdit && version.status === 'DRAFT') || canPublish"
+                :label="`${detail.template.templateCode} V${version.versionNo}更多操作`"
+                :placement="index >= detail.versions.length - 3 ? 'top-end' : 'bottom-end'"
+              >
+                <V2Button
+                  v-if="canEdit && version.status === 'DRAFT'"
+                  size="small"
+                  variant="ghost"
+                  @click="openEdit(version)"
+                >
+                  编辑
+                </V2Button>
+                <V2Button
+                  v-if="canPublish && version.status === 'DRAFT'"
+                  size="small"
+                  @click="versionAction = { kind: 'publish', version }"
+                >
+                  发布
+                </V2Button>
+                <V2Button
+                  v-if="canPublish && version.status === 'PUBLISHED'"
+                  size="small"
+                  variant="secondary"
+                  @click="versionAction = { kind: 'default', version }"
+                >
+                  设为默认
+                </V2Button>
+                <V2Button
+                  v-if="canPublish && version.status === 'PUBLISHED'"
+                  size="small"
+                  variant="danger"
+                  @click="versionAction = { kind: 'disable', version }"
+                >
+                  停用
+                </V2Button>
+                <V2Button
+                  v-if="canPublish && version.status === 'DISABLED'"
+                  size="small"
+                  @click="versionAction = { kind: 'enable', version }"
+                >
+                  启用
+                </V2Button>
+              </V2ActionMenu>
+            </div>
+          </section>
           <V2Pagination
             :total="templates.length"
             :page-no="pageNo"
@@ -821,65 +832,68 @@ onBeforeUnmount(() => {
             label="业务模板分页"
             @update:page-no="pageNo = $event"
           />
-        </template>
-      </V2Card>
+        </section>
 
-      <V2Card title="HTML预览">
-        <V2PageState
-          v-if="detailLoading"
-          kind="loading"
-          title="正在读取预览"
-          description="请稍候。"
-        />
-        <V2PageState
-          v-else-if="!selectedVersion"
-          kind="empty"
-          title="请选择模板版本"
-          description="选择模板和版本后查看服务端HTML。"
-        />
-        <V2PageState
-          v-else-if="!canPreviewVersion"
-          kind="empty"
-          title="无 HTML 预览权限"
-          description="需要模板编辑和单据生成权限。"
-        />
-        <V2PageState
-          v-else-if="versionPreviewLoading"
-          kind="loading"
-          title="正在生成 HTML 预览"
-          description="请稍候。"
-        />
-        <V2PageState
-          v-else-if="versionPreviewError"
-          kind="error"
-          title="HTML 预览失败"
-          :description="versionPreviewError"
-        />
-        <V2PageState
-          v-else-if="!versionPreviewHtml"
-          kind="empty"
-          title="暂无 HTML 预览"
-          description="服务端未返回可预览内容。"
-        />
-        <div v-else class="document-template-page__html-preview">
-          <div class="document-template-page__preview-meta">
-            <strong>V{{ selectedVersion.versionNo }}</strong>
-            <V2Badge :tone="statusTone(selectedVersion.status)">
-              {{ versionStatusLabel(selectedVersion.status) }}
-            </V2Badge>
-            <span>{{ selectedVersion.schemaVersion }}</span>
+        <section class="document-template-page__column" aria-labelledby="document-preview-title">
+          <header class="document-template-page__column-heading">
+            <h2 id="document-preview-title">3.HTML预览</h2>
+          </header>
+          <V2PageState
+            v-if="detailLoading"
+            kind="loading"
+            title="正在读取预览"
+            description="请稍候。"
+          />
+          <V2PageState
+            v-else-if="!selectedVersion"
+            kind="empty"
+            title="请选择模板版本"
+            description="选择模板和版本后查看服务端HTML。"
+          />
+          <V2PageState
+            v-else-if="!canPreviewVersion"
+            kind="empty"
+            title="无 HTML 预览权限"
+            description="需要模板编辑和单据生成权限。"
+          />
+          <V2PageState
+            v-else-if="versionPreviewLoading"
+            kind="loading"
+            title="正在生成 HTML 预览"
+            description="请稍候。"
+          />
+          <V2PageState
+            v-else-if="versionPreviewError"
+            kind="error"
+            title="HTML 预览失败"
+            :description="versionPreviewError"
+          />
+          <V2PageState
+            v-else-if="!versionPreviewHtml"
+            kind="empty"
+            title="暂无 HTML 预览"
+            description="服务端未返回可预览内容。"
+          />
+          <div v-else class="document-template-page__html-preview">
+            <div class="document-template-page__preview-meta">
+              <strong>V{{ selectedVersion.versionNo }}</strong>
+              <V2Badge :tone="statusTone(selectedVersion.status)">
+                {{ versionStatusLabel(selectedVersion.status) }}
+              </V2Badge>
+              <span>{{ selectedVersion.schemaVersion }}</span>
+            </div>
+            <iframe title="选中模板版本 HTML 预览" sandbox="" :srcdoc="versionPreviewHtml"></iframe>
+            <details class="document-template-page__version-detail">
+              <summary>版本信息</summary>
+              <strong>内容哈希</strong>
+              <code>{{ selectedVersion.contentHash }}</code>
+              <strong>字段清单</strong>
+              <pre>{{ selectedVersion.fieldManifest }}</pre>
+            </details>
           </div>
-          <iframe title="选中模板版本 HTML 预览" sandbox="" :srcdoc="versionPreviewHtml"></iframe>
-          <details class="document-template-page__version-detail">
-            <summary>版本信息</summary>
-            <strong>内容哈希</strong>
-            <code>{{ selectedVersion.contentHash }}</code>
-            <strong>字段清单</strong>
-            <pre>{{ selectedVersion.fieldManifest }}</pre>
-          </details>
-        </div>
-      </V2Card>
-    </div>
+        </section>
+      </div>
+    </V2Card>
 
     <V2Dialog
       v-model:open="editorOpen"
@@ -994,14 +1008,65 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.document-template-page__columns {
-  display: grid;
-  grid-template-columns: minmax(13rem, 0.6fr) minmax(19rem, 0.9fr) minmax(24rem, 1.5fr);
-  gap: var(--v2-space-4);
+.document-template-page {
+  height: 100%;
+  min-height: 0;
 }
 
-.document-template-page__columns > * {
+.document-template-page__workbench {
+  flex: 1;
+  min-height: 0;
+}
+
+.document-template-page__workbench :deep(.v2-card__body) {
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.document-template-page__columns {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(13rem, 0.6fr) minmax(19rem, 0.9fr) minmax(24rem, 1.5fr);
+}
+
+.document-template-page__column {
   min-width: 0;
+  min-height: 0;
+  padding: 0 var(--v2-space-4) var(--v2-space-4);
+  overflow-y: auto;
+}
+
+.document-template-page__column + .document-template-page__column {
+  border-left: 1px solid var(--v2-color-border-subtle);
+}
+
+.document-template-page__column-heading {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+  min-height: 3.5rem;
+  margin-bottom: var(--v2-space-3);
+  padding: var(--v2-space-3) 0;
+  background: var(--v2-color-surface);
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+}
+
+.document-template-page__column-heading h2 {
+  margin: 0;
+  font-size: var(--v2-font-size-14);
+}
+
+.document-template-page__column-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--v2-space-2);
 }
 
 .document-template-page__business-list {
@@ -1194,8 +1259,34 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1180px) {
+  .document-template-page {
+    height: auto;
+  }
+
+  .document-template-page__workbench {
+    flex: initial;
+  }
+
+  .document-template-page__workbench :deep(.v2-card__body),
+  .document-template-page__columns {
+    height: auto;
+  }
+
   .document-template-page__columns {
     grid-template-columns: 1fr;
+  }
+
+  .document-template-page__column {
+    overflow-y: visible;
+  }
+
+  .document-template-page__column + .document-template-page__column {
+    border-top: 1px solid var(--v2-color-border-subtle);
+    border-left: 0;
+  }
+
+  .document-template-page__column-heading {
+    position: static;
   }
 }
 

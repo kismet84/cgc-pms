@@ -1,7 +1,7 @@
 {
-  "current_commit": "54269637f48ec4c540af0a624b61cf322aeda1d8",
+  "current_commit": "bd6bf240b3653950f49bcb488ff7aea23457eb99",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T09:15:32.993Z",
+  "generation_time": "2026-08-08T09:42:51.281Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -53,15 +53,12 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 3858,
-  "repository_file_count": 3858,
-  "included_file_count": 2588,
+  "repository_file_count": 3860,
+  "included_file_count": 2590,
   "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "backend",
-      "delivery_tooling",
-      "desktop_launcher",
       "documentation"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
@@ -83,7 +80,7 @@
         "backend/**"
       ],
       "file_count": 1797,
-      "fingerprint": "b76e0627530f399ce8f41c1eac7106e0b530bf39c0090cb2576a71bf4a3948e5"
+      "fingerprint": "c59d6043f5c77dd7dae0c23e46dac3cf3d105288224e793e085082ffa667d24b"
     },
     {
       "id": "delivery_tooling",
@@ -95,7 +92,7 @@
         "tools/**"
       ],
       "file_count": 268,
-      "fingerprint": "190f9b3b548da590dee0e7d03e4af3eec2796d9d5df730623a0140b6512d1fb6"
+      "fingerprint": "606c2a06228ff7a6b194850946151b1f671b9616072506282a3d40bc0779f289"
     },
     {
       "id": "desktop_launcher",
@@ -103,15 +100,15 @@
         "desktop-launcher/**"
       ],
       "file_count": 17,
-      "fingerprint": "fc9ed5f4ee8cf674f9b5e238ed288ca0c645026c3f61d33a78b8ff863915007e"
+      "fingerprint": "4963dce6199601640386b6697f328411f1cdf2c64456d784cdbb32cee0fc5059"
     },
     {
       "id": "documentation",
       "scope": [
         "docs/**"
       ],
-      "file_count": 122,
-      "fingerprint": "96c1e8e4bee578112563a90e262d9f33ac6ca4404cfca10f7b76e58c95318bc7"
+      "file_count": 124,
+      "fingerprint": "6fe6d745068b2a02be937ad0fc46a4e74c42c0864949b083d1baad26a3ff5f53"
     },
     {
       "id": "frontend_v2",
@@ -119,7 +116,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 271,
-      "fingerprint": "c0ac963460ad0200d0cf6145f8b7b08e663f2ee6288cc157522f1c4ce4ef93c0"
+      "fingerprint": "178f76b4ed2b227b3a95e711afafa273f7e01a267b00bf08314a6e6035073b5f"
     },
     {
       "id": "mobile",
