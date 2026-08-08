@@ -404,6 +404,7 @@ bool CompleteWindowConfiguration(HWND window, bool configured) {
 #ifdef CGCPMS_CONTRACT_TEST
   return SetPropW(window, kWindowConfiguredProperty, reinterpret_cast<HANDLE>(1)) != FALSE;
 #else
+  static_cast<void>(window);
   return true;
 #endif
 }

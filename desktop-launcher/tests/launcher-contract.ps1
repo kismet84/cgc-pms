@@ -158,6 +158,7 @@ try {
   Assert-True (Test-Path -LiteralPath (Join-Path $logRoot 'launcher.log.1')) 'Log rotation did not retain prior log.'
 
   Set-Content -LiteralPath (Join-Path $evidenceRoot 'hold.flag') -Value 'hold' -NoNewline -Encoding ascii
+  Remove-Item -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') -Force -ErrorAction SilentlyContinue
   $first = Start-LauncherProcess
   Wait-For { Test-Path -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') } 'Fake browser did not start.'
   for ($i = 0; $i -lt 9; $i++) { Assert-Equal 20 (Invoke-Launcher) "Duplicate launch $($i + 2) must be rejected." }
