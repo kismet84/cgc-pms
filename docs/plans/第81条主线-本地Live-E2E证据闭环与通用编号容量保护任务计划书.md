@@ -199,6 +199,6 @@ Push-Location backend; .\mvnw.cmd -Dtest=CodeGenerationServiceTest test; Pop-Loc
 ## 9. 实施结果
 
 - G0～G5本地门禁通过，`ISSUE-081-001`关闭；受保护Git交付按用户授权继续。
-- 实现SHA `c0595172` 的本地live执行9/9 spec、80/80用例、0 skipped/unexpected/flaky且working tree clean；browser contract执行27/27 spec、98/98用例。
+- 实现与修复依赖SHA `75a84cb8` 的本地live执行9/9 spec、80/80用例、0 skipped/unexpected/flaky且working tree clean；browser contract执行27/27 spec、98/98用例。
 - 公共编号与六调用方相关测试107/107、真实MySQL 5/5、前端单测502/502通过；编号超过999统一fail-closed，六Mapper软删除历史占号和legacy1000优先成立。
 - 证据分类、失败分类、边界和剩余Git状态见[`质量报告`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
