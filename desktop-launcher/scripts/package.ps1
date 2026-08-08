@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $launcherRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $lock = Get-Content -Raw -LiteralPath (Join-Path $launcherRoot 'chromium.lock.json') | ConvertFrom-Json
 $outRoot = Join-Path $launcherRoot 'out'
-$launcherVersion = '1.0.1'
+$launcherVersion = '1.0.4'
 
 function Assert-UnderLauncher([string]$Path) {
   $full = [IO.Path]::GetFullPath($Path)

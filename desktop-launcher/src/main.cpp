@@ -35,6 +35,7 @@ constexpr int kWindowWidth = 1440;
 constexpr int kWindowHeight = 900;
 constexpr DWORD kWindowWaitMs = 10000;
 constexpr DWORD kWindowStabilizeMs = 750;
+constexpr DWORD kWindowMaintainMs = 250;
 #ifdef CGCPMS_CONTRACT_TEST
 constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 constexpr wchar_t kMutexName[] = L"Local\\CGCPMS.Desktop.Launcher.Contract";
@@ -383,7 +384,7 @@ BOOL CALLBACK FindChromiumWindow(HWND window, LPARAM parameter) {
   if (pid != search->pid) return TRUE;
   wchar_t className[64]{};
   if (!GetClassNameW(window, className, static_cast<int>(std::size(className)))) return TRUE;
-  if (wcsncmp(className, L"Chrome_WidgetWin_", 17) != 0) return TRUE;
+  if (wcscmp(className, L"Chrome_WidgetWin_1") != 0) return TRUE;
   search->window = window;
   return FALSE;
 }
@@ -467,19 +468,92 @@ bool ConfigureChromiumWindow(DWORD pid, HANDLE process, const fs::path& dataRoot
     if (IsZoomed(window) == FALSE) {
       return FailWindowConfiguration(dataRoot, pid, "maximize_state_failed", GetLastError());
     }
-    if (!CompleteWindowConfiguration()) {
-      return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
+  } else {
+    ShowWindow(window, SW_RESTORE);
+    const bool configured = SetWindowPos(
+                                window, nullptr, left, top, width, height,
+                                SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
+    if (!configured) return FailWindowConfiguration(dataRoot, pid, "position_failed", GetLastError());
+  }
+
+  SetLastError(ERROR_SUCCESS);
+  const LONG_PTR appliedStyle = GetWindowLongPtrW(window, GWL_STYLE);
+  if (!appliedStyle && GetLastError() != ERROR_SUCCESS) {
+    return FailWindowConfiguration(dataRoot, pid, "style_verify_failed", GetLastError());
+  }
+  if ((appliedStyle & WS_THICKFRAME) != 0) {
+    return FailWindowConfiguration(dataRoot, pid, "style_not_fixed");
+  }
+  if (!CompleteWindowConfiguration()) {
+    return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
+  }
+  return true;
+}
+
+bool MaintainChromiumWindow(DWORD pid, const fs::path& dataRoot) {
+  WindowSearch search{pid, nullptr};
+  EnumWindows(FindChromiumWindow, reinterpret_cast<LPARAM>(&search));
+  if (!search.window) return true;
+
+  HWND window = search.window;
+  SetLastError(ERROR_SUCCESS);
+  const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  if (!style && GetLastError() != ERROR_SUCCESS) {
+    return FailWindowConfiguration(dataRoot, pid, "maintain_style_read_failed", GetLastError());
+  }
+  const LONG_PTR fixedStyle = (style & ~static_cast<LONG_PTR>(WS_THICKFRAME)) |
+                              WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+  const bool styleChanged = fixedStyle != style;
+  if (styleChanged) {
+    SetLastError(ERROR_SUCCESS);
+    if (!SetWindowLongPtrW(window, GWL_STYLE, fixedStyle) && GetLastError() != ERROR_SUCCESS) {
+      return FailWindowConfiguration(dataRoot, pid, "maintain_style_write_failed", GetLastError());
+    }
+  }
+
+  if (IsIconic(window) || IsZoomed(window)) {
+    if (styleChanged &&
+        !SetWindowPos(window, nullptr, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)) {
+      return FailWindowConfiguration(dataRoot, pid, "maintain_frame_failed", GetLastError());
     }
     return true;
   }
 
-  ShowWindow(window, SW_RESTORE);
-  const bool configured = SetWindowPos(
-                              window, nullptr, left, top, width, height,
-                              SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
-  if (!configured) return FailWindowConfiguration(dataRoot, pid, "position_failed", GetLastError());
-  if (!CompleteWindowConfiguration()) {
-    return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
+  const UINT dpi = GetDpiForWindow(window);
+  if (!dpi) return FailWindowConfiguration(dataRoot, pid, "maintain_dpi_failed", GetLastError());
+  const int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  const int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  if (!monitor || !GetMonitorInfoW(monitor, &info)) {
+    return FailWindowConfiguration(dataRoot, pid, "maintain_monitor_failed", GetLastError());
+  }
+  const int availableWidth = info.rcWork.right - info.rcWork.left;
+  const int availableHeight = info.rcWork.bottom - info.rcWork.top;
+  if (availableWidth < width || availableHeight < height) {
+    if (styleChanged &&
+        !SetWindowPos(window, nullptr, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)) {
+      return FailWindowConfiguration(dataRoot, pid, "maintain_frame_failed", GetLastError());
+    }
+    ShowWindow(window, SW_MAXIMIZE);
+    return true;
+  }
+
+  RECT rect{};
+  if (!GetWindowRect(window, &rect)) {
+    return FailWindowConfiguration(dataRoot, pid, "maintain_rect_failed", GetLastError());
+  }
+  const bool sizeChanged = rect.right - rect.left != width || rect.bottom - rect.top != height;
+  if (styleChanged || sizeChanged) {
+    UINT flags = SWP_NOZORDER | SWP_NOACTIVATE;
+    if (styleChanged) flags |= SWP_FRAMECHANGED;
+    if (!SetWindowPos(window, nullptr, rect.left, rect.top, width, height, flags)) {
+      return FailWindowConfiguration(dataRoot, pid, "maintain_position_failed", GetLastError());
+    }
+    Log(dataRoot, "window", "maintained", 0, pid);
   }
   return true;
 }
@@ -585,7 +659,22 @@ int RunLauncher(int argc) {
     return kLaunchFailed;
   }
   Log(dataRoot, "browser", "started", 0, process.dwProcessId);
-  WaitForSingleObject(processHandle.value, INFINITE);
+  DWORD waitResult = WAIT_TIMEOUT;
+  while ((waitResult = WaitForSingleObject(processHandle.value, kWindowMaintainMs)) == WAIT_TIMEOUT) {
+    if (!MaintainChromiumWindow(process.dwProcessId, dataRoot)) {
+      TerminateProcess(processHandle.value, kLaunchFailed);
+      WaitForSingleObject(processHandle.value, 5000);
+      fs::remove(statePath, ec);
+      return kLaunchFailed;
+    }
+  }
+  if (waitResult == WAIT_FAILED) {
+    TerminateProcess(processHandle.value, kLaunchFailed);
+    WaitForSingleObject(processHandle.value, 5000);
+    fs::remove(statePath, ec);
+    Log(dataRoot, "browser", "wait_failed", GetLastError(), process.dwProcessId);
+    return kLaunchFailed;
+  }
   DWORD browserExit = 0;
   GetExitCodeProcess(processHandle.value, &browserExit);
   fs::remove(statePath, ec);
