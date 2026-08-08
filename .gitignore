@@ -62,6 +62,7 @@ deploy/minio/data/
 deploy/ssl/
 
 # Test / snapshot artifacts
+local-evidence/
 .playwright-mcp/
 *-snapshot.yml
 login-snapshot.yml

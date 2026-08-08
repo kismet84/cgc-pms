@@ -16,7 +16,8 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
 
     @Override
     @Select("SELECT bid_code FROM bid_cost WHERE bid_code LIKE CONCAT(#{prefix}, '%') "
-            + "AND tenant_id = #{tenantId} ORDER BY bid_code DESC LIMIT 1")
+            + "AND tenant_id = #{tenantId} "
+            + "ORDER BY CHAR_LENGTH(bid_code) DESC, bid_code DESC LIMIT 1")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 
     @Select("SELECT id, tenant_id, project_id FROM bid_cost "

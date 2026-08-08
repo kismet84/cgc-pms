@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 
 const runLiveApproval = process.env.V2_LIVE_APPROVAL === '1'
 const controlledInstanceId = '520000000000009541'
@@ -174,8 +175,8 @@ test.describe('M2 live approval workbench', () => {
     await page.goto('/approval/todo')
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
     const headers = page.getByRole('columnheader')
-    await expect(headers.nth(0)).toHaveText('审批事项')
-    await expect(headers.nth(1)).toHaveText('业务编号')
+    await expect(headers.nth(0)).toHaveText('业务编号')
+    await expect(headers.nth(1)).toHaveText('审批事项')
     await expect(page.getByRole('button', { name: '查看', exact: true })).toHaveCount(0)
     await expect(page.locator('.workflow-pagination > span').first()).toHaveCSS('font-size', '12px')
 
@@ -233,12 +234,12 @@ test.describe('M2 live approval workbench', () => {
     await sidebar.getByRole('button', { name: '切换演示角色' }).click()
     await expect(sidebar.getByRole('region', { name: '演示角色' })).toBeVisible()
     const switched = page.waitForResponse((item) =>
-      item.url().includes('/api/auth/dev-login?username=demo.cost'),
+      item.url().includes('/api/auth/dev-login?username=ui26.cost01'),
     )
     await sidebar.getByRole('button', { name: /成本经理/ }).click()
     expect((await switched).ok()).toBe(true)
     await expect(page).toHaveURL(/\/approval\/todo/)
-    await expect(page.getByRole('banner').getByText('演示成本经理', { exact: true })).toBeVisible()
+    await expect(page.getByRole('banner').getByText('许承泽', { exact: true })).toBeVisible()
   })
 
   test('eight roles expose all five instance states and scoped lists', async ({ page }) => {

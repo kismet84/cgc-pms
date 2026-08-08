@@ -15,6 +15,7 @@
     "check:design-system": "vitest run tests/unit/design-system.test.ts tests/unit/v2-ui-remediation-gate.test.ts tests/unit/global-context-contract.test.ts",
     "test:e2e:health": "playwright test e2e/health.spec.ts",
     "test:e2e:contract": "node scripts/run-migration-ui-gate.mjs",
+    "test:e2e:live": "pwsh -NoProfile -File ../scripts/demo/complete-project-v2/verify-live-all.ps1",
     "test:e2e:migration-gate": "pnpm test:e2e:contract",
     "check:pre-push": "node scripts/run-push-quality-gate.mjs",
     "check:boundary": "node scripts/check-clean-room-boundary.mjs",

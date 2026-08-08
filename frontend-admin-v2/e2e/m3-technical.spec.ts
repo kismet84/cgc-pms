@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveTechnical = process.env.V2_LIVE_TECHNICAL === '1'
@@ -49,35 +50,41 @@ test.describe('M3 live technical management workspace', () => {
     await login(page, 'demo.tech.query')
     await openTechnical(page)
     for (const action of [
-      '新建方案',
+      '新建技术方案',
       '提交方案',
       '接收图纸',
-      '登记会审',
+      '登记图纸会审',
       '发起 RFI',
       '设计回复',
       '接受/驳回',
-      '登记交底',
+      '登记技术交底',
       '确认归档',
     ])
       await expect(page.getByRole('button', { name: action, exact: true })).toHaveCount(0)
     expect(mutations).toEqual([])
   })
 
-  for (const [username, action] of [
-    ['demo.tech.scheme-maintain', '新建方案'],
-    ['demo.tech.scheme-submit', '提交方案'],
-    ['demo.tech.drawing-receive', '接收图纸'],
-    ['demo.tech.drawing-review', '登记会审'],
-    ['demo.tech.rfi-raise', '发起 RFI'],
-    ['demo.tech.rfi-respond', '设计回复'],
-    ['demo.tech.rfi-accept', '接受/驳回'],
-    ['demo.tech.disclosure', '登记交底'],
-    ['demo.tech.archive', '确认归档'],
+  for (const [username, tab, action] of [
+    ['demo.tech.scheme-maintain', '技术方案', '新建技术方案'],
+    ['demo.tech.scheme-submit', '技术方案', '提交方案'],
+    ['demo.tech.drawing-receive', '图纸管理', '接收图纸'],
+    ['demo.tech.drawing-review', '图纸会审', '登记图纸会审'],
+    ['demo.tech.rfi-raise', 'RFI', '发起 RFI'],
+    ['demo.tech.rfi-respond', 'RFI', '设计回复'],
+    ['demo.tech.rfi-accept', 'RFI', '接受/驳回'],
+    ['demo.tech.disclosure', '技术交底', '登记技术交底'],
+    ['demo.tech.archive', '验收归档', '确认归档'],
   ] as const) {
     test(`${username} exposes its authorized action`, async ({ page }) => {
       await login(page, username)
       await openTechnical(page)
-      await expect(page.getByRole('button', { name: action, exact: true }).first()).toBeVisible()
+      await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
+
+      const actionButton = page.getByRole('button', { name: action, exact: true }).first()
+      if (!(await actionButton.isVisible()) && action === '设计回复') {
+        await page.locator('summary[aria-label$="更多操作"]').first().click()
+      }
+      await expect(actionButton).toBeVisible()
     })
   }
 })

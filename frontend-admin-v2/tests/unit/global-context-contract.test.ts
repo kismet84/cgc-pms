@@ -67,6 +67,15 @@ describe('full V2 public context contract', () => {
       resolve(import.meta.dirname, '../../scripts/e2e-spec-groups.mjs'),
       'utf-8',
     )
+    const liveEvidenceGate = readFileSync(
+      resolve(import.meta.dirname, '../../../scripts/demo/complete-project-v2/verify-live-all.ps1'),
+      'utf-8',
+    )
+    const countSpecs = (name: string) => {
+      const body =
+        specGroups.match(new RegExp(`export const ${name} = \\[([\\s\\S]*?)\\]`))?.[1] ?? ''
+      return body.match(/\.spec\.ts'/g)?.length ?? 0
+    }
 
     expect(baseline).toContain('全 V2 强制退出门')
     expect(baseline).toContain('不得维护会遗漏新路由的第二份手工页面清单')
@@ -76,10 +85,14 @@ describe('full V2 public context contract', () => {
     expect(migrationGate).toContain("from './e2e-spec-groups.mjs'")
     expect(migrationGate).toContain('E2E classification drift')
     expect(migrationGate).toContain('stats.skipped > 0')
-    expect(migrationGate).toMatch(
-      /if \(!existsSync\(reportPath\)\) \{[\s\S]*?process\.exit\(1\)/,
-    )
-    expect(specGroups.match(/\.spec\.ts'/g)).toHaveLength(37)
+    expect(migrationGate).toMatch(/if \(!existsSync\(reportPath\)\) \{[\s\S]*?process\.exit\(1\)/)
+    expect(countSpecs('contractSpecs')).toBe(27)
+    expect(countSpecs('liveSpecs')).toBe(9)
+    expect(countSpecs('specialSpecs')).toBe(1)
+    expect(liveEvidenceGate.match(/V2_LIVE_[A-Z]+ = '1'/g)).toHaveLength(9)
+    expect(liveEvidenceGate).toContain('Assert-LivePreflight')
+    expect(liveEvidenceGate).toContain('Assert-PlaywrightEvidence')
+    expect(liveEvidenceGate).toContain('LIVE_EVIDENCE_BACKEND_DATABASE_MISMATCH')
     expect(migrationGate).toContain('PLAYWRIGHT_MIGRATION_WORKERS')
     expect(migrationGate).toContain("'--workers', workers")
   })

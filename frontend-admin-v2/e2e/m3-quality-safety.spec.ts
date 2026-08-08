@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveQuality = process.env.V2_LIVE_QUALITY === '1'
@@ -53,17 +54,23 @@ test.describe('M3 live quality and safety workspace', () => {
     expect(mutatingRequests).toEqual([])
   })
 
-  for (const [username, action] of [
-    ['demo.qs.plan', '新建检查计划'],
-    ['demo.qs.inspection', '新建检查'],
-    ['demo.qs.rectify', '提交整改'],
-    ['demo.qs.reinspect', '复检'],
-    ['demo.qs.consequence', '登记后果'],
+  for (const [username, tab, action] of [
+    ['demo.qs.plan', '检查计划', '新建检查计划'],
+    ['demo.qs.inspection', '检查记录', '新建检查'],
+    ['demo.qs.rectify', '问题整改', '提交整改'],
+    ['demo.qs.reinspect', '复检闭环', '复检'],
+    ['demo.qs.consequence', '后果追踪', '登记后果'],
   ] as const) {
     test(`${username} exposes its authorized action`, async ({ page }) => {
       await login(page, username)
       await openQuality(page)
-      await expect(page.getByRole('button', { name: action, exact: true }).first()).toBeVisible()
+      await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
+
+      const actionButton = page.getByRole('button', { name: action, exact: true }).first()
+      if (!(await actionButton.isVisible()) && action === '提交整改') {
+        await page.locator('summary[aria-label$="更多操作"]').first().click()
+      }
+      await expect(actionButton).toBeVisible()
     })
   }
 })

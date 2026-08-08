@@ -11,7 +11,8 @@ import org.apache.ibatis.annotations.Select;
 public interface ProjectBudgetMapper extends BaseMapper<ProjectBudget>, DeletedCodeSource {
     @Override
     @Select("SELECT budget_code FROM project_budget WHERE budget_code LIKE CONCAT(#{prefix}, '%') "
-            + "AND tenant_id = #{tenantId} ORDER BY budget_code DESC LIMIT 1")
+            + "AND tenant_id = #{tenantId} "
+            + "ORDER BY CHAR_LENGTH(budget_code) DESC, budget_code DESC LIMIT 1")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 
     @Select("SELECT * FROM project_budget WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")

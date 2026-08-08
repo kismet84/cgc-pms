@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './live-test'
 
 const runLiveAuth = process.env.V2_LIVE_AUTH === '1'
 const liveClientIpSeed = (process.pid + Date.now()) % 200

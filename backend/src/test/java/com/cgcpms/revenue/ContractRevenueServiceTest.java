@@ -68,6 +68,32 @@ class ContractRevenueServiceTest {
         assertEquals("DRAFT", saved.getApprovalStatus());
     }
 
+    @Test @Transactional @DisplayName("自动编号包含软删除历史并在999后稳定耗尽")
+    void testGeneratedCodeIncludesSoftDeletedHistoryAndFailsAt999() {
+        String fullPrefix = "RV-" + LocalDate.now().format(
+                com.cgcpms.common.util.DateTimeUtils.DATE_COMPACT) + "-";
+        ContractRevenue deletedHistory = revenue("RV-SEED-", "DRAFT", "100.00", "0.00");
+        deletedHistory.setRevenueCode(fullPrefix + "998");
+        mapper.insert(deletedHistory);
+        mapper.deleteById(deletedHistory.getId());
+
+        ContractRevenue next = revenue("RV-AUTO-", "DRAFT", "100.00", "0.00");
+        next.setRevenueCode(null);
+        Long id = service.create(next);
+        assertEquals(fullPrefix + "999", mapper.selectById(id).getRevenueCode());
+
+        ContractRevenue overflow = revenue("RV-AUTO-", "DRAFT", "100.00", "0.00");
+        overflow.setRevenueCode(null);
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.create(overflow));
+
+        assertEquals("BUSINESS_CODE_SEQUENCE_EXHAUSTED", exception.getCode());
+        Long illegalCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM contract_revenue WHERE tenant_id = ? AND revenue_code = ?",
+                Long.class, TENANT_ID, fullPrefix + "1000");
+        assertEquals(0L, illegalCount);
+    }
+
     @Test @Transactional @DisplayName("分页查询收入确认单列表")
     void testGetPage() {
         var page = service.getPage(1, 10, null, null, null, null, null);

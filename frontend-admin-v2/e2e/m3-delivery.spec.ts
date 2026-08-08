@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveDelivery = process.env.V2_LIVE_DELIVERY === '1'
@@ -32,19 +33,17 @@ test.describe('M3 live delivery workspace', () => {
 
     await page.goto(`/project-schedule?projectId=${projectId}#delivery`)
     await expect(page.getByRole('main')).toContainText('项目计划与施工履约')
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
 
     await page.goto(`/site/daily-log?projectId=${projectId}#delivery`)
     await expect(page.getByRole('main')).toContainText('现场日报')
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     await expect(page.locator('.daily-log-page__filters')).toHaveCount(0)
-    await expect(
-      page.locator('.daily-log-page__toolbar').getByRole('button', {
-        name: '日报状态：全部状态',
-      }),
-    ).toBeVisible()
+    const dailyLogStatus = page.getByRole('combobox', { name: '日报状态' })
+    await expect(dailyLogStatus).toBeVisible()
+    await expect(dailyLogStatus).toHaveValue('')
   })
 
   test('schedule detail uses a deep link and returns to the list', async ({ page }) => {
@@ -73,12 +72,11 @@ test.describe('M3 live delivery workspace', () => {
     await page.goto(`/project-schedule?projectId=${scheduleProjectId}`)
 
     const projectControl = page.locator('#global-project')
-    await projectControl.click()
     const allProjectsResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return url.pathname === '/api/project-schedules' && !url.searchParams.has('projectId')
     })
-    await projectControl.locator('..').locator('[role="option"][data-value=""]').click()
+    await projectControl.selectOption('')
 
     expect((await allProjectsResponse).ok()).toBe(true)
     await expect(page).toHaveURL('/project-schedule')
@@ -106,12 +104,8 @@ test.describe('M3 live delivery workspace', () => {
     const projectId = await firstProjectId(page)
     await page.goto(`/site/daily-log?projectId=${projectId}`)
     const periodControl = page.locator('#global-report-period')
-    await periodControl.click()
-    const option = periodControl
-      .locator('..')
-      .locator('[role="option"][data-value]:not([data-value=""])')
-      .first()
-    const period = await option.getAttribute('data-value')
+    const option = periodControl.locator('option:not([value=""])').first()
+    const period = await option.getAttribute('value')
     expect(period).toMatch(/^\d{4}-\d{2}$/)
     const [, year, month] = /^(\d{4})-(\d{2})$/.exec(period!)!
     const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
@@ -123,7 +117,7 @@ test.describe('M3 live delivery workspace', () => {
         url.searchParams.get('endDate') === `${period}-${String(lastDay).padStart(2, '0')}`
       )
     })
-    await option.click()
+    await periodControl.selectOption(period!)
     expect((await filtered).ok()).toBe(true)
 
     const statusControl = page.getByRole('combobox', { name: '日报状态' })
@@ -207,15 +201,17 @@ test.describe('M3 live delivery workspace', () => {
     }
   })
 
-  test('delivery section headings keep the shared computed typography', async ({ page }) => {
+  test('technical and closeout section headings keep the shared computed typography', async ({
+    page,
+  }) => {
     await login(page, 'admin')
 
     for (const [route, selector] of [
-      ['/quality-safety', '.quality-page__record-sections h3'],
-      ['/technical-management', '.technical-page__record-sections h3'],
+      ['/technical-management?tab=drawing', '.technical-page__record-sections h3'],
       ['/project-closeout', '.closeout-page__record-sections h3'],
     ]) {
-      await page.goto(`${route}?projectId=${scheduleProjectId}`)
+      const separator = route.includes('?') ? '&' : '?'
+      await page.goto(`${route}${separator}projectId=${scheduleProjectId}`)
       const headings = page.locator(selector)
       await expect(headings.first()).toBeVisible()
       const typography = await headings.evaluateAll((nodes) =>

@@ -159,7 +159,7 @@ public class ContractRevenueService {
         }
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             revenue.setRevenueCode(codeGenerationService.nextCode(
-                    mapper, ContractRevenue::getRevenueCode, "RV-", revenue.getTenantId(), false, attempt));
+                    mapper, ContractRevenue::getRevenueCode, "RV-", revenue.getTenantId(), true, attempt));
             try {
                 mapper.insert(revenue);
                 return revenue.getId();

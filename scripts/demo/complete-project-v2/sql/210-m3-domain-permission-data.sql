@@ -279,6 +279,16 @@ VALUES
   (520000000000009010,0,@demo_org,'XM-20260722-903','收尾关闭演示项目','CONSTRUCTION','演示地址10号','演示建设单位','演示监理','演示设计',100000,80000,'2025-01-01','2026-06-30','2025-01-01',NULL,@demo_admin,'ACTIVE','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目关闭正向阶段')
 ON DUPLICATE KEY UPDATE project_code=VALUES(project_code),project_name=VALUES(project_name),status='ACTIVE',approval_status='APPROVED',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0,remark=VALUES(remark);
 
+-- Keep the eight controlled projects aligned with all enabled project_status dictionary values.
+UPDATE pm_project
+SET status=CASE id
+    WHEN 520000000000009001 THEN 'PREPARING'
+    WHEN 520000000000009006 THEN 'COMPLETION'
+    WHEN 520000000000009007 THEN 'WARRANTY'
+  END,
+  updated_by=@demo_admin,updated_at=NOW()
+WHERE tenant_id=0 AND id IN (520000000000009001,520000000000009006,520000000000009007) AND deleted_flag=0;
+
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES

@@ -46,6 +46,8 @@ public interface PayRecordMapper extends BaseMapper<PayRecord>, DeletedCodeSourc
     Long lockTenantPaymentCodeScope(@Param("tenantId") Long tenantId);
 
     @Override
-    @Select("SELECT record_code FROM pay_record WHERE record_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY record_code DESC LIMIT 1 FOR UPDATE")
+    @Select("SELECT record_code FROM pay_record WHERE record_code LIKE CONCAT(#{prefix}, '%') "
+            + "AND tenant_id = #{tenantId} "
+            + "ORDER BY CHAR_LENGTH(record_code) DESC, record_code DESC LIMIT 1 FOR UPDATE")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 }
