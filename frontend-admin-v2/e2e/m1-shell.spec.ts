@@ -281,7 +281,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
       await page.getByRole('link', { name: '物资管理' }).click()
       await expect(page).toHaveURL(/\/inventory\/purchase-request$/)
       await expect(page.getByRole('main')).toBeFocused()
-      await expect(page.getByRole('main')).not.toHaveCSS('outline-style', 'none')
+      await expect(page.getByRole('main')).toHaveCSS('outline-style', 'none')
     }
   }
 

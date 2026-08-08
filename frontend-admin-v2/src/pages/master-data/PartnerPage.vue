@@ -45,7 +45,7 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
 const dialogOpen = ref(false)
-const detailOpen = ref(false)
+const selectedPartnerId = ref('')
 const detailRecord = ref<PartnerRecord | null>(null)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<PartnerRecord | null>(null)
@@ -147,6 +147,8 @@ function closeDialog(): void {
 }
 
 async function load(): Promise<void> {
+  const preferredSelection = selectedPartnerId.value
+  clearDetail()
   loadController?.abort()
   const controller = new AbortController()
   loadController = controller
@@ -173,10 +175,14 @@ async function load(): Promise<void> {
     records.value = page.records
     total.value = page.total
     partnerTypes.value = types
+    if (loadController === controller) loading.value = false
+    const selected = page.records.find((item) => item.id === preferredSelection)
+    await selectPartner(selected?.id ?? page.records[0]?.id ?? '')
   } catch (value) {
     if (controller.signal.aborted) return
     records.value = []
     total.value = 0
+    clearDetail()
     error.value = messageOf(value)
   } finally {
     if (loadController === controller) loading.value = false
@@ -186,6 +192,11 @@ async function load(): Promise<void> {
 function search(): void {
   pageNo.value = 1
   void load()
+}
+
+function selectType(value: string): void {
+  filters.partnerType = value
+  search()
 }
 
 function reset(): void {
@@ -211,14 +222,18 @@ function openCreate(): void {
   dialogOpen.value = true
 }
 
-async function openDetail(record: PartnerRecord): Promise<void> {
+async function selectPartner(id: string): Promise<void> {
   const request = ++detailRequest
-  detailOpen.value = true
-  detailLoading.value = true
-  detailError.value = ''
+  selectedPartnerId.value = id
   detailRecord.value = null
+  detailError.value = ''
+  if (!id) {
+    detailLoading.value = false
+    return
+  }
+  detailLoading.value = true
   try {
-    const detail = await loadPartner(record.id)
+    const detail = await loadPartner(id)
     if (request === detailRequest) detailRecord.value = detail
   } catch (value) {
     if (request === detailRequest) detailError.value = messageOf(value)
@@ -227,9 +242,12 @@ async function openDetail(record: PartnerRecord): Promise<void> {
   }
 }
 
-function closeDetail(): void {
+function clearDetail(): void {
   detailRequest++
-  detailOpen.value = false
+  selectedPartnerId.value = ''
+  detailRecord.value = null
+  detailError.value = ''
+  detailLoading.value = false
 }
 
 async function openEdit(record: PartnerRecord): Promise<void> {
@@ -351,7 +369,7 @@ onBeforeUnmount(() => loadController?.abort())
 
 <template>
   <V2Stack class="master-page" :gap="4">
-    <V2Card title="客户管理" :heading-level="1">
+    <V2Card title="合作方管理" :heading-level="1">
       <template #actions>
         <form class="v2-page-heading__filters" @submit.prevent="search">
           <V2Input
@@ -365,15 +383,6 @@ onBeforeUnmount(() => loadController?.abort())
             label="合作方名称"
             hide-label
             placeholder="合作方名称"
-          />
-          <V2Select
-            v-model="filters.partnerType"
-            :options="typeOptions"
-            label="合作方类型"
-            hide-label
-            placeholder="合作方类型"
-            allow-empty
-            @update:model-value="search"
           />
           <V2Select
             v-model="filters.status"
@@ -400,185 +409,209 @@ onBeforeUnmount(() => loadController?.abort())
       <template #actions><V2Button @click="load">重试</V2Button></template>
     </V2PageState>
 
-    <V2PageState v-if="loading" kind="loading" title="正在读取合作方" description="请稍候。" />
-    <V2PageState v-else-if="error" kind="error" title="合作方加载失败" :description="error">
-      <template #actions><V2Button @click="load">重试</V2Button></template>
-    </V2PageState>
-    <V2PageState
-      v-else-if="!records.length"
-      kind="empty"
-      title="暂无合作方"
-      description="调整筛选条件后重试。"
-    />
-    <V2Card v-else>
-      <div class="master-page__table-wrap">
-        <table class="v2-table--top">
-          <thead>
-            <tr>
-              <th>编号</th>
-              <th>名称</th>
-              <th>类型</th>
-              <th>联系人</th>
-              <th>风险</th>
-              <th>状态</th>
-              <th class="v2-table-cell--actions">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(record, index) in records" :key="record.id">
-              <th scope="row">
-                <V2Button
-                  size="small"
-                  variant="ghost"
-                  class="v2-table__record-link"
-                  :aria-label="`打开合作方 ${record.partnerCode}`"
-                  @click="openDetail(record)"
-                >
-                  {{ record.partnerCode }}
-                </V2Button>
-              </th>
-              <td>{{ record.partnerName }}</td>
-              <td>{{ typeLabel(record.partnerType) }}</td>
-              <td>{{ record.contactName || '—' }}</td>
-              <td>
-                <V2Badge
-                  :tone="record.blacklistFlag || record.riskLevel === 'HIGH' ? 'danger' : 'neutral'"
-                >
-                  {{ record.blacklistFlag ? '黑名单' : riskLabel(record.riskLevel) }}
-                </V2Badge>
-              </td>
-              <td>
-                <V2StatusToggle
-                  :enabled="record.status === 'ENABLE'"
-                  :disabled="!canEdit || changingStatus"
-                  :aria-label="`${record.status === 'ENABLE' ? '停用' : '启用'}合作方 ${record.partnerName}`"
-                  @toggle="statusTarget = record"
-                />
-              </td>
-              <td class="v2-table-cell--actions">
-                <V2ActionMenu
-                  :label="`${record.partnerCode || record.partnerName}更多操作`"
-                  :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
-                >
-                  <V2Button
-                    v-if="canEdit"
-                    size="small"
-                    variant="secondary"
-                    @click="openEdit(record)"
-                  >
-                    编辑
-                  </V2Button>
-                  <V2Button
-                    v-if="canDelete"
-                    size="small"
-                    variant="danger"
-                    @click="deleteTarget = record"
-                  >
-                    删除
-                  </V2Button>
-                </V2ActionMenu>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <template #footer>
-        <nav class="v2-pagination" aria-label="合作方分页">
-          <span>共 {{ total }} 条</span>
-          <V2Button variant="secondary" size="small" :disabled="pageNo <= 1" @click="previousPage">
-            上一页
-          </V2Button>
-          <span>第 {{ pageNo }} 页</span>
-          <V2Button
-            variant="secondary"
-            size="small"
-            :disabled="pageNo * pageSize >= total"
-            @click="nextPage"
-          >
-            下一页
-          </V2Button>
-        </nav>
-      </template>
-    </V2Card>
+    <V2Card class="partner-workspace-card">
+      <div class="partner-workspace">
+        <section aria-labelledby="partner-types-title">
+          <div class="partner-workspace__heading">
+            <h2 id="partner-types-title">1. 类型</h2>
+            <span>{{ typeOptions.length }} 个</span>
+          </div>
+          <div class="partner-type-list" role="group" aria-label="合作方类型">
+            <V2Button
+              size="medium"
+              :variant="filters.partnerType ? 'ghost' : 'secondary'"
+              :aria-pressed="!filters.partnerType"
+              @click="selectType('')"
+            >
+              全部类型
+            </V2Button>
+            <V2Button
+              v-for="option in typeOptions"
+              :key="option.value"
+              size="medium"
+              :variant="filters.partnerType === option.value ? 'secondary' : 'ghost'"
+              :aria-pressed="filters.partnerType === option.value"
+              @click="selectType(option.value)"
+            >
+              {{ option.label }}
+            </V2Button>
+          </div>
+        </section>
 
-    <V2Dialog
-      :open="detailOpen"
-      title="合作方详情"
-      panel-class="v2-detail-dialog v2-dialog-wide"
-      close-label="关闭合作方详情"
-      @close="closeDetail"
-    >
-      <V2PageState
-        v-if="detailLoading"
-        kind="loading"
-        title="正在读取合作方详情"
-        description="请稍候。"
-      />
-      <V2PageState
-        v-else-if="detailError"
-        kind="error"
-        title="合作方详情加载失败"
-        :description="detailError"
-      />
-      <dl v-else-if="detailRecord" class="v2-detail-dialog__facts">
-        <div>
-          <dt>合作方编号</dt>
-          <dd>{{ detailRecord.partnerCode }}</dd>
-        </div>
-        <div>
-          <dt>合作方类型</dt>
-          <dd>{{ typeLabel(detailRecord.partnerType) }}</dd>
-        </div>
-        <div>
-          <dt>统一社会信用代码</dt>
-          <dd>{{ text(detailRecord.creditCode) }}</dd>
-        </div>
-        <div>
-          <dt>法定代表人</dt>
-          <dd>{{ text(detailRecord.legalPerson) }}</dd>
-        </div>
-        <div>
-          <dt>联系人</dt>
-          <dd>{{ text(detailRecord.contactName) }}</dd>
-        </div>
-        <div>
-          <dt>联系电话</dt>
-          <dd>{{ text(detailRecord.contactPhone) }}</dd>
-        </div>
-        <div>
-          <dt>开户银行</dt>
-          <dd>{{ text(detailRecord.bankName) }}</dd>
-        </div>
-        <div>
-          <dt>银行账号</dt>
-          <dd>{{ text(detailRecord.bankAccount) }}</dd>
-        </div>
-        <div>
-          <dt>资质等级</dt>
-          <dd>{{ text(detailRecord.qualificationLevel) }}</dd>
-        </div>
-        <div>
-          <dt>默认提前期</dt>
-          <dd>{{ text(detailRecord.defaultLeadDays) }}</dd>
-        </div>
-        <div>
-          <dt>风险等级</dt>
-          <dd>{{ riskLabel(detailRecord.riskLevel) }}</dd>
-        </div>
-        <div>
-          <dt>状态</dt>
-          <dd>
-            <V2Badge :tone="detailRecord.status === 'ENABLE' ? 'success' : 'neutral'">
-              {{ detailRecord.status === 'ENABLE' ? '启用' : '停用' }}
-            </V2Badge>
-          </dd>
-        </div>
-        <div>
-          <dt>黑名单</dt>
-          <dd>{{ detailRecord.blacklistFlag ? '是' : '否' }}</dd>
-        </div>
-      </dl>
-    </V2Dialog>
+        <section aria-labelledby="partners-title">
+          <div class="partner-workspace__heading">
+            <h2 id="partners-title">2. 合作方</h2>
+            <span>共 {{ total }} 条</span>
+          </div>
+          <V2PageState
+            v-if="loading"
+            kind="loading"
+            title="正在读取合作方"
+            description="请稍候。"
+          />
+          <V2PageState v-else-if="error" kind="error" title="合作方加载失败" :description="error">
+            <template #actions><V2Button @click="load">重试</V2Button></template>
+          </V2PageState>
+          <V2PageState
+            v-else-if="!records.length"
+            kind="empty"
+            title="暂无合作方"
+            description="调整筛选条件后重试。"
+          />
+          <div v-else class="partner-list" role="listbox" aria-label="合作方">
+            <article
+              v-for="(record, index) in records"
+              :key="record.id"
+              class="partner-list__item"
+              :class="{ 'partner-list__item--selected': selectedPartnerId === record.id }"
+            >
+              <V2Button
+                class="partner-list__select"
+                size="medium"
+                :variant="selectedPartnerId === record.id ? 'secondary' : 'ghost'"
+                role="option"
+                :aria-selected="selectedPartnerId === record.id"
+                :aria-label="`选择合作方 ${record.partnerCode}`"
+                @click="selectPartner(record.id)"
+              >
+                <span>
+                  <strong>{{ record.partnerName }}</strong>
+                  <small>{{ record.partnerCode }} · {{ typeLabel(record.partnerType) }}</small>
+                </span>
+              </V2Button>
+              <V2Badge
+                :tone="record.blacklistFlag || record.riskLevel === 'HIGH' ? 'danger' : 'neutral'"
+              >
+                {{ record.blacklistFlag ? '黑名单' : riskLabel(record.riskLevel) }}
+              </V2Badge>
+              <V2StatusToggle
+                :enabled="record.status === 'ENABLE'"
+                :disabled="!canEdit || changingStatus"
+                :aria-label="`${record.status === 'ENABLE' ? '停用' : '启用'}合作方 ${record.partnerName}`"
+                @toggle="statusTarget = record"
+              />
+              <V2ActionMenu
+                :label="`${record.partnerCode || record.partnerName}更多操作`"
+                :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+              >
+                <V2Button v-if="canEdit" size="small" variant="secondary" @click="openEdit(record)">
+                  编辑
+                </V2Button>
+                <V2Button
+                  v-if="canDelete"
+                  size="small"
+                  variant="danger"
+                  @click="deleteTarget = record"
+                >
+                  删除
+                </V2Button>
+              </V2ActionMenu>
+            </article>
+          </div>
+          <nav class="v2-pagination" aria-label="合作方分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              variant="secondary"
+              size="small"
+              :disabled="pageNo <= 1"
+              @click="previousPage"
+            >
+              上一页
+            </V2Button>
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              variant="secondary"
+              size="small"
+              :disabled="pageNo * pageSize >= total"
+              @click="nextPage"
+            >
+              下一页
+            </V2Button>
+          </nav>
+        </section>
+
+        <section aria-labelledby="partner-detail-title">
+          <div class="partner-workspace__heading">
+            <h2 id="partner-detail-title">3. 详情</h2>
+          </div>
+          <V2PageState
+            v-if="detailLoading"
+            kind="loading"
+            title="正在读取合作方详情"
+            description="请稍候。"
+          />
+          <V2PageState
+            v-else-if="detailError"
+            kind="error"
+            title="合作方详情加载失败"
+            :description="detailError"
+          />
+          <dl v-else-if="detailRecord" class="partner-detail__facts">
+            <div>
+              <dt>合作方名称</dt>
+              <dd>{{ detailRecord.partnerName }}</dd>
+            </div>
+            <div>
+              <dt>合作方编号</dt>
+              <dd>{{ detailRecord.partnerCode }}</dd>
+            </div>
+            <div>
+              <dt>合作方类型</dt>
+              <dd>{{ typeLabel(detailRecord.partnerType) }}</dd>
+            </div>
+            <div>
+              <dt>统一社会信用代码</dt>
+              <dd>{{ text(detailRecord.creditCode) }}</dd>
+            </div>
+            <div>
+              <dt>法定代表人</dt>
+              <dd>{{ text(detailRecord.legalPerson) }}</dd>
+            </div>
+            <div>
+              <dt>联系人</dt>
+              <dd>{{ text(detailRecord.contactName) }}</dd>
+            </div>
+            <div>
+              <dt>联系电话</dt>
+              <dd>{{ text(detailRecord.contactPhone) }}</dd>
+            </div>
+            <div>
+              <dt>开户银行</dt>
+              <dd>{{ text(detailRecord.bankName) }}</dd>
+            </div>
+            <div>
+              <dt>银行账号</dt>
+              <dd>{{ text(detailRecord.bankAccount) }}</dd>
+            </div>
+            <div>
+              <dt>资质等级</dt>
+              <dd>{{ text(detailRecord.qualificationLevel) }}</dd>
+            </div>
+            <div>
+              <dt>默认提前期</dt>
+              <dd>{{ text(detailRecord.defaultLeadDays) }}</dd>
+            </div>
+            <div>
+              <dt>风险等级</dt>
+              <dd>{{ riskLabel(detailRecord.riskLevel) }}</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd>
+                <V2Badge :tone="detailRecord.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ detailRecord.status === 'ENABLE' ? '启用' : '停用' }}
+                </V2Badge>
+              </dd>
+            </div>
+            <div>
+              <dt>黑名单</dt>
+              <dd>{{ detailRecord.blacklistFlag ? '是' : '否' }}</dd>
+            </div>
+          </dl>
+          <V2PageState v-else kind="empty" title="暂无合作方详情" description="请选择合作方。" />
+        </section>
+      </div>
+    </V2Card>
 
     <V2Dialog
       :open="dialogOpen"
@@ -658,8 +691,122 @@ onBeforeUnmount(() => loadController?.abort())
   gap: var(--v2-space-4);
 }
 
-.master-page__table-wrap {
-  overflow-x: auto;
+.partner-workspace-card :deep(.v2-card__body) {
+  min-height: 0;
+  height: calc(100vh - 15rem);
+  padding: 0;
+}
+
+.partner-workspace {
+  display: grid;
+  height: 100%;
+  min-height: 32rem;
+  grid-template-columns: minmax(11rem, 0.55fr) minmax(24rem, 1.15fr) minmax(18rem, 0.9fr);
+}
+
+.partner-workspace > section {
+  min-width: 0;
+  padding: var(--v2-space-4);
+  overflow-y: auto;
+}
+
+.partner-workspace > section + section {
+  border-left: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.partner-workspace__heading {
+  position: sticky;
+  z-index: 1;
+  top: calc(var(--v2-space-4) * -1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+  margin: calc(var(--v2-space-4) * -1) calc(var(--v2-space-4) * -1) var(--v2-space-3);
+  padding: var(--v2-space-4);
+  background: var(--v2-color-surface);
+}
+
+.partner-workspace__heading h2 {
+  margin: 0;
+  font-size: var(--v2-font-size-17);
+}
+
+.partner-workspace__heading span,
+.partner-list__select small {
+  color: var(--v2-color-text-muted);
+}
+
+.partner-type-list,
+.partner-list {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.partner-type-list > :deep(button) {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.partner-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-2);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.partner-list__item--selected {
+  border-color: var(--v2-color-primary);
+}
+
+.partner-list__select {
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.partner-list__select span {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.partner-list__select strong,
+.partner-list__select small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partner-detail__facts {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.partner-detail__facts > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.45fr) minmax(0, 1fr);
+  gap: var(--v2-space-3);
+  padding-bottom: var(--v2-space-2);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.partner-detail__facts dt {
+  color: var(--v2-color-text-muted);
+}
+
+.partner-detail__facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.partner-workspace .v2-pagination {
+  margin-top: var(--v2-space-4);
 }
 
 .master-page__check {
@@ -672,6 +819,31 @@ onBeforeUnmount(() => loadController?.abort())
 @media (max-width: 48rem) {
   .master-page__form {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .partner-workspace-card :deep(.v2-card__body) {
+    height: auto;
+  }
+
+  .partner-workspace {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .partner-workspace > section {
+    overflow: visible;
+  }
+
+  .partner-workspace > section + section {
+    border-top: var(--v2-border-width) solid var(--v2-color-border);
+    border-left: 0;
+  }
+
+  .partner-workspace__heading {
+    position: static;
   }
 }
 </style>

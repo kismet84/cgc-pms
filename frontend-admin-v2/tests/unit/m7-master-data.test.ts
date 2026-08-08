@@ -191,7 +191,7 @@ afterEach(() => {
 })
 
 describe('M7 master-data pages', () => {
-  it('keeps partner list free of phone and bank account, loading them only for edit', async () => {
+  it('renders the partner three-pane workspace and automatically loads the first detail', async () => {
     useSessionStore().replaceUserInfo(user(['partner:query', 'partner:edit']))
     const wrapper = mount(PartnerPage, { attachTo: document.body })
     await flushPromises()
@@ -199,9 +199,30 @@ describe('M7 master-data pages', () => {
     expect(wrapper.text()).toContain('服务端合作方')
     expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('查询条件')
-    expect(wrapper.text()).not.toContain('13800000000')
-    expect(wrapper.text()).not.toContain('6222000000000000')
-    expect(masterData.loadPartner).not.toHaveBeenCalled()
+    expect(wrapper.findAll('.partner-workspace > section')).toHaveLength(3)
+    expect(wrapper.get('#partner-types-title').text()).toBe('1. 类型')
+    expect(wrapper.get('#partners-title').text()).toBe('2. 合作方')
+    expect(wrapper.get('#partner-detail-title').text()).toBe('3. 详情')
+    expect(wrapper.text()).toContain('全部类型')
+    expect(
+      wrapper
+        .get('.v2-page-heading__filters')
+        .findAllComponents(V2Select)
+        .some((select) => select.props('label') === '合作方类型'),
+    ).toBe(false)
+    expect(wrapper.text()).toContain('13800000000')
+    expect(wrapper.text()).toContain('6222000000000000')
+    expect(masterData.loadPartner).toHaveBeenCalledWith('101')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '供应商')!
+      .trigger('click')
+    await flushPromises()
+    expect(masterData.loadPartners).toHaveBeenLastCalledWith(
+      expect.objectContaining({ partnerType: 'SUPPLIER', pageNo: 1 }),
+      expect.any(AbortSignal),
+    )
 
     const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')
     expect(editButton).toBeDefined()
@@ -212,21 +233,80 @@ describe('M7 master-data pages', () => {
     expect(document.body.textContent).toContain('联系电话')
   })
 
-  it('opens server facts in a partner detail dialog', async () => {
+  it('shows server facts inline without opening a detail dialog', async () => {
     useSessionStore().replaceUserInfo(user(['partner:query']))
     const wrapper = mount(PartnerPage, { attachTo: document.body })
     await flushPromises()
 
-    const recordLink = wrapper.findAll('button').find((button) => button.text() === 'PTN-101')!
-    expect(recordLink.classes()).toContain('v2-table__record-link')
-    await recordLink.trigger('click')
-    await flushPromises()
-
     expect(masterData.loadPartner).toHaveBeenCalledWith('101')
-    const dialog = document.body.querySelector('[role="dialog"]')!
-    expect(dialog.textContent).toContain('合作方详情')
-    expect(dialog.textContent).toContain('PTN-101')
-    expect(dialog.textContent).toContain('13800000000')
+    expect(wrapper.get('[aria-labelledby="partner-detail-title"]').text()).toContain('PTN-101')
+    expect(wrapper.get('[aria-labelledby="partner-detail-title"]').text()).toContain('13800000000')
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('isolates stale partner detail responses when selection changes', async () => {
+    useSessionStore().replaceUserInfo(user(['partner:query']))
+    vi.mocked(masterData.loadPartners).mockResolvedValue({
+      records: [
+        {
+          id: '101',
+          partnerCode: 'PTN-101',
+          partnerName: '甲方',
+          partnerType: 'SUPPLIER',
+          status: 'ENABLE',
+        },
+        {
+          id: '102',
+          partnerCode: 'PTN-102',
+          partnerName: '乙方',
+          partnerType: 'SUPPLIER',
+          status: 'ENABLE',
+        },
+      ],
+      total: 2,
+      pageNo: 1,
+      pageSize: 10,
+    })
+    let resolveFirst!: (value: Awaited<ReturnType<typeof masterData.loadPartner>>) => void
+    let resolveSecond!: (value: Awaited<ReturnType<typeof masterData.loadPartner>>) => void
+    vi.mocked(masterData.loadPartner)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve
+        }),
+      )
+
+    const wrapper = mount(PartnerPage)
+    await flushPromises()
+    await wrapper.get('[aria-label="选择合作方 PTN-102"]').trigger('click')
+    resolveSecond({
+      id: '102',
+      partnerCode: 'PTN-102',
+      partnerName: '乙方',
+      partnerType: 'SUPPLIER',
+      contactPhone: '102-phone',
+      status: 'ENABLE',
+    })
+    await flushPromises()
+    expect(wrapper.get('[aria-labelledby="partner-detail-title"]').text()).toContain('102-phone')
+
+    resolveFirst({
+      id: '101',
+      partnerCode: 'PTN-101',
+      partnerName: '甲方',
+      partnerType: 'SUPPLIER',
+      contactPhone: '101-phone',
+      status: 'ENABLE',
+    })
+    await flushPromises()
+    expect(wrapper.get('[aria-labelledby="partner-detail-title"]').text()).not.toContain(
+      '101-phone',
+    )
   })
 
   it('normalizes a numeric partner id before the required post-create read', async () => {
@@ -280,7 +360,7 @@ describe('M7 master-data pages', () => {
 
     const partner = mount(PartnerPage)
     await flushPromises()
-    expect(partner.get('h1').text()).toBe('客户管理')
+    expect(partner.get('h1').text()).toBe('合作方管理')
     expect(partner.text()).toContain('新增合作方')
     partner.unmount()
 
@@ -316,7 +396,7 @@ describe('M7 master-data pages', () => {
         status: 'DISABLE',
       }),
     )
-    expect(masterData.loadPartner).toHaveBeenCalledTimes(2)
+    expect(masterData.loadPartner).toHaveBeenCalledTimes(4)
     expect(masterData.loadPartners).toHaveBeenCalledTimes(2)
   })
 

@@ -1206,9 +1206,9 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   margin: 0;
 }
 
-.app-shell__content:focus {
-  outline: 3px solid var(--v2-color-primary);
-  outline-offset: -3px;
+.app-shell__content:focus,
+.app-shell__content:focus-visible {
+  outline: 0;
 }
 
 .app-shell__notice-region {

@@ -363,6 +363,34 @@ describe('M7 system management contracts', () => {
         dualStatus = String(options.body?.status)
         return undefined
       }
+      if (path === '/system/users/1') {
+        return {
+          id: 1,
+          username: 'admin',
+          realName: '平台管理员',
+          phone: '13800000001',
+          email: 'admin@example.com',
+          orgId: '总部',
+          status: 'ENABLE',
+          roleIds: [1],
+          roleNames: ['超级管理员'],
+          createdAt: '2026-08-01 09:00:00',
+        }
+      }
+      if (path === '/system/users/2') {
+        return {
+          id: 2,
+          username: 'dual.user',
+          realName: '双岗成员',
+          phone: '13800000002',
+          email: 'dual@example.com',
+          orgId: '项目部',
+          status: dualStatus,
+          roleIds: [1, 2],
+          roleNames: ['超级管理员', '项目经理'],
+          createdAt: '2026-08-02 10:00:00',
+        }
+      }
       if (path.startsWith('/system/users?')) {
         const roleId = new URLSearchParams(path.split('?')[1]).get('roleId')
         const records =
@@ -443,49 +471,42 @@ describe('M7 system management contracts', () => {
     await flushPromises()
 
     expect(wrapper.findAll('.v2-card')).toHaveLength(2)
-    expect(wrapper.findAll('.user-workspace > section')).toHaveLength(2)
+    expect(wrapper.findAll('.user-workspace > section')).toHaveLength(3)
     expect(wrapper.get('#user-workspace-roles-title').text()).toBe('1. 角色')
     expect(wrapper.get('#user-workspace-users-title').text()).toBe('2. 用户')
+    expect(wrapper.get('#user-workspace-detail-title').text()).toBe('3. 详情')
     const roleButtons = wrapper.findAll('.user-role-list__item')
     expect(roleButtons).toHaveLength(2)
     expect(roleButtons[0]!.text()).toContain('超级管理员2 人')
     expect(roleButtons[1]!.text()).toContain('项目经理1 人')
     expect(roleButtons[0]!.attributes('aria-pressed')).toBe('true')
-    const userTable = wrapper.get('.user-workspace__table')
-    expect(userTable.classes()).toContain('v2-table--compact')
-    expect(userTable.findAll('thead th').map((header) => header.text())).toEqual([
-      '用户名',
-      '姓名',
-      '联系方式',
-      '状态',
-      '操作',
-    ])
-    expect(userTable.findAll('tbody tr')).toHaveLength(2)
-    expect(userTable.text()).toContain('平台管理员')
-    expect(userTable.text()).toContain('双岗成员')
+    const userList = wrapper.get('.user-workspace__list')
+    expect(userList.attributes('role')).toBe('listbox')
+    expect(userList.findAll('[role="option"]')).toHaveLength(2)
+    expect(userList.findAll('[role="option"]')[0]!.attributes('aria-selected')).toBe('true')
+    expect(userList.text()).toContain('平台管理员')
+    expect(userList.text()).toContain('双岗成员')
+    expect(wrapper.get('.user-workspace__details').text()).toContain('admin@example.com')
+    expect(wrapper.get('.user-workspace__details').text()).toContain('总部')
+    expect(apiRequest).toHaveBeenCalledWith('/system/users/1')
 
     await roleButtons[1]!.trigger('click')
     await flushPromises()
     expect(wrapper.findAll('.user-role-list__item')[1]!.attributes('aria-pressed')).toBe('true')
-    const projectManagerTable = wrapper.get('.user-workspace__table')
-    expect(projectManagerTable.findAll('tbody tr')).toHaveLength(1)
-    expect(projectManagerTable.text()).toContain('双岗成员')
-    expect(projectManagerTable.text()).not.toContain('平台管理员')
+    const projectManagerList = wrapper.get('.user-workspace__list')
+    expect(projectManagerList.findAll('[role="option"]')).toHaveLength(1)
+    expect(projectManagerList.text()).toContain('双岗成员')
+    expect(projectManagerList.text()).not.toContain('平台管理员')
+    expect(wrapper.get('.user-workspace__details').text()).toContain('dual@example.com')
     expect(wrapper.text()).toContain('共 1 条')
     expect(apiRequest).toHaveBeenCalledWith('/system/users?pageNo=1&pageSize=10&roleId=2', {
       signal: expect.any(AbortSignal),
     })
-    const statusSwitch = projectManagerTable.get('button[role="switch"]')
+    const statusSwitch = projectManagerList.get('button[role="switch"]')
     expect(statusSwitch.attributes('aria-checked')).toBe('true')
     expect(statusSwitch.attributes('disabled')).toBeUndefined()
     expect(statusSwitch.classes()).toContain('is-enabled')
-    expect(projectManagerTable.find('input[role="switch"]').exists()).toBe(false)
-    expect(
-      projectManagerTable
-        .findAll('.access-control-page__actions button')
-        .some((candidate) => ['启用', '停用'].includes(candidate.text())),
-    ).toBe(false)
-
+    expect(projectManagerList.find('input[role="switch"]').exists()).toBe(false)
     await statusSwitch.trigger('click')
     await flushPromises()
     const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
@@ -500,11 +521,12 @@ describe('M7 system management contracts', () => {
       body: { status: 'DISABLE' },
     })
     expect(
-      wrapper.get('.user-workspace__table button[role="switch"]').attributes('aria-checked'),
+      wrapper.get('.user-workspace__list button[role="switch"]').attributes('aria-checked'),
     ).toBe('false')
-    expect(wrapper.get('.user-workspace__table button[role="switch"]').classes()).toContain(
+    expect(wrapper.get('.user-workspace__list button[role="switch"]').classes()).toContain(
       'is-disabled',
     )
+    expect(wrapper.get('.user-workspace__details').text()).toContain('停用')
 
     useSessionStore().replaceUserInfo({
       tenantId: '1001',
@@ -514,9 +536,110 @@ describe('M7 system management contracts', () => {
       permissions: ['system:user:query'],
     })
     await flushPromises()
-    expect(wrapper.get('.user-workspace__table button[role="switch"]').attributes('disabled')).toBe(
+    expect(wrapper.get('.user-workspace__list button[role="switch"]').attributes('disabled')).toBe(
       '',
     )
+    expect(wrapper.find('.user-workspace__user-actions .v2-action-menu').exists()).toBe(false)
+  })
+
+  it('isolates stale user detail responses and clears detail for an empty page', async () => {
+    let resolveFirstDetail!: (value: unknown) => void
+    const firstDetail = new Promise((resolve) => {
+      resolveFirstDetail = resolve
+    })
+    vi.mocked(apiRequest).mockImplementation(async (path) => {
+      if (path === '/system/roles') {
+        return [
+          {
+            id: 1,
+            roleCode: 'PROJECT_MANAGER',
+            roleName: '项目经理',
+            status: 'ENABLE',
+            dataScope: 'SELF',
+            userCount: 2,
+            menuIds: [],
+          },
+        ]
+      }
+      if (path.startsWith('/system/users?')) {
+        const query = new URLSearchParams(path.split('?')[1])
+        const records = query.get('username')
+          ? []
+          : [
+              {
+                id: 1,
+                username: 'slow.user',
+                realName: '慢响应用户',
+                status: 'ENABLE',
+                roleIds: [1],
+                roleNames: ['项目经理'],
+              },
+              {
+                id: 2,
+                username: 'fast.user',
+                realName: '快响应用户',
+                status: 'ENABLE',
+                roleIds: [1],
+                roleNames: ['项目经理'],
+              },
+            ]
+        return { pageNo: 1, pageSize: 10, total: records.length, records }
+      }
+      if (path === '/system/users/1') return firstDetail
+      if (path === '/system/users/2') {
+        return {
+          id: 2,
+          username: 'fast.user',
+          realName: '快响应用户',
+          status: 'ENABLE',
+          roleIds: [1],
+          roleNames: ['项目经理'],
+          email: 'fast@example.com',
+        }
+      }
+      throw new Error(`unexpected request: ${path}`)
+    })
+    useSessionStore().replaceUserInfo({
+      tenantId: '1001',
+      userId: '9',
+      username: 'viewer',
+      roles: ['USER'],
+      permissions: ['system:user:query'],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/system/users', component: AccessControlPage }],
+    })
+    await router.push('/system/users')
+    await router.isReady()
+    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('正在读取用户详情')
+    await wrapper.findAll('[role="option"]')[1]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('.user-workspace__details').text()).toContain('fast@example.com')
+    expect(wrapper.findAll('[role="option"]')[1]!.attributes('aria-selected')).toBe('true')
+
+    resolveFirstDetail({
+      id: 1,
+      username: 'slow.user',
+      realName: '慢响应用户',
+      status: 'ENABLE',
+      roleIds: [1],
+      roleNames: ['项目经理'],
+      email: 'stale@example.com',
+    })
+    await flushPromises()
+    expect(wrapper.get('.user-workspace__details').text()).toContain('fast@example.com')
+    expect(wrapper.text()).not.toContain('stale@example.com')
+
+    await wrapper.get('input[placeholder="用户名"]').setValue('nobody')
+    await wrapper.get('form.v2-page-heading__filters').trigger('submit')
+    await flushPromises()
+    expect(wrapper.find('.user-workspace__list').exists()).toBe(false)
+    expect(wrapper.text()).toContain('当前角色暂无用户')
+    expect(wrapper.text()).toContain('暂无用户详情')
   })
 
   it('keeps role editing separate from permission assignment', async () => {

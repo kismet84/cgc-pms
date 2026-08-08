@@ -107,6 +107,11 @@ const statusTarget = ref<UserRecord | null>(null)
 const roleStatusTarget = ref<RoleRecord | null>(null)
 const userRoleSearch = ref('')
 const selectedUserRoleId = ref('')
+const selectedUserId = ref('')
+const selectedUser = ref<UserRecord | null>(null)
+const userDetailLoading = ref(false)
+const userDetailError = ref('')
+let userDetailLoadVersion = 0
 const roleSearch = ref('')
 const selectedRoleId = ref('')
 const selectedMenuIds = ref<Set<string>>(new Set())
@@ -444,6 +449,7 @@ async function refreshUsers(signal?: AbortSignal): Promise<void> {
   if (!nextRoleId) {
     users.value = []
     total.value = 0
+    clearUserDetail()
     return
   }
   const page = await loadUsers(
@@ -459,6 +465,10 @@ async function refreshUsers(signal?: AbortSignal): Promise<void> {
   )
   users.value = page.records
   total.value = page.total
+  const nextUserId =
+    page.records.find((user) => user.id === selectedUserId.value)?.id ?? page.records[0]?.id
+  if (nextUserId) void selectUser(nextUserId)
+  else clearUserDetail()
 }
 
 async function refreshRoles(): Promise<void> {
@@ -486,8 +496,39 @@ function clearRows(): void {
   menus.value = []
   total.value = 0
   selectedUserRoleId.value = ''
+  clearUserDetail()
   selectedRoleId.value = ''
   applyRoleMenus([])
+}
+
+function clearUserDetail(): void {
+  userDetailLoadVersion += 1
+  selectedUserId.value = ''
+  selectedUser.value = null
+  userDetailLoading.value = false
+  userDetailError.value = ''
+}
+
+async function selectUser(userId: string): Promise<void> {
+  if (!userId) {
+    clearUserDetail()
+    return
+  }
+  const requestVersion = ++userDetailLoadVersion
+  selectedUserId.value = userId
+  selectedUser.value = null
+  userDetailLoading.value = true
+  userDetailError.value = ''
+  try {
+    const detail = await loadUser(userId)
+    if (requestVersion !== userDetailLoadVersion || selectedUserId.value !== userId) return
+    selectedUser.value = detail
+  } catch (value) {
+    if (requestVersion !== userDetailLoadVersion || selectedUserId.value !== userId) return
+    userDetailError.value = messageOf(value)
+  } finally {
+    if (requestVersion === userDetailLoadVersion) userDetailLoading.value = false
+  }
 }
 
 function applyRoleMenus(menuIds: string[]): void {
@@ -896,64 +937,57 @@ onBeforeUnmount(() => controller?.abort())
             title="当前角色暂无用户"
             description="当前筛选条件没有匹配用户。"
           />
-          <div v-else class="access-control-page__table-wrap">
-            <table class="v2-table--compact user-workspace__table" data-table-identity="contextual">
-              <thead>
-                <tr>
-                  <th>用户名</th>
-                  <th>姓名</th>
-                  <th>联系方式</th>
-                  <th>状态</th>
-                  <th class="v2-table-cell--actions">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(item, index) in users" :key="item.id">
-                  <th scope="row">{{ item.username }}</th>
-                  <td>{{ item.realName || '—' }}</td>
-                  <td>{{ item.phone || item.email || '—' }}</td>
-                  <td>
-                    <V2StatusToggle
-                      :enabled="item.status === 'ENABLE'"
-                      :disabled="
-                        !canUserEdit || saving || item.id === String(session.userInfo?.userId ?? '')
-                      "
-                      :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}用户${item.username}`"
-                      @toggle="requestUserStatusChange(item)"
-                    />
-                  </td>
-                  <td class="v2-table-cell--actions">
-                    <div class="access-control-page__actions">
-                      <V2ActionMenu
-                        v-if="canUserEdit || canUserDelete"
-                        :label="`${item.username}更多操作`"
-                        :placement="index >= users.length - 3 ? 'top-end' : 'bottom-end'"
-                      >
-                        <V2Button
-                          v-if="canUserEdit"
-                          size="small"
-                          variant="ghost"
-                          @click="openUserEditor(item)"
-                        >
-                          编辑
-                        </V2Button>
-                        <V2Button
-                          v-if="canUserDelete"
-                          size="small"
-                          variant="danger"
-                          @click="
-                            deleteTarget = { kind: 'user', id: item.id, label: item.username }
-                          "
-                        >
-                          删除
-                        </V2Button>
-                      </V2ActionMenu>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <ul v-else class="user-workspace__list" role="listbox" aria-label="用户">
+            <li
+              v-for="(item, index) in users"
+              :key="item.id"
+              class="user-workspace__user"
+              :class="{ 'is-selected': item.id === selectedUserId }"
+              role="option"
+              tabindex="0"
+              :aria-selected="item.id === selectedUserId"
+              @click="selectUser(item.id)"
+              @keydown.enter.prevent="selectUser(item.id)"
+              @keydown.space.prevent="selectUser(item.id)"
+            >
+              <span class="user-workspace__identity">
+                <strong>{{ item.username }}</strong>
+                <span>{{ item.realName || '未填写姓名' }}</span>
+              </span>
+              <span class="user-workspace__user-actions" @click.stop @keydown.stop>
+                <V2StatusToggle
+                  :enabled="item.status === 'ENABLE'"
+                  :disabled="
+                    !canUserEdit || saving || item.id === String(session.userInfo?.userId ?? '')
+                  "
+                  :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}用户${item.username}`"
+                  @toggle="requestUserStatusChange(item)"
+                />
+                <V2ActionMenu
+                  v-if="canUserEdit || canUserDelete"
+                  :label="`${item.username}更多操作`"
+                  :placement="index >= users.length - 3 ? 'top-end' : 'bottom-end'"
+                >
+                  <V2Button
+                    v-if="canUserEdit"
+                    size="small"
+                    variant="ghost"
+                    @click="openUserEditor(item)"
+                  >
+                    编辑
+                  </V2Button>
+                  <V2Button
+                    v-if="canUserDelete"
+                    size="small"
+                    variant="danger"
+                    @click="deleteTarget = { kind: 'user', id: item.id, label: item.username }"
+                  >
+                    删除
+                  </V2Button>
+                </V2ActionMenu>
+              </span>
+            </li>
+          </ul>
           <nav class="access-control-page__pagination v2-pagination" aria-label="用户分页">
             <span>共 {{ total }} 条</span>
             <V2Button
@@ -974,6 +1008,73 @@ onBeforeUnmount(() => controller?.abort())
               下一页
             </V2Button>
           </nav>
+        </section>
+
+        <section aria-labelledby="user-workspace-detail-title">
+          <div class="user-workspace__section-heading">
+            <h3 id="user-workspace-detail-title">3. 详情</h3>
+            <span>{{ selectedUser?.username || '未选择用户' }}</span>
+          </div>
+          <V2PageState
+            v-if="userDetailLoading"
+            kind="loading"
+            title="正在读取用户详情"
+            description="请稍候。"
+          />
+          <V2PageState
+            v-else-if="userDetailError"
+            kind="error"
+            title="用户详情加载失败"
+            :description="userDetailError"
+          >
+            <template #actions>
+              <V2Button size="small" @click="selectUser(selectedUserId)">重试</V2Button>
+            </template>
+          </V2PageState>
+          <dl v-else-if="selectedUser" class="user-workspace__details">
+            <div>
+              <dt>用户名</dt>
+              <dd>{{ selectedUser.username }}</dd>
+            </div>
+            <div>
+              <dt>姓名</dt>
+              <dd>{{ selectedUser.realName || '—' }}</dd>
+            </div>
+            <div>
+              <dt>手机</dt>
+              <dd>{{ selectedUser.phone || '—' }}</dd>
+            </div>
+            <div>
+              <dt>邮箱</dt>
+              <dd>{{ selectedUser.email || '—' }}</dd>
+            </div>
+            <div>
+              <dt>组织</dt>
+              <dd>{{ selectedUser.orgId || '—' }}</dd>
+            </div>
+            <div>
+              <dt>角色</dt>
+              <dd>{{ selectedUser.roleNames.join('、') || '—' }}</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd>
+                <V2Badge :tone="selectedUser.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ selectedUser.status === 'ENABLE' ? '启用' : '停用' }}
+                </V2Badge>
+              </dd>
+            </div>
+            <div>
+              <dt>创建时间</dt>
+              <dd>{{ selectedUser.createdAt || '—' }}</dd>
+            </div>
+          </dl>
+          <V2PageState
+            v-else
+            kind="empty"
+            title="暂无用户详情"
+            description="请选择用户，或调整角色和筛选条件。"
+          />
         </section>
       </div>
     </V2Card>
@@ -1433,12 +1534,16 @@ onBeforeUnmount(() => controller?.abort())
 
 .user-workspace {
   display: grid;
-  grid-template-columns: minmax(14rem, 0.65fr) minmax(36rem, 1.35fr);
+  grid-template-columns: minmax(13rem, 0.65fr) minmax(20rem, 1fr) minmax(16rem, 0.8fr);
   gap: var(--v2-space-4);
+  height: calc(100dvh - 16rem);
+  min-height: 28rem;
 }
 
 .user-workspace > section {
   min-width: 0;
+  overflow-y: auto;
+  padding-right: var(--v2-space-1);
 }
 
 .user-workspace__section-heading {
@@ -1456,6 +1561,80 @@ onBeforeUnmount(() => controller?.abort())
 
 .user-workspace__section-heading > span {
   color: var(--v2-color-text-muted);
+}
+
+.user-workspace__list {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.user-workspace__user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  cursor: pointer;
+}
+
+.user-workspace__user:hover,
+.user-workspace__user.is-selected {
+  border-color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.user-workspace__user:focus-visible {
+  outline: 2px solid var(--v2-color-primary);
+  outline-offset: 2px;
+}
+
+.user-workspace__identity {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.user-workspace__identity strong,
+.user-workspace__identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-workspace__identity span,
+.user-workspace__details dt {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-13);
+}
+
+.user-workspace__user-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.user-workspace__details {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.user-workspace__details > div {
+  display: grid;
+  gap: var(--v2-space-1);
+  padding-bottom: var(--v2-space-3);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.user-workspace__details dt,
+.user-workspace__details dd {
+  margin: 0;
 }
 
 .permission-role-list {
@@ -1607,6 +1786,13 @@ onBeforeUnmount(() => controller?.abort())
   .permission-workspace,
   .user-workspace {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+
+  .user-workspace > section {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .permission-role-list {
