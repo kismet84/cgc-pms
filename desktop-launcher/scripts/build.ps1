@@ -4,7 +4,9 @@ param(
   [string]$Configuration = 'Release',
   [ValidateSet('x64')]
   [string]$Architecture = 'x64',
-  [switch]$Contract
+  [switch]$Contract,
+  [ValidateRange(1024, 65535)]
+  [int]$HealthPort = 55173
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,7 +78,7 @@ if ($Contract) {
   try { Invoke-Native 'rc.exe' @('/nologo', "/fo$launcherRes", 'launcher.rc') } finally { Pop-Location }
   $launcherExe = Join-Path $packageRoot 'CGC-PMS.exe'
   Invoke-Native 'cl.exe' ($common + @(
-      '/DCGCPMS_CONTRACT_TEST', '/DCGCPMS_HEALTH_PORT=55173', '/DCGCPMS_HEALTH_ATTEMPTS=2',
+      '/DCGCPMS_CONTRACT_TEST', "/DCGCPMS_HEALTH_PORT=$HealthPort", '/DCGCPMS_HEALTH_ATTEMPTS=2',
       '/DCGCPMS_HEALTH_DELAY_MS=100', $source, $launcherRes,
       "/Fo$(Join-Path $contractRoot 'launcher.obj')", "/Fe$launcherExe", '/link', '/SUBSYSTEM:CONSOLE',
       'winhttp.lib', 'shell32.lib', 'version.lib'))

@@ -4,7 +4,10 @@ param()
 $ErrorActionPreference = 'Stop'
 $launcherRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $buildScript = Join-Path $launcherRoot 'scripts\build.ps1'
-$buildOutput = & $buildScript -Configuration Release -Architecture x64 -Contract
+$portProbe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+$portProbe.Start()
+try { $healthPort = ([Net.IPEndPoint]$portProbe.LocalEndpoint).Port } finally { $portProbe.Stop() }
+$buildOutput = & $buildScript -Configuration Release -Architecture x64 -Contract -HealthPort $healthPort
 if ($LASTEXITCODE -ne 0) { throw 'Contract build failed.' }
 $packageRoot = [string]($buildOutput | Select-Object -Last 1)
 $launcher = Join-Path $packageRoot 'CGC-PMS.exe'
@@ -93,9 +96,12 @@ Remove-TestState
 Set-Content -LiteralPath $modePath -Value 'up' -NoNewline -Encoding utf8
 if (Test-Path -LiteralPath $readyPath) { Remove-Item -LiteralPath $readyPath -Force }
 $server = Start-Process -FilePath (Get-Command node.exe).Source `
-  -ArgumentList @($serverScript, $modePath, $readyPath, '55173') -PassThru -WindowStyle Hidden
+  -ArgumentList @($serverScript, $modePath, $readyPath, [string]$healthPort) -PassThru -WindowStyle Hidden
 try {
-  Wait-For { Test-Path -LiteralPath $readyPath } 'Health fixture did not start.'
+  Wait-For { (Test-Path -LiteralPath $readyPath) -or $server.HasExited } 'Health fixture did not start.' 30
+  if ($server.HasExited) { throw "Health fixture exited before readiness with code $($server.ExitCode)." }
+  $readyText = Get-Content -Raw -LiteralPath $readyPath
+  if ($readyText.StartsWith('ERROR:', [StringComparison]::Ordinal)) { throw "Health fixture failed: $readyText" }
 
   Assert-Equal 10 (Invoke-Launcher @('--app=https://example.invalid')) 'Unknown arguments must fail.'
 

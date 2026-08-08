@@ -21,5 +21,9 @@ const server = createServer((request, response) => {
   }
 })
 
+server.on('error', (error) => {
+  writeFileSync(readyPath, `ERROR:${error.code ?? error.message}`)
+  process.exitCode = 1
+})
 server.listen(Number(portText), '127.0.0.1', () => writeFileSync(readyPath, String(process.pid)))
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)))
