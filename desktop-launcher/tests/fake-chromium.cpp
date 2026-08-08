@@ -148,9 +148,24 @@ int wmain(int argc, wchar_t** argv) {
                                 WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
                                 nullptr, nullptr, windowClass.hInstance, nullptr);
   if (!window) return 92;
+
+  windowClass.lpszClassName = L"Chrome_WidgetWin_0";
+  if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return 94;
+  HWND decoy = CreateWindowExW(0, windowClass.lpszClassName, L"", WS_OVERLAPPEDWINDOW,
+                               CW_USEDEFAULT, CW_USEDEFAULT, 640, 480, nullptr, nullptr,
+                               windowClass.hInstance, nullptr);
+  if (!decoy) return 95;
   HANDLE configuredEvent = CreateEventW(nullptr, TRUE, FALSE, kWindowConfiguredEvent);
   if (!configuredEvent) return 93;
   const bool configured = WaitForFixedFrame(window, configuredEvent, 10000);
+  if (configured) {
+    SetWindowLongPtrW(window, GWL_STYLE, GetWindowLongPtrW(window, GWL_STYLE) | WS_THICKFRAME);
+    if (IsZoomed(window) == FALSE) {
+      SetWindowPos(window, nullptr, 0, 0, 1000, 700, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE |
+                                                        SWP_FRAMECHANGED);
+    }
+    PumpMessages(1000);
+  }
   WriteWindowEvidence(directory / L"fake-window.txt", window, configured);
   CloseHandle(configuredEvent);
   if (fs::exists(directory / L"hold.flag")) PumpMessages(8000);

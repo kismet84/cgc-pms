@@ -1,7 +1,7 @@
 {
-  "current_commit": "fa2a682200db3d00e29877de3e61a1a2b0581c64",
+  "current_commit": "688b65d2dff54d65610648f9fabcdc8dfa2f7aab",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T12:34:44.272Z",
+  "generation_time": "2026-08-08T13:41:51.509Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -59,6 +59,7 @@
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
+      "desktop_launcher",
       "documentation"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
@@ -100,7 +101,7 @@
         "desktop-launcher/**"
       ],
       "file_count": 17,
-      "fingerprint": "6776ea13ebb43eab694dade5614c2cd14a35527aa216287ee728ea1f51d02a1d"
+      "fingerprint": "61277086b097988cbab1a4129f93d95a2978cce7d3577e841e7598b67c08cae0"
     },
     {
       "id": "documentation",
@@ -108,7 +109,7 @@
         "docs/**"
       ],
       "file_count": 124,
-      "fingerprint": "5a1025394ef84c01bb9c929830223c37f9a3e0a8c039350f1ed11ff43aca890e"
+      "fingerprint": "e4419c4f1b5a9a0b56b0a6ac4ac17c20baf8e2fdeb609a24c3292b3febc958d5"
     },
     {
       "id": "frontend_v2",
