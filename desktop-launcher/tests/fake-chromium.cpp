@@ -56,20 +56,18 @@ bool WaitForFixedFrame(HWND window, HANDLE configuredEvent, DWORD timeoutMs) {
 
 void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   const bool initialMaximized = IsZoomed(window) != FALSE;
-  if (initialMaximized) {
-    ShowWindow(window, SW_RESTORE);
-    PumpMessages(100);
-  }
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  const bool hasPlacement = GetWindowPlacement(window, &placement) != FALSE;
   RECT normal{};
-  GetWindowRect(window, &normal);
+  if (initialMaximized && hasPlacement) {
+    normal = placement.rcNormalPosition;
+  } else {
+    GetWindowRect(window, &normal);
+  }
   const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
-  ShowWindow(window, SW_MAXIMIZE);
-  PumpMessages(100);
-  const bool maximized = IsZoomed(window) != FALSE;
-  ShowWindow(window, SW_RESTORE);
-  PumpMessages(100);
-  RECT restored{};
-  GetWindowRect(window, &restored);
+  const bool maximizeSupported = (style & WS_MAXIMIZEBOX) != 0;
+  const RECT restored = hasPlacement ? placement.rcNormalPosition : normal;
   const UINT dpi = GetDpiForWindow(window);
   auto logical = [dpi](LONG value) {
     return MulDiv(value, USER_DEFAULT_SCREEN_DPI, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI));
@@ -82,7 +80,7 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
            << "height=" << logical(normal.bottom - normal.top) << '\n'
            << "restoredWidth=" << logical(restored.right - restored.left) << '\n'
            << "restoredHeight=" << logical(restored.bottom - restored.top) << '\n'
-           << "maximized=" << (maximized ? 1 : 0) << '\n';
+           << "maximized=" << (maximizeSupported ? 1 : 0) << '\n';
 }
 
 int wmain(int argc, wchar_t** argv) {
