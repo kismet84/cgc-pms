@@ -133,11 +133,17 @@ try {
   Assert-True (($windowEvidence.style -band 0x00040000) -eq 0) 'Resizable WS_THICKFRAME must be removed.'
   Assert-True (($windowEvidence.style -band 0x00010000) -ne 0) 'WS_MAXIMIZEBOX must remain enabled.'
   Assert-True (($windowEvidence.style -band 0x00020000) -ne 0) 'WS_MINIMIZEBOX must remain enabled.'
-  Assert-True ([Math]::Abs($windowEvidence.width - 1440) -le 2) "Normal window width must be 1440 logical pixels; actual=$($windowEvidence.width)."
-  Assert-True ([Math]::Abs($windowEvidence.height - 900) -le 2) "Normal window height must be 900 logical pixels; actual=$($windowEvidence.height)."
   Assert-Equal 1 $windowEvidence.maximized 'Window must support maximize.'
-  Assert-True ([Math]::Abs($windowEvidence.restoredWidth - 1440) -le 2) "Restore width must return to 1440 logical pixels; actual=$($windowEvidence.restoredWidth)."
-  Assert-True ([Math]::Abs($windowEvidence.restoredHeight - 900) -le 2) "Restore height must return to 900 logical pixels; actual=$($windowEvidence.restoredHeight)."
+  if ($windowEvidence.smallWorkArea -eq 1) {
+    Assert-Equal 1 $windowEvidence.initialMaximized 'Small work areas must launch maximized.'
+    Assert-True ($windowEvidence.width -gt 0 -and $windowEvidence.height -gt 0) 'Small-work-area window evidence must remain valid.'
+  } else {
+    Assert-Equal 0 $windowEvidence.initialMaximized 'Sufficient work areas must launch in the normal state.'
+    Assert-True ([Math]::Abs($windowEvidence.width - 1440) -le 2) "Normal window width must be 1440 logical pixels; actual=$($windowEvidence.width)."
+    Assert-True ([Math]::Abs($windowEvidence.height - 900) -le 2) "Normal window height must be 900 logical pixels; actual=$($windowEvidence.height)."
+    Assert-True ([Math]::Abs($windowEvidence.restoredWidth - 1440) -le 2) "Restore width must return to 1440 logical pixels; actual=$($windowEvidence.restoredWidth)."
+    Assert-True ([Math]::Abs($windowEvidence.restoredHeight - 900) -le 2) "Restore height must return to 900 logical pixels; actual=$($windowEvidence.restoredHeight)."
+  }
   foreach ($forbidden in '--disable-web-security', '--ignore-certificate-errors', '--no-sandbox', '--remote-debugging-port') {
     Assert-True (!$argsText.Contains($forbidden)) "Forbidden Chromium flag present: $forbidden"
   }

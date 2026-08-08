@@ -100,12 +100,24 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
     restored = normal;
   }
   const UINT dpi = GetDpiForWindow(window);
+  const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                   USER_DEFAULT_SCREEN_DPI);
+  const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                    USER_DEFAULT_SCREEN_DPI);
+  MONITORINFO monitorInfo{};
+  monitorInfo.cbSize = sizeof(monitorInfo);
+  const HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  const bool hasMonitor = monitor && GetMonitorInfoW(monitor, &monitorInfo) != FALSE;
+  const bool smallWorkArea = hasMonitor &&
+                             (monitorInfo.rcWork.right - monitorInfo.rcWork.left < expectedWidth ||
+                              monitorInfo.rcWork.bottom - monitorInfo.rcWork.top < expectedHeight);
   auto logical = [dpi](LONG value) {
     return MulDiv(value, USER_DEFAULT_SCREEN_DPI, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI));
   };
   std::ofstream evidence(path, std::ios::trunc);
   evidence << "configured=" << (configured ? 1 : 0) << '\n'
            << "initialMaximized=" << (initialMaximized ? 1 : 0) << '\n'
+           << "smallWorkArea=" << (smallWorkArea ? 1 : 0) << '\n'
            << "style=" << static_cast<unsigned long long>(style) << '\n'
            << "width=" << logical(normal.right - normal.left) << '\n'
            << "height=" << logical(normal.bottom - normal.top) << '\n'
