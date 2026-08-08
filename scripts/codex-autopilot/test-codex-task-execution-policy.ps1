@@ -83,7 +83,7 @@ Assert-Contains 'mainline skill' $mainline @('**Goal:**','**Architecture:**','�
 $canonicalCategories = @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')
 Assert-Contains 'CI skill categories' $ci $canonicalCategories
 Assert-Contains 'CI evidence reuse policy' $ci @(
-  'pr-push-evidence','精确 HEAD','14 个 required jobs','CI_PR_PUSH_REUSE_ENABLED=true','fork PR','push run、带 PR 编号的 PR run','merge tree'
+  'pr-push-evidence','精确 HEAD','15 个 required jobs','CI_PR_PUSH_REUSE_ENABLED=true','fork PR','push run、带 PR 编号的 PR run','merge tree'
 )
 Assert-Contains 'PowerShell ripgrep invocation' $ci @(
   'PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号',
@@ -200,8 +200,25 @@ if ($null -ne $larkCli) {
   if ($LASTEXITCODE -ne 0 -or $embeddedShared -notmatch '(?m)^name:\s*lark-shared\s*$' -or $embeddedShared -notmatch 'auth login') { throw 'lark-cli embedded lark-shared authority is unavailable' }
 }
 
-$trackedSkillPaths = @(& git -C $RepoRoot ls-files -- '.agents/skills/**/*.md' 'plugins/**/skills/**/*.md')
-if ($LASTEXITCODE -ne 0 -or $trackedSkillPaths.Count -eq 0) { throw 'tracked Skill Markdown inventory is unavailable' }
+$longTaskSkillRoot = Join-Path $RepoRoot '.agents\skills\long-task-gate'
+$longTaskHooksPath = Join-Path $RepoRoot '.codex\hooks.json'
+if (!(Test-Path -LiteralPath $longTaskSkillRoot -PathType Container) -or !(Test-Path -LiteralPath $longTaskHooksPath -PathType Leaf)) {
+  throw 'long-task-gate deliverable Skill or repository Hook is missing'
+}
+$longTaskHooks = Get-Content -LiteralPath $longTaskHooksPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$longTaskHookText = Get-Content -LiteralPath $longTaskHooksPath -Raw -Encoding UTF8
+$longTaskScript = Get-Content -LiteralPath (Join-Path $longTaskSkillRoot 'scripts\long-task-gate.mjs') -Raw -Encoding UTF8
+$longTaskMetadata = Get-Content -LiteralPath (Join-Path $longTaskSkillRoot 'agents\openai.yaml') -Raw -Encoding UTF8
+Assert-Contains 'long-task Hook contract' $longTaskHookText @('UserPromptSubmit','Stop','commandWindows','long-task-gate.mjs')
+Assert-Contains 'long-task execution boundary' $longTaskScript @('shell: false','BLOCKED_GATE','BLOCKED_NOTIFICATION','--idempotency-key','targetEnv')
+Assert-Contains 'long-task explicit Skill policy' $longTaskMetadata @('allow_implicit_invocation: false')
+if (@($longTaskHooks.hooks.UserPromptSubmit).Count -ne 1 -or @($longTaskHooks.hooks.Stop).Count -ne 1) { throw 'long-task Hook event count is not fail-close' }
+if (($longTaskHookText + $longTaskScript + $longTaskMetadata) -match '(?i)\b(?:ou|oc)_[a-z0-9]{8,}\b|app_secret\s*[:=]|tenant_access_token\s*[:=]') {
+  throw 'long-task deliverable contains a fixed recipient or credential'
+}
+
+$trackedSkillPaths = @(& git -C $RepoRoot ls-files -c -o --exclude-standard -- '.agents/skills/**/*.md' 'plugins/**/skills/**/*.md')
+if ($LASTEXITCODE -ne 0 -or $trackedSkillPaths.Count -eq 0) { throw 'deliverable Skill Markdown inventory is unavailable' }
 foreach ($relativePath in $trackedSkillPaths) {
   $source = Get-Item -LiteralPath (Join-Path $RepoRoot $relativePath)
   $text = Get-Content -LiteralPath $source.FullName -Raw -Encoding UTF8

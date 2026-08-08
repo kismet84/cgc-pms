@@ -1,0 +1,32 @@
+{
+  "description": "Explicit repository canary for deterministic long-task completion checks.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const{spawnSync}=require('node:child_process');const{pathToFileURL}=require('node:url');const path=require('node:path');const git=spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8',shell:false});if(git.status!==0)process.exit(git.status||1);process.argv.splice(1,0,'hook-entry');import(pathToFileURL(path.join(git.stdout.trim(),'.agents/skills/long-task-gate/scripts/long-task-gate.mjs')).href).catch(()=>{process.exitCode=1})\" user-prompt",
+            "commandWindows": "node -e \"const{spawnSync}=require('node:child_process');const{pathToFileURL}=require('node:url');const path=require('node:path');const git=spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8',shell:false});if(git.status!==0)process.exit(git.status||1);process.argv.splice(1,0,'hook-entry');import(pathToFileURL(path.join(git.stdout.trim(),'.agents/skills/long-task-gate/scripts/long-task-gate.mjs')).href).catch(()=>{process.exitCode=1})\" user-prompt",
+            "timeout": 5,
+            "statusMessage": "Registering explicit long-task completion gate",
+            "additionalContextLimit": 500
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const{spawnSync}=require('node:child_process');const{pathToFileURL}=require('node:url');const path=require('node:path');const git=spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8',shell:false});if(git.status!==0)process.exit(git.status||1);process.argv.splice(1,0,'hook-entry');import(pathToFileURL(path.join(git.stdout.trim(),'.agents/skills/long-task-gate/scripts/long-task-gate.mjs')).href).catch(()=>{process.exitCode=1})\" stop",
+            "commandWindows": "node -e \"const{spawnSync}=require('node:child_process');const{pathToFileURL}=require('node:url');const path=require('node:path');const git=spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8',shell:false});if(git.status!==0)process.exit(git.status||1);process.argv.splice(1,0,'hook-entry');import(pathToFileURL(path.join(git.stdout.trim(),'.agents/skills/long-task-gate/scripts/long-task-gate.mjs')).href).catch(()=>{process.exitCode=1})\" stop",
+            "timeout": 330,
+            "statusMessage": "Checking long-task completion contract"
+          }
+        ]
+      }
+    ]
+  }
+}

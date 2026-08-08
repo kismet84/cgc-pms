@@ -30,6 +30,12 @@ frontend-admin-v2/test-results/
 frontend-admin-v2/.pnpm-store/
 mobile/node_modules/
 mobile/dist/
+desktop-launcher/.cache/
+desktop-launcher/out/
+desktop-launcher/dist/
+desktop-launcher/*.zip
+desktop-launcher/*.pdb
+desktop-launcher/resources/cgc-pms.ico
 
 # IDE
 .idea/
@@ -76,11 +82,20 @@ admin-state.json
 # Local AI / tooling state
 .agent-runtime/
 .agents/
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/long-task-gate/
+!.agents/skills/long-task-gate/**
 .archive/
 .baoyu-skills/
 .claude/
 .codegraph/
 .codex/
+!.codex/
+.codex/*
+!.codex/hooks.json
 .codex-autopilot/*.flag
 .codex-autopilot/state.json
 .codex-autopilot/run.lock

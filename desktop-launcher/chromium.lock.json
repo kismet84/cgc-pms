@@ -1,0 +1,19 @@
+{
+  "product": "chromium",
+  "platform": "win-x64",
+  "version": "153.0.7998.0",
+  "major": 153,
+  "revision": "1676106",
+  "chromiumCommit": "b63b9e327e1587d61dd78339be39b0b017817326",
+  "sourceUrl": "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_x64/1676106/chrome-win.zip",
+  "archiveFileName": "chrome-win.zip",
+  "archiveRoot": "chrome-win",
+  "archiveSize": 344373598,
+  "archiveSha256": "8344DFB088B8E7D844172E0BEEBEDC9900404447784AEAABBFEEE57AA42C539C",
+  "licenseUrl": "https://chromium.googlesource.com/chromium/src/+/b63b9e327e1587d61dd78339be39b0b017817326/LICENSE?format=TEXT",
+  "licenseSha256": "368CCA1106BE99D39ECD32A38D8305585D802A475EFFB66380B91FFC9BCF709B",
+  "licenseEvidence": [
+    "LICENSE",
+    "chrome://credits"
+  ]
+}

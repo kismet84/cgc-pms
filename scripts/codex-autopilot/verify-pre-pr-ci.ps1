@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $script:PrePrRequiredJobs = @(
   'pr-push-evidence',
+  'desktop-launcher',
   'backend-test',
   'backend-order-sensitive',
   'backend-dependency-scan',

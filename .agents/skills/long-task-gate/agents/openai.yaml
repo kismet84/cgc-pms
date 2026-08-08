@@ -1,0 +1,7 @@
+interface:
+  display_name: "Long Task Gate"
+  short_description: "Explicit long-task completion checks and Feishu notice"
+  default_prompt: "Use $long-task-gate to register deterministic completion checks for this long-running task."
+
+policy:
+  allow_implicit_invocation: false

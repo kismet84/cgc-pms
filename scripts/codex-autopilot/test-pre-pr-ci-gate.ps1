@@ -21,7 +21,7 @@ function Assert-Rejected([scriptblock]$Action,[string]$Pattern) {
 $sha = 'a' * 40
 $branch = 'codex/example'
 $result = Test-PrePrCiEvidence -ExpectedHeadSha $sha -ExpectedHeadBranch $branch -Runs @((New-Run $sha)) -Jobs (New-Jobs)
-if ($result.status -ne 'PASS' -or $result.headSha -ne $sha -or @($result.requiredJobs).Count -ne 14) { throw 'valid pre-PR CI evidence was rejected or incomplete' }
+if ($result.status -ne 'PASS' -or $result.headSha -ne $sha -or @($result.requiredJobs).Count -ne 15) { throw 'valid pre-PR CI evidence was rejected or incomplete' }
 
 $missingJobs = @(New-Jobs | Where-Object { $_.name -ne 'backend-order-sensitive' })
 Assert-Rejected { Test-PrePrCiEvidence -ExpectedHeadSha $sha -ExpectedHeadBranch $branch -Runs @((New-Run $sha)) -Jobs $missingJobs } 'PRE_PR_CI_JOB_EVIDENCE_MISSING.*backend-order-sensitive'

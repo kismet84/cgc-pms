@@ -23,9 +23,10 @@ writeFileSync(htmlPath, html)
 
 const excluded = new Set(previous.excluded_directories.map(path => path.replaceAll('\\', '/')))
 const modules = [
-  ['agent_platform', ['.agents/', '.codex-autopilot/', 'plugins/']],
+  ['agent_platform', ['.agents/', '.codex/', '.codex-autopilot/', 'plugins/']],
   ['backend', ['backend/']],
   ['delivery_tooling', ['.github/', '.githooks/', 'deploy/', 'scripts/', 'tools/']],
+  ['desktop_launcher', ['desktop-launcher/']],
   ['documentation', ['docs/']],
   ['frontend_v2', ['frontend-admin-v2/']],
   ['mobile', ['mobile/']],
@@ -49,7 +50,8 @@ const fingerprint = paths => {
 const matches = (path, prefixes) => prefixes[0] === '' ? !path.includes('/') : prefixes.some(prefix => path.startsWith(prefix))
 const moduleRows = modules.map(([id, prefixes]) => {
   const paths = included.filter(path => matches(path, prefixes))
-  return { id, scope: previous.modules.find(module => module.id === id).scope, file_count: paths.length, fingerprint: fingerprint(paths) }
+  const priorScope = previous.modules.find(module => module.id === id)?.scope
+  return { id, scope: priorScope ?? prefixes.map(prefix => `${prefix}**`), file_count: paths.length, fingerprint: fingerprint(paths) }
 })
 const oldById = new Map(previous.modules.map(module => [module.id, module.fingerprint]))
 const staleModules = moduleRows.filter(module => oldById.get(module.id) !== module.fingerprint).map(module => module.id)
