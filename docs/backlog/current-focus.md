@@ -1,14 +1,15 @@
 # Current Focus
 
-## 2026-08-08 第81条主线：本地 Live E2E 证据闭环与通用编号容量保护本地收口、交付中
+## 2026-08-08 第81条主线：本地 Live E2E 证据闭环与通用编号容量保护已合并
 
 - 目标：为9组本地 live E2E 建立安全、可重复、绑定当前 SHA 的统一证据入口；在公共编号服务单点阻止三位日序号超过999。
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / ISSUE-081-001_CLOSED / GIT_DELIVERY_AUTHORIZED_PENDING`。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / ISSUE-081-001_CLOSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`。
 - 审计裁决：`CGC-AUD-20260808-001`仅部分成立，required CI contract-only 是既定分层，真实缺口是本地 live 证据和 `full` 命名漂移；`CGC-AUD-20260808-002`成立并影响6个直接调用方。
 - 边界：仅本地 dev/test/demo；不新增生产、目标环境、nightly/release、required live CI、序列表、编号扩位或 migration。
 - 证据：实现与修复依赖SHA `75a84cb8` 的9/9 live spec、80/80用例、0 skip/unexpected/flaky、clean tree通过；27/27 contract spec、98/98用例、后端相关107/107、真实MySQL 5/5、前端502/502通过。
 - 独立复核：3项P1、4项P2全部本轮整改并复验；报告见[`ISSUE-081-001`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
-- 计划：[`第81条`](../plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md)；用户已授权受保护Git完整交付，push/PR/合并/post-merge证据尚待取得。
+- Git：源 SHA `fd2668bc13d611e7b76908bd7777655f37563bb6` 的 push CI `31244041407`、Pre-PR verifier 与独立 PR CI `31244569723` 通过；PR #412 合并为 `08b2f111dafb562e85baeb8e4f66ff54f531ab11`，post-merge run `31244965147` 成功；实现源分支本地、远端均已删除。
+- 计划：[`第81条`](../plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md)；受保护Git交付已完成。
 - 零悬空：本轮新增0、关闭0、净变化`0`；计划全周期问题源新增1、关闭1、净变化`0`。
 
 ## 2026-08-07 第80条主线：CI 全量验证分层与后端测试门禁提效已合并

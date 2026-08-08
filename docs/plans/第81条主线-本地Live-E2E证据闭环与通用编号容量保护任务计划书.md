@@ -3,7 +3,7 @@
 **Goal:** 修正 `CGC-AUD-20260808-001` 的证据语义漂移，建立可重复、绑定当前 SHA 的本地 9 组 live E2E 验收入口；修复 `CGC-AUD-20260808-002` 中通用三位日序号在 `999` 后生成不可解析 `1000` 的确定性缺陷，并覆盖全部现有调用方。 **Architecture:** 复用 `complete-project-v2` 本地演示数据包、Playwright `liveSpecs` 显式清单、现有 contract CI 分层、`CodeGenerationService` 与既有 `BUSINESS_CODE_SEQUENCE_EXHAUSTED` 错误契约；增加一个本地 live 编排入口和一个公共容量守卫。不得把 live 搬入 GitHub required CI，不新建 nightly/release/生产流程、序列表、编号宽度、第二编号器或数据库 migration。
 
 > 编制日期：2026-08-08
-> 计划状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED_PENDING`
+> 计划状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`
 > 唯一问题源：`ISSUE-081-001`
 > 审计来源：`CGC-AUD-20260808-001`、`CGC-AUD-20260808-002`
 > 编制基线：`master@367d110e6e66dfbf3248d7b00299c98ebd526603`，编制前工作区干净
@@ -198,7 +198,8 @@ Push-Location backend; .\mvnw.cmd -Dtest=CodeGenerationServiceTest test; Pop-Loc
 
 ## 9. 实施结果
 
-- G0～G5本地门禁通过，`ISSUE-081-001`关闭；受保护Git交付按用户授权继续。
+- G0～G5门禁通过，`ISSUE-081-001`关闭；受保护Git交付完成。
 - 实现与修复依赖SHA `75a84cb8` 的本地live执行9/9 spec、80/80用例、0 skipped/unexpected/flaky且working tree clean；browser contract执行27/27 spec、98/98用例。
 - 公共编号与六调用方相关测试107/107、真实MySQL 5/5、前端单测502/502通过；编号超过999统一fail-closed，六Mapper软删除历史占号和legacy1000优先成立。
-- 证据分类、失败分类、边界和剩余Git状态见[`质量报告`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
+- 源 SHA `fd2668bc13d611e7b76908bd7777655f37563bb6` 的 push CI `31244041407`、Pre-PR verifier、独立 PR CI `31244569723` 通过；PR #412 合并为 `08b2f111dafb562e85baeb8e4f66ff54f531ab11`，post-merge run `31244965147` 成功；实现源分支本地、远端均已删除。
+- 证据分类、失败分类与边界见[`质量报告`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
