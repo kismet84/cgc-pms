@@ -36,7 +36,7 @@ constexpr int kWindowHeight = 900;
 constexpr DWORD kWindowWaitMs = 10000;
 constexpr DWORD kWindowStabilizeMs = 750;
 #ifdef CGCPMS_CONTRACT_TEST
-constexpr wchar_t kWindowConfiguredProperty[] = L"CGCPMS.Window.Configured";
+constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 constexpr wchar_t kMutexName[] = L"Local\\CGCPMS.Desktop.Launcher.Contract";
 constexpr wchar_t kRuntimeDir[] = L"contract-runtime";
 constexpr wchar_t kProfileDir[] = L"contract-profiles";
@@ -399,12 +399,11 @@ HWND WaitForChromiumWindow(DWORD pid, HANDLE process) {
   return nullptr;
 }
 
-bool CompleteWindowConfiguration(HWND window, bool configured) {
-  if (!configured) return false;
+bool CompleteWindowConfiguration() {
 #ifdef CGCPMS_CONTRACT_TEST
-  return SetPropW(window, kWindowConfiguredProperty, reinterpret_cast<HANDLE>(1)) != FALSE;
+  UniqueHandle configuredEvent(OpenEventW(EVENT_MODIFY_STATE, FALSE, kWindowConfiguredEvent));
+  return configuredEvent && SetEvent(configuredEvent.value) != FALSE;
 #else
-  static_cast<void>(window);
   return true;
 #endif
 }
@@ -468,7 +467,7 @@ bool ConfigureChromiumWindow(DWORD pid, HANDLE process, const fs::path& dataRoot
     if (IsZoomed(window) == FALSE) {
       return FailWindowConfiguration(dataRoot, pid, "maximize_state_failed", GetLastError());
     }
-    if (!CompleteWindowConfiguration(window, true)) {
+    if (!CompleteWindowConfiguration()) {
       return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
     }
     return true;
@@ -479,7 +478,7 @@ bool ConfigureChromiumWindow(DWORD pid, HANDLE process, const fs::path& dataRoot
                               window, nullptr, left, top, width, height,
                               SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
   if (!configured) return FailWindowConfiguration(dataRoot, pid, "position_failed", GetLastError());
-  if (!CompleteWindowConfiguration(window, true)) {
+  if (!CompleteWindowConfiguration()) {
     return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
   }
   return true;

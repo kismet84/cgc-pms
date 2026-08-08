@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-constexpr wchar_t kWindowConfiguredProperty[] = L"CGCPMS.Window.Configured";
+constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 
 std::string Utf8(const std::wstring& value) {
   int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
@@ -41,12 +41,12 @@ void PumpMessages(DWORD durationMs) {
   } while (GetTickCount64() < deadline);
 }
 
-bool WaitForFixedFrame(HWND window, DWORD timeoutMs) {
+bool WaitForFixedFrame(HWND window, HANDLE configuredEvent, DWORD timeoutMs) {
   const ULONGLONG deadline = GetTickCount64() + timeoutMs;
   do {
     PumpMessages(20);
     if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_THICKFRAME) == 0 &&
-        GetPropW(window, kWindowConfiguredProperty) != nullptr) {
+        WaitForSingleObject(configuredEvent, 0) == WAIT_OBJECT_0) {
       PumpMessages(200);
       return true;
     }
@@ -107,11 +107,11 @@ int wmain(int argc, wchar_t** argv) {
                                 WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
                                 nullptr, nullptr, windowClass.hInstance, nullptr);
   if (!window) return 92;
-  ShowWindow(window, SW_SHOW);
-  UpdateWindow(window);
-  const bool configured = WaitForFixedFrame(window, 10000);
+  HANDLE configuredEvent = CreateEventW(nullptr, TRUE, FALSE, kWindowConfiguredEvent);
+  if (!configuredEvent) return 93;
+  const bool configured = WaitForFixedFrame(window, configuredEvent, 10000);
   WriteWindowEvidence(directory / L"fake-window.txt", window, configured);
-  RemovePropW(window, kWindowConfiguredProperty);
+  CloseHandle(configuredEvent);
   if (fs::exists(directory / L"hold.flag")) PumpMessages(8000);
   int code = 0;
   std::ifstream exitCode(directory / L"exit-code.txt");
