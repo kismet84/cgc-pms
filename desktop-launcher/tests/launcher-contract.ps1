@@ -25,7 +25,15 @@ $processHarness = Join-Path $contractRoot 'process-harness.exe'
 $harnessPidPath = Join-Path $contractRoot 'harness-child-pid.txt'
 
 function Assert-Equal($Expected, $Actual, [string]$Message) {
-  if ($Expected -ne $Actual) { throw "$Message expected=$Expected actual=$Actual" }
+  if ($Expected -ne $Actual) {
+    $logPath = Join-Path $logRoot 'launcher.log'
+    $diagnostics = if (Test-Path -LiteralPath $logPath) {
+      (Get-Content -LiteralPath $logPath -Tail 30 | Out-String).Trim()
+    } else {
+      'launcher log unavailable'
+    }
+    throw "$Message expected=$Expected actual=$Actual`n$diagnostics"
+  }
 }
 
 function Assert-True([bool]$Condition, [string]$Message) {

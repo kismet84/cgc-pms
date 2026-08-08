@@ -1,7 +1,7 @@
 {
-  "current_commit": "d519141c33120e9a74f63efc8438cb4c362d9653",
+  "current_commit": "a8551d8966987ca1dbf324150d72823d75d2cc6c",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T11:14:31.912Z",
+  "generation_time": "2026-08-08T11:21:21.871Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -101,7 +101,7 @@
         "desktop-launcher/**"
       ],
       "file_count": 17,
-      "fingerprint": "6019656ca6b26af382d5d691ec212dcd0315714d3aa948e63213ef406388d0c8"
+      "fingerprint": "4f88cdeb45647d6cb1dd44a88f221cce498d876afeb25d3e5e0690f91a9a9671"
     },
     {
       "id": "documentation",
@@ -109,7 +109,7 @@
         "docs/**"
       ],
       "file_count": 124,
-      "fingerprint": "52ace2db3733e59271bad0e70ed86b6d8ad7d45975d4ef2bab6db745bf098d94"
+      "fingerprint": "a163e0d4eb56b07f8a52cf9731f7403a867cd6a0aaa1004a62227374518f29bb"
     },
     {
       "id": "frontend_v2",

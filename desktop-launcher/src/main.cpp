@@ -409,29 +409,47 @@ bool CompleteWindowConfiguration(HWND window, bool configured) {
 #endif
 }
 
-bool ConfigureChromiumWindow(DWORD pid, HANDLE process) {
+bool FailWindowConfiguration(const fs::path& dataRoot, DWORD pid, const char* result,
+                             DWORD code = 0) {
+  Log(dataRoot, "window", result, code, pid);
+  return false;
+}
+
+bool ConfigureChromiumWindow(DWORD pid, HANDLE process, const fs::path& dataRoot) {
   HWND window = WaitForChromiumWindow(pid, process);
-  if (!window) return false;
-  if (WaitForSingleObject(process, kWindowStabilizeMs) != WAIT_TIMEOUT) return false;
+  if (!window) {
+    DWORD exitCode = STILL_ACTIVE;
+    GetExitCodeProcess(process, &exitCode);
+    return FailWindowConfiguration(dataRoot, pid, "not_found", exitCode);
+  }
+  if (WaitForSingleObject(process, kWindowStabilizeMs) != WAIT_TIMEOUT) {
+    DWORD exitCode = 0;
+    GetExitCodeProcess(process, &exitCode);
+    return FailWindowConfiguration(dataRoot, pid, "exited_during_stabilize", exitCode);
+  }
 
   SetLastError(ERROR_SUCCESS);
   LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
-  if (!style && GetLastError() != ERROR_SUCCESS) return false;
+  if (!style && GetLastError() != ERROR_SUCCESS) {
+    return FailWindowConfiguration(dataRoot, pid, "style_read_failed", GetLastError());
+  }
   const LONG_PTR fixedStyle = (style & ~static_cast<LONG_PTR>(WS_THICKFRAME)) |
                               WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
   SetLastError(ERROR_SUCCESS);
   if (!SetWindowLongPtrW(window, GWL_STYLE, fixedStyle) && GetLastError() != ERROR_SUCCESS) {
-    return false;
+    return FailWindowConfiguration(dataRoot, pid, "style_write_failed", GetLastError());
   }
 
   const UINT dpi = GetDpiForWindow(window);
-  if (!dpi) return false;
+  if (!dpi) return FailWindowConfiguration(dataRoot, pid, "dpi_failed", GetLastError());
   const int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
   const int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
   HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
   MONITORINFO info{};
   info.cbSize = sizeof(info);
-  if (!monitor || !GetMonitorInfoW(monitor, &info)) return false;
+  if (!monitor || !GetMonitorInfoW(monitor, &info)) {
+    return FailWindowConfiguration(dataRoot, pid, "monitor_failed", GetLastError());
+  }
   const int availableWidth = info.rcWork.right - info.rcWork.left;
   const int availableHeight = info.rcWork.bottom - info.rcWork.top;
   const int left = availableWidth >= width
@@ -444,17 +462,27 @@ bool ConfigureChromiumWindow(DWORD pid, HANDLE process) {
   if (availableWidth < width || availableHeight < height) {
     if (!SetWindowPos(window, nullptr, left, top, width, height,
                       SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW)) {
-      return false;
+      return FailWindowConfiguration(dataRoot, pid, "maximize_position_failed", GetLastError());
     }
     ShowWindow(window, SW_MAXIMIZE);
-    return CompleteWindowConfiguration(window, IsZoomed(window) != FALSE);
+    if (IsZoomed(window) == FALSE) {
+      return FailWindowConfiguration(dataRoot, pid, "maximize_state_failed", GetLastError());
+    }
+    if (!CompleteWindowConfiguration(window, true)) {
+      return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
+    }
+    return true;
   }
 
   ShowWindow(window, SW_RESTORE);
   const bool configured = SetWindowPos(
                               window, nullptr, left, top, width, height,
                               SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
-  return CompleteWindowConfiguration(window, configured);
+  if (!configured) return FailWindowConfiguration(dataRoot, pid, "position_failed", GetLastError());
+  if (!CompleteWindowConfiguration(window, true)) {
+    return FailWindowConfiguration(dataRoot, pid, "contract_signal_failed", GetLastError());
+  }
+  return true;
 }
 
 int RunLauncher(int argc) {
@@ -540,7 +568,7 @@ int RunLauncher(int argc) {
   }
   UniqueHandle processHandle(process.hProcess);
   UniqueHandle threadHandle(process.hThread);
-  if (!ConfigureChromiumWindow(process.dwProcessId, processHandle.value)) {
+  if (!ConfigureChromiumWindow(process.dwProcessId, processHandle.value, dataRoot)) {
     TerminateProcess(processHandle.value, kLaunchFailed);
     WaitForSingleObject(processHandle.value, 5000);
     Inform(L"无法配置 CGC-PMS 窗口。请校验 Chromium 运行时。", MB_OK | MB_ICONERROR);
