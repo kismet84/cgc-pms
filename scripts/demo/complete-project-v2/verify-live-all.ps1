@@ -333,7 +333,8 @@ function Invoke-LiveEvidence {
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($headSha)) {
         throw 'LIVE_EVIDENCE_HEAD_SHA_UNAVAILABLE'
     }
-    $branch = (git -C $repoRoot branch --show-current).Trim()
+    $branch = [string](git -C $repoRoot branch --show-current)
+    $branch = $branch.Trim()
     if ([string]::IsNullOrWhiteSpace($branch)) { $branch = 'DETACHED' }
     $liveSpecs = @(Get-LiveSpecs $frontendRoot)
     $requiredUsers = @(Get-RequiredUsers -FrontendRoot $frontendRoot -LiveSpecs $liveSpecs)
