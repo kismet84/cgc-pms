@@ -1,15 +1,15 @@
 # Current Focus
 
-## 2026-08-08 第81条主线：本地 Live E2E 证据闭环与通用编号容量保护精确SHA复验中
+## 2026-08-08 第81条主线：本地 Live E2E 证据闭环与通用编号容量保护本地收口、交付中
 
 - 目标：为9组本地 live E2E 建立安全、可重复、绑定当前 SHA 的统一证据入口；在公共编号服务单点阻止三位日序号超过999。
-- 状态：`IMPLEMENTED / G0-G3_PASSED / G4_EXACT_SHA_LIVE_PENDING / G5_PENDING`；`ISSUE-081-001`仍在实施。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / ISSUE-081-001_CLOSED / GIT_DELIVERY_AUTHORIZED_PENDING`。
 - 审计裁决：`CGC-AUD-20260808-001`仅部分成立，required CI contract-only 是既定分层，真实缺口是本地 live 证据和 `full` 命名漂移；`CGC-AUD-20260808-002`成立并影响6个直接调用方。
 - 边界：仅本地 dev/test/demo；不新增生产、目标环境、nightly/release、required live CI、序列表、编号扩位或 migration。
-- 已通过证据：27/27 contract spec、98/98用例、后端相关107/107、真实MySQL 5/5、前端502/502；独立复核7项发现均已整改并专项复验。
-- 待完成：在干净任务提交SHA上复跑9/9 live，并将持久摘要纳入[`ISSUE-081-001报告`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)后再关闭问题源、进入Git交付。
-- 计划：[`第81条`](../plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md)；用户已授权受保护Git完整交付。
-- 零悬空：本轮新增0、关闭0、净变化`0`；计划全周期问题源新增1、关闭0、净变化`+1`。
+- 证据：实现SHA `c0595172` 的9/9 live spec、80/80用例、0 skip/unexpected/flaky、clean tree通过；27/27 contract spec、98/98用例、后端相关107/107、真实MySQL 5/5、前端502/502通过。
+- 独立复核：3项P1、4项P2全部本轮整改并复验；报告见[`ISSUE-081-001`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
+- 计划：[`第81条`](../plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md)；用户已授权受保护Git完整交付，push/PR/合并/post-merge证据尚待取得。
+- 零悬空：本轮新增0、关闭0、净变化`0`；计划全周期问题源新增1、关闭1、净变化`0`。
 
 ## 2026-08-07 第80条主线：CI 全量验证分层与后端测试门禁提效已合并
 
