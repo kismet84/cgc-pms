@@ -1,13 +1,13 @@
 # ISSUE-082 Windows 便携 Chromium 轻量启动壳质量报告
 
 > 日期：2026-08-08
-> 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`
+> 状态：`COMPLETED / G0-G5_PASSED / GIT_DELIVERED`
 > 基线：`fd2668bc13d611e7b76908bd7777655f37563bb6`
 > 环境：Windows 10/11 x64 本地 dev/test/demo 与 GitHub Actions 定义
 
 ## 裁决
 
-G0～G5 本地通过。新增 Win32 C++17 x64 薄启动器和固定 Chromium 153.0.7998.0 发行链；未改业务前后端、数据库、Compose loopback 或认证语义。Git、同 SHA CI、PR 与合并证据在交付阶段另行绑定，不能由本报告预先替代。
+G0～G5 与受保护 Git 交付通过。新增 Win32 C++17 x64 薄启动器和固定 Chromium 153.0.7998.0 发行链；未改业务前后端、数据库、Compose loopback 或认证语义。
 
 ## G0～G5 证据
 
@@ -46,6 +46,14 @@ G0～G5 本地通过。新增 Win32 C++17 x64 薄启动器和固定 Chromium 153
 - 构建参数、Unicode fixture、缺链接库、包复验漏参：`tool_invocation`；修正最小调用后通过。
 - 图标缺口：`quality_or_security`；增加确定性 ICO 生成与资源编译，实际 EXE 提取验证。
 - 浏览器 performance API 不可用：`tool_config`；停止原样重试，改用 DOM、控制台和既有 Service Worker 静态/单测证据。
+
+## Git 交付证据
+
+- 功能分支最终 SHA：`6020ed0f0658d042b080a74500970cd252b6db6e`。
+- 同 SHA push CI：run `31251731844`，15 个 required jobs 通过；`verify-pre-pr-ci.ps1` 返回 `PASS`。
+- 独立 PR CI：PR #415，run `31252163224`，全部 required jobs 与 `build-summary` 通过。
+- squash merge：`master@ff9ae4c70414f924555e0c4a935a99e5b5934d22`；post-merge run `31252564603` 通过。
+- 原源分支被并发追加第84条提交后，另建干净分支完成交付；第84条提交与 PR #414 原样保留，未进入本计划 diff。
 
 ## 零悬空
 

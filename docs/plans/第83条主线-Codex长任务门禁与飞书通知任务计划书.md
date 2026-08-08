@@ -3,7 +3,7 @@
 **Goal:** 为 CGC-PMS 的显式长任务建立可观测、可恢复、默认不影响普通任务的 Completion Gate：任务准备结束时由 Codex `Stop` Hook 校验结构化完成契约，未通过则继续修复，通过后以幂等方式调用 `lark-cli` 发送一次飞书通知。 **Architecture:** V1 采用仓库级 `.codex/hooks.json`、一个显式调用的 `long-task-gate` Skill、一个 Node.js 标准库门禁 CLI 和用户级私有运行状态目录；Skill 只负责把任务目标转成 Completion Contract，Hook/CLI 负责确定性校验、状态原子写入、有限重试和通知。复用现有 `lark-cli` 及仓库飞书授权边界，不改现有全局 `notify`，不复用 AutoPilot 业务状态机，不引入数据库、后台守护进程、第三方运行库或非本地环境。
 
 > 编制日期：2026-08-08
-> 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`
+> 状态：`COMPLETED / G0-G5_PASSED / GIT_DELIVERED`
 > 规划基线：`codex/mainline-81-live-e2e-code-cap@367d110e6e66dfbf3248d7b00299c98ebd526603`
 > 当前工具：`codex-cli 0.146.0`、`lark-cli 1.0.70`；版本只代表编制时本机快照，实施 G0 必须重新核验
 > 工作区边界：编制时已有第81/82条、Codemap、Backlog、前后端和测试等非本任务脏改动；本轮只新增本文档
@@ -591,4 +591,4 @@ git diff --check
 - 新增后续项：`0`；
 - 关闭后续项：`0`；
 - 后续项净变化：`0`；
-- 当前裁决：`本地 G0～G5 通过；Git 交付进行中`。
+- 当前裁决：`G0～G5 通过；PR #415 已合并；master@ff9ae4c70414f924555e0c4a935a99e5b5934d22 post-merge 通过`。
