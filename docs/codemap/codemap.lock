@@ -1,7 +1,7 @@
 {
-  "current_commit": "08b2f111dafb562e85baeb8e4f66ff54f531ab11",
+  "current_commit": "bd6bf240b3653950f49bcb488ff7aea23457eb99",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T06:59:25.467Z",
+  "generation_time": "2026-08-08T09:56:36.581Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,14 +52,19 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3829,
-  "repository_file_count": 3829,
-  "included_file_count": 2559,
+  "tracked_file_count": 3858,
+  "repository_file_count": 3858,
+  "included_file_count": 2588,
   "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "documentation"
+      "agent_platform",
+      "backend",
+      "delivery_tooling",
+      "desktop_launcher",
+      "frontend_v2",
+      "repository_meta"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -71,8 +76,8 @@
         ".codex-autopilot/**",
         "plugins/**"
       ],
-      "file_count": 80,
-      "fingerprint": "f0437114f01badf5150186b75e74e7b52aff21a70e51530f23c1ec7da34b4a81"
+      "file_count": 86,
+      "fingerprint": "5bc97d50674fd66107cecea868457bfcf7723b93f885457805cf07a03ac2cfc7"
     },
     {
       "id": "backend",
@@ -80,7 +85,7 @@
         "backend/**"
       ],
       "file_count": 1797,
-      "fingerprint": "b76e0627530f399ce8f41c1eac7106e0b530bf39c0090cb2576a71bf4a3948e5"
+      "fingerprint": "d21c34dadb75cf48f66713b3df1afe0a1ccd073adec692558f1095d63cdbb978"
     },
     {
       "id": "delivery_tooling",
@@ -92,15 +97,23 @@
         "tools/**"
       ],
       "file_count": 268,
-      "fingerprint": "70218eeea3308627a15f9d34ab499080937b7dbcae181c74cefa0054d9d4e983"
+      "fingerprint": "347b08bab67b567a49b17a1a765c1bfcb8ed90fee2f2f9d92dec2cf7ee86766f"
+    },
+    {
+      "id": "desktop_launcher",
+      "scope": [
+        "desktop-launcher/**"
+      ],
+      "file_count": 17,
+      "fingerprint": "8a87e2c3ef875ce196f4c8864b421bd91b20257990b3b756001eac7546c53f29"
     },
     {
       "id": "documentation",
       "scope": [
         "docs/**"
       ],
-      "file_count": 116,
-      "fingerprint": "100c444d489bd7454e12ffc5421868c1a9ec7529aa73b434011fe0263916977e"
+      "file_count": 122,
+      "fingerprint": "96c1e8e4bee578112563a90e262d9f33ac6ca4404cfca10f7b76e58c95318bc7"
     },
     {
       "id": "frontend_v2",
@@ -108,7 +121,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 271,
-      "fingerprint": "c0ac963460ad0200d0cf6145f8b7b08e663f2ee6288cc157522f1c4ce4ef93c0"
+      "fingerprint": "82bfae9fb6404d3e5583b9fdf598616879e6d8cb08b27646da0e6323cb6952c3"
     },
     {
       "id": "mobile",
@@ -124,7 +137,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 7,
-      "fingerprint": "82ef40d0f9b5fac1c2fc648d0d9ecc7334a55c9e6b33f753ac3476abfa7bca11"
+      "fingerprint": "dacb3b9ca092e2c08a4b6810d0035431eb1e93f12fb55b54c7c8d1437d770b2a"
     },
     {
       "id": "shared_packages",

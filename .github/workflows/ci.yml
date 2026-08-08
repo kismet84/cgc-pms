@@ -83,6 +83,30 @@ jobs:
           "run-full=$($runFull.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "mode=$mode" >> $env:GITHUB_STEP_SUMMARY
 
+  desktop-launcher:
+    needs: pr-push-evidence
+    if: needs.pr-push-evidence.outputs.run-full == 'true'
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build Windows x64 launcher
+        shell: pwsh
+        run: ./desktop-launcher/scripts/build.ps1 -Configuration Release -Architecture x64
+      - name: Run launcher contract tests
+        shell: pwsh
+        run: ./desktop-launcher/tests/launcher-contract.ps1
+      - name: Reject unsafe Chromium flags and committed runtime artifacts
+        shell: pwsh
+        run: |
+          $source = Get-Content -Raw -LiteralPath desktop-launcher/src/main.cpp
+          foreach ($flag in '--disable-web-security', '--ignore-certificate-errors', '--no-sandbox', '--remote-debugging-port') {
+            if ($source.Contains($flag)) { throw "Forbidden Chromium flag: $flag" }
+          }
+          $tracked = git ls-files desktop-launcher
+          if ($tracked -match '(?i)(^|/)(\.cache|out|dist|profiles?|logs?|runtime)/|\.(zip|pdb|log)$') {
+            throw 'Desktop launcher runtime/build artifact is tracked.'
+          }
+
   backend-test:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
@@ -439,6 +463,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - pr-push-evidence
+      - desktop-launcher
       - backend-test
       - backend-order-sensitive
       - backend-dependency-scan
@@ -461,10 +486,11 @@ jobs:
             echo "- Run number: ${{ github.run_number }}"
             echo "- Commit SHA: ${{ github.sha }}"
             echo "- PR push evidence: ${{ needs.pr-push-evidence.result }}"
-            echo "- Core gate jobs: pr-push-evidence, backend-test, backend-order-sensitive, backend-dependency-scan, backend-test-mysql, frontend-lint, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, sql-safety-scan, supply-chain-security, e2e (browser contract)"
+            echo "- Core gate jobs: pr-push-evidence, desktop-launcher, backend-test, backend-order-sensitive, backend-dependency-scan, backend-test-mysql, frontend-lint, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, sql-safety-scan, supply-chain-security, e2e (browser contract)"
             echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_TEST_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
             echo ""
             echo "### Job Results"
+            echo "- desktop-launcher: ${{ needs.desktop-launcher.result }}"
             echo "- backend-test: ${{ needs.backend-test.result }}"
             echo "- backend-order-sensitive: ${{ needs.backend-order-sensitive.result }}"
             echo "- backend-dependency-scan: ${{ needs.backend-dependency-scan.result }}"
