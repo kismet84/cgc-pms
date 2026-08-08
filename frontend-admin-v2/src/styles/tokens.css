@@ -115,7 +115,7 @@
   --v2-table-row-height: 2.5rem;
   --v2-table-wrap-line-height: 1.125rem;
   --v2-page-gutter: clamp(1rem, 2vw, 2rem);
-  --v2-page-max-width: 90rem;
+  --v2-page-max-width: 100%;
   --v2-grid-gap: var(--v2-space-3);
 
   --v2-z-base: 0;

@@ -1,12 +1,19 @@
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 namespace fs = std::filesystem;
+
+constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
+
+LONG gFixedNormalWidth = 0;
+LONG gFixedNormalHeight = 0;
 
 std::string Utf8(const std::wstring& value) {
   int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
@@ -16,6 +23,107 @@ std::string Utf8(const std::wstring& value) {
   WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
                       result.data(), size, nullptr, nullptr);
   return result;
+}
+
+LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+  if (message == WM_WINDOWPOSCHANGED) {
+    const auto* position = reinterpret_cast<const WINDOWPOS*>(lParam);
+    const UINT dpi = GetDpiForWindow(window);
+    const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                     USER_DEFAULT_SCREEN_DPI);
+    const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                      USER_DEFAULT_SCREEN_DPI);
+    if (position && (position->flags & SWP_NOSIZE) == 0 &&
+        std::abs(position->cx - expectedWidth) <= 2 &&
+        std::abs(position->cy - expectedHeight) <= 2) {
+      gFixedNormalWidth = position->cx;
+      gFixedNormalHeight = position->cy;
+    }
+  }
+  if (message == WM_DESTROY) {
+    PostQuitMessage(0);
+    return 0;
+  }
+  return DefWindowProcW(window, message, wParam, lParam);
+}
+
+void PumpMessages(DWORD durationMs) {
+  const ULONGLONG deadline = GetTickCount64() + durationMs;
+  do {
+    MSG message{};
+    while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+      TranslateMessage(&message);
+      DispatchMessageW(&message);
+    }
+    Sleep(10);
+  } while (GetTickCount64() < deadline);
+}
+
+bool WaitForFixedFrame(HWND window, HANDLE configuredEvent, DWORD timeoutMs) {
+  const ULONGLONG deadline = GetTickCount64() + timeoutMs;
+  do {
+    PumpMessages(20);
+    if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_THICKFRAME) == 0 &&
+        WaitForSingleObject(configuredEvent, 0) == WAIT_OBJECT_0) {
+      PumpMessages(200);
+      return true;
+    }
+  } while (GetTickCount64() < deadline);
+  return false;
+}
+
+void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
+  const bool initialMaximized = IsZoomed(window) != FALSE;
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  const bool hasPlacement = GetWindowPlacement(window, &placement) != FALSE;
+  RECT normal{};
+  if (initialMaximized && gFixedNormalWidth > 0 && gFixedNormalHeight > 0) {
+    normal.right = gFixedNormalWidth;
+    normal.bottom = gFixedNormalHeight;
+  } else if (initialMaximized && hasPlacement) {
+    normal.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
+    normal.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
+  } else {
+    GetWindowRect(window, &normal);
+  }
+  const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  const bool maximizeSupported = (style & WS_MAXIMIZEBOX) != 0;
+  RECT restored{};
+  if (gFixedNormalWidth > 0 && gFixedNormalHeight > 0) {
+    restored.right = gFixedNormalWidth;
+    restored.bottom = gFixedNormalHeight;
+  } else if (hasPlacement) {
+    restored.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
+    restored.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
+  } else {
+    restored = normal;
+  }
+  const UINT dpi = GetDpiForWindow(window);
+  const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                   USER_DEFAULT_SCREEN_DPI);
+  const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+                                    USER_DEFAULT_SCREEN_DPI);
+  MONITORINFO monitorInfo{};
+  monitorInfo.cbSize = sizeof(monitorInfo);
+  const HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  const bool hasMonitor = monitor && GetMonitorInfoW(monitor, &monitorInfo) != FALSE;
+  const bool smallWorkArea = hasMonitor &&
+                             (monitorInfo.rcWork.right - monitorInfo.rcWork.left < expectedWidth ||
+                              monitorInfo.rcWork.bottom - monitorInfo.rcWork.top < expectedHeight);
+  auto logical = [dpi](LONG value) {
+    return MulDiv(value, USER_DEFAULT_SCREEN_DPI, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI));
+  };
+  std::ofstream evidence(path, std::ios::trunc);
+  evidence << "configured=" << (configured ? 1 : 0) << '\n'
+           << "initialMaximized=" << (initialMaximized ? 1 : 0) << '\n'
+           << "smallWorkArea=" << (smallWorkArea ? 1 : 0) << '\n'
+           << "style=" << static_cast<unsigned long long>(style) << '\n'
+           << "width=" << logical(normal.right - normal.left) << '\n'
+           << "height=" << logical(normal.bottom - normal.top) << '\n'
+           << "restoredWidth=" << logical(restored.right - restored.left) << '\n'
+           << "restoredHeight=" << logical(restored.bottom - restored.top) << '\n'
+           << "maximized=" << (maximizeSupported ? 1 : 0) << '\n';
 }
 
 int wmain(int argc, wchar_t** argv) {
@@ -30,7 +138,22 @@ int wmain(int argc, wchar_t** argv) {
   std::ofstream pid(directory / L"fake-pid.txt", std::ios::trunc);
   pid << GetCurrentProcessId() << '\n';
   pid.close();
-  if (fs::exists(directory / L"hold.flag")) Sleep(8000);
+
+  WNDCLASSW windowClass{};
+  windowClass.lpfnWndProc = WindowProc;
+  windowClass.hInstance = GetModuleHandleW(nullptr);
+  windowClass.lpszClassName = L"Chrome_WidgetWin_1";
+  if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return 91;
+  HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"CGC-PMS Contract Browser",
+                                WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+                                nullptr, nullptr, windowClass.hInstance, nullptr);
+  if (!window) return 92;
+  HANDLE configuredEvent = CreateEventW(nullptr, TRUE, FALSE, kWindowConfiguredEvent);
+  if (!configuredEvent) return 93;
+  const bool configured = WaitForFixedFrame(window, configuredEvent, 10000);
+  WriteWindowEvidence(directory / L"fake-window.txt", window, configured);
+  CloseHandle(configuredEvent);
+  if (fs::exists(directory / L"hold.flag")) PumpMessages(8000);
   int code = 0;
   std::ifstream exitCode(directory / L"exit-code.txt");
   if (exitCode) exitCode >> code;

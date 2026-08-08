@@ -90,7 +90,7 @@ if ($Contract) {
   Invoke-Native 'cl.exe' ($common + @(
       (Join-Path $testsRoot 'fake-chromium.cpp'), $fakeRes,
       "/Fo$(Join-Path $contractRoot 'fake-chromium.obj')", "/Fe$(Join-Path $chromiumRoot 'chrome.exe')",
-      '/link', '/SUBSYSTEM:CONSOLE'))
+      '/link', '/SUBSYSTEM:CONSOLE', 'user32.lib'))
   Invoke-Native 'cl.exe' ($common + @(
       (Join-Path $testsRoot 'process-harness.cpp'),
       "/Fo$(Join-Path $contractRoot 'process-harness.obj')", "/Fe$(Join-Path $contractRoot 'process-harness.exe')",
