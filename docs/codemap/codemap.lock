@@ -1,7 +1,7 @@
 {
-  "current_commit": "b7ae6fa2879c7fdc308d4c9f9723b528cc0de8f7",
+  "current_commit": "4802d5677f3a01aefeac9a6841c38979de567a5e",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T08:27:53.248Z",
+  "generation_time": "2026-08-08T08:28:05.598Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,19 +52,14 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3865,
-  "repository_file_count": 3865,
-  "included_file_count": 2589,
-  "excluded_file_count": 1276,
+  "tracked_file_count": 3857,
+  "repository_file_count": 3857,
+  "included_file_count": 2587,
+  "excluded_file_count": 1270,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "agent_platform",
-      "backend",
-      "delivery_tooling",
-      "desktop_launcher",
-      "documentation",
-      "repository_meta"
+      "documentation"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -112,8 +107,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 124,
-      "fingerprint": "3496afffaf5f04edc7feec508878536b5fad9c5b682b21d963edb532c6e0ed51"
+      "file_count": 122,
+      "fingerprint": "346549a4c02d90e25ab57b1ca2cdb041bb093ce20b19871b9cf009726c2a9786"
     },
     {
       "id": "frontend_v2",
