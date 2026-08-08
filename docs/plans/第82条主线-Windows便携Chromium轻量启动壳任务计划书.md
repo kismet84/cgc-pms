@@ -3,7 +3,7 @@
 **Goal:** 在不改造 CGC-PMS 业务前后端、不引入 Electron/CEF/WebView2、不打包数据库或 Docker 的前提下，新增 Windows x64 轻量启动器，将固定版本便携 Chromium 作为旁载运行时，以应用模式打开现有本地 `http://127.0.0.1:5173/`，形成可复制、可校验、可回滚、用户数据隔离的本地桌面入口。 **Architecture:** 采用无第三方运行时依赖的 Win32 C++17 GUI 启动器，编译期固定应用 URL、健康检查 URL 和允许的 Chromium 参数；运行时只执行单实例检查、同源链路健康检查、专用 profile 定位、`chrome.exe --app=...` 启动、脱敏日志和退出码记录。Chromium 二进制不入 Git，通过锁定版本、来源、SHA-256 和许可证清单生成本地发行目录；继续复用 `frontend-admin-v2 → /api → Spring Boot` 权威链路，禁止扩展为桌面业务客户端、自动更新器、任意 URL 浏览器或非本地发布体系。
 
 > 编制日期：2026-08-08
-> 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`
+> 状态：`COMPLETED / G0-G5_PASSED / GIT_DELIVERED`
 > 计划编号：第82条主线候选；第81条仍是当前已规划未实施主线，本计划暂不改写 `docs/plans/README.md` 或 Backlog 事实源
 > 规划基线：`codex/mainline-81-live-e2e-code-cap@367d110e6e66dfbf3248d7b00299c98ebd526603`
 > 工作区边界：编制时已有第81条后端、测试、Backlog、Codemap、计划索引等非本任务脏改动；本计划只新增本文档
@@ -574,4 +574,4 @@ git diff --check
 - 新增后续项：`0`；
 - 关闭后续项：`0`；
 - 后续项净变化：`0`；
-- 当前裁决：`本地 G0～G5 通过；Git 交付进行中`。
+- 当前裁决：`G0～G5 通过；PR #415 已合并；master@ff9ae4c70414f924555e0c4a935a99e5b5934d22 post-merge 通过`。
