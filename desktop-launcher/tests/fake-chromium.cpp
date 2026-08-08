@@ -11,6 +11,9 @@ namespace fs = std::filesystem;
 
 constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 
+LONG gLastNormalWidth = 0;
+LONG gLastNormalHeight = 0;
+
 std::string Utf8(const std::wstring& value) {
   int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
                                  static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
@@ -22,6 +25,15 @@ std::string Utf8(const std::wstring& value) {
 }
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+  if (message == WM_WINDOWPOSCHANGED) {
+    const auto* position = reinterpret_cast<const WINDOWPOS*>(lParam);
+    const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+    if (position && (position->flags & SWP_NOSIZE) == 0 && (style & WS_MAXIMIZE) == 0 &&
+        position->cx > 0 && position->cy > 0) {
+      gLastNormalWidth = position->cx;
+      gLastNormalHeight = position->cy;
+    }
+  }
   if (message == WM_DESTROY) {
     PostQuitMessage(0);
     return 0;
@@ -60,14 +72,27 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   placement.length = sizeof(placement);
   const bool hasPlacement = GetWindowPlacement(window, &placement) != FALSE;
   RECT normal{};
-  if (initialMaximized && hasPlacement) {
-    normal = placement.rcNormalPosition;
+  if (initialMaximized && gLastNormalWidth > 0 && gLastNormalHeight > 0) {
+    normal.right = gLastNormalWidth;
+    normal.bottom = gLastNormalHeight;
+  } else if (initialMaximized && hasPlacement) {
+    normal.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
+    normal.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
   } else {
     GetWindowRect(window, &normal);
   }
   const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
   const bool maximizeSupported = (style & WS_MAXIMIZEBOX) != 0;
-  const RECT restored = hasPlacement ? placement.rcNormalPosition : normal;
+  RECT restored{};
+  if (gLastNormalWidth > 0 && gLastNormalHeight > 0) {
+    restored.right = gLastNormalWidth;
+    restored.bottom = gLastNormalHeight;
+  } else if (hasPlacement) {
+    restored.right = placement.rcNormalPosition.right - placement.rcNormalPosition.left;
+    restored.bottom = placement.rcNormalPosition.bottom - placement.rcNormalPosition.top;
+  } else {
+    restored = normal;
+  }
   const UINT dpi = GetDpiForWindow(window);
   auto logical = [dpi](LONG value) {
     return MulDiv(value, USER_DEFAULT_SCREEN_DPI, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI));
