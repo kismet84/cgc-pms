@@ -9,6 +9,8 @@
 
 namespace fs = std::filesystem;
 
+constexpr wchar_t kWindowConfiguredProperty[] = L"CGCPMS.Window.Configured";
+
 std::string Utf8(const std::wstring& value) {
   int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
                                  static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
@@ -43,7 +45,8 @@ bool WaitForFixedFrame(HWND window, DWORD timeoutMs) {
   const ULONGLONG deadline = GetTickCount64() + timeoutMs;
   do {
     PumpMessages(20);
-    if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_THICKFRAME) == 0) {
+    if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_THICKFRAME) == 0 &&
+        GetPropW(window, kWindowConfiguredProperty) != nullptr) {
       PumpMessages(200);
       return true;
     }
@@ -108,6 +111,7 @@ int wmain(int argc, wchar_t** argv) {
   UpdateWindow(window);
   const bool configured = WaitForFixedFrame(window, 10000);
   WriteWindowEvidence(directory / L"fake-window.txt", window, configured);
+  RemovePropW(window, kWindowConfiguredProperty);
   if (fs::exists(directory / L"hold.flag")) PumpMessages(8000);
   int code = 0;
   std::ifstream exitCode(directory / L"exit-code.txt");

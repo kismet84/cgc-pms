@@ -36,6 +36,7 @@ constexpr int kWindowHeight = 900;
 constexpr DWORD kWindowWaitMs = 10000;
 constexpr DWORD kWindowStabilizeMs = 750;
 #ifdef CGCPMS_CONTRACT_TEST
+constexpr wchar_t kWindowConfiguredProperty[] = L"CGCPMS.Window.Configured";
 constexpr wchar_t kMutexName[] = L"Local\\CGCPMS.Desktop.Launcher.Contract";
 constexpr wchar_t kRuntimeDir[] = L"contract-runtime";
 constexpr wchar_t kProfileDir[] = L"contract-profiles";
@@ -398,6 +399,15 @@ HWND WaitForChromiumWindow(DWORD pid, HANDLE process) {
   return nullptr;
 }
 
+bool CompleteWindowConfiguration(HWND window, bool configured) {
+  if (!configured) return false;
+#ifdef CGCPMS_CONTRACT_TEST
+  return SetPropW(window, kWindowConfiguredProperty, reinterpret_cast<HANDLE>(1)) != FALSE;
+#else
+  return true;
+#endif
+}
+
 bool ConfigureChromiumWindow(DWORD pid, HANDLE process) {
   HWND window = WaitForChromiumWindow(pid, process);
   if (!window) return false;
@@ -436,12 +446,14 @@ bool ConfigureChromiumWindow(DWORD pid, HANDLE process) {
       return false;
     }
     ShowWindow(window, SW_MAXIMIZE);
-    return IsZoomed(window) != FALSE;
+    return CompleteWindowConfiguration(window, IsZoomed(window) != FALSE);
   }
 
   ShowWindow(window, SW_RESTORE);
-  return SetWindowPos(window, nullptr, left, top, width, height,
-                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
+  const bool configured = SetWindowPos(
+                              window, nullptr, left, top, width, height,
+                              SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW) != FALSE;
+  return CompleteWindowConfiguration(window, configured);
 }
 
 int RunLauncher(int argc) {
