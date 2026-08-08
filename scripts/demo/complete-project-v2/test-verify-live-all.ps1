@@ -38,6 +38,10 @@ if (-not $source.Contains("[string]`$FrontendUrl = 'http://127.0.0.1:4173'", [St
     -or -not $source.Contains("@(`$viteEntry, '--host'", [StringComparison]::Ordinal)) {
     throw 'LIVE_EVIDENCE_ISOLATED_FRONTEND_CONTRACT_INVALID'
 }
+if (-not $source.Contains("node_modules/@playwright/test/cli.js", [StringComparison]::Ordinal) `
+    -or $source.Contains('& pnpm exec playwright', [StringComparison]::Ordinal)) {
+    throw 'LIVE_EVIDENCE_PLAYWRIGHT_CLI_CONTRACT_INVALID'
+}
 if ([regex]::Matches($source, "V2_LIVE_[A-Z]+ = '1'").Count -ne 9) {
     throw 'LIVE_EVIDENCE_FLAG_COUNT_INVALID'
 }

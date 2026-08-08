@@ -370,6 +370,10 @@ function Invoke-LiveEvidence {
     $jsonReport = Join-Path $evidenceRoot 'playwright.json'
     $playwrightOutput = Join-Path $evidenceRoot 'artifacts'
     $visualOutput = Join-Path $evidenceRoot 'visual'
+    $playwrightCli = Join-Path $frontendRoot 'node_modules/@playwright/test/cli.js'
+    if (-not (Test-Path -LiteralPath $playwrightCli -PathType Leaf)) {
+        throw 'LIVE_EVIDENCE_PLAYWRIGHT_UNAVAILABLE'
+    }
 
     $environmentValues = [ordered]@{
         V2_LIVE_AUTH = '1'
@@ -402,7 +406,7 @@ function Invoke-LiveEvidence {
     Push-Location $frontendRoot
     try {
         $specArguments = @($liveSpecs | ForEach-Object { "e2e/$_" })
-        & pnpm exec playwright test --workers $Workers --max-failures 1 --reporter=json @specArguments
+        & node $playwrightCli test --workers $Workers --max-failures 1 --reporter=json @specArguments
         $exitCode = $LASTEXITCODE
     } finally {
         Pop-Location
