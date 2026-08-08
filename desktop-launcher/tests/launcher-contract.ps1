@@ -18,6 +18,8 @@ $logRoot = Join-Path $dataRoot 'contract-logs'
 $modePath = Join-Path $contractRoot 'health-mode.txt'
 $readyPath = Join-Path $contractRoot 'health-ready.txt'
 $serverScript = Join-Path $PSScriptRoot 'health-server.mjs'
+$processHarness = Join-Path $contractRoot 'process-harness.exe'
+$harnessPidPath = Join-Path $contractRoot 'harness-child-pid.txt'
 
 function Assert-Equal($Expected, $Actual, [string]$Message) {
   if ($Expected -ne $Actual) { throw "$Message expected=$Expected actual=$Actual" }
@@ -59,10 +61,22 @@ function Wait-For([scriptblock]$Condition, [string]$Message, [int]$TimeoutSecond
   throw $Message
 }
 
+function Start-LauncherProcess([string[]]$Arguments = @()) {
+  $start = [Diagnostics.ProcessStartInfo]::new()
+  $start.FileName = $processHarness
+  $start.UseShellExecute = $false
+  $start.CreateNoWindow = $true
+  [void]$start.ArgumentList.Add($launcher)
+  foreach ($argument in $Arguments) { [void]$start.ArgumentList.Add($argument) }
+  $process = [Diagnostics.Process]::new()
+  $process.StartInfo = $start
+  if (!$process.Start()) { throw 'Launcher process did not start.' }
+  return $process
+}
+
 function Invoke-Launcher([string[]]$Arguments = @()) {
-  $options = @{ FilePath = $launcher; PassThru = $true; Wait = $true; WindowStyle = 'Hidden' }
-  if ($Arguments.Count -gt 0) { $options.ArgumentList = $Arguments }
-  $process = Start-Process @options
+  $process = Start-LauncherProcess $Arguments
+  $process.WaitForExit()
   return $process.ExitCode
 }
 
@@ -119,7 +133,7 @@ try {
   Assert-True (Test-Path -LiteralPath (Join-Path $logRoot 'launcher.log.1')) 'Log rotation did not retain prior log.'
 
   Set-Content -LiteralPath (Join-Path $evidenceRoot 'hold.flag') -Value 'hold' -NoNewline -Encoding ascii
-  $first = Start-Process -FilePath $launcher -PassThru -WindowStyle Hidden
+  $first = Start-LauncherProcess
   Wait-For { Test-Path -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') } 'Fake browser did not start.'
   for ($i = 0; $i -lt 9; $i++) { Assert-Equal 20 (Invoke-Launcher) "Duplicate launch $($i + 2) must be rejected." }
   if (!$first.WaitForExit(12000)) { throw 'Primary launcher did not exit after fake browser hold.' }
@@ -128,10 +142,14 @@ try {
 
   Set-Content -LiteralPath (Join-Path $evidenceRoot 'hold.flag') -Value 'hold' -NoNewline -Encoding ascii
   Remove-Item -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') -Force -ErrorAction SilentlyContinue
-  $orphanLauncher = Start-Process -FilePath $launcher -PassThru -WindowStyle Hidden
+  Remove-Item -LiteralPath $harnessPidPath -Force -ErrorAction SilentlyContinue
+  $env:CGCPMS_PROCESS_HARNESS_PID_FILE = $harnessPidPath
+  try { $orphanLauncher = Start-LauncherProcess } finally { Remove-Item Env:CGCPMS_PROCESS_HARNESS_PID_FILE -ErrorAction SilentlyContinue }
+  Wait-For { Test-Path -LiteralPath $harnessPidPath } 'Harness did not record launcher child PID.'
   Wait-For { Test-Path -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt') } 'Orphan fixture browser did not start.'
   $fakePid = [int](Get-Content -Raw -LiteralPath (Join-Path $evidenceRoot 'fake-pid.txt'))
-  Stop-Process -Id $orphanLauncher.Id -Force
+  $launcherPid = [int](Get-Content -Raw -LiteralPath $harnessPidPath)
+  Stop-Process -Id $launcherPid -Force
   $orphanLauncher.WaitForExit()
   Assert-Equal 21 (Invoke-Launcher) 'Live orphan browser must prevent duplicate profile launch.'
   Stop-Process -Id $fakePid -Force
