@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, streamTest, test } from './live-test'
 
 const runLiveShell = process.env.V2_LIVE_SHELL === '1'
 
@@ -84,4 +84,48 @@ test.describe('V2 live application shell', () => {
       ),
     ).toEqual([])
   })
+})
+
+streamTest('opens and closes the real notification and communication streams', async ({ page }) => {
+  streamTest.skip(!runLiveShell, 'Set V2_LIVE_SHELL=1 only against the local test/demo runtime')
+  expect((await page.request.get('/api/auth/dev-login?username=admin')).ok()).toBe(true)
+  await page.route('**/__live-stream-probe', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<!doctype html><title>Live stream probe</title>',
+    }),
+  )
+  await page.goto('/__live-stream-probe')
+
+  const connected = await page.evaluate(async () => {
+    const paths = ['/api/notifications/stream', '/api/communications/stream']
+    return Promise.all(
+      paths.map(
+        (path, index) =>
+          new Promise<string>((resolve, reject) => {
+            const source = new EventSource(`${path}?clientId=cgc-pms-live-probe-${index}`)
+            const timeout = window.setTimeout(() => {
+              source.close()
+              reject(new Error(`LIVE_STREAM_CONNECT_TIMEOUT:${path}`))
+            }, 5_000)
+            source.addEventListener(
+              'connected',
+              () => {
+                window.clearTimeout(timeout)
+                source.close()
+                resolve(path)
+              },
+              { once: true },
+            )
+            source.onerror = () => {
+              window.clearTimeout(timeout)
+              source.close()
+              reject(new Error(`LIVE_STREAM_CONNECT_FAILED:${path}`))
+            }
+          }),
+      ),
+    )
+  })
+
+  expect(connected).toEqual(['/api/notifications/stream', '/api/communications/stream'])
 })

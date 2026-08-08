@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveProjects = process.env.V2_LIVE_PROJECTS === '1'
@@ -60,25 +61,20 @@ test.describe('M3 live project object', () => {
       })
 
     await page.goto('/project/list')
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     const detailResponse = page.waitForResponse(
       (response) => new URL(response.url()).pathname === `/api/projects/${projectId}`,
     )
-    await page.locator('#global-project').click()
-    await page
-      .locator('#global-project')
-      .locator('..')
-      .locator(`[role="option"][data-value="${projectId}"]`)
-      .click()
+    await page.locator('#global-project').selectOption(projectId)
     expect((await detailResponse).ok()).toBe(true)
     await expect(page.locator('.project-page__table tbody tr')).toHaveCount(1)
 
     await page.goto(`/project/${projectId}/overview`)
     await expect(page.locator('.app-shell__object-context')).toHaveCount(0)
     await expect(page.getByText(`对象 project / ${projectId}`)).toHaveCount(0)
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     await expect(page.getByText('当前项目（当前页面不适用）')).toHaveCount(0)
   })
 
@@ -134,7 +130,7 @@ test.describe('M3 live project object', () => {
   })
 
   test('real query-only identity cannot see writes or member route', async ({ page }) => {
-    await login(page, 'demo.business')
+    await login(page, 'demo.schedule.query')
     await page.goto('/project/list')
     await expect(page.getByRole('button', { name: '新建项目' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /删除|归档|提交/ })).toHaveCount(0)
@@ -145,7 +141,7 @@ test.describe('M3 live project object', () => {
   test('real member-readonly identity can read but cannot mutate members', async ({ page }) => {
     await login(page, 'demo.member-readonly')
     await page.goto('/project/520000000000009002/members')
-    await expect(page.getByRole('heading', { name: '项目成员' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '项目成员', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /添加成员|编辑|移除/ })).toHaveCount(0)
     const denied = await page.evaluate(async () => {
       const csrf = document.cookie

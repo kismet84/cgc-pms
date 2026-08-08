@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
 import com.baomidou.mybatisplus.core.toolkit.support.LambdaMeta;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.common.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,7 @@ import java.util.List;
 public class CodeGenerationService {
 
     private static final int SEQ_LENGTH = 3;
+    private static final int MAX_SEQUENCE = 999;
 
     // ---------------------------------------------------------------------
     // 重载 1：Lambda 引用（SFunction） —— 类型安全，推荐使用
@@ -239,60 +241,73 @@ public class CodeGenerationService {
     }
 
     private String parseSeqFromLastCode(String lastCode, String fullPrefix, int offset) {
-        if (lastCode == null) {
-            return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", 1 + offset);
-        }
-
-        int seq = 1 + offset;
-        if (lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
-            try {
-                seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("解析编码序列号失败: {}", lastCode, e);
-            }
-        }
-        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
+        long sequence = lastCode == null
+                ? 1L + offset
+                : parseExistingSequence(lastCode, fullPrefix) + 1L + offset;
+        return formatAndValidateSequence(fullPrefix, sequence);
     }
 
     private String parseSeqFromLastCode(String lastCode, String fullPrefix) {
-        if (lastCode == null) {
-            return fullPrefix + "001";
-        }
-
-        int seq = 1;
-        if (lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
-            try {
-                seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("解析编码序列号失败: {}", lastCode, e);
-            }
-        }
-        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
+        return parseSeqFromLastCode(lastCode, fullPrefix, 0);
     }
 
     private <T> String parseSeq(List<T> records,
                                 String fullPrefix,
                                 SFunction<T, String> codeGetter,
                                 int offset) {
-        int seq = 1 + offset;
-        if (!records.isEmpty()) {
-            T last = records.get(0);
-            String lastCode = codeGetter.apply(last);
-            if (lastCode != null && lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
-                try {
-                    seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1 + offset;
-                } catch (NumberFormatException e) {
-                    log.warn("解析编码序列号失败: {}", lastCode, e);
-                }
-            }
-        }
-        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
+        String lastCode = records.isEmpty() ? null : codeGetter.apply(records.get(0));
+        return parseSeqFromLastCode(lastCode, fullPrefix, offset);
     }
 
     private <T> String parseSeq(List<T> records,
                                 String fullPrefix,
                                 SFunction<T, String> codeGetter) {
         return parseSeq(records, fullPrefix, codeGetter, 0);
+    }
+
+    private int parseExistingSequence(String code, String fullPrefix) {
+        if (!code.startsWith(fullPrefix)) {
+            throw invalidSequence(code);
+        }
+        String suffix = code.substring(fullPrefix.length());
+        if (suffix.isEmpty() || suffix.chars().anyMatch(value -> value < '0' || value > '9')) {
+            throw invalidSequence(code);
+        }
+        long sequence;
+        try {
+            sequence = Long.parseLong(suffix);
+        } catch (NumberFormatException e) {
+            throw invalidSequence(code);
+        }
+        if (sequence > MAX_SEQUENCE) {
+            throw exhaustedSequence();
+        }
+        if (suffix.length() != SEQ_LENGTH || sequence < 1) {
+            throw invalidSequence(code);
+        }
+        return (int) sequence;
+    }
+
+    private String formatAndValidateSequence(String fullPrefix, long sequence) {
+        if (sequence > MAX_SEQUENCE) {
+            throw exhaustedSequence();
+        }
+        if (sequence < 1) {
+            throw invalidSequence(fullPrefix + sequence);
+        }
+        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", sequence);
+    }
+
+    private BusinessException exhaustedSequence() {
+        return new BusinessException(
+                "BUSINESS_CODE_SEQUENCE_EXHAUSTED",
+                "当日业务编号已超过999条，请联系管理员");
+    }
+
+    private BusinessException invalidSequence(String code) {
+        return new BusinessException(
+                "BUSINESS_CODE_SEQUENCE_INVALID",
+                "历史业务编号格式无效，无法安全生成下一编号: " + code);
     }
 
     // ---------------------------------------------------------------------

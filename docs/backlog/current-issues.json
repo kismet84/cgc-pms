@@ -1,8 +1,25 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-07T14:15:50+08:00",
+  "updatedAt": "2026-08-08T14:13:13+08:00",
   "issues": [
+    {
+      "issueKey": "ISSUE-081-001",
+      "title": "本地Live E2E证据闭环与通用编号容量保护",
+      "status": "IN_PROGRESS",
+      "classification": "CONFIRMED_AUDIT_REMEDIATION",
+      "priority": "P2",
+      "blocking": false,
+      "summary": "公共编号、六Mapper、live安全门、pre-push分类和SSE回归均已整改；独立复核确认原dirty HEAD摘要不构成最终证据，当前仅待在干净任务提交SHA上复跑9/9 live并持久化摘要。",
+      "acceptanceCriteria": "干净任务提交SHA下统一入口在loopback专用demo库精确执行9/9 live spec且0 skipped/unexpected/flaky，持久摘要绑定该SHA；公共编号限定ASCII 001..999，六Mapper软删除/legacy1000/租户隔离、MySQL并发及BFCache回归通过。",
+      "deferReason": "实现与非live验证已通过；必须先建立任务提交SHA，再执行最终live证据，不能以dirty基线HEAD冒充。",
+      "sourceRefs": [
+        "docs/plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md",
+        "docs/quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md",
+        "scripts/demo/complete-project-v2/verify-live-all.ps1",
+        "backend/src/main/java/com/cgcpms/common/util/CodeGenerationService.java"
+      ]
+    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-08-08 主线81：本地 Live E2E 证据闭环与通用编号容量保护精确SHA复验中
+
+- 问题源：`ISSUE-081-001`实施中；状态 `IMPLEMENTED / G0-G3_PASSED / G4_EXACT_SHA_LIVE_PENDING / G5_PENDING`。
+- 目标链：`liveSpecs显式清单 → 本地安全前置 → 专用demo库 → 9组真实运行态E2E → 当前SHA证据`；`6个业务调用方 → CodeGenerationService → 001..999公共容量守卫 → 耗尽fail-closed`。
+- 最小方案：复用 complete-project-v2、现有 contract CI、Playwright 分组和 `BUSINESS_CODE_SEQUENCE_EXHAUSTED`；不建 required live CI、生产流程、序列表、编号扩位或 migration。
+- 审计边界：`CGC-AUD-20260808-001`部分成立，`CGC-AUD-20260808-002`成立；报告中的生产阻塞结论不适用。
+- 证据：27组contract共98项、后端相关107项、真实MySQL 5项、前端502项通过；独立复核7项已整改，干净任务SHA的9组live证据待复跑；[`质量报告`](../quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md)。
+- 计划：[`第81条主线`](../plans/第81条主线-本地Live-E2E证据闭环与通用编号容量保护任务计划书.md)；精确SHA live通过后进入受保护Git交付。
+
 ## 2026-08-07 主线79：单据渲染一致性与交付状态校准已合并
 
 - 问题源：`ISSUE-079-001`已关闭；状态 `IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`。

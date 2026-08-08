@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-07T16:39:02.506Z",
-  "generated_from_commit": "5504fc8faeadc39f58a15211659bf8203a2ad726",
+  "generated_at": "2026-08-08T06:00:02.525Z",
+  "generated_from_commit": "367d110e6e66dfbf3248d7b00299c98ebd526603",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",
@@ -986,6 +986,138 @@
       ]
     },
     {
+      "id": "local-live-e2e",
+      "label": "本地 Live E2E 证据编排",
+      "type": "delivery",
+      "boundary": "本地 dev/test/demo",
+      "layer": 6,
+      "path": "scripts/demo/complete-project-v2",
+      "role": "以完整项目演示数据包和显式 liveSpecs 清单编排9组真实前后端验收；只允许 loopback 专用 demo 数据库。",
+      "entrypoints": [
+        {
+          "path": "scripts/demo/complete-project-v2/verify-m3-live.ps1",
+          "symbol": "5组M3 live兼容入口"
+        },
+        {
+          "path": "frontend-admin-v2/scripts/e2e-spec-groups.mjs",
+          "symbol": "liveSpecs"
+        }
+      ],
+      "tests": [
+        {
+          "path": "frontend-admin-v2/tests/unit/global-context-contract.test.ts",
+          "symbol": "locks the global standard and executable browser gate"
+        },
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "e2e"
+        }
+      ],
+      "constraints": [
+        "9组 live 不进入 GitHub required CI，不得被 browser contract 结果替代。",
+        "任何数据加载前必须证明 loopback、reset marker、专用 cgc_pms_demo_v2、实际 backend 数据源、健康检查和测试身份。",
+        "live 证据必须绑定当前 HEAD，且0 skipped、0 unexpected、0 flaky。"
+      ],
+      "evidence": [
+        {
+          "path": "scripts/demo/complete-project-v2/load.ps1",
+          "symbol": "ALLOW_TEST_DATA_RESET"
+        },
+        {
+          "path": "scripts/demo/complete-project-v2/verify.ps1",
+          "symbol": "完整演示数据守恒校验"
+        },
+        {
+          "path": "frontend-admin-v2/scripts/e2e-spec-groups.mjs",
+          "symbol": "liveSpecs"
+        }
+      ]
+    },
+    {
+      "id": "business-code-generation",
+      "label": "通用三位日序业务编号",
+      "type": "shared-service",
+      "boundary": "后端业务域",
+      "layer": 4,
+      "path": "backend/src/main/java/com/cgcpms/common/util/CodeGenerationService.java",
+      "role": "为投标成本、合同收入、单据模板、项目预算、合同和付款记录生成同租户同日前缀的001..999编号。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/revenue/service/ContractRevenueService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/service/DocumentTemplateService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/budget/service/ProjectBudgetService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/common/util/BusinessCodeGeneratorTest.java",
+          "symbol": "throwsBusinessErrorWhenDailySequenceIsExhausted"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java",
+          "symbol": "class BidCostServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/revenue/ContractRevenueServiceTest.java",
+          "symbol": "class ContractRevenueServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/document/DocumentTemplateServiceIntegrationTest.java",
+          "symbol": "class DocumentTemplateServiceIntegrationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/budget/ProjectBudgetIntegrationTest.java",
+          "symbol": "class ProjectBudgetIntegrationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/contract/CtContractServiceTest.java",
+          "symbol": "class CtContractServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/payment/PayRecordCashJournalIntegrationTest.java",
+          "symbol": "class PayRecordCashJournalIntegrationTest"
+        }
+      ],
+      "constraints": [
+        "编号格式固定为{PREFIX}-{yyyyMMdd}-{3位序号}，序号只允许1..999。",
+        "软删除历史号继续占号；非法历史号和容量耗尽必须 fail-closed。",
+        "各业务域保留既有租户锁、唯一约束和 DuplicateKeyException 重试边界。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/util/CodeGenerationService.java",
+          "symbol": "nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/util/DeletedCodeSource.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/util/BusinessCodeGenerator.java",
+          "symbol": "BUSINESS_CODE_SEQUENCE_EXHAUSTED"
+        }
+      ]
+    },
+    {
       "id": "ci-verification",
       "label": "CI 验证",
       "type": "delivery",
@@ -1761,6 +1893,117 @@
           "symbol": "design_schema"
         }
       ]
+    },
+    {
+      "from": "local-live-e2e",
+      "to": "v2-client",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/scripts/e2e-spec-groups.mjs",
+          "symbol": "liveSpecs"
+        }
+      ]
+    },
+    {
+      "from": "local-live-e2e",
+      "to": "spring-api",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "scripts/demo/complete-project-v2/verify-m3-live.ps1",
+          "symbol": "PLAYWRIGHT_BASE_URL"
+        }
+      ]
+    },
+    {
+      "from": "local-live-e2e",
+      "to": "mysql-flyway",
+      "type": "reads-writes",
+      "evidence": [
+        {
+          "path": "scripts/demo/complete-project-v2/load.ps1",
+          "symbol": "START TRANSACTION"
+        },
+        {
+          "path": "scripts/demo/complete-project-v2/verify.ps1",
+          "symbol": "verifySql"
+        }
+      ]
+    },
+    {
+      "from": "pre-push-quality-gate",
+      "to": "local-live-e2e",
+      "type": "requires-separate-proof",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/scripts/run-push-quality-gate.mjs",
+          "symbol": "test:e2e:contract"
+        }
+      ]
+    },
+    {
+      "from": "bid-project-scope",
+      "to": "business-code-generation",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "project-contract-cost",
+      "to": "business-code-generation",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/revenue/service/ContractRevenueService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/budget/service/ProjectBudgetService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "document-template-platform",
+      "to": "business-code-generation",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/service/DocumentTemplateService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "finance-accounting",
+      "to": "business-code-generation",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "business-code-generation",
+      "to": "mysql-flyway",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/util/DeletedCodeSource.java",
+          "symbol": "selectLastCodeByPrefix"
+        }
+      ]
     }
   ],
   "flows": [
@@ -1960,6 +2203,34 @@
         "mysql-flyway"
       ],
       "outcome": "既有职责分离、乐观锁、附件证据和状态机形成可审计关闭链。"
+    },
+    {
+      "id": "local-live-evidence",
+      "name": "本地 Live E2E 证据闭环",
+      "trigger": "开发者在loopback专用demo库验证9组真实业务链",
+      "steps": [
+        "local-live-e2e",
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api",
+        "mysql-flyway"
+      ],
+      "outcome": "完整演示数据、真实API、权限和状态机形成绑定当前HEAD的9/9本地证据。"
+    },
+    {
+      "id": "shared-business-code-generation",
+      "name": "六业务域通用编号生成",
+      "trigger": "投标、收入、模板、预算、合同或付款新增记录",
+      "steps": [
+        "bid-project-scope",
+        "project-contract-cost",
+        "document-template-platform",
+        "finance-accounting",
+        "business-code-generation",
+        "mysql-flyway"
+      ],
+      "outcome": "同租户同日前缀只生成001..999；软删除占号，非法历史号和容量耗尽统一失败。"
     }
   ]
 }

@@ -13,8 +13,7 @@ function resolveClientId(): string {
   const existing = sessionStorage.getItem(CLIENT_ID_KEY)
   const documentId = String(performance.timeOrigin)
   const navigation = performance.getEntriesByType('navigation')[0] as
-    | PerformanceNavigationTiming
-    | undefined
+    PerformanceNavigationTiming | undefined
   const sameDocument = sessionStorage.getItem(CLIENT_DOCUMENT_KEY) === documentId
   const reloadedDocument = navigation?.type === 'reload' || navigation?.type === 'back_forward'
   if (existing && CLIENT_ID_PATTERN.test(existing) && (sameDocument || reloadedDocument)) {
@@ -53,5 +52,17 @@ export function openResilientStream<T>(
   source.onopen = onOpen
   source.onerror = () => onError?.() // Native EventSource reconnects while source remains open.
   for (const name of eventNames) source.addEventListener(name, receive as EventListener)
-  return { close: () => source.close() }
+  let closed = false
+  const closeOnPageHide = (event: PageTransitionEvent) => {
+    if (event.persisted) return
+    close()
+  }
+  const close = () => {
+    if (closed) return
+    closed = true
+    window.removeEventListener('pagehide', closeOnPageHide)
+    source.close()
+  }
+  window.addEventListener('pagehide', closeOnPageHide)
+  return { close }
 }

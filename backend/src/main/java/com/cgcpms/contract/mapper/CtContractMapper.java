@@ -22,6 +22,9 @@ public interface CtContractMapper extends BaseMapper<CtContract>, DeletedCodeSou
     /**
      * 查询最新合同编号（含软删除记录，避免编号冲突）
      */
-    @Select("SELECT contract_code FROM ct_contract WHERE contract_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY contract_code DESC LIMIT 1")
+    @Override
+    @Select("SELECT contract_code FROM ct_contract WHERE contract_code LIKE CONCAT(#{prefix}, '%') "
+            + "AND tenant_id = #{tenantId} "
+            + "ORDER BY CHAR_LENGTH(contract_code) DESC, contract_code DESC LIMIT 1")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 }

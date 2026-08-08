@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { type Page } from '@playwright/test'
+import { expect, test } from './live-test'
 import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveCloseout = process.env.V2_LIVE_CLOSEOUT === '1'
@@ -68,14 +69,14 @@ test.describe('M3 live project closeout workspace', () => {
     expect(mutations).toEqual([])
   })
 
-  for (const [username, action, projectId] of [
+  for (const [username, action, projectId, actionMenu] of [
     ['demo.closeout.initiate', '发起收尾', '520000000000009003'],
     ['demo.closeout.section', '登记分项验收', '520000000000009002'],
     ['demo.closeout.acceptance', '登记竣工验收', '520000000000009001'],
     ['demo.closeout.settlement', '绑定最终结算', '520000000000009004'],
     ['demo.closeout.collection', '核验尾款回收', '520000000000009005'],
     ['demo.closeout.warranty', '登记质保责任', '520000000000009006'],
-    ['demo.closeout.defect', '登记缺陷', '520000000000009008'],
+    ['demo.closeout.defect', '登记缺陷', '520000000000009008', 'M53-WARRANTY-DEFECT更多操作'],
     ['demo.closeout.defect-verify', '复验缺陷', '520000000000009008'],
     ['demo.closeout.archive', '登记档案移交', '520000000000009007'],
     ['demo.closeout.close', '关闭项目', '520000000000009010'],
@@ -83,6 +84,7 @@ test.describe('M3 live project closeout workspace', () => {
     test(`${username} exposes its authorized stage action`, async ({ page }) => {
       await login(page, username)
       await openCloseout(page, projectId)
+      if (actionMenu) await page.locator(`summary[aria-label="${actionMenu}"]`).click()
       await expect(page.getByRole('button', { name: action, exact: true }).first()).toBeVisible()
     })
   }

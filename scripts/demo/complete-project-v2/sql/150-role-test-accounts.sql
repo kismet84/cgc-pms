@@ -23,6 +23,42 @@ VALUES
 ON DUPLICATE KEY UPDATE
   real_name=VALUES(real_name),email=VALUES(email),org_id=VALUES(org_id),status='ENABLE',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
+-- AppShell dev-only role switcher accounts. Keep all visible options executable on a clean demo load.
+INSERT INTO sys_user
+  (id,tenant_id,username,password,real_name,phone,email,org_id,avatar,status,is_admin,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000008701,0,'ui26.pm01',@demo_password_hash,'周明远',NULL,'ui26.pm01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008702,0,'ui26.bm01',@demo_password_hash,'陈思远',NULL,'ui26.bm01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008703,0,'ui26.cost01',@demo_password_hash,'许承泽',NULL,'ui26.cost01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008704,0,'ui26.pur01',@demo_password_hash,'何俊峰',NULL,'ui26.pur01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008705,0,'ui26.prod01',@demo_password_hash,'郑宏达',NULL,'ui26.prod01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008706,0,'ui26.chief01',@demo_password_hash,'徐正凯',NULL,'ui26.chief01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008707,0,'ui26.fin01',@demo_password_hash,'沈佳宁',NULL,'ui26.fin01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008708,0,'ui26.mgmt01',@demo_password_hash,'叶宗岳',NULL,'ui26.mgmt01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008709,0,'ui26.staff01',@demo_password_hash,'陈安琪',NULL,'ui26.staff01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008710,0,'ui26.gm01',@demo_password_hash,'顾景航',NULL,'ui26.gm01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号'),
+  (520000000000008711,0,'ui26.mat01',@demo_password_hash,'赵启航',NULL,'ui26.mat01@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'本地演示角色切换账号')
+ON DUPLICATE KEY UPDATE
+  real_name=VALUES(real_name),password=VALUES(password),email=VALUES(email),org_id=VALUES(org_id),status='ENABLE',
+  updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
+VALUES
+  (520000000000008720,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.pm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROJECT_MANAGER' AND deleted_flag=0)),
+  (520000000000008721,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.bm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMMERCIAL_MANAGER' AND deleted_flag=0)),
+  (520000000000008722,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.bm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='DEPARTMENT_MANAGER' AND deleted_flag=0)),
+  (520000000000008723,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.cost01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COST_MANAGER' AND deleted_flag=0)),
+  (520000000000008724,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.pur01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PURCHASE_MANAGER' AND deleted_flag=0)),
+  (520000000000008725,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.prod01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PRODUCTION_MANAGER' AND deleted_flag=0)),
+  (520000000000008726,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.chief01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='CHIEF_ENGINEER' AND deleted_flag=0)),
+  (520000000000008727,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.fin01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='FINANCE' AND deleted_flag=0)),
+  (520000000000008728,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.mgmt01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='MANAGEMENT' AND deleted_flag=0)),
+  (520000000000008729,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.mgmt01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='MANAGEMENT_EXECUTIVE' AND deleted_flag=0)),
+  (520000000000008730,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.staff01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMMON_USER' AND deleted_flag=0)),
+  (520000000000008731,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.gm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='GENERAL_MANAGER' AND deleted_flag=0)),
+  (520000000000008732,0,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.mat01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='MATERIAL_CLERK' AND deleted_flag=0))
+ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),role_id=VALUES(role_id);
+
 INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
 VALUES
   (520000000000008612,0,520000000000008602,4),

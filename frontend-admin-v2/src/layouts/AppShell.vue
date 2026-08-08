@@ -1357,6 +1357,10 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
     display: block;
   }
 
+  .app-shell__main {
+    height: 100%;
+  }
+
   .app-shell__sidebar {
     position: fixed;
     z-index: var(--v2-z-dropdown);

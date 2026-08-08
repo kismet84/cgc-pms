@@ -118,4 +118,7 @@ INSERT INTO sys_user_preference
   (id,tenant_id,user_id,preferences,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
   (520000000000007531,0,@demo_user,JSON_OBJECT('notificationEnabled',true,'theme','light','sidebarCollapsed',false,'tableDensity','middle'),
-   @demo_user,NOW(),@demo_user,NOW(),0,'系统设置表单完整样本');
+   @demo_user,NOW(),@demo_user,NOW(),0,'系统设置表单完整样本')
+ON DUPLICATE KEY UPDATE
+  preferences=VALUES(preferences),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),
+  deleted_flag=0,remark=VALUES(remark);

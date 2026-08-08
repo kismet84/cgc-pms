@@ -34,7 +34,7 @@ UNION ALL SELECT 'settlement',COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND
 UNION ALL SELECT 'settlement_contract_item',COUNT(*) FROM ct_contract_item WHERE tenant_id=0 AND id=520000000000002103 AND contract_id=520000000000000703 AND deleted_flag=0
 UNION ALL SELECT 'settlement_measure_source',COUNT(*) FROM sub_measure_item WHERE tenant_id=0 AND id=520000000000002102 AND contract_item_id=520000000000002103 AND deleted_flag=0
 UNION ALL SELECT 'settlement_item_source',COUNT(*) FROM stl_settlement_item WHERE tenant_id=0 AND id=520000000000002202 AND source_type='CT_CONTRACT' AND source_id=520000000000002103 AND amount=200000 AND deleted_flag=0
-UNION ALL SELECT 'settlement_action_permission',COUNT(*) FROM sys_menu WHERE tenant_id=0 AND perms IN ('settlement:add','settlement:edit','settlement:delete') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'settlement_action_permission',COUNT(DISTINCT perms) FROM sys_menu WHERE tenant_id=0 AND perms IN ('settlement:add','settlement:edit','settlement:delete') AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'settlement_commercial_permission',COUNT(DISTINCT m.perms) FROM sys_role_menu rm JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id WHERE rm.tenant_id=0 AND rm.role_id=4 AND m.perms IN ('settlement:query','settlement:add','settlement:edit','settlement:delete','settlement:submit') AND m.deleted_flag=0
 UNION ALL SELECT 'settlement_draft_candidate',COUNT(*) FROM ct_contract c JOIN ct_contract_item ci ON ci.contract_id=c.id AND ci.deleted_flag=0 JOIN sub_measure sm ON sm.contract_id=c.id AND sm.approval_status='APPROVED' AND sm.deleted_flag=0 JOIN sub_measure_item smi ON smi.measure_id=sm.id AND smi.contract_item_id=ci.id AND smi.deleted_flag=0 LEFT JOIN stl_settlement st ON st.contract_id=c.id AND st.deleted_flag=0 WHERE c.tenant_id=0 AND c.id=520000000000014201 AND c.deleted_flag=0 AND st.id IS NULL
 UNION ALL SELECT 'settlement_workflow_approver_invalid',COUNT(*) FROM wf_template t JOIN wf_template_node n ON n.template_id=t.id AND n.tenant_id=t.tenant_id LEFT JOIN sys_user u ON u.tenant_id=t.tenant_id AND u.id=CAST(JSON_UNQUOTE(JSON_EXTRACT(n.approver_config,'$.userId')) AS UNSIGNED) AND u.status='ENABLE' AND u.deleted_flag=0 WHERE t.tenant_id=0 AND t.business_type='SETTLEMENT' AND t.enabled=1 AND t.deleted_flag=0 AND n.deleted_flag=0 AND u.id IS NULL
@@ -98,6 +98,8 @@ UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE t
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'ui_role_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01','ui26.mgmt01','ui26.staff01','ui26.gm01','ui26.mat01') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'ui_role_account_roles',COUNT(DISTINCT u.username) FROM sys_user u JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id WHERE u.tenant_id=0 AND u.username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01','ui26.mgmt01','ui26.staff01','ui26.gm01','ui26.mat01') AND u.status='ENABLE' AND u.deleted_flag=0 AND r.status='ENABLE' AND r.deleted_flag=0
 UNION ALL SELECT 'project_manager_contract_query',COUNT(*) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
@@ -631,7 +633,8 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 23 -and $metrics.unexpected_project_seed_files -eq 0 `
     -and $metrics.settlement_action_permission -eq 3 -and $metrics.settlement_commercial_permission -eq 5 `
     -and $metrics.settlement_workflow_approver_invalid -eq 0 `
-    -and $metrics.role_test_account -eq 8 -and $metrics.project_manager_contract_query -eq 1 `
+    -and $metrics.role_test_account -eq 8 -and $metrics.ui_role_account -eq 11 -and $metrics.ui_role_account_roles -eq 11 `
+    -and $metrics.project_manager_contract_query -eq 1 `
     -and $metrics.project_manager_variation_permissions -eq 9 -and $metrics.business_variation_bid_permissions -eq 14 `
     -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.cost_manager_cost_target_permissions -eq 6 `
     -and $metrics.project_manager_cost_summary_permissions -eq 2 -and $metrics.cost_manager_cost_summary_permissions -eq 2 `
@@ -653,8 +656,8 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.risk_level_purchase_order -eq 1 -and $metrics.risk_level_measures -eq 4 `
     -and $metrics.risk_level_tech_items -eq 2 -and $metrics.risk_level_finance_records -eq 4 `
     -and $metrics.risk_level_alert_severities -eq 4 -and $metrics.role_quality_safety_alert -eq 1 `
-    -and $metrics.cost_breakdown_rows -eq 5 -and $metrics.cost_breakdown_roots -eq 1 `
-    -and $metrics.cost_breakdown_children -eq 4 -and $metrics.cost_breakdown_permission -eq 1 `
+    -and $metrics.cost_breakdown_rows -eq 4 -and $metrics.cost_breakdown_roots -eq 1 `
+    -and $metrics.cost_breakdown_children -eq 3 -and $metrics.cost_breakdown_permission -eq 1 `
     -and $metrics.cost_breakdown_target_delta -eq 0 -and $metrics.cost_breakdown_actual_delta -eq 0 `
     -and $metrics.cost_breakdown_dynamic_delta -eq 0 -and $metrics.cost_breakdown_deviation_delta -eq 0 `
     -and $metrics.role_workflow_status_instances -eq 40 -and $metrics.role_workflow_status_pairs -eq 40 `

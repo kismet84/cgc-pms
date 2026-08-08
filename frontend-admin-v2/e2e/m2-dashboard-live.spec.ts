@@ -1,12 +1,11 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Locator } from '@playwright/test'
+import { type Locator } from '@playwright/test'
+import { expect, test } from './live-test'
 
 const runLiveDashboard = process.env.V2_LIVE_DASHBOARD === '1'
 
 function selectOption(control: Locator, value: string) {
-  return control
-    .click()
-    .then(() => control.locator('..').locator(`[role="option"][data-value="${value}"]`).click())
+  return control.selectOption(value)
 }
 
 const roles = [
@@ -31,11 +30,10 @@ test.describe('M2 live eight-role dashboard', () => {
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
     await page.goto('/project/list')
     await selectOption(page.locator('#global-project'), projectId)
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-report-period')).toBeEnabled()
 
     await page.getByRole('link', { name: '工作台', exact: true }).click()
-    await selectOption(page.locator('#global-report-period'), period)
-
+    await expect(page).toHaveURL(new RegExp(`/dashboard\\?projectId=${projectId}`))
     const dashboardResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return (
@@ -44,7 +42,7 @@ test.describe('M2 live eight-role dashboard', () => {
         url.searchParams.get('month') === period
       )
     })
-    await page.getByRole('button', { name: '刷新', exact: true }).click()
+    await selectOption(page.locator('#global-report-period'), period)
 
     expect((await dashboardResponse).ok()).toBe(true)
     await expect(page).toHaveURL(new RegExp(`projectId=${projectId}.*period=${period}`))
@@ -60,12 +58,24 @@ test.describe('M2 live eight-role dashboard', () => {
       const url = new URL(request.url())
       if (url.pathname === '/api/alerts') alertUrls.push(url)
     })
+    const waitForScopedAlerts = () =>
+      page.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return (
+          url.pathname === '/api/alerts' &&
+          url.searchParams.get('projectId') === projectId &&
+          url.searchParams.has('triggeredStart') &&
+          url.searchParams.has('triggeredEnd')
+        )
+      })
     expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
+    const managementAlerts = waitForScopedAlerts()
     await page.goto(`/dashboard?role=mgmt&projectId=${projectId}&period=${period}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     })
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    expect((await managementAlerts).ok()).toBe(true)
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     await expect(page.getByText('当前项目', { exact: true })).toBeVisible()
     expect(alertUrls.length).toBeGreaterThan(0)
     expect(
@@ -78,11 +88,13 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
 
     alertUrls.length = 0
+    const businessAlerts = waitForScopedAlerts()
     await page.goto(`/dashboard?role=bm&projectId=${projectId}&period=${period}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     })
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    expect((await businessAlerts).ok()).toBe(true)
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     await expect(page.getByText('报告期（当前页面不适用）')).toHaveCount(0)
     expect(
       alertUrls.some(
@@ -94,11 +106,13 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
 
     alertUrls.length = 0
+    const financeAlerts = waitForScopedAlerts()
     await page.goto(`/dashboard?role=finance&projectId=${projectId}&period=${period}`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     })
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    expect((await financeAlerts).ok()).toBe(true)
+    await expect(page.locator('#global-project')).toBeEnabled()
+    await expect(page.locator('#global-report-period')).toBeEnabled()
     expect(
       alertUrls.some(
         (url) =>
@@ -125,10 +139,8 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(trendRows).toHaveCount(3)
 
     const projectSelect = page.locator('#global-project')
-    const activeProject = projectSelect
-      .locator('..')
-      .locator('[role="option"]', { hasText: '劳务分包在建演示项目' })
-    const projectId = await activeProject.getAttribute('data-value')
+    const activeProject = projectSelect.locator('option', { hasText: '劳务分包在建演示项目' })
+    const projectId = await activeProject.getAttribute('value')
     expect(projectId).toBeTruthy()
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
@@ -163,7 +175,7 @@ test.describe('M2 live eight-role dashboard', () => {
       envelope.data.subjectBreakdowns.filter(
         (item) => item.level === 2 && item.parentSubjectId === '900001',
       ),
-    ).toHaveLength(4)
+    ).toHaveLength(3)
 
     const panel = page.locator('#cost-breakdown')
     const rows = panel.locator('tbody tr')
@@ -171,12 +183,10 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(rows).toHaveCount(1)
     await expect(rows.first()).toContainText('合同履约成本')
     await panel.getByRole('button', { name: '展开', exact: true }).click()
-    await expect(rows).toHaveCount(5)
+    await expect(rows).toHaveCount(4)
     await expect(panel.getByText('招投标及前期费用', { exact: true })).toBeVisible()
-    await expect(panel.getByText('采购阶段成本', { exact: true })).toBeVisible()
-    await expect(panel.getByText('施工阶段成本', { exact: true })).toBeVisible()
+    await expect(panel.getByText('项目目标成本', { exact: true })).toBeVisible()
     await expect(panel.getByText('项目间接费用', { exact: true })).toBeVisible()
-    await expect(rows.filter({ hasText: '采购阶段成本' })).toContainText('¥980,000.00')
     await panel.getByRole('button', { name: '收起', exact: true }).click()
     await expect(rows).toHaveCount(1)
   })
@@ -190,9 +200,9 @@ test.describe('M2 live eight-role dashboard', () => {
 
     const projectSelect = page.locator('#global-project')
     const projectId = '520000000000009002'
-    await expect(
-      projectSelect.locator('..').locator(`[role="option"][data-value="${projectId}"]`),
-    ).toHaveText('劳务分包在建演示项目')
+    await expect(projectSelect.locator(`option[value="${projectId}"]`)).toHaveText(
+      '劳务分包在建演示项目',
+    )
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return (
@@ -284,19 +294,11 @@ test.describe('M2 live eight-role dashboard', () => {
     const projectSelect = page.locator('#global-project')
     const periodSelect = page.locator('#global-report-period')
     await expect(projectSelect).toContainText('全部项目')
-    await expect(
-      projectSelect.locator('..').locator('[role="option"][data-value=""]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect(projectSelect).toHaveValue('')
     await expect(periodSelect).toContainText('全部报告期')
-    await expect(
-      periodSelect.locator('..').locator('[role="option"][data-value=""]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect(periodSelect).toHaveValue('')
 
-    const projectId = await projectSelect
-      .locator('..')
-      .locator('[role="option"]')
-      .nth(1)
-      .getAttribute('data-value')
+    const projectId = await projectSelect.locator('option').nth(1).getAttribute('value')
     expect(projectId).toBeTruthy()
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
@@ -309,11 +311,7 @@ test.describe('M2 live eight-role dashboard', () => {
     expect((await projectResponse).ok()).toBe(true)
     await expect(page).toHaveURL(new RegExp(`projectId=${projectId}`))
 
-    const period = await periodSelect
-      .locator('..')
-      .locator('[role="option"]')
-      .nth(1)
-      .getAttribute('data-value')
+    const period = await periodSelect.locator('option').nth(1).getAttribute('value')
     expect(period).toBeTruthy()
     await selectOption(periodSelect, period!)
     await expect(page).toHaveURL(new RegExp(`period=${period}`))
@@ -404,11 +402,12 @@ test.describe('M2 live eight-role dashboard', () => {
 
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
     await page.goto('/dashboard?role=pm')
+    const riskFilter = page.getByRole('combobox', { name: '预警级别' })
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
-    await expect(page.locator('.risk-filter summary')).toHaveText('高')
+    await expect(riskFilter).toHaveValue('high')
     await expect(page.locator('#risk-list .risk-level').first()).toHaveText('高')
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
-    await expect(page.locator('.risk-filter summary')).toHaveText('全部预警')
+    await expect(riskFilter).toHaveValue('all')
   })
 
   test('every role exposes scoped authoritative alerts without severity distortion', async ({
@@ -480,10 +479,10 @@ test.describe('M2 live eight-role dashboard', () => {
     page.on('pageerror', (error) => runtimeProblems.push(`pageerror ${error.message}`))
     page.on('response', (response) => {
       const path = new URL(response.url()).pathname
+      if (response.status() >= 400) runtimeProblems.push(`${response.status()} ${path}`)
       if (path.startsWith('/api/dashboard/')) {
         dashboardRequests.push(path)
         dashboardRequestUrls.push(response.url())
-        if (response.status() >= 400) runtimeProblems.push(`${response.status()} ${path}`)
       }
     })
 
@@ -493,13 +492,9 @@ test.describe('M2 live eight-role dashboard', () => {
     await page.goto('/dashboard?role=pm')
     await expect(page.getByText('项目经营健康评分')).toBeVisible()
     await expect(page.locator('#global-project')).toContainText('全部项目')
-    await expect(
-      page.locator('#global-project').locator('..').locator('[role="option"][data-value=""]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#global-project')).toHaveValue('')
     await expect(page.locator('#global-report-period')).toContainText('全部报告期')
-    await expect(
-      page.locator('#global-report-period').locator('..').locator('[role="option"][data-value=""]'),
-    ).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#global-report-period')).toHaveValue('')
     expect(
       dashboardRequestUrls.some((url) => {
         const requestUrl = new URL(url)

@@ -3,11 +3,14 @@ import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { contractSpecs } from './e2e-spec-groups.mjs'
+import { requiresLocalLiveEvidence } from './prepush-live-impact.mjs'
 
 const frontendRoot = resolve(process.cwd())
 const repositoryRoot = resolve(frontendRoot, '..')
-const fullGateScript = 'test:e2e:contract'
+const fullContractGateScript = 'test:e2e:contract'
 const contractSpecSet = new Set(contractSpecs.map((name) => `e2e/${name}`))
+const localLiveCommand =
+  'pwsh -NoProfile -File scripts/demo/complete-project-v2/verify-live-all.ps1'
 const pnpmCli = process.env.npm_execpath
 
 function resolveCommand(command, args) {
@@ -73,7 +76,8 @@ function affectsFrontendGate(file) {
     file === 'scripts/ci/test-workflow-contract.ps1' ||
     file.startsWith('.github/actions/') ||
     file.startsWith('.github/workflows/') ||
-    file.startsWith('packages/frontend-contracts/')
+    file.startsWith('packages/frontend-contracts/') ||
+    requiresLocalLiveEvidence(file)
   )
 }
 
@@ -164,9 +168,13 @@ const dependencyChanged = affected.some(
     file.startsWith('patches/'),
 )
 
-const tier = fullGate ? 'full' : pages.length > 0 ? 'local-feature' : 'tests-only'
+const tier = fullGate ? 'full-contract' : pages.length > 0 ? 'local-feature' : 'tests-only'
 console.log(`pre-push quality gate: tier=${tier}`)
 for (const file of affected) console.log(`- ${file}`)
+const liveEvidenceRequired = affected.some(requiresLocalLiveEvidence)
+if (liveEvidenceRequired) {
+  console.log(`pre-push separate local live evidence required: ${localLiveCommand}`)
+}
 
 const workers = process.env.PLAYWRIGHT_MIGRATION_WORKERS || (process.env.CI ? '2' : '4')
 const gates = []
@@ -213,7 +221,12 @@ if (fullGate || pages.length > 0) {
 }
 
 if (fullGate) {
-  gates.push({ id: 'e2e:full', command: 'pnpm', args: [fullGateScript], cwd: frontendRoot })
+  gates.push({
+    id: 'e2e:full-contract',
+    command: 'pnpm',
+    args: [fullContractGateScript],
+    cwd: frontendRoot,
+  })
 } else if (selectedE2eSpecs.length > 0) {
   gates.push({
     id: `e2e:${selectedE2eSpecs.join(',')}`,

@@ -20,6 +20,6 @@ public interface DocumentTemplateMapper extends BaseMapper<DocumentTemplate>, De
     @Override
     @Select("SELECT template_code FROM biz_document_template "
             + "WHERE tenant_id=#{tenantId} AND template_code LIKE CONCAT(#{prefix}, '%') "
-            + "ORDER BY template_code DESC LIMIT 1 FOR UPDATE")
+            + "ORDER BY CHAR_LENGTH(template_code) DESC, template_code DESC LIMIT 1 FOR UPDATE")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 }

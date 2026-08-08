@@ -232,6 +232,7 @@ Assert-Contains $e2e @(
 foreach ($forbidden in @('services:','setup-backend','start-e2e-minio.sh','start-e2e-backend.sh','PLAYWRIGHT_USE_DEV_LOGIN','PLAYWRIGHT_DEV_LOGIN_PATH')) {
   if ($e2e.Contains($forbidden)) { throw "browser contract job contains obsolete runtime dependency: $forbidden" }
 }
+if ($e2e.Contains('V2_LIVE_')) { throw 'browser contract job must not enable local live specs' }
 Assert-Contains $sqlSafety @(
   './scripts/ci/test-workflow-contract.ps1',
   './scripts/ci/test-pr-push-evidence.ps1',
@@ -274,7 +275,7 @@ Assert-Contains $dependencyScanScript @(
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'
 $frontendPackage = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
-foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:contract','test:e2e:migration-gate','check:pre-push')) {
+foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:contract','test:e2e:live','test:e2e:migration-gate','check:pre-push')) {
   if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
 }
 
@@ -290,6 +291,10 @@ Assert-Contains $pushGate @(
   "'test:unit'",
   "'build'",
   "'test:e2e:contract'",
+  "'full-contract'",
+  "'e2e:full-contract'",
+  'requiresLocalLiveEvidence',
+  'verify-live-all.ps1',
   "startsWith('frontend-admin-v2/src/pages/')",
   "startsWith('frontend-admin-v2/')",
   "startsWith('frontend-admin-v2/patches/')",
@@ -311,6 +316,15 @@ Assert-Contains $pushGate @(
   'untrackedFilesAreRegular',
   'cache write skipped:'
 ) 'frontend pre-push quality gate'
+$liveImpactClassifier = Read-RepoText 'frontend-admin-v2\scripts\prepush-live-impact.mjs'
+Assert-Contains $liveImpactClassifier @(
+  'liveSpecs',
+  "startsWith('scripts/demo/complete-project-v2/')",
+  "'frontend-admin-v2/e2e/live-test.ts'",
+  "'frontend-admin-v2/scripts/e2e-spec-groups.mjs'"
+) 'frontend local live impact classifier'
+if ($pushGate.Contains("tier = fullGate ? 'full'")) { throw 'contract-only pre-push tier must not be named full' }
+if ($pushGate.Contains("id: 'e2e:full'")) { throw 'contract-only E2E gate must not be named e2e:full' }
 if ($pushGate.Contains("'type-check'")) { throw 'frontend pre-push gate must not repeat the build type check' }
 if ($pushGate.Contains('shell:')) { throw 'frontend pre-push gate must not invoke pnpm through a shell' }
 $prePushHook = Read-RepoText '.githooks\pre-push'
