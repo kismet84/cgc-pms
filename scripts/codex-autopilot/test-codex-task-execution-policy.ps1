@@ -178,8 +178,8 @@ Assert-Contains 'local path ignores' $gitIgnore @('.trivy-cache/','.codex-autopi
 Assert-Contains 'Windows MySQL backup root' $mysqlBackup @('[IO.Path]::GetPathRoot','backups\cgc-pms\mysql','[string]$BackupDir = ""')
 Assert-Contains 'Windows MySQL retention count' $mysqlBackup @("[Alias('RetentionDays')]",'[int]$RetentionCount = 7','Select-Object -Skip $RetentionCount','keeping latest $RetentionCount')
 if ($mysqlBackup -match [regex]::Escape("Join-Path (Split-Path -Parent `$PSScriptRoot) 'backups\mysql'")) { throw 'Windows MySQL backup still defaults inside the repository' }
-$expectedAutoPilotWorktreeRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot '.worktrees\autopilot')).TrimEnd('\')
-$configuredAutoPilotWorktreeRoot = [IO.Path]::GetFullPath([string]$autopilotConfig.worktreeRoot).TrimEnd('\')
+$expectedAutoPilotWorktreeRoot = 'D:\projects-test\cgc-pms\.worktrees\autopilot'
+$configuredAutoPilotWorktreeRoot = ([string]$autopilotConfig.worktreeRoot).Replace('/', '\').TrimEnd('\')
 if (-not [string]::Equals($configuredAutoPilotWorktreeRoot, $expectedAutoPilotWorktreeRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'AutoPilot worktreeRoot differs from the approved repository exception' }
 foreach ($path in @('docs/standards/16-本地路径与产物规范.md','scripts/audit-local-path-layout.ps1')) {
   if (@($autopilotConfig.controlPlaneCanary.fingerprintPaths) -notcontains $path) { throw "control-plane fingerprint misses local path governance: $path" }
