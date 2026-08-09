@@ -18,8 +18,9 @@ try {
   writeFileSync(join(fixture, 'app.txt'), 'one\n')
   writeFileSync(join(fixture, 'docs', 'codemap', 'codemap.json'), '{}\n')
   const htmlPath = join(fixture, 'docs', 'codemap', 'codemap.html')
+  const lockPath = join(fixture, 'docs', 'codemap', 'codemap.lock')
   writeFileSync(htmlPath, "<script>\nconst PACKED='';\nconst colors={};\n</script>\n")
-  writeFileSync(join(fixture, 'docs', 'codemap', 'codemap.lock'), `${JSON.stringify({
+  writeFileSync(lockPath, `${JSON.stringify({
     excluded_directories: ['docs/codemap'],
     modules: [],
   }, null, 2)}\n`)
@@ -38,6 +39,14 @@ try {
   writeFileSync(join(fixture, 'app.txt'), 'one\r\n')
   const verifiedAlternateEol = run('--verify')
   if (verifiedAlternateEol.status !== 0) throw new Error('equivalent Git-normalized line endings were rejected')
+  const boundLockText = readFileSync(lockPath, 'utf8')
+  const boundLock = JSON.parse(boundLockText)
+  if (boundLock.fingerprint_algorithm?.version !== 'repo-path-git-object-v3' || !boundLock.fingerprint_algorithm.record_format.includes('O:<git-object-id-byte-length>')) {
+    throw new Error('Git-normalized fingerprint metadata is missing')
+  }
+  writeFileSync(lockPath, `${JSON.stringify({ ...boundLock, fingerprint_algorithm: { ...boundLock.fingerprint_algorithm, version: 'corrupt' } }, null, 2)}\n`)
+  if (run('--verify').status === 0) throw new Error('mismatched fingerprint metadata was accepted')
+  writeFileSync(lockPath, boundLockText)
 
   const boundHtml = readFileSync(htmlPath, 'utf8')
   const activeMatch = boundHtml.match(/const PACKED='([^']*)';/)

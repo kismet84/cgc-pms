@@ -11,6 +11,15 @@ const previous = JSON.parse(readFileSync(lockPath, 'utf8'))
 const generatedAt = new Date().toISOString()
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', cwd: root }).trim()
 const verifyOnly = process.argv.includes('--verify')
+const fingerprintAlgorithm = {
+  name: 'sha256',
+  version: 'repo-path-git-object-v3',
+  input: 'git tracked and untracked non-ignored paths plus Git-normalized object IDs',
+  path_order: 'ordinal case-sensitive',
+  record_format: 'P:<utf8-path-byte-length>:<utf8-path>O:<git-object-id-byte-length>:<git-object-id><LF>',
+  untracked_files: 'included unless ignored, out of scope, or excluded',
+  self_reference: 'docs/codemap excluded',
+}
 
 const excluded = new Set(previous.excluded_directories.map(path => path.replaceAll('\\', '/')))
 const modules = [
@@ -62,6 +71,7 @@ if (verifyOnly) {
   })
   const countMismatch = previous.repository_file_count !== allFiles.length ||
     previous.included_file_count !== included.length || previous.excluded_file_count !== allFiles.length - included.length
+  const algorithmBound = JSON.stringify(previous.fingerprint_algorithm) === JSON.stringify(fingerprintAlgorithm)
   const json = readFileSync(jsonPath, 'utf8')
   const html = readFileSync(htmlPath, 'utf8')
   const assignments = [...html.matchAll(/const PACKED='([^']*)';/g)]
@@ -77,8 +87,8 @@ if (verifyOnly) {
   }
   const map = JSON.parse(json)
   const metadataBound = map.generated_at === previous.generation_time && map.generated_from_commit === previous.current_commit
-  if (mismatches.length || countMismatch || !htmlBound || !metadataBound) {
-    throw new Error(`codemap snapshot is stale: modules=${mismatches.join(',') || 'none'}, counts=${countMismatch}, html=${htmlBound}, metadata=${metadataBound}`)
+  if (mismatches.length || countMismatch || !algorithmBound || !htmlBound || !metadataBound) {
+    throw new Error(`codemap snapshot is stale: modules=${mismatches.join(',') || 'none'}, counts=${countMismatch}, algorithm=${algorithmBound}, html=${htmlBound}, metadata=${metadataBound}`)
   }
   console.log(`codemap snapshot verified for ${head}`)
   process.exit(0)
@@ -104,6 +114,7 @@ const lock = {
   current_commit: head,
   working_tree_dirty: nonCodemapStatus.length > 0,
   generation_time: generatedAt,
+  fingerprint_algorithm: fingerprintAlgorithm,
   tracked_file_count: Number(execFileSync('git', ['ls-files'], { encoding: 'utf8', cwd: root }).trim().split(/\r?\n/).filter(Boolean).length),
   repository_file_count: allFiles.length,
   included_file_count: included.length,
