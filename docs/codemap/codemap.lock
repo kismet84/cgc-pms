@@ -1,7 +1,7 @@
 {
-  "current_commit": "ccfd6c6b62e55e57a2a1e856b9cab1eddebce0dc",
+  "current_commit": "d728df448b0d6cab03a5dc66fdf4d0fa35084c40",
   "working_tree_dirty": false,
-  "generation_time": "2026-08-09T21:28:48.385Z",
+  "generation_time": "2026-08-09T21:45:18.189Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -114,7 +114,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 271,
-      "fingerprint": "0c2bbf12480d4691b50c35abec5efc8a97b78b6d2edf7440ff38726f8d907f4c"
+      "fingerprint": "7e6de70bcd711cfbb5667dffc44bd75cbe59334e2d2838b1f0b0a334b217b557"
     },
     {
       "id": "mobile",
