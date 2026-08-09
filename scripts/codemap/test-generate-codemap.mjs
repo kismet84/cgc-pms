@@ -14,6 +14,7 @@ try {
   git('config', 'user.email', 'codemap-test@example.invalid')
   git('config', 'user.name', 'Codemap Test')
   mkdirSync(join(fixture, 'docs', 'codemap'), { recursive: true })
+  writeFileSync(join(fixture, '.gitattributes'), '*.txt text eol=lf\n')
   writeFileSync(join(fixture, 'app.txt'), 'one\n')
   writeFileSync(join(fixture, 'docs', 'codemap', 'codemap.json'), '{}\n')
   const htmlPath = join(fixture, 'docs', 'codemap', 'codemap.html')
@@ -34,6 +35,9 @@ try {
   git('commit', '-qm', 'bind codemap')
   const verifiedAfterCommit = run('--verify')
   if (verifiedAfterCommit.status !== 0) throw new Error('codemap must remain bound after its generated files are committed')
+  writeFileSync(join(fixture, 'app.txt'), 'one\r\n')
+  const verifiedAlternateEol = run('--verify')
+  if (verifiedAlternateEol.status !== 0) throw new Error('equivalent Git-normalized line endings were rejected')
 
   const boundHtml = readFileSync(htmlPath, 'utf8')
   const activeMatch = boundHtml.match(/const PACKED='([^']*)';/)

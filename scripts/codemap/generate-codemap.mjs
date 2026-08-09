@@ -28,10 +28,18 @@ const allFiles = execFileSync('git', ['ls-files', '-c', '-o', '--exclude-standar
   .toString('utf8').split('\0').filter(Boolean).filter(path => existsSync(`${root}/${path}`)).sort()
 const isExcluded = path => [...excluded].some(dir => path === dir || path.startsWith(`${dir}/`) || path.includes(`/${dir}/`))
 const included = allFiles.filter(path => !isExcluded(path))
-const records = new Map(included.map(path => {
+const objectIds = included.length
+  ? execFileSync('git', ['hash-object', '--stdin-paths'], {
+      cwd: root,
+      encoding: 'utf8',
+      input: `${included.join('\n')}\n`,
+    }).trim().split(/\r?\n/)
+  : []
+if (objectIds.length !== included.length) throw new Error('codemap content hash count mismatch')
+const records = new Map(included.map((path, index) => {
   const pathBytes = Buffer.from(path)
-  const content = readFileSync(`${root}/${path}`)
-  return [path, Buffer.concat([Buffer.from(`P:${pathBytes.length}:`), pathBytes, Buffer.from(`C:${content.length}:`), content, Buffer.from('\n')])]
+  const objectId = Buffer.from(objectIds[index])
+  return [path, Buffer.concat([Buffer.from(`P:${pathBytes.length}:`), pathBytes, Buffer.from(`O:${objectId.length}:`), objectId, Buffer.from('\n')])]
 }))
 const fingerprint = paths => {
   const hash = createHash('sha256')
