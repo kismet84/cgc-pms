@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-09T14:07:03.944Z",
-  "generated_from_commit": "31b34cacde764e665b26354e3711ead5abb6e95a",
+  "generated_at": "2026-08-09T21:28:48.385Z",
+  "generated_from_commit": "ccfd6c6b62e55e57a2a1e856b9cab1eddebce0dc",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
@@ -554,6 +554,10 @@
           "symbol": "class QualitySafetyClosedLoopIntegrationTest"
         },
         {
+          "path": "backend/src/test/java/com/cgcpms/quality/QualitySafetyClosedLoopIntegrationTest.java",
+          "symbol": "issueCodeStopsAtThreeDigitCapacity"
+        },
+        {
           "path": "frontend-admin-v2/tests/unit/m3-delivery.test.ts",
           "symbol": "describe"
         },
@@ -568,7 +572,8 @@
       ],
       "constraints": [
         "数据库仍是日报、问题、整改和复验的唯一事实源；本地草稿不得扩张服务端权限或状态机。",
-        "日报写入受项目范围和草稿状态保护；质量安全复用既有职责分离、乐观锁和 CLEAN 附件证据。"
+        "日报写入受项目范围和草稿状态保护；质量安全复用既有职责分离、乐观锁和 CLEAN 附件证据。",
+        "质量问题子序号按同租户、同检查单计数；第999个可生成，第1000个候选号失败关闭。"
       ],
       "evidence": [
         {
@@ -586,6 +591,10 @@
         {
           "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
           "symbol": "public QualitySafetyIssue createIssue"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
+          "symbol": "nextIssueCode"
         }
       ]
     },
@@ -982,6 +991,46 @@
       ]
     },
     {
+      "id": "long-task-completion-gate",
+      "label": "Codex 长任务完成门禁",
+      "type": "governance",
+      "boundary": "Codex 任务生命周期",
+      "layer": 6,
+      "path": ".agents/skills/long-task-gate",
+      "role": "由仓库 Hook 在显式激活后按顺序执行 Completion Contract；失败修复后从首项全量复验，通过后幂等发送终态通知。",
+      "entrypoints": [
+        {
+          "path": ".codex/hooks.json",
+          "symbol": "UserPromptSubmit and Stop"
+        },
+        {
+          "path": ".agents/skills/long-task-gate/scripts/long-task-gate.mjs",
+          "symbol": "handleStop"
+        }
+      ],
+      "tests": [
+        {
+          "path": ".agents/skills/long-task-gate/tests/long-task-gate.test.mjs",
+          "symbol": "failed check continues, repaired check completes"
+        }
+      ],
+      "constraints": [
+        "只有显式 $long-task-gate 激活 Completion Contract。",
+        "检查失败修复后从首项全量复验；通知恢复路径不重跑已经通过的业务检查。",
+        "连续相同失败三次停止自动续跑，状态与通知保持会话 fencing 和幂等。"
+      ],
+      "evidence": [
+        {
+          "path": ".agents/skills/long-task-gate/references/completion-contract.md",
+          "symbol": "Completion Contract"
+        },
+        {
+          "path": "docs/manuals/codex-long-task-gate.md",
+          "symbol": "激活与登记"
+        }
+      ]
+    },
+    {
       "id": "readme-sync-gate",
       "label": "README 与操作手册同步门禁",
       "type": "governance",
@@ -1080,8 +1129,8 @@
       "role": "以完整项目演示数据包和显式 liveSpecs 清单编排9组真实前后端验收；只允许 loopback 专用 demo 数据库。",
       "entrypoints": [
         {
-          "path": "scripts/demo/complete-project-v2/verify-m3-live.ps1",
-          "symbol": "5组M3 live兼容入口"
+          "path": "scripts/demo/complete-project-v2/verify-live-all.ps1",
+          "symbol": "Assert-LiveSafetyPreflight and liveSpecs"
         },
         {
           "path": "frontend-admin-v2/scripts/e2e-spec-groups.mjs",
@@ -1089,6 +1138,10 @@
         }
       ],
       "tests": [
+        {
+          "path": "scripts/demo/complete-project-v2/test-verify-live-all.ps1",
+          "symbol": "negativePreconditions and liveFlags"
+        },
         {
           "path": "frontend-admin-v2/tests/unit/global-context-contract.test.ts",
           "symbol": "locks the global standard and executable browser gate"
@@ -1113,6 +1166,10 @@
           "symbol": "完整演示数据守恒校验"
         },
         {
+          "path": "scripts/demo/complete-project-v2/verify-live-all.ps1",
+          "symbol": "summary.json"
+        },
+        {
           "path": "frontend-admin-v2/scripts/e2e-spec-groups.mjs",
           "symbol": "liveSpecs"
         }
@@ -1125,7 +1182,7 @@
       "boundary": "后端业务域",
       "layer": 4,
       "path": "backend/src/main/java/com/cgcpms/common/util/CodeGenerationService.java",
-      "role": "为投标成本、合同收入、单据模板、项目预算、合同和付款记录生成同租户同日前缀的001..999编号。",
+      "role": "为21个日型业务入口生成同租户同日前缀的001..999编号；13个本轮 Mapper 显式读取含软删除历史。",
       "entrypoints": [
         {
           "path": "backend/src/main/java/com/cgcpms/bid/service/BidCostService.java",
@@ -1149,6 +1206,66 @@
         },
         {
           "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractChangeService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/expense/service/ExpenseApplicationService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/partner/service/MdPartnerService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/BidAwardProjectService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/PmProjectService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/PurchaseRequestConversionService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseRequestService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/receipt/service/MatReceiptService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/requisition/service/MatRequisitionService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/settlement/service/StlSettlementWriteService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/service/SubMeasureService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/service/SubTaskService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/variation/service/VarOrderService.java",
           "symbol": "codeGenerationService.nextCode"
         }
       ],
@@ -1180,11 +1297,29 @@
         {
           "path": "backend/src/test/java/com/cgcpms/payment/PayRecordCashJournalIntegrationTest.java",
           "symbol": "class PayRecordCashJournalIntegrationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/common/util/CodeGenerationServiceTest.java",
+          "symbol": "failsClosedWhenSoftDeletedHistorySourceIsMissing"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/common/util/CodeGenerationMySqlIntegrationTest.java",
+          "symbol": "allDeletedCodeMappersKeepTenantDateDeletedAndLexicographicScopes"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/payment/PayApplicationCodeRetryTest.java",
+          "symbol": "class PayApplicationCodeRetryTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/bid/BidAwardProjectServiceTest.java",
+          "symbol": "class BidAwardProjectServiceTest"
         }
       ],
       "constraints": [
         "编号格式固定为{PREFIX}-{yyyyMMdd}-{3位序号}，序号只允许1..999。",
         "软删除历史号继续占号；非法历史号和容量耗尽必须 fail-closed。",
+        "includeDeleted=true 必须由 DeletedCodeSource 提供含软删除查询，缺失即失败关闭。",
+        "原生查询按 CHAR_LENGTH(code) 后代码降序，避免历史1000被998字典序遮蔽。",
         "各业务域保留既有租户锁、唯一约束和 DuplicateKeyException 重试边界。"
       ],
       "evidence": [
@@ -1199,6 +1334,62 @@
         {
           "path": "backend/src/main/java/com/cgcpms/common/util/BusinessCodeGenerator.java",
           "symbol": "BUSINESS_CODE_SEQUENCE_EXHAUSTED"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/common/util/CodeGenerationMySqlIntegrationTest.java",
+          "symbol": "allM85CodeColumnsHaveTenantScopedUniqueConstraint"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/mapper/CtContractChangeMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/expense/mapper/ExpenseApplicationMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/partner/mapper/MdPartnerMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/mapper/PayApplicationMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/mapper/PmProjectMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/mapper/MatPurchaseOrderMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/mapper/MatPurchaseRequestMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/receipt/mapper/MatReceiptMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/requisition/mapper/MatRequisitionMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/settlement/mapper/StlSettlementMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/mapper/SubMeasureMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/mapper/SubTaskMapper.java",
+          "symbol": "selectLastCodeByPrefix"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/variation/mapper/VarOrderMapper.java",
+          "symbol": "selectLastCodeByPrefix"
         }
       ]
     },
@@ -1873,6 +2064,17 @@
       ]
     },
     {
+      "from": "long-task-completion-gate",
+      "to": "repository-governance",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": ".agents/skills/long-task-gate/scripts/long-task-gate.mjs",
+          "symbol": "handleStop"
+        }
+      ]
+    },
+    {
       "from": "ci-verification",
       "to": "v2-client",
       "type": "calls",
@@ -2109,6 +2311,69 @@
         {
           "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractService.java",
           "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/contract/service/CtContractChangeService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/expense/service/ExpenseApplicationService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/BidAwardProjectService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/service/PmProjectService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/settlement/service/StlSettlementWriteService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/service/SubMeasureService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/subcontract/service/SubTaskService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/variation/service/VarOrderService.java",
+          "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "supply-inventory",
+      "to": "business-code-generation",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/partner/service/MdPartnerService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/PurchaseRequestConversionService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseRequestService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/receipt/service/MatReceiptService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/requisition/service/MatRequisitionService.java",
+          "symbol": "codeGenerationService.nextCode"
         }
       ]
     },
@@ -2130,6 +2395,10 @@
       "evidence": [
         {
           "path": "backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java",
+          "symbol": "codeGenerationService.nextCode"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java",
           "symbol": "codeGenerationService.nextCode"
         }
       ]
