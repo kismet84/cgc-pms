@@ -646,7 +646,7 @@ public class QualitySafetyService {
         if (sequence > ISSUE_CODE_MAX_SEQUENCE) {
             throw new BusinessException(
                     "BUSINESS_CODE_SEQUENCE_EXHAUSTED",
-                    "当日业务编号已超过999条，请联系管理员");
+                    "该检查单问题编号已达到999条，请联系管理员");
         }
         return normalizeCode(inspection.getInspectionCode()) + "-ISS-" + String.format("%03d", sequence);
     }

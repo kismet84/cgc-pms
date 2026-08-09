@@ -387,6 +387,7 @@ class QualitySafetyClosedLoopIntegrationTest {
         BusinessException exhausted = assertThrows(BusinessException.class,
                 () -> service.createIssue(inspection.getId(), command));
         assertEquals("BUSINESS_CODE_SEQUENCE_EXHAUSTED", exhausted.getCode());
+        assertEquals("该检查单问题编号已达到999条，请联系管理员", exhausted.getMessage());
     }
 
     private PlanCommand planCommand(String code) {
