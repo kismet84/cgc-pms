@@ -4,7 +4,7 @@
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1
-#   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1 -BackupDir "D:\backups\mysql"
+#   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1 -BackupDir "D:\backups\cgc-pms\mysql"
 #
 # Exit 0 = success, Exit 1 = failure.
 #
@@ -14,11 +14,14 @@
 #   MYSQL_HOST          — MySQL host (default: 127.0.0.1)
 #   MYSQL_PORT          — MySQL port (default: 3307)
 #
-# Retention: keeps last 7 daily full backups by default (override with -RetentionDays).
+# Retention: keeps the latest 7 full backups by default.
+# -RetentionDays remains a compatibility alias; its value is a backup count, not calendar days.
 
 param(
     [string]$BackupDir = "",
-    [int]$RetentionDays = 7,
+    [Alias('RetentionDays')]
+    [ValidateRange(1, 3650)]
+    [int]$RetentionCount = 7,
     [string]$MysqlHost = "",
     [string]$MysqlPort = "",
     [string]$MysqlDatabase = "",
@@ -40,7 +43,9 @@ if (-not $MysqlPassword) {
 }
 
 if (-not $BackupDir) {
-    $BackupDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'backups\mysql'
+    $repoRoot = Split-Path -Parent $PSScriptRoot
+    $repoDrive = [IO.Path]::GetPathRoot([IO.Path]::GetFullPath($repoRoot))
+    $BackupDir = Join-Path $repoDrive 'backups\cgc-pms\mysql'
 }
 
 # Ensure backup directory exists
@@ -117,7 +122,7 @@ finally {
 if (-not $SkipRetention) {
     $oldFiles = Get-ChildItem -Path $BackupDir -Filter "${MysqlDatabase}_full_*.sql.gz" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending |
-        Select-Object -Skip $RetentionDays
+        Select-Object -Skip $RetentionCount
 
     foreach ($f in $oldFiles) {
         Write-Host "Removing expired backup: $($f.Name)"
@@ -125,7 +130,7 @@ if (-not $SkipRetention) {
     }
 
     if ($oldFiles.Count -gt 0) {
-        Write-Host "Retention cleanup: removed $($oldFiles.Count) expired backup(s), keeping last $RetentionDays."
+        Write-Host "Retention cleanup: removed $($oldFiles.Count) older backup(s), keeping latest $RetentionCount."
     }
 }
 

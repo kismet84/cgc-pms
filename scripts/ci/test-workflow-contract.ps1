@@ -234,6 +234,11 @@ foreach ($forbidden in @('services:','setup-backend','start-e2e-minio.sh','start
 }
 if ($e2e.Contains('V2_LIVE_')) { throw 'browser contract job must not enable local live specs' }
 Assert-Contains $sqlSafety @(
+  'fetch-depth: 0',
+  'Verify README and manual sync',
+  'README_SYNC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}',
+  'README_SYNC_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
+  'node scripts/ci/check-readme-sync.mjs --range "$env:README_SYNC_BASE_SHA" "$env:README_SYNC_HEAD_SHA"',
   './scripts/ci/test-workflow-contract.ps1',
   './scripts/ci/test-pr-push-evidence.ps1',
   './scripts/check-sql-safety.ps1'
@@ -328,7 +333,14 @@ if ($pushGate.Contains("id: 'e2e:full'")) { throw 'contract-only E2E gate must n
 if ($pushGate.Contains("'type-check'")) { throw 'frontend pre-push gate must not repeat the build type check' }
 if ($pushGate.Contains('shell:')) { throw 'frontend pre-push gate must not invoke pnpm through a shell' }
 $prePushHook = Read-RepoText '.githooks\pre-push'
-Assert-Contains $prePushHook @('set -eu','pnpm --dir frontend-admin-v2 check:pre-push') 'versioned pre-push hook'
+$preCommitHook = Read-RepoText '.githooks\pre-commit'
+$readmeSyncGate = Read-RepoText 'scripts\ci\check-readme-sync.mjs'
+Assert-Contains $preCommitHook @('set -eu','node scripts/ci/check-readme-sync.mjs --staged') 'versioned pre-commit hook'
+Assert-Contains $prePushHook @('set -eu','node scripts/ci/check-readme-sync.mjs --pre-push "${1:-origin}"','pnpm --dir frontend-admin-v2 check:pre-push') 'versioned pre-push hook'
+if ($prePushHook.IndexOf('check-readme-sync.mjs') -gt $prePushHook.IndexOf('check:pre-push')) { throw 'README sync gate must run before the frontend pre-push gate' }
+Assert-Contains $readmeSyncGate @('--cached','--range','readFileSync(0','merge-base','nearestReadme','currentReadmes','historicalReadmes','docs/manuals/codex-long-task-gate.md') 'README sync gate'
+
+& node --test (Join-Path $RepoRoot 'scripts\ci\check-readme-sync.test.mjs')
 
 & (Join-Path $RepoRoot 'scripts\ci\test-pr-push-evidence.ps1')
 & (Join-Path $RepoRoot 'scripts\ci\test-post-merge-ci-evidence.ps1')

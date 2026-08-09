@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -34,7 +34,7 @@ const modules = [
   ['shared_packages', ['packages/']],
 ]
 const allFiles = execFileSync('git', ['ls-files', '-c', '-o', '--exclude-standard', '-z'], { cwd: root })
-  .toString('utf8').split('\0').filter(Boolean).sort()
+  .toString('utf8').split('\0').filter(Boolean).filter(path => existsSync(`${root}/${path}`)).sort()
 const isExcluded = path => [...excluded].some(dir => path === dir || path.startsWith(`${dir}/`) || path.includes(`/${dir}/`))
 const included = allFiles.filter(path => !isExcluded(path))
 const records = new Map(included.map(path => {

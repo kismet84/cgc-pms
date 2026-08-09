@@ -1,7 +1,7 @@
 {
-  "current_commit": "91d0394e661c8207da25bb28cee4032ac35339f9",
+  "current_commit": "e22c6be462b83e9d106c41926ab0ec32a328da50",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-08T14:16:49.478Z",
+  "generation_time": "2026-08-09T06:33:15.212Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -54,14 +54,12 @@
   },
   "tracked_file_count": 3860,
   "repository_file_count": 3860,
-  "included_file_count": 2590,
-  "excluded_file_count": 1270,
+  "included_file_count": 2596,
+  "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
-    "stale_modules": [
-      "documentation"
-    ],
-    "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
+    "stale_modules": [],
+    "reason": "Current snapshot matches previous code map inputs."
   },
   "modules": [
     {
@@ -72,7 +70,7 @@
         "plugins/**"
       ],
       "file_count": 86,
-      "fingerprint": "e934f00546f4e39bf5acef518764e4994a7d3f58418b307a7d14acb0b5e02171"
+      "fingerprint": "7f5066a503a514e4a312279aaa2157d73c8886435a7ca519df1bb2a8604c0447"
     },
     {
       "id": "backend",
@@ -91,8 +89,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 268,
-      "fingerprint": "606c2a06228ff7a6b194850946151b1f671b9616072506282a3d40bc0779f289"
+      "file_count": 274,
+      "fingerprint": "ed2b27f2a6c78189adbe7566f692d70ca47f1364ccc6fb3d027800fb3345f315"
     },
     {
       "id": "desktop_launcher",
@@ -107,8 +105,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 124,
-      "fingerprint": "26fff2c6a4328f8802f986c5078e0e12bac70148801b0e259331b2866f63074e"
+      "file_count": 126,
+      "fingerprint": "a354644bb78e1e561623066c281dfece01bff00f6d09508eb3d75d8440f2f3fd"
     },
     {
       "id": "frontend_v2",
@@ -123,16 +121,16 @@
       "scope": [
         "mobile/**"
       ],
-      "file_count": 1,
-      "fingerprint": "e66f6ce1323b73e04141090bbaffa5bf28e4e7340340545c37199610a943128f"
+      "file_count": 0,
+      "fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "id": "repository_meta",
       "scope": [
         "tracked and untracked repository root files"
       ],
-      "file_count": 7,
-      "fingerprint": "eba261d7fe2e086e6e698803e9d453250983b55eee2574a155d9ab057f10d263"
+      "file_count": 6,
+      "fingerprint": "e8d3fa2dfa5da43e58a7c608da203d08558c2df1ba14eb1156e5244746753c87"
     },
     {
       "id": "shared_packages",

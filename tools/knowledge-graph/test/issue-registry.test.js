@@ -3,25 +3,26 @@ import assert from "node:assert/strict";
 import { loadConfig } from "../src/config.js";
 import { loadIssueRegister, parseIssueRegister } from "../src/issue-registry.js";
 
-test("current issue register is valid, unique, and preserves release blockers", () => {
+test("current issue register is valid, unique, and freezes local-only release items", () => {
   const config = loadConfig();
   const { register, sha256 } = loadIssueRegister(config.repoRoot);
   assert.equal(register.schemaVersion, 1);
+  assert.match(register.versionScope, /^v\d+\.\d+$/);
   assert.match(sha256, /^[a-f0-9]{64}$/);
   assert.ok(register.issues.length > 0);
   assert.equal(new Set(register.issues.map((issue) => issue.issueKey)).size, register.issues.length);
 
-  const blockers = register.issues.filter((issue) => issue.blocking);
-  assert.equal(blockers.length, 3);
-  assert.ok(blockers.every((issue) => issue.status === "RELEASE_GATE"));
-  assert.ok(blockers.every((issue) => issue.classification === "RELEASE_PREREQUISITE"));
-  assert.ok(blockers.every((issue) => issue.priority === "P0"));
+  const localOnly = register.issues.filter((issue) => issue.classification === "NOT_APPLICABLE_LOCAL_ONLY");
+  assert.equal(localOnly.length, 3);
+  assert.ok(localOnly.every((issue) => issue.status === "FROZEN"));
+  assert.ok(localOnly.every((issue) => issue.blocking === false));
+  assert.ok(localOnly.every((issue) => issue.priority === "P0"));
 });
 
 test("issue register rejects duplicate keys and missing parents", () => {
   const base = {
     schemaVersion: 1,
-    versionScope: "v1.5",
+    versionScope: "v1.6",
     updatedAt: "2026-07-13T21:00:00+08:00",
     issues: [{
       issueKey: "A-01",
@@ -36,6 +37,7 @@ test("issue register rejects duplicate keys and missing parents", () => {
     }],
   };
   assert.throws(() => parseIssueRegister({ ...base, issues: [...base.issues, ...base.issues] }), /Duplicate issueKey/);
+  assert.throws(() => parseIssueRegister({ ...base, versionScope: "latest" }), /invalid_format/);
   assert.throws(() => parseIssueRegister({
     ...base,
     issues: [{ ...base.issues[0], issueKey: "child", parentIssueKey: "missing" }],
@@ -64,7 +66,7 @@ test("issue register accepts a strict optional governance candidate", () => {
   };
   const base = {
     schemaVersion: 1,
-    versionScope: "v1.5",
+    versionScope: "v1.6",
     updatedAt: "2026-07-17T13:00:00+08:00",
     issues: [{
       issueKey: "AUTO-IMPROVEMENT-TEST",

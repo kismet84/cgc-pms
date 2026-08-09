@@ -1,5 +1,7 @@
 # 库存台账、领用与退料设计 QA
 
+> 归档说明（2026-08-09）：本文从仓库根目录迁入 V1.5 质量归档。下列本地绝对路径仅记录当时取证位置，不承诺当前仍存在。
+
 - source visual truth path: conversation attachment `Browser Comment 1`
 - source design brief: 用户选择的方案 3——库存台账默认全量列表与底部流水抽屉；领用与退料采用左侧申请列表、右侧完整链路及多行申请表单
 - implementation screenshot paths:

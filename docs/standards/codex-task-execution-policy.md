@@ -17,7 +17,7 @@
 | 升版本、版本发布、Tag、GitHub Release 与历史 Release 回填 | `.agents/skills/release-skills/SKILL.md` |
 | AutoPilot 触发、Ready 来源和事实入口 | `plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md` |
 | AutoPilot 调度、checkpoint、fencing、恢复、Reviewer、评分、回顾与金丝雀 | `plugins/cgc-pms-autopilot/references/control-plane-policy.md`、配置和 Schema |
-| 本地依赖、缓存、索引、构建与证据产物的保留/清理 | 本文“本地产物保留与清理” |
+| 本地主仓、clone、worktree、缓存、备份、日志、数据与临时产物 | `docs/standards/16-本地路径与产物规范.md` |
 
 主线 G0～G5 门禁、进入/退出条件和停线规则唯一维护于 `cgc-pms-mainline-owner-flow/SKILL.md`；运行态 G4 证据维护于 `cgc-pms-runtime-refresh/SKILL.md`；失败分类和复验维护于 `cgc-pms-ci-gate-triage/SKILL.md`。
 
@@ -30,12 +30,6 @@
 5. 同一规则只在表中指定的权威正文维护；其他文件只能引用，不得复制。
 6. 仅 Git 已跟踪的 `.agents/skills/**` 和 `plugins/**/skills/**` 属于项目可交付 Skill；被忽略或未跟踪的同名目录属于本地运行时能力，不进入 clean checkout 文件验收，也不得用本地存在性冒充项目来源。外部 Skill 以已跟踪来源锁和提供方 CLI 的可读结果验真。
 
-## 本地产物保留与清理
-
-- 四类处理：活跃依赖/缓存默认保留；可离线复用冷缓存按版本或期限保留；正式证据脱敏归档；仅损坏或无调用方产物进入清理候选。命中 `.gitignore`、可重建或可下载不能单独证明应删除。
-- 依赖树进入清理候选前，必须核实调用方、lockfile、实际 `storeDir`，并在一次性目录完成离线安装；失败即保留缓存或补齐缺包，禁止联网重下冒充验证。
-- `.codegraph` 等索引的新鲜度必须联合核对数据库文件、守护日志、进程或锁及补同步结果；父目录时间不得单独触发删除或重建。
-
 ## 维护验证
 
 - `scripts/codex-autopilot/test-codex-task-policy-suite.ps1`
@@ -43,5 +37,7 @@
 - `scripts/codex-autopilot/test-control-plane-fingerprint.ps1`
 
 Skill Markdown 链接检查只扫描 Git 已跟踪文件；新增项目 Skill 必须先版本化，再进入项目路由和验收。
+
+版本化 `.githooks/pre-commit` 与 `.githooks/pre-push` 共用 `scripts/ci/check-readme-sync.mjs`：提交前检查暂存区，推送前检查 Git 提供的 outgoing refs；required CI 以明确 base/head range 复验，避免 `--no-verify` 绕过。检查器只验证相关 README/操作手册已进入同一范围，不自动生成或改写文档；归档与 codemap 产物不参与同步判定。启用命令为 `git config core.hooksPath .githooks`。
 
 行为性控制面变更必须更新指纹覆盖；测试通过不替代用户明确启动的单 Issue 金丝雀。

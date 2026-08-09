@@ -92,15 +92,15 @@
 
 截图证据路径：
 
-1. 采购申请列表：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\purchase-request-list.png`
-2. 采购申请详情：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\purchase-request-detail.png`
-3. 采购申请深链：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\pr-2026-07-06T04-36-49-355Z-deeplink.png`
-4. 采购订单列表：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\purchase-order-list.png`
-5. 采购订单详情：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\purchase-order-detail.png`
-6. 采购订单深链：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\po-2026-07-06T04-37-18-919Z-deeplink.png`
-7. 库存台账列表：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\inventory-stock.png`
-8. 库存台账初始态：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\stock-2026-07-06T04-42-30-565Z-initial.png`
-9. 库存台账筛选态：`D:\projects-test\cgc-pms\output\playwright\m22-5-acceptance\stock-2026-07-06T04-42-30-565Z-filtered.png`
+1. 采购申请列表：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\purchase-request-list.png`
+2. 采购申请详情：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\purchase-request-detail.png`
+3. 采购申请深链：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\pr-2026-07-06T04-36-49-355Z-deeplink.png`
+4. 采购订单列表：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\purchase-order-list.png`
+5. 采购订单详情：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\purchase-order-detail.png`
+6. 采购订单深链：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\po-2026-07-06T04-37-18-919Z-deeplink.png`
+7. 库存台账列表：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\inventory-stock.png`
+8. 库存台账初始态：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\stock-2026-07-06T04-42-30-565Z-initial.png`
+9. 库存台账筛选态：`D:\projects-test\cgc-pms\local-evidence\output\playwright\m22-5-acceptance\stock-2026-07-06T04-42-30-565Z-filtered.png`
 
 验收判定：
 
@@ -128,7 +128,7 @@
 | M22-2 后端最小加固 | 已完成 | `MatStockServiceTest 34 tests pass`、migration 相关 `20 tests pass`、`V131 success=1`、重复活动库存预查 `0` |
 | M22-3 前端业务契约最小修正 | 已完成 | 定向 Vitest `22 tests pass`、`type-check` 通过、`build` 通过 |
 | M22-4 运行态刷新 | 已完成 | backend health `200`、frontend `5173` `200`、前端重启后 ready |
-| M22-5 桌面真实验收 | 已完成 | 采购申请 / 采购订单 / 库存台账真实桌面验收通过，截图证据已归档到 `output/playwright/m22-5-acceptance/` |
+| M22-5 桌面真实验收 | 已完成 | 采购申请 / 采购订单 / 库存台账真实桌面验收通过，截图证据现归档于 `local-evidence/output/playwright/m22-5-acceptance/` |
 | M22-6 质量归档 | 已完成 | 本报告已落盘 |
 
 ## 模型分档复盘
@@ -164,7 +164,7 @@
 
 ## 运行残留说明
 
-1. `output/playwright/m22-5-acceptance/` 及其子目录需要保留，原因是其中包含本轮正式桌面验收截图与 Playwright 产物，是本报告对应的原始证据。
+1. `local-evidence/output/playwright/m22-5-acceptance/` 及其子目录需要保留，原因是其中包含本轮正式桌面验收截图与 Playwright 产物，是本报告对应的原始证据。
 2. 当前环境可见 `chrome`、`node`、`node_repl` 等进程，但仅能确认其处于运行中，不能确认都由本轮主线 22 验收独占创建。
 3. 由于进程归属不明，本轮未执行任何清理或杀进程动作，避免误伤用户现有开发 / 验收环境。
 4. 本轮质量归档未清理 `output/`，符合“证据保留、不盲删”的边界要求。

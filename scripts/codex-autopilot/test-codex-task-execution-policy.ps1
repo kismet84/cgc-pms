@@ -16,7 +16,13 @@ function Assert-Contains([string]$Name,[string]$Text,[string[]]$Patterns) {
 }
 
 $agents = Read-RepoText 'AGENTS.md'
+$gitIgnore = Read-RepoText '.gitignore'
 $policy = Read-RepoText 'docs\standards\codex-task-execution-policy.md'
+$localPathPolicy = Read-RepoText 'docs\standards\16-本地路径与产物规范.md'
+$localPathAudit = Read-RepoText 'scripts\audit-local-path-layout.ps1'
+$mysqlBackup = Read-RepoText 'scripts\mysql-backup.ps1'
+$autopilotConfigText = Read-RepoText 'scripts\codex-autopilot\codex-autopilot.config.json'
+$autopilotConfig = $autopilotConfigText | ConvertFrom-Json
 $runtime = Read-RepoText '.agents\skills\cgc-pms-runtime-refresh\SKILL.md'
 $ci = Read-RepoText '.agents\skills\cgc-pms-ci-gate-triage\SKILL.md'
 $mainline = Read-RepoText '.agents\skills\cgc-pms-mainline-owner-flow\SKILL.md'
@@ -155,8 +161,29 @@ if (Test-Path -LiteralPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\refer
   throw 'duplicate AutoPilot failure-classification authority still exists'
 }
 
-Assert-Contains 'local artifact policy' $policy @('四类处理','实际 `storeDir`','一次性目录完成离线安装','数据库文件','守护日志','进程或锁','补同步结果','父目录时间不得单独触发删除或重建')
-if ($policy -match '(?i)(?:命中\s*`?\.gitignore`?|可重建|可下载).{0,20}(?:即可|直接|应当)删除') { throw 'ignored or rebuildable artifacts can still be deleted without reuse evidence' }
+Assert-Contains 'local path policy' $localPathPolicy @(
+  'D:\projects-test\cgc-pms','D:\projects-test\_clones\cgc-pms','D:\projects-test\_worktrees\cgc-pms',
+  'D:\cache\cgc-pms','D:\backups\cgc-pms','D:\var\log\cgc-pms','%TEMP%\cgc-pms',
+  '主仓根目录白名单','design-qa.md','output/','memory/','mobile/','frontend-admin/',
+  '四类处理','实际 `storeDir`','一次性目录完成离线安装','数据库文件','守护日志','进程或锁','补同步结果','父目录时间不得单独触发删除或重建',
+  '不自动迁移','不自动删除','不证明内容无价值'
+)
+if ($localPathPolicy -match '(?i)(?:命中\s*`?\.gitignore`?|可重建|可下载)\s*(?:即可|直接|应当)\s*删除') { throw 'ignored or rebuildable artifacts can still be deleted without reuse evidence' }
+Assert-Contains 'local path audit' $localPathAudit @(
+  'COMPLIANT','LEGACY_REVIEW','EVIDENCE_REQUIRED','FORBIDDEN_NEW',
+  'RepoRoot','DriveRoot','MaxDepth','AsJson','Strict','SelfTest',
+  '.omc','.claude','ReparsePoint','allowedRepoRootEntries','legacyRepoRootEntries'
+)
+Assert-Contains 'local path ignores' $gitIgnore @('.trivy-cache/','.codex-autopilot/artifacts/','.codex-autopilot/issues/','/backups/')
+Assert-Contains 'Windows MySQL backup root' $mysqlBackup @('[IO.Path]::GetPathRoot','backups\cgc-pms\mysql','[string]$BackupDir = ""')
+Assert-Contains 'Windows MySQL retention count' $mysqlBackup @("[Alias('RetentionDays')]",'[int]$RetentionCount = 7','Select-Object -Skip $RetentionCount','keeping latest $RetentionCount')
+if ($mysqlBackup -match [regex]::Escape("Join-Path (Split-Path -Parent `$PSScriptRoot) 'backups\mysql'")) { throw 'Windows MySQL backup still defaults inside the repository' }
+$expectedAutoPilotWorktreeRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot '.worktrees\autopilot')).TrimEnd('\')
+$configuredAutoPilotWorktreeRoot = [IO.Path]::GetFullPath([string]$autopilotConfig.worktreeRoot).TrimEnd('\')
+if (-not [string]::Equals($configuredAutoPilotWorktreeRoot, $expectedAutoPilotWorktreeRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'AutoPilot worktreeRoot differs from the approved repository exception' }
+foreach ($path in @('docs/standards/16-本地路径与产物规范.md','scripts/audit-local-path-layout.ps1')) {
+  if (@($autopilotConfig.controlPlaneCanary.fingerprintPaths) -notcontains $path) { throw "control-plane fingerprint misses local path governance: $path" }
+}
 Assert-Contains 'artifact governance' $artifactGovernance @('插件自身计划书','独立项目业务任务的计划书','docs/plans','plugins/cgc-pms-autopilot/artifacts/plans')
 
 Assert-Contains 'soft-delete standards' ($backendStandard + $databaseStandard) @('active_unique_token','活动行固定为 `0`','删除行')

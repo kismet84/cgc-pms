@@ -5,11 +5,11 @@ import { parseEpisodeOptions, parseIssueOptions } from "../src/cli.js";
 test("issues CLI parses bounded list filters without changing query semantics", () => {
   assert.deepEqual(parseIssueOptions([
     "--view", "list", "--limit", "20", "--status", "OPEN",
-    "--classification", "STILL_APPLICABLE", "--priority", "P0",
+    "--classification", "NOT_APPLICABLE_LOCAL_ONLY", "--priority", "P0",
     "--parent-issue-key", "A-01", "--blocking", "false",
     "--current-only", "--query", "tenant",
   ]), {
-    view: "list", limit: 20, status: "OPEN", classification: "STILL_APPLICABLE",
+    view: "list", limit: 20, status: "OPEN", classification: "NOT_APPLICABLE_LOCAL_ONLY",
     priority: "P0", parentIssueKey: "A-01", blocking: false,
     currentOnly: true, query: "tenant",
   });

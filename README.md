@@ -77,6 +77,7 @@ scripts\start-dev.bat
 
 - [AGENTS.md](AGENTS.md)：项目协作、授权、验证与收口规则入口
 - [Codex 任务执行策略](docs/standards/codex-task-execution-policy.md)：任务状态、验证、Git 和沟通约定
+- 本地执行 `git config core.hooksPath .githooks` 启用版本化 Hook；`pre-commit` 检查暂存改动，`pre-push` 复核实际待推送提交，涉及的 README 或操作手册必须进入同一交付范围
 
 ## 验证与交付提醒
 
