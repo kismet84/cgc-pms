@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -355,6 +356,37 @@ class QualitySafetyClosedLoopIntegrationTest {
                 issue.getId(), "整改内容已变更", 1L, LocalDate.now().plusDays(2), null, "rect-replay");
         assertEquals("IDEMPOTENCY_CONFLICT", assertThrows(BusinessException.class,
                 () -> service.createRectification(changedRectification)).getCode());
+    }
+
+    @Test
+    void issueCodeStopsAtThreeDigitCapacity() {
+        QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-CAPACITY")).getId());
+        QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
+                plan.getId(), null, "QS-CHK-CAPACITY", LocalDate.now(), "F区", 1L, "编号容量检查", null));
+        List<Object[]> rows = IntStream.rangeClosed(1, 998)
+                .mapToObj(sequence -> new Object[]{
+                        99200000L + sequence, plan.getId(), inspection.getId(), PROJECT,
+                        inspection.getInspectionCode() + "-ISS-" + String.format("%03d", sequence), PARTNER
+                })
+                .toList();
+        jdbc.batchUpdate("""
+                INSERT INTO qs_issue(
+                    id,tenant_id,plan_id,inspection_id,project_id,issue_code,issue_type,category,severity,
+                    title,description,responsible_kind,responsible_partner_id,responsible_user_id,due_date,
+                    status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,?, 'SAFETY','CAPACITY','LOW','容量检查','容量检查',
+                       'PARTNER',?,1,CURRENT_DATE,'OPEN',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, rows);
+
+        IssueCommand command = new IssueCommand(
+                inspection.getId(), "容量检查", "LOW", "第999个问题", "三位子序号边界",
+                "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(1), null);
+        QualitySafetyIssue last = service.createIssue(inspection.getId(), command);
+        assertTrue(last.getIssueCode().endsWith("-ISS-999"));
+
+        BusinessException exhausted = assertThrows(BusinessException.class,
+                () -> service.createIssue(inspection.getId(), command));
+        assertEquals("BUSINESS_CODE_SEQUENCE_EXHAUSTED", exhausted.getCode());
     }
 
     private PlanCommand planCommand(String code) {

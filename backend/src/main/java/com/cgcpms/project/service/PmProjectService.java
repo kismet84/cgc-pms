@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
@@ -39,13 +41,10 @@ import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
 @Service
@@ -69,6 +68,7 @@ public class PmProjectService {
     private final SysDictDataService sysDictDataService;
     private final BidCostMapper bidCostMapper;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String keyword, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -129,9 +129,6 @@ public class PmProjectService {
                 "PROJECT_TYPE_INVALID", "项目类型不合法"));
 
         // Auto-generate project code: XM-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "XM-" + today + "-";
-
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId == null) {
             tenantId = 0L;
@@ -146,7 +143,9 @@ public class PmProjectService {
         project.setOwnerContractId(null);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            project.setProjectCode(nextProjectCode(tenantId, prefix, attempt));
+            project.setProjectCode(codeGenerationService.nextCode(
+                    pmProjectMapper, PmProject::getProjectCode,
+                    "XM-", tenantId, true, attempt));
             try {
                 pmProjectMapper.insert(project);
                 return project.getId();
@@ -175,30 +174,6 @@ public class PmProjectService {
         project.setApprovalStatus("APPROVING");
         pmProjectMapper.updateById(project);
         return instance.getId();
-    }
-
-    private String nextProjectCode(Long tenantId, String prefix, int offset) {
-        LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PmProject::getTenantId, tenantId)
-                .likeRight(PmProject::getProjectCode, prefix)
-                .orderByDesc(PmProject::getProjectCode);
-        Page<PmProject> page = new Page<>(0, 1);
-        Page<PmProject> result = pmProjectMapper.selectPage(page, wrapper);
-        List<PmProject> list = result.getRecords();
-
-        int seq = 1 + offset;
-        if (!list.isEmpty()) {
-            PmProject last = list.get(0);
-            if (last.getProjectCode() != null
-                    && last.getProjectCode().length() == prefix.length() + 3) {
-                try {
-                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1 + offset;
-                } catch (NumberFormatException ex) {
-                    log.warn("Failed to parse sequence number: {}", last.getProjectCode(), ex);
-                }
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

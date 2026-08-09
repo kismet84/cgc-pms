@@ -26,13 +26,13 @@ Codex 会从仓库 `.codex/hooks.json` 加载 Hook。首次使用或 Hook 定义
 
    进程崩溃遗留陈旧锁时，普通命令 fail-close。先查看 `status`，再显式执行 `node .agents/skills/long-task-gate/scripts/long-task-gate.mjs recover-lock`；存活进程的锁不可恢复。
 
-4. Stop 时检查失败会生成 continuation。相同失败连续 3 次进入 `BLOCKED_GATE`，不无限续跑。
+4. Stop 时检查失败会生成 continuation；修复后从首项重跑全部 Completion Contract 检查。相同失败连续 3 次进入 `BLOCKED_GATE`，不无限续跑。
 
 ## 飞书目标与重试
 
 V1 只使用已认证 Bot。普通终态通知从 `LTG_FEISHU_CHAT_ID` 读取 `oc_` 群聊目标；显式契约可使用 `chat-id` 或 `user-id`，但只保存私有环境变量名，例如 `LTG_FEISHU_USER_ID`。真实收件值不得进入仓库、契约、状态或日志。Windows 用户环境变量变更后必须完全重启 Codex，Hook 子进程才能继承新值。
 
-通知失败不会重跑通过的业务检查，也不会把已通过任务改为阻塞；任务保持 `COMPLETED`，未发送 outbox 可在恢复认证、网络或目标后显式重试：
+通知恢复路径（`TASK_PASSED`、`NOTIFYING`、`BLOCKED_NOTIFICATION`，以及存在未发送 outbox 的 `COMPLETED`）不重跑已经通过的业务检查。通知失败不会把已通过任务改为阻塞；任务保持 `COMPLETED`，未发送 outbox 可在恢复认证、网络或目标后显式重试：
 
 ```powershell
 node .agents/skills/long-task-gate/scripts/long-task-gate.mjs notify-retry

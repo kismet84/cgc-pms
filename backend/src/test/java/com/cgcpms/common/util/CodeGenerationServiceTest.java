@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class CodeGenerationServiceTest {
@@ -120,6 +121,18 @@ class CodeGenerationServiceTest {
         }
     }
 
+    @Test
+    void failsClosedWhenSoftDeletedHistorySourceIsMissing() {
+        ActiveOnlyMapper activeOnlyMapper = mock(ActiveOnlyMapper.class);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.nextCode(activeOnlyMapper, TestRow::getCode,
+                        PREFIX, TENANT_ID, true));
+
+        assertEquals("BUSINESS_CODE_DELETED_SOURCE_MISSING", exception.getCode());
+        verifyNoInteractions(activeOnlyMapper);
+    }
+
     private String nextActive(int offset) {
         return service.nextCode(mapper, "code", TestRow::getCode,
                 PREFIX, TENANT_ID, false, offset);
@@ -140,6 +153,9 @@ class CodeGenerationServiceTest {
     }
 
     private interface TestMapper extends BaseMapper<TestRow>, DeletedCodeSource {
+    }
+
+    private interface ActiveOnlyMapper extends BaseMapper<TestRow> {
     }
 
     private static final class TestRow {

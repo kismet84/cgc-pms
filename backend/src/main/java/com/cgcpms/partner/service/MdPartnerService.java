@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -20,10 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
-
-import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
 @Service
@@ -36,6 +35,7 @@ public class MdPartnerService {
     private final CtContractMapper ctContractMapper;
     private final SysDictDataService sysDictDataService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<MdPartnerVO> getPage(long pageNo, long pageSize, String partnerCode, String partnerName, String partnerType, String status) {
         LambdaQueryWrapper<MdPartner> wrapper = new LambdaQueryWrapper<>();
@@ -72,13 +72,13 @@ public class MdPartnerService {
         normalizeRiskLevel(partner);
         normalizeDefaultLeadDays(partner, partner.getPartnerType());
         Long tenantId = UserContext.getCurrentTenantId();
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "PTN-" + today + "-";
         partner.setPartnerCode(null);
         if (partner.getStatus() == null) partner.setStatus("ENABLE");
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            partner.setPartnerCode(nextPartnerCode(tenantId, prefix, attempt));
+            partner.setPartnerCode(codeGenerationService.nextCode(
+                    mdPartnerMapper, MdPartner::getPartnerCode,
+                    "PTN-", tenantId, true, attempt));
             try {
                 mdPartnerMapper.insert(partner);
                 log.info("Creating partner: {}", partner.getPartnerName());
@@ -88,29 +88,6 @@ public class MdPartnerService {
             }
         }
         throw new BusinessException("PARTNER_CODE_CONFLICT", "合作方编号生成冲突，请重试");
-    }
-
-    private String nextPartnerCode(Long tenantId, String prefix, int offset) {
-        LambdaQueryWrapper<MdPartner> codeWrapper = new LambdaQueryWrapper<>();
-        codeWrapper.eq(MdPartner::getTenantId, tenantId)
-                .likeRight(MdPartner::getPartnerCode, prefix)
-                .orderByDesc(MdPartner::getPartnerCode);
-        Page<MdPartner> page = new Page<>(0, 1);
-        Page<MdPartner> result = mdPartnerMapper.selectPage(page, codeWrapper);
-        List<MdPartner> list = result.getRecords();
-        int seq = 1 + offset;
-        if (!list.isEmpty()) {
-            MdPartner last = list.get(0);
-            if (last.getPartnerCode() != null
-                    && last.getPartnerCode().length() == prefix.length() + 3) {
-                try {
-                    seq = Integer.parseInt(last.getPartnerCode().substring(prefix.length())) + 1 + offset;
-                } catch (NumberFormatException ex) {
-                    log.warn("Failed to parse partner code sequence: {}", last.getPartnerCode(), ex);
-                }
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.inventory.entity.MatWarehouse;
@@ -55,6 +56,7 @@ public class MatReceiptService {
     private final ProcurementIntegrityService integrityService;
     private final WfInstanceMapper wfInstanceMapper;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     private final MatReceiptAssembler assembler;
 
@@ -143,7 +145,6 @@ public class MatReceiptService {
     public Long create(MatReceipt receipt) {
         checkProjectAccess(receipt.getProjectId(), "创建材料验收单");
         // Auto-generate receipt code: MR-yyyyMMdd-XXX
-        String prefix = "MR-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         receipt.setApprovalStatus("DRAFT");
         receipt.setCostGeneratedFlag(0);
         if (!StringUtils.hasText(receipt.getReceiptMode())) receipt.setReceiptMode("INVENTORY");
@@ -169,7 +170,9 @@ public class MatReceiptService {
         }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            receipt.setReceiptCode(nextReceiptCode(prefix, attempt));
+            receipt.setReceiptCode(codeGenerationService.nextCode(
+                    matReceiptMapper, MatReceipt::getReceiptCode,
+                    "MR-", UserContext.getCurrentTenantId(), true, attempt));
             try {
                 matReceiptMapper.insert(receipt);
                 return receipt.getId();
@@ -178,26 +181,6 @@ public class MatReceiptService {
             }
         }
         throw new BusinessException("RECEIPT_CODE_CONFLICT", "收货单编号生成冲突，请重试");
-    }
-
-    private String nextReceiptCode(String prefix, int offset) {
-        LambdaQueryWrapper<MatReceipt> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatReceipt::getReceiptCode, prefix)
-                .eq(MatReceipt::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatReceipt::getReceiptCode);
-        Page<MatReceipt> page = new Page<>(0, 1);
-        Page<MatReceipt> result = matReceiptMapper.selectPage(page, wrapper);
-        MatReceipt last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getReceiptCode() != null && last.getReceiptCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getReceiptCode().substring(prefix.length())) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getReceiptCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

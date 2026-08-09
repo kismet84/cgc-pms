@@ -1,6 +1,7 @@
 package com.cgcpms.project.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cgcpms.common.util.DeletedCodeSource;
 import com.cgcpms.project.entity.PmProject;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
@@ -8,7 +9,10 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
-public interface PmProjectMapper extends BaseMapper<PmProject> {
+public interface PmProjectMapper extends BaseMapper<PmProject>, DeletedCodeSource {
+
+    @Select("SELECT project_code FROM pm_project WHERE project_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY CHAR_LENGTH(project_code) DESC, project_code DESC LIMIT 1")
+    String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
 
     @Select("""
             SELECT id,tenant_id,org_id,project_code,project_name,project_type,project_address,

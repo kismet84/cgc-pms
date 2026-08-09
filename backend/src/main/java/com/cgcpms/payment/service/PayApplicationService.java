@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -47,7 +48,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.HashSet;
 import java.util.List;
@@ -81,6 +81,7 @@ public class PayApplicationService {
     private final PaymentApplicationSourceService sourceService;
     private final SysDictDataService sysDictDataService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public PayApplicationService(
             PayApplicationMapper payApplicationMapper,
@@ -99,6 +100,7 @@ public class PayApplicationService {
             PaymentApplicationSourceService sourceService,
             SysDictDataService sysDictDataService,
             FileLifecycleGateway fileLifecycleGateway,
+            CodeGenerationService codeGenerationService,
             @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
         this.payApplicationMapper = payApplicationMapper;
         this.payApplicationBasisMapper = payApplicationBasisMapper;
@@ -116,6 +118,7 @@ public class PayApplicationService {
         this.sourceService = sourceService;
         this.sysDictDataService = sysDictDataService;
         this.fileLifecycleGateway = fileLifecycleGateway;
+        this.codeGenerationService = codeGenerationService;
         this.workflowEngine = workflowEngine;
     }
 
@@ -220,7 +223,6 @@ public class PayApplicationService {
         normalizeBusinessDictionaryFields(app, null);
         validateProjectAndContract(app.getProjectId(), app.getContractId(), "创建付款申请");
         boolean autoGenerateCode = !StringUtils.hasText(app.getApplyCode());
-        String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Default statuses
         if (app.getPayStatus() == null || app.getPayStatus().isBlank()) {
@@ -240,7 +242,9 @@ public class PayApplicationService {
         }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            app.setApplyCode(nextApplyCode(prefix, attempt));
+            app.setApplyCode(codeGenerationService.nextCode(
+                    payApplicationMapper, PayApplication::getApplyCode,
+                    "PAY-", app.getTenantId(), true, attempt));
             try {
                 payApplicationMapper.insert(app);
                 return app.getId();
@@ -249,26 +253,6 @@ public class PayApplicationService {
             }
         }
         throw new BusinessException("PAY_APPLICATION_CODE_CONFLICT", "付款申请编号生成冲突，请重试");
-    }
-
-    private String nextApplyCode(String prefix, int offset) {
-        LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PayApplication::getTenantId, UserContext.getCurrentTenantId())
-                .likeRight(PayApplication::getApplyCode, prefix)
-                .orderByDesc(PayApplication::getApplyCode);
-        Page<PayApplication> page = new Page<>(0, 1);
-        Page<PayApplication> result = payApplicationMapper.selectPage(page, wrapper);
-        PayApplication last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getApplyCode() != null && last.getApplyCode().startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(last.getApplyCode().substring(last.getApplyCode().lastIndexOf('-') + 1)) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getApplyCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

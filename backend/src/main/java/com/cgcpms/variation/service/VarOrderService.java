@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -65,6 +66,7 @@ public class VarOrderService {
     private final CtContractChangeService ctContractChangeService;
     private final JdbcTemplate jdbcTemplate;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<VarOrderVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                       Long partnerId, String varType, String direction, String varCode,
@@ -158,20 +160,9 @@ public class VarOrderService {
         validatePartner(order.getPartnerId());
 
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "VO-" + today + "-";
-
-        String lastCode = varOrderMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
-
-        int seq = 1;
-        if (lastCode != null && lastCode.startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", lastCode, e);
-            }
-        }
-        order.setVarCode(prefix + String.format("%03d", seq));
+        order.setVarCode(codeGenerationService.nextCode(
+                varOrderMapper, VarOrder::getVarCode,
+                "VO-", UserContext.getCurrentTenantId(), true));
 
         // Default approval status
         if (order.getApprovalStatus() == null || order.getApprovalStatus().isBlank()) {

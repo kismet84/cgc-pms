@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
-import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -64,6 +64,7 @@ public class MatRequisitionService {
     private final ProjectExecutionGuard projectExecutionGuard;
     private final WorkflowEngine workflowEngine;
     private final MatRequisitionAssembler assembler;
+    private final CodeGenerationService codeGenerationService;
 
     // ================================================================
     // 分页查询
@@ -139,16 +140,15 @@ public class MatRequisitionService {
         checkProjectAccess(requisition.getProjectId(), "创建领料申请");
         validateRelations(requisition);
         // Auto-generate requisition code: REQ-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "REQ-" + today + "-";
-
         requisition.setApprovalStatus("DRAFT");
         requisition.setStockOutFlag(0);
         requisition.setTenantId(UserContext.getCurrentTenantId());
         requisition.setTotalAmount(BigDecimal.ZERO.setScale(2));
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            requisition.setRequisitionCode(nextRequisitionCode(prefix, attempt));
+            requisition.setRequisitionCode(codeGenerationService.nextCode(
+                    requisitionMapper, MatRequisition::getRequisitionCode,
+                    "REQ-", requisition.getTenantId(), true, attempt));
             try {
                 requisitionMapper.insert(requisition);
                 return requisition.getId();
@@ -158,27 +158,6 @@ public class MatRequisitionService {
         }
 
         throw new BusinessException("REQUISITION_CODE_CONFLICT", "领料申请编号生成冲突，请重试");
-    }
-
-    private String nextRequisitionCode(String prefix, int offset) {
-        LambdaQueryWrapper<MatRequisition> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatRequisition::getRequisitionCode, prefix)
-                .eq(MatRequisition::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatRequisition::getRequisitionCode);
-        Page<MatRequisition> page = new Page<>(0, 1);
-        Page<MatRequisition> result = requisitionMapper.selectPage(page, wrapper);
-        MatRequisition last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getRequisitionCode() != null
-                && last.getRequisitionCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getRequisitionCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getRequisitionCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq + offset);
     }
 
     // ================================================================
