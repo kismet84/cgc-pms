@@ -231,6 +231,61 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
     await expectNoHorizontalOverflow(page)
     await expectNoSeriousAxeViolations(page)
 
+    const recentTrigger = page.locator('summary[aria-label="最近打开"]')
+    if (viewport.name === 'mobile') {
+      await expect(recentTrigger).toBeHidden()
+    } else {
+      await recentTrigger.click()
+      await expect(
+        page
+          .locator('details.app-shell__recent')
+          .getByRole('link', { name: '驾驶舱 工作台 · 经营驾驶舱' }),
+      ).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.locator('details.app-shell__recent')).not.toHaveAttribute('open', '')
+    }
+
+    if (viewport.name === 'desktop') {
+      await page.goto('/dashboard?desktop=1')
+      const dashboardLink = page
+        .locator('a')
+        .filter({ hasText: /^经营驾驶舱$/ })
+        .first()
+      await expect(page.locator('html')).toHaveAttribute('data-desktop-shell', 'true')
+      await expect(dashboardLink).not.toHaveAttribute('href')
+      await expect(page.locator('a[href]')).toHaveCount(0)
+      await page.evaluate(() => {
+        ;(
+          window as typeof window & { __desktopContextMenuPrevented?: boolean }
+        ).__desktopContextMenuPrevented = false
+        window.addEventListener(
+          'contextmenu',
+          (event) => {
+            ;(
+              window as typeof window & { __desktopContextMenuPrevented?: boolean }
+            ).__desktopContextMenuPrevented = event.defaultPrevented
+          },
+          { once: true },
+        )
+      })
+      await page.getByRole('main').click({ button: 'right', position: { x: 20, y: 20 } })
+      expect(
+        await page.evaluate(
+          () =>
+            (window as typeof window & { __desktopContextMenuPrevented?: boolean })
+              .__desktopContextMenuPrevented,
+        ),
+      ).toBe(true)
+
+      await page.goto('/dashboard')
+      await expect(page.locator('html')).toHaveAttribute('data-desktop-shell', 'true')
+      await expect(page.locator('a[href]')).toHaveCount(0)
+      await page.getByRole('link', { name: '物资管理', exact: true }).click()
+      await expect(page).toHaveURL(/\/inventory\/purchase-request\?desktop=1/)
+      await page.goto('/dashboard?desktop=1')
+      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+    }
+
     await page.getByRole('button', { name: '打开通知中心' }).click()
     await expect(page.getByRole('dialog', { name: '通知中心' })).toBeVisible()
     await expect(page.getByRole('heading', { name: '暂无站内通知' })).toBeVisible()
@@ -282,6 +337,9 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
       await expect(page).toHaveURL(/\/inventory\/purchase-request$/)
       await expect(page.getByRole('main')).toBeFocused()
       await expect(page.getByRole('main')).toHaveCSS('outline-style', 'none')
+    }
+    if (viewport.name === 'desktop') {
+      await page.evaluate(() => sessionStorage.removeItem('cgc-pms:desktop-shell'))
     }
   }
 

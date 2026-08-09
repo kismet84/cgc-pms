@@ -3,7 +3,10 @@ import { defineStore } from 'pinia'
 import { buildDashboardReportPeriods } from '@cgc-pms/frontend-contracts'
 import type { LocationQuery, RouteParamsGeneric } from 'vue-router'
 import { loadVisibleProjects } from '@/services/projects'
-import { registerSessionCacheClearer } from '@/stores/session'
+import { getSessionNamespaceIdentity, registerSessionCacheClearer } from '@/stores/session'
+
+const RECENT_PAGE_LIMIT = 8
+const RECENT_PAGE_STORAGE_PREFIX = 'cgc-pms-recent-pages'
 
 export interface ContextOption {
   value: string
@@ -29,11 +32,13 @@ function paramValue(value: RouteParamsGeneric[string]): string | null {
 export const useWorkspaceStore = defineStore('v2-workspace', () => {
   const projects = ref<ContextOption[]>([])
   const reportPeriods = ref<ContextOption[]>([])
+  const recentPaths = ref<string[]>([])
   const requestedProjectId = ref<string | null>(null)
   const requestedReportPeriod = ref<string | null>(null)
   const objectContext = ref<ObjectContext | null>(null)
   let contextLoadGeneration = 0
   let contextLoadController: AbortController | null = null
+  let recentStorageKey: string | null = null
 
   const selectedProjectId = computed(() =>
     projects.value.some((item) => item.value === requestedProjectId.value)
@@ -93,6 +98,31 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     }
   }
 
+  function loadRecentPaths(): void {
+    const identity = getSessionNamespaceIdentity()
+    const key = identity
+      ? `${RECENT_PAGE_STORAGE_PREFIX}:${identity.tenantId}:${identity.userId}`
+      : null
+    if (key === recentStorageKey) return
+    recentStorageKey = key
+    recentPaths.value = key ? readRecentPaths(key) : []
+  }
+
+  function recordRecentPath(path: string): void {
+    if (!path.startsWith('/')) return
+    loadRecentPaths()
+    if (!recentStorageKey || recentPaths.value[0] === path) return
+    recentPaths.value = [path, ...recentPaths.value.filter((item) => item !== path)].slice(
+      0,
+      RECENT_PAGE_LIMIT,
+    )
+    try {
+      window.localStorage.setItem(recentStorageKey, JSON.stringify(recentPaths.value))
+    } catch {
+      // 存储不可用时保留当前窗口内的最近记录。
+    }
+  }
+
   async function initialize(): Promise<void> {
     const generation = ++contextLoadGeneration
     contextLoadController?.abort()
@@ -121,6 +151,8 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     contextLoadController = null
     projects.value = []
     reportPeriods.value = []
+    recentPaths.value = []
+    recentStorageKey = null
     requestedProjectId.value = null
     requestedReportPeriod.value = null
     objectContext.value = null
@@ -131,6 +163,7 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
   return {
     projects,
     reportPeriods,
+    recentPaths,
     selectedProjectId,
     selectedReportPeriod,
     objectContext,
@@ -139,7 +172,22 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     selectProject,
     selectReportPeriod,
     syncRoute,
+    loadRecentPaths,
+    recordRecentPath,
     initialize,
     clear,
   }
 })
+
+function readRecentPaths(key: string): string[] {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) || '[]') as unknown
+    if (!Array.isArray(value)) return []
+    return value
+      .filter((item): item is string => typeof item === 'string' && item.startsWith('/'))
+      .filter((item, index, items) => items.indexOf(item) === index)
+      .slice(0, RECENT_PAGE_LIMIT)
+  } catch {
+    return []
+  }
+}

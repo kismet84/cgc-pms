@@ -6,7 +6,7 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Dialog, V2PageState, V2Select } from '@/components'
+import { V2ActionMenu, V2Alert, V2Button, V2Dialog, V2PageState, V2Select } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { findWorkspace, visibleNavigation } from '@/navigation/catalog'
 import {
@@ -48,6 +48,25 @@ let communicationController: AbortController | null = null
 let communicationStream: ResilientStream | null = null
 
 const navigation = computed(() => visibleNavigation(session.roles, session.permissions))
+const visiblePages = computed(() =>
+  navigation.value.flatMap((domain) =>
+    domain.workspaces.flatMap((workspace) =>
+      workspace.tabs.map((tab) => ({
+        path: tab.path,
+        label: tab.label,
+        domainId: domain.id,
+        domainLabel: domain.label,
+        workspaceLabel: workspace.label,
+      })),
+    ),
+  ),
+)
+const recentPages = computed(() =>
+  workspaceStore.recentPaths.flatMap((path) => {
+    const page = visiblePages.value.find((item) => item.path === path)
+    return page ? [page] : []
+  }),
+)
 const canRequestNotifications = computed(() => canRequestAlertNotifications(session.permissions))
 const canEditNotifications = computed(() => hasPermission(session.permissions, 'notification:edit'))
 const canViewCommunication = computed(() => session.hasAdminOrPermission('communication:view'))
@@ -94,9 +113,13 @@ const demoRoleAccounts = demoRoleGroups.map((group) => ({
 }))
 
 watch(
-  () => route.fullPath,
+  [() => route.fullPath, navigation],
   () => {
     workspaceStore.syncRoute(route.path, route.query, route.params)
+    workspaceStore.loadRecentPaths()
+    if (visiblePages.value.some((page) => page.path === route.path)) {
+      workspaceStore.recordRecentPath(route.path)
+    }
     mobileNavigationOpen.value = false
     restoreMenuFocus = false
   },
@@ -362,6 +385,9 @@ function contextRoute(path: string) {
       ...(workspaceStore.selectedReportPeriod
         ? { period: workspaceStore.selectedReportPeriod }
         : {}),
+      ...(route.query.desktop === '1' || document.documentElement.dataset.desktopShell === 'true'
+        ? { desktop: '1' }
+        : {}),
     },
   }
 }
@@ -583,6 +609,32 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
             @update:model-value="selectReportPeriod"
           />
         </div>
+
+        <V2ActionMenu class="app-shell__recent" label="最近打开">
+          <template #trigger>
+            <svg class="app-shell__recent-trigger-icon" aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M4.5 5.5V10H9" />
+              <path d="M5 9.5A8 8 0 1 1 6.4 17" />
+              <path d="M12 7.5V12L15 14" />
+            </svg>
+          </template>
+          <p v-if="!recentPages.length" class="app-shell__recent-empty">暂无最近打开</p>
+          <RouterLink
+            v-for="page in recentPages"
+            :key="page.path"
+            :to="contextRoute(page.path)"
+            class="v2-action-menu__item app-shell__recent-item"
+          >
+            <DomainNavigationIcon
+              class="app-shell__recent-domain-icon"
+              :domain-id="page.domainId"
+            />
+            <span>
+              <strong>{{ page.label }}</strong>
+              <small>{{ page.domainLabel }} · {{ page.workspaceLabel }}</small>
+            </span>
+          </RouterLink>
+        </V2ActionMenu>
 
         <RouterLink
           v-if="canViewCommunication"
@@ -931,7 +983,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   height: 4.0625rem;
   min-height: 4.0625rem;
   display: grid;
-  grid-template-columns: minmax(24rem, 1fr) auto auto auto;
+  grid-template-columns: minmax(24rem, 1fr) auto auto auto auto;
   align-items: center;
   gap: var(--v2-space-4);
   padding: var(--v2-space-2) var(--v2-page-gutter);
@@ -941,6 +993,67 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
 
 .app-shell__menu-toggle {
   display: none;
+}
+
+.app-shell__recent :deep(.v2-action-menu__trigger) {
+  width: var(--v2-control-height-touch);
+  height: var(--v2-control-height-touch);
+  padding: 0;
+}
+
+.app-shell__recent :deep(.v2-action-menu__content) {
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: min(30rem, calc(100vh - 6rem));
+  overflow-y: auto;
+}
+
+.app-shell__recent-trigger-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.app-shell__recent-empty {
+  margin: 0;
+  padding: var(--v2-space-3);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
+  white-space: nowrap;
+}
+
+.app-shell__recent-item {
+  gap: var(--v2-space-3);
+  text-decoration: none;
+}
+
+.app-shell__recent-domain-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  color: var(--v2-color-primary);
+}
+
+.app-shell__recent-item > span {
+  min-width: 0;
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.app-shell__recent-item strong,
+.app-shell__recent-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell__recent-item small {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+  font-weight: var(--v2-font-weight-regular);
 }
 
 .app-shell__notification,
@@ -1336,7 +1449,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
 
 @media (max-width: 70rem) and (min-width: 48.01rem) {
   .app-shell__header {
-    grid-template-columns: minmax(20rem, 1fr) auto auto auto;
+    grid-template-columns: minmax(20rem, 1fr) auto auto auto auto;
   }
 
   .app-shell__context-controls {
@@ -1406,6 +1519,10 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
     border-radius: var(--v2-radius-sm);
     grid-column: 1;
     grid-row: 1;
+  }
+
+  .app-shell__recent {
+    display: none;
   }
 
   .app-shell__context-controls {

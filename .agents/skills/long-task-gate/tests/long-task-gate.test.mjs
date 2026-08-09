@@ -15,12 +15,13 @@ function fixture() {
   const repository = path.join(root, 'repo');
   const state = path.join(root, 'state');
   const larkLog = path.join(root, 'lark.log');
+  const larkMessageLog = path.join(root, 'lark-message.log');
   const larkMock = path.join(root, 'lark-success.mjs');
   mkdirSync(repository);
   execFileSync('git', ['init', '-q'], { cwd: repository });
-  writeFileSync(larkMock, `import{appendFileSync}from'node:fs';appendFileSync(${JSON.stringify(larkLog)},process.env.LTG_IDEMPOTENCY_KEY_FOR_TEST+'\\n');process.stdout.write(JSON.stringify({data:{message_id:'om_mock'}}));`);
+  writeFileSync(larkMock, `import{appendFileSync}from'node:fs';const i=process.argv.indexOf('--text');appendFileSync(${JSON.stringify(larkMessageLog)},JSON.stringify(process.argv[i+1])+'\\n');appendFileSync(${JSON.stringify(larkLog)},process.env.LTG_IDEMPOTENCY_KEY_FOR_TEST+'\\n');process.stdout.write(JSON.stringify({data:{message_id:'om_mock'}}));`);
   temporaryRoots.push(root);
-  return { root, repository, state, larkLog, larkMock };
+  return { root, repository, state, larkLog, larkMessageLog, larkMock };
 }
 
 function run(ctx, command, input, extraEnv = {}) {
@@ -144,14 +145,22 @@ test('ordinary prompt does not arm and ordinary Stop sends a turn notification',
   const ctx = fixture();
   assert.deepEqual(json(prompt(ctx, 'ordinary long task text')), {});
   assert.equal(existsSync(ctx.state), false);
-  assert.deepEqual(json(stop(ctx)), {});
+  assert.deepEqual(json(stop(ctx, {}, { last_assistant_message: '# 已完成普通任务，OPENAI_API_KEY=openai-secret AWS_SECRET_ACCESS_KEY=aws-secret GITHUB_TOKEN=github-secret refresh_token=refresh-secret access_token=access-secret。\n- 详情不应进入通知' })), {});
   assert.deepEqual(json(stop(ctx, {}, { stop_hook_active: true })), {});
-  assert.deepEqual(json(stop(ctx, {}, { turn_id: 'turn-b' })), {});
+  assert.deepEqual(json(stop(ctx, {}, { turn_id: 'turn-b', last_assistant_message: '# 凭据 sk-testsecret1234567890 password=hunter2 AWS=AKIAIOSFODNN7EXAMPLE jwt=eyJhbGciOiJIUzI1NiJ9.e30.signature。' })), {});
+  assert.deepEqual(json(stop(ctx, {}, { turn_id: 'turn-c', last_assistant_message: null })), {});
   assert.equal(existsSync(ctx.state), false);
   const keys = readFileSync(ctx.larkLog, 'utf8').trim().split(/\r?\n/);
-  assert.equal(keys.length, 2);
+  assert.equal(keys.length, 3);
   assert.match(keys[0], /^ltg-turn-[a-f0-9]{32}$/);
-  assert.notEqual(keys[0], keys[1]);
+  assert.equal(new Set(keys).size, 3);
+  const messages = readFileSync(ctx.larkMessageLog, 'utf8').trim().split(/\r?\n/).map(JSON.parse);
+  assert.equal(messages.length, 3);
+  assert.match(messages[0], /汇报: 已完成普通任务，OPENAI_API_KEY=\[已脱敏\] AWS_SECRET_ACCESS_KEY=\[已脱敏\] GITHUB_TOKEN=\[已脱敏\] refresh_token=\[已脱敏\] access_token=\[已脱敏\]。/);
+  assert.doesNotMatch(messages[0], /openai-secret|aws-secret|github-secret|refresh-secret|access-secret|详情不应进入通知/);
+  assert.match(messages[1], /汇报: 凭据 \[已脱敏\] password=\[已脱敏\] AWS=\[已脱敏\] jwt=\[已脱敏\]。/);
+  assert.doesNotMatch(messages[1], /testsecret|hunter2|AKIA|eyJ/);
+  assert.match(messages[2], /汇报: 本轮未生成可用汇报。/);
 });
 
 test('ordinary Stop notification failure warns without continuing the task', () => {

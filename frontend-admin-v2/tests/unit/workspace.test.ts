@@ -11,9 +11,75 @@ const loadVisibleProjectsMock = vi.mocked(loadVisibleProjects)
 beforeEach(() => {
   vi.resetAllMocks()
   setActivePinia(createPinia())
+  localStorage.clear()
 })
 
 describe('V2 workspace context store', () => {
+  it('persists eight per-user recent paths in most-recent-first order', () => {
+    const session = useSessionStore()
+    session.replaceUserInfo({
+      tenantId: '1001',
+      userId: '1',
+      username: 'tester',
+      roles: ['USER'],
+      permissions: [],
+    })
+    const workspace = useWorkspaceStore()
+
+    for (let index = 1; index <= 9; index += 1) workspace.recordRecentPath(`/page-${index}`)
+    workspace.recordRecentPath('/page-3')
+
+    expect(workspace.recentPaths).toEqual([
+      '/page-3',
+      '/page-9',
+      '/page-8',
+      '/page-7',
+      '/page-6',
+      '/page-5',
+      '/page-4',
+      '/page-2',
+    ])
+    expect(JSON.parse(localStorage.getItem('cgc-pms-recent-pages:1001:1') || '[]')).toEqual(
+      workspace.recentPaths,
+    )
+
+    workspace.clear()
+    expect(workspace.recentPaths).toEqual([])
+    expect(localStorage.getItem('cgc-pms-recent-pages:1001:1')).not.toBeNull()
+  })
+
+  it('isolates recent paths by identity and tolerates corrupt or unavailable storage', () => {
+    const session = useSessionStore()
+    session.replaceUserInfo({
+      tenantId: '1001',
+      userId: '2',
+      username: 'other',
+      roles: ['USER'],
+      permissions: [],
+    })
+    localStorage.setItem('cgc-pms-recent-pages:1001:2', '{bad json')
+    const workspace = useWorkspaceStore()
+    workspace.loadRecentPaths()
+    expect(workspace.recentPaths).toEqual([])
+
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('quota exceeded')
+    })
+    workspace.recordRecentPath('/dashboard')
+    expect(workspace.recentPaths).toEqual(['/dashboard'])
+    setItem.mockRestore()
+
+    session.replaceUserInfo({
+      tenantId: '1001',
+      userId: '3',
+      username: 'third',
+      roles: ['USER'],
+      permissions: [],
+    })
+    workspace.loadRecentPaths()
+    expect(workspace.recentPaths).toEqual([])
+  })
+
   it('does not retain unknown project or report-period values from a deep link', () => {
     const workspace = useWorkspaceStore()
     workspace.setProjects([{ value: 'P-1', label: '项目一' }])

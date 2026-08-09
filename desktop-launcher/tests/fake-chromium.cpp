@@ -31,7 +31,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     const UINT dpi = GetDpiForWindow(window);
     const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
                                      USER_DEFAULT_SCREEN_DPI);
-    const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+    const int expectedHeight = MulDiv(1080, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
                                       USER_DEFAULT_SCREEN_DPI);
     if (position && (position->flags & SWP_NOSIZE) == 0 &&
         std::abs(position->cx - expectedWidth) <= 2 &&
@@ -72,7 +72,9 @@ bool WaitForFixedFrame(HWND window, HANDLE configuredEvent, DWORD timeoutMs) {
   return false;
 }
 
-void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
+void WriteWindowEvidence(const fs::path& path, HWND window, HWND statusBubble,
+                         const RECT& initialStatusBubbleRect, LONG_PTR initialStatusBubbleStyle,
+                         bool configured) {
   const bool initialMaximized = IsZoomed(window) != FALSE;
   WINDOWPLACEMENT placement{};
   placement.length = sizeof(placement);
@@ -102,7 +104,7 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   const UINT dpi = GetDpiForWindow(window);
   const int expectedWidth = MulDiv(1440, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
                                    USER_DEFAULT_SCREEN_DPI);
-  const int expectedHeight = MulDiv(900, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
+  const int expectedHeight = MulDiv(1080, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI),
                                     USER_DEFAULT_SCREEN_DPI);
   MONITORINFO monitorInfo{};
   monitorInfo.cbSize = sizeof(monitorInfo);
@@ -114,6 +116,9 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
   auto logical = [dpi](LONG value) {
     return MulDiv(value, USER_DEFAULT_SCREEN_DPI, static_cast<int>(dpi ? dpi : USER_DEFAULT_SCREEN_DPI));
   };
+  RECT statusBubbleRect{};
+  GetWindowRect(statusBubble, &statusBubbleRect);
+  const LONG_PTR statusBubbleStyle = GetWindowLongPtrW(statusBubble, GWL_STYLE);
   std::ofstream evidence(path, std::ios::trunc);
   evidence << "configured=" << (configured ? 1 : 0) << '\n'
            << "initialMaximized=" << (initialMaximized ? 1 : 0) << '\n'
@@ -123,7 +128,16 @@ void WriteWindowEvidence(const fs::path& path, HWND window, bool configured) {
            << "height=" << logical(normal.bottom - normal.top) << '\n'
            << "restoredWidth=" << logical(restored.right - restored.left) << '\n'
            << "restoredHeight=" << logical(restored.bottom - restored.top) << '\n'
-           << "maximized=" << (maximizeSupported ? 1 : 0) << '\n';
+           << "maximized=" << (maximizeSupported ? 1 : 0) << '\n'
+           << "statusBubbleUnchanged="
+           << (statusBubbleStyle == initialStatusBubbleStyle &&
+                       statusBubbleRect.right - statusBubbleRect.left ==
+                           initialStatusBubbleRect.right - initialStatusBubbleRect.left &&
+                       statusBubbleRect.bottom - statusBubbleRect.top ==
+                           initialStatusBubbleRect.bottom - initialStatusBubbleRect.top
+                   ? 1
+                   : 0)
+           << '\n';
 }
 
 int wmain(int argc, wchar_t** argv) {
@@ -149,6 +163,13 @@ int wmain(int argc, wchar_t** argv) {
                                 nullptr, nullptr, windowClass.hInstance, nullptr);
   if (!window) return 92;
 
+  HWND statusBubble = CreateWindowExW(WS_EX_TOOLWINDOW, windowClass.lpszClassName, L"",
+                                      WS_POPUP, 0, 0, 240, 28, window, nullptr,
+                                      windowClass.hInstance, nullptr);
+  if (!statusBubble) return 96;
+  RECT initialStatusBubbleRect{};
+  LONG_PTR initialStatusBubbleStyle = 0;
+
   windowClass.lpszClassName = L"Chrome_WidgetWin_0";
   if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return 94;
   HWND decoy = CreateWindowExW(0, windowClass.lpszClassName, L"", WS_OVERLAPPEDWINDOW,
@@ -159,6 +180,12 @@ int wmain(int argc, wchar_t** argv) {
   if (!configuredEvent) return 93;
   const bool configured = WaitForFixedFrame(window, configuredEvent, 10000);
   if (configured) {
+    RECT rootRect{};
+    GetWindowRect(window, &rootRect);
+    SetWindowPos(statusBubble, nullptr, rootRect.left, rootRect.bottom - 28, 240, 28,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    GetWindowRect(statusBubble, &initialStatusBubbleRect);
+    initialStatusBubbleStyle = GetWindowLongPtrW(statusBubble, GWL_STYLE);
     SetWindowLongPtrW(window, GWL_STYLE, GetWindowLongPtrW(window, GWL_STYLE) | WS_THICKFRAME);
     if (IsZoomed(window) == FALSE) {
       SetWindowPos(window, nullptr, 0, 0, 1000, 700, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE |
@@ -166,7 +193,8 @@ int wmain(int argc, wchar_t** argv) {
     }
     PumpMessages(1000);
   }
-  WriteWindowEvidence(directory / L"fake-window.txt", window, configured);
+  WriteWindowEvidence(directory / L"fake-window.txt", window, statusBubble,
+                      initialStatusBubbleRect, initialStatusBubbleStyle, configured);
   CloseHandle(configuredEvent);
   if (fs::exists(directory / L"hold.flag")) PumpMessages(8000);
   int code = 0;

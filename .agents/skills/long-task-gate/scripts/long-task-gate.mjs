@@ -14,6 +14,7 @@ const MAX_TOTAL_MS = process.env.NODE_ENV === 'test' && process.env.LONG_TASK_GA
   : 265_000;
 const MAX_CAPTURE = 128 * 1024;
 const MAX_EVENT_TEXT = 240;
+const MAX_TURN_REPORT_CHARS = 160;
 const LOCK_STALE_MS = 120_000;
 const BLOCKED_EXECUTABLES = new Set(['bash', 'bash.exe', 'cmd', 'cmd.exe', 'powershell', 'powershell.exe', 'pwsh', 'pwsh.exe', 'sh', 'sh.exe', 'wsl', 'wsl.exe']);
 const TURN_NOTIFICATION = { targetType: 'chat-id', targetEnv: 'LTG_FEISHU_CHAT_ID' };
@@ -356,6 +357,29 @@ function notificationMessage(state) {
   return `CGC-PMS 长任务已通过\n任务: ${state.contract.taskId}\n摘要: ${state.contract.summary}\n检查: ${state.contract.checks.length}\n状态: COMPLETED`;
 }
 
+function turnReport(payload) {
+  const fallback = '本轮未生成可用汇报。';
+  const source = typeof payload.last_assistant_message === 'string' ? payload.last_assistant_message : '';
+  let report = source.split(/\r?\n/).map((line) => line.trim()).find((line) => line && !line.startsWith('```')) || fallback;
+  report = report
+    .replace(/^(?:#{1,6}|[-*+]|>)\s+/, '')
+    .replace(/-----BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY-----/gi, '[已脱敏]')
+    .replace(/\b(?:sk|gh[pousr]|xox[baprs])[-_][A-Za-z0-9_-]{8,}\b/gi, '[已脱敏]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/gi, 'Bearer [已脱敏]')
+    .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[已脱敏]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[已脱敏]')
+    .replace(
+      /((?:^|[^A-Za-z0-9_-])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|secret|token|password|passwd|pwd|authorization|cookie)(?:[_-][A-Za-z0-9]+)*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&#。！？!?]+)/gi,
+      '$1[已脱敏]',
+    )
+    .replace(/\s+/g, ' ')
+    .trim() || fallback;
+  const sentenceEnd = report.search(/[。！？!?]/u);
+  if (sentenceEnd >= 0) report = report.slice(0, sentenceEnd + 1);
+  const characters = Array.from(report);
+  return characters.length <= MAX_TURN_REPORT_CHARS ? report : `${characters.slice(0, MAX_TURN_REPORT_CHARS - 1).join('').trimEnd()}…`;
+}
+
 function larkInvocation(args) {
   if (process.env.NODE_ENV === 'test' && process.env.LONG_TASK_GATE_LARK_MOCK) {
     return { executable: process.execPath, args: [process.env.LONG_TASK_GATE_LARK_MOCK, ...args] };
@@ -395,7 +419,7 @@ function sendLarkMessage(notification, text, idempotencyKey) {
 function notifyTurnStop(payload, root, status = 'STOPPED') {
   try {
     const idempotencyKey = `ltg-turn-${sha(`${repoKey(root)}:${sessionKey(payload.session_id)}:${turnHash(payload)}`).slice(0, 32)}`;
-    const message = `CGC-PMS Codex 任务已停止\n仓库: ${path.basename(root)}\n状态: ${status}\n说明: 正常完成、失败或等待输入均会通知`;
+    const message = `CGC-PMS Codex 任务已停止\n仓库: ${path.basename(root)}\n状态: ${status}\n汇报: ${turnReport(payload)}`;
     const result = sendLarkMessage(TURN_NOTIFICATION, message, idempotencyKey);
     return result.ok ? {} : { systemMessage: `飞书任务通知失败：${result.detail}` };
   } catch (error) {

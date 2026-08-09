@@ -47,6 +47,10 @@ body {
   line-height: var(--v2-line-height-body);
 }
 
+html[data-desktop-shell='true'] iframe[sandbox] {
+  pointer-events: none;
+}
+
 #app,
 .v2-error-boundary__content,
 .global-error-page {

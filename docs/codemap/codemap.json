@@ -1,7 +1,8 @@
 {
-  "generated_at": "2026-08-09T06:33:15.212Z",
-  "generated_from_commit": "e22c6be462b83e9d106c41926ab0ec32a328da50",
+  "generated_at": "2026-08-09T11:12:41.528Z",
+  "generated_from_commit": "fafd400f228549f563e892a6801be732bf3523a6",
   "scope": [
+    "desktop-launcher",
     "frontend-admin-v2",
     "packages/frontend-contracts",
     "backend",
@@ -10,6 +11,41 @@
     "scripts/ci"
   ],
   "nodes": [
+    {
+      "id": "desktop-launcher",
+      "label": "Windows 桌面启动器",
+      "type": "client-shell",
+      "boundary": "Windows 本地 dev/test/demo",
+      "layer": 0,
+      "path": "desktop-launcher",
+      "role": "校验本地健康状态后，以固定 loopback URL 和独立 profile 启动便携 Chromium 应用窗口。",
+      "entrypoints": [
+        {
+          "path": "desktop-launcher/src/main.cpp",
+          "symbol": "wWinMain"
+        }
+      ],
+      "tests": [
+        {
+          "path": "desktop-launcher/tests/launcher-contract.ps1",
+          "symbol": "launcher contract"
+        }
+      ],
+      "constraints": [
+        "仅打开 http://127.0.0.1:5173/?desktop=1，不直接调用后端或管理 Docker。",
+        "窗口、profile、状态和 Chromium 参数由启动器固定控制，用户输入不得覆盖。"
+      ],
+      "evidence": [
+        {
+          "path": "desktop-launcher/src/main.cpp",
+          "symbol": "ConfigureChromiumWindow"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "desktop-launcher:"
+        }
+      ]
+    },
     {
       "id": "v2-client",
       "label": "V2 管理端",
@@ -1208,6 +1244,28 @@
   ],
   "edges": [
     {
+      "from": "desktop-launcher",
+      "to": "v2-client",
+      "type": "opens",
+      "evidence": [
+        {
+          "path": "desktop-launcher/src/main.cpp",
+          "symbol": "--app=http://127.0.0.1:5173/?desktop=1"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "desktop-launcher",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "desktop-launcher:"
+        }
+      ]
+    },
+    {
       "from": "v2-client",
       "to": "frontend-contracts",
       "type": "imports",
@@ -2089,6 +2147,19 @@
     }
   ],
   "flows": [
+    {
+      "id": "local-desktop-launch",
+      "name": "本地桌面应用启动",
+      "trigger": "用户双击 CGC-PMS.exe",
+      "steps": [
+        "desktop-launcher",
+        "v2-client",
+        "edge-proxy-deploy",
+        "security-auth",
+        "spring-api"
+      ],
+      "outcome": "健康检查通过后，固定尺寸 Chromium 应用窗口加载同源 V2 管理端。"
+    },
     {
       "id": "production-startup-gate",
       "name": "生产启动配置门禁",

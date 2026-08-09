@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)]
-  [string]$PackagePath
+  [string]$PackagePath,
+  [switch]$RuntimeSource
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +12,17 @@ $lock = Get-Content -Raw -LiteralPath (Join-Path $launcherRoot 'chromium.lock.js
 
 foreach ($relative in 'CGC-PMS.exe', 'chromium\chrome.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'BUILD-METADATA.json', 'checksums.sha256') {
   if (!(Test-Path -LiteralPath (Join-Path $package $relative) -PathType Leaf)) { throw "Package file missing: $relative" }
+}
+
+if (!$RuntimeSource) {
+  $metadata = Get-Content -Raw -LiteralPath (Join-Path $package 'BUILD-METADATA.json') | ConvertFrom-Json
+  if ([string]$metadata.launcherVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Launcher version metadata is invalid.' }
+  $expectedLauncherVersion = "$($metadata.launcherVersion).0"
+  $launcher = Get-Item -LiteralPath (Join-Path $package 'CGC-PMS.exe')
+  if ($launcher.VersionInfo.FileVersion -ne $expectedLauncherVersion -or
+      $launcher.VersionInfo.ProductVersion -ne $expectedLauncherVersion) {
+    throw "Launcher version mismatch: expected $expectedLauncherVersion, got $($launcher.VersionInfo.FileVersion)/$($launcher.VersionInfo.ProductVersion)"
+  }
 }
 
 $chrome = Get-Item -LiteralPath (Join-Path $package 'chromium\chrome.exe')

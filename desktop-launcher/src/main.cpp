@@ -29,10 +29,10 @@ namespace fs = std::filesystem;
 #define CGCPMS_HEALTH_DELAY_MS 1000
 #endif
 
-constexpr wchar_t kAppUrl[] = L"http://127.0.0.1:5173/";
+constexpr wchar_t kAppUrl[] = L"http://127.0.0.1:5173/?desktop=1";
 constexpr wchar_t kHealthPath[] = L"/api/actuator/health";
 constexpr int kWindowWidth = 1440;
-constexpr int kWindowHeight = 900;
+constexpr int kWindowHeight = 1080;
 constexpr DWORD kWindowWaitMs = 10000;
 constexpr DWORD kWindowStabilizeMs = 750;
 constexpr DWORD kWindowMaintainMs = 250;
@@ -385,6 +385,12 @@ BOOL CALLBACK FindChromiumWindow(HWND window, LPARAM parameter) {
   wchar_t className[64]{};
   if (!GetClassNameW(window, className, static_cast<int>(std::size(className)))) return TRUE;
   if (wcscmp(className, L"Chrome_WidgetWin_1") != 0) return TRUE;
+  const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  if (GetWindow(window, GW_OWNER) != nullptr || (style & WS_CHILD) != 0 ||
+      (style & WS_POPUP) != 0 || (style & WS_CAPTION) != WS_CAPTION ||
+      (style & WS_SYSMENU) == 0) {
+    return TRUE;
+  }
   search->window = window;
   return FALSE;
 }
@@ -618,7 +624,7 @@ int RunLauncher(int argc) {
       L"--no-first-run",
       L"--no-default-browser-check",
       L"--disable-sync",
-      L"--window-size=1440,900",
+      L"--window-size=1440,1080",
   };
   std::wstring command;
   for (const auto& arg : args) {

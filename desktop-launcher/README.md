@@ -1,6 +1,6 @@
 # CGC-PMS Windows desktop launcher
 
-Win32 x64 launcher for the existing local CGC-PMS web stack. It opens the fixed URL `http://127.0.0.1:5173/` in a side-loaded Chromium application window after `GET /api/actuator/health` reports top-level `status=UP`.
+Win32 x64 launcher for the existing local CGC-PMS web stack. It opens the fixed URL `http://127.0.0.1:5173/?desktop=1` in a side-loaded Chromium application window with a fixed `1440×1080` logical-pixel normal size. Desktop mode disables link-target status hints and page context menus after `GET /api/actuator/health` reports top-level `status=UP`.
 
 ## Build and test
 
