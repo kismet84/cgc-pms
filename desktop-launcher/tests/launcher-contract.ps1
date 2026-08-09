@@ -119,9 +119,10 @@ try {
   $argsPath = Join-Path $evidenceRoot 'fake-argv.txt'
   Assert-True (Test-Path -LiteralPath $argsPath) 'Fake browser argv evidence missing.'
   $argsText = Get-Content -Raw -LiteralPath $argsPath
-  Assert-True ($argsText.Contains('--app=http://127.0.0.1:5173/')) 'Application URL is not fixed.'
+  Assert-True ($argsText.Contains('--app=http://127.0.0.1:5173/?desktop=1')) 'Desktop application URL is not fixed.'
   Assert-True ($argsText.Contains('--user-data-dir=')) 'Dedicated profile argument missing.'
-  Assert-True ($argsText.Contains('--window-size=1440,900')) 'Fixed Chromium window size argument missing.'
+  Assert-True (!$argsText.Contains('--force-app-mode')) 'Forced app mode is incompatible with URL app windows.'
+  Assert-True ($argsText.Contains('--window-size=1440,1080')) 'Fixed Chromium window size argument missing.'
   $windowPath = Join-Path $evidenceRoot 'fake-window.txt'
   Assert-True (Test-Path -LiteralPath $windowPath) 'Fake browser window evidence missing.'
   $windowEvidence = @{}
@@ -133,6 +134,7 @@ try {
   Assert-True (($windowEvidence.style -band 0x00040000) -eq 0) 'Resizable WS_THICKFRAME must be removed.'
   Assert-True (($windowEvidence.style -band 0x00010000) -ne 0) 'WS_MAXIMIZEBOX must remain enabled.'
   Assert-True (($windowEvidence.style -band 0x00020000) -ne 0) 'WS_MINIMIZEBOX must remain enabled.'
+  Assert-Equal 1 $windowEvidence.statusBubbleUnchanged 'Chromium status bubble must never be configured as the browser root.'
   Assert-Equal 1 $windowEvidence.maximized 'Window must support maximize.'
   if ($windowEvidence.smallWorkArea -eq 1) {
     Assert-Equal 1 $windowEvidence.initialMaximized 'Small work areas must launch maximized.'
@@ -140,9 +142,9 @@ try {
   } else {
     Assert-Equal 0 $windowEvidence.initialMaximized 'Sufficient work areas must launch in the normal state.'
     Assert-True ([Math]::Abs($windowEvidence.width - 1440) -le 2) "Normal window width must be 1440 logical pixels; actual=$($windowEvidence.width)."
-    Assert-True ([Math]::Abs($windowEvidence.height - 900) -le 2) "Normal window height must be 900 logical pixels; actual=$($windowEvidence.height)."
+    Assert-True ([Math]::Abs($windowEvidence.height - 1080) -le 2) "Normal window height must be 1080 logical pixels; actual=$($windowEvidence.height)."
     Assert-True ([Math]::Abs($windowEvidence.restoredWidth - 1440) -le 2) "Restore width must return to 1440 logical pixels; actual=$($windowEvidence.restoredWidth)."
-    Assert-True ([Math]::Abs($windowEvidence.restoredHeight - 900) -le 2) "Restore height must return to 900 logical pixels; actual=$($windowEvidence.restoredHeight)."
+    Assert-True ([Math]::Abs($windowEvidence.restoredHeight - 1080) -le 2) "Restore height must return to 1080 logical pixels; actual=$($windowEvidence.restoredHeight)."
   }
   foreach ($forbidden in '--disable-web-security', '--ignore-certificate-errors', '--no-sandbox', '--remote-debugging-port') {
     Assert-True (!$argsText.Contains($forbidden)) "Forbidden Chromium flag present: $forbidden"

@@ -36,7 +36,9 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeFromOutsi
     :class="`v2-action-menu--${placement}`"
     @keydown.esc.stop.prevent="close(true)"
   >
-    <summary class="v2-action-menu__trigger" :aria-label="label">{{ triggerText }}</summary>
+    <summary class="v2-action-menu__trigger" :aria-label="label">
+      <slot name="trigger">{{ triggerText }}</slot>
+    </summary>
     <div class="v2-action-menu__content" role="group" :aria-label="label" @click="close()">
       <slot />
     </div>

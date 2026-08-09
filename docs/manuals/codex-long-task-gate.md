@@ -2,7 +2,7 @@
 
 ## 定位
 
-`long-task-gate` 是仓库级显式金丝雀：原生 `/goal` 负责长时间持续执行；本门禁只在 Stop 阶段运行确定性 Completion Contract，并在通过后发送一次飞书终态通知。普通任务不建立 Contract，但每个主线程终态 Stop 仍发送一次 best-effort 飞书通知；通知失败只警告，不阻断任务结束。
+`long-task-gate` 是仓库级显式金丝雀：原生 `/goal` 负责长时间持续执行；本门禁只在 Stop 阶段运行确定性 Completion Contract，并在通过后发送一次飞书终态通知。普通任务不建立 Contract，但每个主线程终态 Stop 仍发送一次 best-effort 飞书通知，并附最新助手消息首个非空文本行生成的一句话汇报；通知失败只警告，不阻断任务结束。
 
 Codex 会从仓库 `.codex/hooks.json` 加载 Hook。首次使用或 Hook 定义变化后，在 `/hooks` 审查并信任当前 hash；不要用本仓库配置覆盖用户全局 Hook 或 `notify`。
 
@@ -47,7 +47,7 @@ node .agents/skills/long-task-gate/scripts/long-task-gate.mjs notify-retry
 - 写入采用私有目录、原子 replace、state hash 和 generation；陈旧锁禁止自动回收，仅由独占 recovery guard 的显式 `recover-lock` 处理，避免 TOCTOU 双持锁。
 - 命令检查总预算 265 秒，为通知和终态落盘保留时间；最后一项的子进程超时会被剪裁到剩余预算。
 - 检查只执行 `shell:false` 的精确 executable/args；拒绝 shell executable、路径逃逸和符号链接逃逸。
-- 事件不记录 prompt、命令完整输出、绝对用户目录、recipient、Token 或飞书 message id。
+- 事件不记录 prompt、命令完整输出、绝对用户目录、recipient、Token 或飞书 message id。普通任务汇报不落盘，只取最新助手消息首行、移除 Markdown 前缀、脱敏常见令牌并限制为 160 字。
 - 回滚：在 `/hooks` 禁用本仓库 Hook；必要时先预览再清理本工具精确状态目录。不要删除飞书凭据、全局通知或其他 Codex 状态。
 
 官方 Hook 行为与信任边界见 <https://learn.chatgpt.com/docs/hooks>；Skill 结构见 <https://learn.chatgpt.com/docs/build-skills>。

@@ -5,7 +5,7 @@ description: Register and enforce deterministic completion checks for an explici
 
 # Long Task Gate
 
-Use repository Hook and private per-user state. Every terminal main-thread Stop sends a best-effort Feishu notification through `LTG_FEISHU_CHAT_ID`, including normal completion, failure, and waiting for user input; notification failure warns but never continues or blocks an ordinary task. Keep business work, Git delivery, AutoPilot, and existing notifications authoritative in their own workflows.
+Use repository Hook and private per-user state. Every terminal main-thread Stop sends a best-effort Feishu notification through `LTG_FEISHU_CHAT_ID`, including a sanitized, single-line report from the latest assistant message for normal completion, failure, and waiting for user input; notification failure warns but never continues or blocks an ordinary task. Keep business work, Git delivery, AutoPilot, and existing notifications authoritative in their own workflows.
 
 ## Activation workflow
 

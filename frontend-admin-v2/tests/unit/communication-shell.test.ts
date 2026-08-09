@@ -25,6 +25,7 @@ vi.mock('@/services/communication', () => ({
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  localStorage.clear()
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -42,6 +43,40 @@ beforeEach(() => {
 })
 
 describe('AppShell communication unread', () => {
+  it('shows only accessible catalog pages in recent-open order', async () => {
+    useSessionStore().replaceUserInfo({
+      tenantId: '1001',
+      userId: '1',
+      username: 'tester',
+      roles: ['USER'],
+      permissions: ['dashboard:view', 'project:query'],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/dashboard', component: { template: '<div>dashboard</div>' } },
+        { path: '/project/list', component: { template: '<div>projects</div>' } },
+        { path: '/project/:projectId/overview', component: { template: '<div>project</div>' } },
+      ],
+    })
+    await router.push('/dashboard')
+    await router.isReady()
+    const wrapper = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+
+    await router.push('/project/list')
+    await flushPromises()
+    await router.push('/project/P-1/overview')
+    await flushPromises()
+
+    expect(wrapper.get('summary[aria-label="最近打开"]')).toBeTruthy()
+    expect(wrapper.findAll('.app-shell__recent-item').map((item) => item.text())).toEqual([
+      '项目列表项目履约 · 项目管理',
+      '驾驶舱工作台 · 经营驾驶舱',
+    ])
+    wrapper.unmount()
+  })
+
   it('keeps newer unread result when an aborted request rejects later', async () => {
     let rejectFirst!: (reason: Error) => void
     vi.mocked(loadCommunicationUnreadCount)

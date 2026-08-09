@@ -1,13 +1,14 @@
 [CmdletBinding()]
 param(
-  [string]$ChromiumArchive
+  [string]$ChromiumArchive,
+  [string]$BasePackage
 )
 
 $ErrorActionPreference = 'Stop'
 $launcherRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $lock = Get-Content -Raw -LiteralPath (Join-Path $launcherRoot 'chromium.lock.json') | ConvertFrom-Json
 $outRoot = Join-Path $launcherRoot 'out'
-$launcherVersion = '1.0.4'
+$launcherVersion = '1.0.9'
 
 function Assert-UnderLauncher([string]$Path) {
   $full = [IO.Path]::GetFullPath($Path)
@@ -51,13 +52,20 @@ if ((Test-Path -LiteralPath $package) -or (Test-Path -LiteralPath $zip)) {
   throw "Versioned package already exists; preserve it and bump launcherVersion before rebuilding: $packageName"
 }
 
-if (!$ChromiumArchive) {
-  $fetched = & (Join-Path $PSScriptRoot 'fetch-chromium.ps1')
-  $ChromiumArchive = [string]$fetched.Archive
-}
-$archive = (Resolve-Path -LiteralPath $ChromiumArchive).Path
-if ((Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash -ne $lock.archiveSha256) {
-  throw 'Chromium archive SHA-256 does not match lock.'
+$base = $null
+$archive = $null
+if ($BasePackage) {
+  $base = (Resolve-Path -LiteralPath $BasePackage).Path
+  & (Join-Path $PSScriptRoot 'verify-package.ps1') -PackagePath $base -RuntimeSource
+} else {
+  if (!$ChromiumArchive) {
+    $fetched = & (Join-Path $PSScriptRoot 'fetch-chromium.ps1')
+    $ChromiumArchive = [string]$fetched.Archive
+  }
+  $archive = (Resolve-Path -LiteralPath $ChromiumArchive).Path
+  if ((Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash -ne $lock.archiveSha256) {
+    throw 'Chromium archive SHA-256 does not match lock.'
+  }
 }
 
 $launcherExe = [string](& (Join-Path $PSScriptRoot 'build.ps1') -Configuration Release -Architecture x64 | Select-Object -Last 1)
@@ -72,16 +80,21 @@ if (Test-Path -LiteralPath $stageRoot) { Remove-Item -LiteralPath $stageRoot -Re
 
 try {
   New-Item -ItemType Directory -Force -Path $temp, $stagedPackage | Out-Null
-  Expand-Archive -LiteralPath $archive -DestinationPath $temp
-  $runtime = Join-Path $temp $lock.archiveRoot
+  if ($base) {
+    $runtime = Join-Path $base 'chromium'
+    $license = Join-Path $base 'LICENSE'
+  } else {
+    Expand-Archive -LiteralPath $archive -DestinationPath $temp
+    $runtime = Join-Path $temp $lock.archiveRoot
+    $license = Join-Path (Split-Path -Parent $archive) 'LICENSE'
+  }
   $chrome = Join-Path $runtime 'chrome.exe'
-  if (!(Test-Path -LiteralPath $chrome -PathType Leaf)) { throw 'Chromium archive root does not contain chrome.exe.' }
+  if (!(Test-Path -LiteralPath $chrome -PathType Leaf)) { throw 'Chromium runtime does not contain chrome.exe.' }
   $actualVersion = (Get-Item -LiteralPath $chrome).VersionInfo.FileVersion
   if ($actualVersion -ne $lock.version) { throw "Locked Chromium version mismatch: $actualVersion" }
 
   Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $stagedPackage 'CGC-PMS.exe')
   Copy-Item -LiteralPath $runtime -Destination (Join-Path $stagedPackage 'chromium') -Recurse
-  $license = Join-Path (Split-Path -Parent $archive) 'LICENSE'
   if (!(Test-Path -LiteralPath $license -PathType Leaf)) {
     $fetched = & (Join-Path $PSScriptRoot 'fetch-chromium.ps1')
     $license = [string]$fetched.License
