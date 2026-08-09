@@ -4,7 +4,7 @@
 
 ## 当前入口
 
-- [项目地图](project-map.md)
+- [项目地图（含实施中的第85条主线）](project-map.md)
 - [V1.6 迭代决策](evolution-decision.md)
 
 V1.5 的[竞品分析](../archive/v1.5/product-intelligence/competitor-analysis.md)、[文档生成研究](../archive/v1.5/product-intelligence/docugenius-document-generation-analysis.md)和[迭代决策](../archive/v1.5/product-intelligence/evolution-decision.md)仅作历史回溯。
