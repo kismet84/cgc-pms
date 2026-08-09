@@ -1,29 +1,8 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-09T21:13:24+08:00",
+  "updatedAt": "2026-08-10T05:56:45+08:00",
   "issues": [
-    {
-      "issueKey": "ISSUE-085-001",
-      "title": "全仓业务编号统一与任务交付门禁契约校准",
-      "status": "IN_PROGRESS",
-      "classification": "CONFIRMED_AUDIT_REMEDIATION",
-      "priority": "P2",
-      "blocking": true,
-      "summary": "15个遗留日型本地编号生成器和1个质量问题子序号缺少统一999容量保护；最终实现SHA需刷新本地Live证据；长任务失败提示与全量复验行为不一致；GitHub master保护缺desktop-launcher。补齐前禁止任何新PR转Ready或合并，不阻塞本地整改。",
-      "acceptanceCriteria": "15个日型服务统一复用现有CodeGenerationService且13个Mapper覆盖租户、软删除、边界和并发；质量子序号999/1000失败关闭；最终SHA本地Live 9/9且0 skip/unexpected/flaky；长任务双检查复验计数2/2；GitHub master回读strict=true、15个精确contexts且全部app_id=15368；G0-G5和零悬空收口。",
-      "deferReason": "无；2026-08-09用户已授权本地实施、仓库GitHub分支保护校准和受保护Git交付。",
-      "sourceRefs": [
-        "docs/plans/第85条主线-全仓业务编号统一与任务交付门禁契约校准任务计划书.md",
-        "docs/quality/2026-08-08-issue-081-本地Live-E2E证据闭环与通用编号容量保护.md",
-        "backend/src/main/java/com/cgcpms/common/util/CodeGenerationService.java",
-        "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java",
-        ".agents/skills/long-task-gate/scripts/long-task-gate.mjs",
-        "scripts/demo/complete-project-v2/verify-live-all.ps1",
-        "scripts/codex-autopilot/verify-pre-pr-ci.ps1",
-        ".github/workflows/ci.yml"
-      ]
-    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

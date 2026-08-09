@@ -1,13 +1,13 @@
 # CGC-PMS 项目地图
 
-## 2026-08-09 主线85：全仓业务编号统一与任务/交付门禁契约校准实施中
+## 2026-08-10 主线85：全仓业务编号统一与任务/交付门禁契约校准本地收口、交付中
 
-- 问题源：`ISSUE-085-001`；状态`AUTHORIZED / G0_IN_PROGRESS / IMPLEMENTATION_IN_PROGRESS / GITHUB_CONFIG_AUTHORIZED / GIT_DELIVERY_AUTHORIZED`。
+- 问题源：`ISSUE-085-001`已关闭；状态`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED_PENDING`。
 - 目标链：`15个日型本地生成器 → CodeGenerationService/DeletedCodeSource → 001..999失败关闭`；`最终SHA → 既有9组本地Live → 精确证据`；`失败提示 → 全量Completion Contract复验`；`仓库15项 → GitHub master保护15项`。
 - 审计边界：`RECHECK-001/003/004`成立，`RECHECK-002`仅证据刷新成立；生产、目标环境、远端数据库和RC workflow不适用。
 - 最小方案：保留两套既有公共编号引擎的职责、3个已有保护特例、contract-only required CI和长任务全量复验；仅补缺口，不建新平台或状态。
-- 交付约束：当前GitHub保护缺`desktop-launcher`；补齐前禁止任何新PR转Ready或合并，本地整改不受阻。
-- 计划：[`第85条主线`](../plans/第85条主线-全仓业务编号统一与任务交付门禁契约校准任务计划书.md)。
+- 证据：干净实现 SHA 的9组Live共80项通过；长任务双检查复验2/2；GitHub保护回读`strict=true`、15个contexts且全部`app_id=15368`；[`质量报告`](../quality/2026-08-10-issue-085-全仓业务编号统一与任务交付门禁契约校准.md)。
+- 计划：[`第85条主线`](../plans/第85条主线-全仓业务编号统一与任务交付门禁契约校准任务计划书.md)；受保护Git交付待执行。
 
 ## 2026-08-08 主线81：本地 Live E2E 证据闭环与通用编号容量保护已合并
 

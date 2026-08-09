@@ -42,6 +42,7 @@
 - [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)
 - [v1.6 计划书](plans/README.md)
 - [第85条主线：全仓业务编号统一与任务交付门禁契约校准](plans/第85条主线-全仓业务编号统一与任务交付门禁契约校准任务计划书.md)
+- [第85条主线质量报告](quality/2026-08-10-issue-085-全仓业务编号统一与任务交付门禁契约校准.md)
 - [v1.6 质量报告](quality/README.md)
 - [V1.5 开发版本归档](archive/v1.5/README.md)
 - [业务闭环标准](business/)
