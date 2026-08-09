@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.core.toolkit.support.LambdaMeta;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -45,7 +44,6 @@ import java.util.List;
  * );
  * }</pre>
  */
-@Slf4j
 @Component
 public class CodeGenerationService {
 
@@ -196,7 +194,7 @@ public class CodeGenerationService {
     }
 
     /**
-     * includeDeleted=true 的兜底路径。
+     * includeDeleted=true 的含软删除专用路径；Mapper 缺少查询能力时失败关闭。
      * <p>
      * MyBatis-Plus 的 {@code @TableLogic} 在 SQL 解析层注入 {@code deleted_flag = 0}，
      * 无法通过 Wrapper API 移除。当需要查询含软删除的记录时，请在对应 Mapper 中
@@ -212,10 +210,7 @@ public class CodeGenerationService {
         if (mapper instanceof DeletedCodeSource codeProvider) {
             lastCode = codeProvider.selectLastCodeByPrefix(fullPrefix, tenantId);
         } else {
-            log.warn("includeDeleted=true 需通过 Mapper 额外声明查询能力，当前 mapper 不支持（将回退到默认路径）");
-            Page<T> page = new Page<>(0, 1);
-            Page<T> result = mapper.selectPage(page, wrapper);
-            return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+            throw missingDeletedCodeSource();
         }
 
         return parseSeqFromLastCode(lastCode, fullPrefix);
@@ -231,10 +226,7 @@ public class CodeGenerationService {
         if (mapper instanceof DeletedCodeSource codeProvider) {
             lastCode = codeProvider.selectLastCodeByPrefix(fullPrefix, tenantId);
         } else {
-            log.warn("includeDeleted=true 需通过 Mapper 额外声明查询能力，当前 mapper 不支持（将回退到默认路径）");
-            Page<T> page = new Page<>(0, 1);
-            Page<T> result = mapper.selectPage(page, wrapper);
-            return parseSeq(result.getRecords(), fullPrefix, codeGetter, offset);
+            throw missingDeletedCodeSource();
         }
 
         return parseSeqFromLastCode(lastCode, fullPrefix, offset);
@@ -308,6 +300,12 @@ public class CodeGenerationService {
         return new BusinessException(
                 "BUSINESS_CODE_SEQUENCE_INVALID",
                 "历史业务编号格式无效，无法安全生成下一编号: " + code);
+    }
+
+    private BusinessException missingDeletedCodeSource() {
+        return new BusinessException(
+                "BUSINESS_CODE_DELETED_SOURCE_MISSING",
+                "编号生成器缺少含软删除记录查询能力");
     }
 
     // ---------------------------------------------------------------------

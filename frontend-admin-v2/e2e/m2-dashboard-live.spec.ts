@@ -446,10 +446,21 @@ test.describe('M2 live eight-role dashboard', () => {
         data: { records: Array<{ severity: string }> }
       }
       const riskBadges = page.locator('#risk-list .risk-level')
-      await expect(riskBadges).toHaveCount(body.data.records.length)
-      expect(await riskBadges.allTextContents()).toEqual(
-        body.data.records.map((record) => riskLabel(record.severity)),
-      )
+      const pageSize = 10
+      const pageCount = Math.max(1, Math.ceil(body.data.records.length / pageSize))
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+        const visibleRecords = body.data.records.slice(
+          pageIndex * pageSize,
+          (pageIndex + 1) * pageSize,
+        )
+        await expect(riskBadges).toHaveCount(visibleRecords.length)
+        expect(await riskBadges.allTextContents()).toEqual(
+          visibleRecords.map((record) => riskLabel(record.severity)),
+        )
+        if (pageIndex + 1 < pageCount) {
+          await page.getByRole('button', { name: '下一页', exact: true }).click()
+        }
+      }
     }
   })
 

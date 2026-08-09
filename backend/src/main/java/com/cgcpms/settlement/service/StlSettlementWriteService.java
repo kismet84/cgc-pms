@@ -2,10 +2,9 @@ package com.cgcpms.settlement.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
@@ -48,7 +47,6 @@ import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_DRAFT;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -85,6 +83,7 @@ public class StlSettlementWriteService {
     private final WfInstanceMapper wfInstanceMapper;
     private final VarOrderMapper varOrderMapper;
     private final PayRecordMapper payRecordMapper;
+    private final CodeGenerationService codeGenerationService;
 
     // ================================================================
     // Create
@@ -112,8 +111,6 @@ public class StlSettlementWriteService {
         }
 
         // Auto-generate settlement code: STL-yyyyMMdd-XXX
-        String prefix = "STL-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-
         // Default statuses
         settlement.setApprovalStatus(APPROVAL_DRAFT);
         settlement.setSettlementStatus(SETTLEMENT_DRAFT);
@@ -124,7 +121,9 @@ public class StlSettlementWriteService {
         autoFillAmounts(settlement, contract);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            settlement.setSettlementCode(nextSettlementCode(tenantId, prefix, attempt));
+            settlement.setSettlementCode(codeGenerationService.nextCode(
+                    stlSettlementMapper, StlSettlement::getSettlementCode,
+                    "STL-", tenantId, true, attempt));
             try {
                 stlSettlementMapper.insert(settlement);
                 return settlement.getId();
@@ -141,25 +140,6 @@ public class StlSettlementWriteService {
             }
         }
         throw new BusinessException("STL_CODE_CONFLICT", "结算单编号生成冲突，请重试");
-    }
-
-    private String nextSettlementCode(Long tenantId, String prefix, int offset) {
-        LambdaQueryWrapper<StlSettlement> codeWrapper = new LambdaQueryWrapper<>();
-        codeWrapper.eq(StlSettlement::getTenantId, tenantId)
-                .likeRight(StlSettlement::getSettlementCode, prefix)
-                .orderByDesc(StlSettlement::getSettlementCode);
-        Page<StlSettlement> page = new Page<>(0, 1);
-        Page<StlSettlement> result = stlSettlementMapper.selectPage(page, codeWrapper);
-        StlSettlement last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-        int seq = 1 + offset;
-        if (last != null && last.getSettlementCode() != null && last.getSettlementCode().startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(last.getSettlementCode().substring(last.getSettlementCode().lastIndexOf('-') + 1)) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getSettlementCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     // ================================================================

@@ -1,8 +1,8 @@
 package com.cgcpms.settlement.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
@@ -101,7 +101,6 @@ class StlSettlementWriteServiceAmountTest {
         contract.setCurrentAmount(new BigDecimal("1000.00"));
         when(contractMapper.selectById(CONTRACT_ID)).thenReturn(contract);
         when(settlementMapper.selectCount(any())).thenReturn(0L);
-        when(settlementMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(0, 1));
         when(queryService.sumVarOrderConfirmed(TENANT_ID, PROJECT_ID, CONTRACT_ID))
                 .thenReturn(new BigDecimal("100.00"));
         when(queryService.sumSubMeasureApproved(TENANT_ID, PROJECT_ID, CONTRACT_ID))
@@ -324,6 +323,7 @@ class StlSettlementWriteServiceAmountTest {
                 settlementMapper, settlementItemMapper, contractMapper, workflowEngine, queryService,
                 settlementSubMeasureMapper, subMeasureMapper, subMeasureItemMapper, contractItemMapper,
                 fileLifecycleGateway, fileMapper, projectMapper,
-                projectAccessChecker, wfInstanceMapper, varOrderMapper, payRecordMapper);
+                projectAccessChecker, wfInstanceMapper, varOrderMapper, payRecordMapper,
+                new CodeGenerationService());
     }
 }

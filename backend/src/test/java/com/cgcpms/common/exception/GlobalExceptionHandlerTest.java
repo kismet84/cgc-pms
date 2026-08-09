@@ -1,6 +1,7 @@
 package com.cgcpms.common.exception;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,5 +28,14 @@ class GlobalExceptionHandlerTest {
             assertEquals("RESOURCE_NOT_FOUND", response.getBody().getCode());
             assertEquals("资源不存在", response.getBody().getMessage());
         }
+    }
+
+    @Test
+    void unhandledUniqueConflictsReturnStableDataConflict() {
+        var response = new GlobalExceptionHandler().handleDataIntegrity(
+                new DataIntegrityViolationException("duplicate key"));
+
+        assertEquals("DATA_CONFLICT", response.getCode());
+        assertEquals("数据冲突，请刷新后重试", response.getMessage());
     }
 }

@@ -2,9 +2,9 @@ package com.cgcpms.bid;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.bid.service.BidAwardProjectCreator.BidAwardProjectCommand;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.service.BidAwardProjectService;
@@ -41,7 +41,7 @@ class BidAwardProjectServiceTest {
             assistant.setCurrentNamespace("BidAwardProjectServiceTest");
             TableInfoHelper.initTableInfo(assistant, PmProject.class);
         }
-        service = new BidAwardProjectService(projectMapper);
+        service = new BidAwardProjectService(projectMapper, new CodeGenerationService());
     }
 
     @Test
@@ -55,7 +55,7 @@ class BidAwardProjectServiceTest {
 
     @Test
     void mapsRequiredAwardFieldsWithoutDefaults() {
-        when(projectMapper.selectPage(any(), any())).thenReturn(new Page<>());
+        when(projectMapper.selectLastCodeByPrefix(any(), any())).thenReturn(null);
         doAnswer(invocation -> {
             PmProject project = invocation.getArgument(0);
             project.setId(99L);

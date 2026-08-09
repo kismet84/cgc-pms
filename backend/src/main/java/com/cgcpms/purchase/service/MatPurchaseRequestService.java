@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.util.DateTimeUtils;
@@ -35,7 +36,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +59,7 @@ public class MatPurchaseRequestService {
     private final JdbcTemplate jdbcTemplate;
     private final ProcurementIntegrityService integrityService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     // ================================================================
     // 分页查询
@@ -160,7 +161,9 @@ public class MatPurchaseRequestService {
         request.setTenantId(tenantId);
 
         for (int attempt = 0; attempt < 3; attempt++) {
-            request.setRequestCode(nextRequestCode(tenantId, attempt));
+            request.setRequestCode(codeGenerationService.nextCode(
+                    requestMapper, MatPurchaseRequest::getRequestCode,
+                    "PR-", tenantId, true, attempt));
             try {
                 requestMapper.insert(request);
                 return request.getId();
@@ -453,29 +456,6 @@ public class MatPurchaseRequestService {
         if (projectId == null) {
             throw new BusinessException("PROJECT_REQUIRED", "项目不能为空");
         }
-    }
-
-    private String nextRequestCode(Long tenantId, int offset) {
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "PR-" + today + "-";
-
-        LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatPurchaseRequest::getRequestCode, prefix)
-                .eq(MatPurchaseRequest::getTenantId, tenantId)
-                .orderByDesc(MatPurchaseRequest::getRequestCode);
-        Page<MatPurchaseRequest> page = new Page<>(0, 1);
-        Page<MatPurchaseRequest> result = requestMapper.selectPage(page, wrapper);
-        MatPurchaseRequest last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getRequestCode() != null && last.getRequestCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getRequestCode().substring(prefix.length())) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getRequestCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     // ================================================================

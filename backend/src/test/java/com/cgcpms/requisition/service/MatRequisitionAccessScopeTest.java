@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
@@ -54,7 +55,8 @@ class MatRequisitionAccessScopeTest {
             projectAccessChecker,
             projectExecutionGuard,
             mock(WorkflowEngine.class),
-            assembler);
+            assembler,
+            new CodeGenerationService());
 
     @BeforeAll
     static void initializeLambdaMetadata() {

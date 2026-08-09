@@ -2,13 +2,12 @@ package com.cgcpms.purchase.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.entity.ContractBudgetAllocation;
 import com.cgcpms.budget.mapper.ContractBudgetAllocationMapper;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -51,6 +50,7 @@ public class PurchaseRequestConversionService {
     private final ContractBudgetAllocationMapper contractBudgetAllocationMapper;
     private final PurchaseOrderPricingService pricingService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final CodeGenerationService codeGenerationService;
 
     /** 显式从已审批申请建单；订单商业事实全部由合同/最近入库事实推导。 */
     @Transactional(rollbackFor = Exception.class)
@@ -135,9 +135,10 @@ public class PurchaseRequestConversionService {
     }
 
     private void insertWithGeneratedCode(MatPurchaseOrder order, Long tenantId) {
-        String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            order.setOrderCode(nextOrderCode(prefix, tenantId, attempt));
+            order.setOrderCode(codeGenerationService.nextCode(
+                    orderMapper, MatPurchaseOrder::getOrderCode,
+                    "PO-", tenantId, true, attempt));
             try {
                 orderMapper.insert(order);
                 return;
@@ -146,24 +147,6 @@ public class PurchaseRequestConversionService {
             }
         }
         throw new BusinessException("PURCHASE_ORDER_CODE_CONFLICT", "采购订单编号生成冲突，请重试");
-    }
-
-    private String nextOrderCode(String prefix, Long tenantId, int offset) {
-        Page<MatPurchaseOrder> page = orderMapper.selectPage(new Page<>(1, 1),
-                new LambdaQueryWrapper<MatPurchaseOrder>()
-                        .eq(MatPurchaseOrder::getTenantId, tenantId)
-                        .likeRight(MatPurchaseOrder::getOrderCode, prefix)
-                        .orderByDesc(MatPurchaseOrder::getOrderCode));
-        MatPurchaseOrder last = page.getRecords().isEmpty() ? null : page.getRecords().getFirst();
-        int sequence = 1 + offset;
-        if (last != null && last.getOrderCode() != null && last.getOrderCode().startsWith(prefix)) {
-            try {
-                sequence = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1 + offset;
-            } catch (NumberFormatException exception) {
-                log.warn("采购订单编号后缀无法解析，改用候选序号：{}", last.getOrderCode());
-            }
-        }
-        return prefix + String.format("%03d", sequence);
     }
 
     private Long resolveContractBudgetLine(Long contractId, Long projectId, Long tenantId) {

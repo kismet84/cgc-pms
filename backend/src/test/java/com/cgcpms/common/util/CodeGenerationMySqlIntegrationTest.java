@@ -1,13 +1,28 @@
 package com.cgcpms.common.util;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.document.mapper.DocumentTemplateMapper;
+import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.revenue.entity.ContractRevenue;
 import com.cgcpms.revenue.mapper.ContractRevenueMapper;
+import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
+import com.cgcpms.variation.mapper.VarOrderMapper;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,8 +69,22 @@ class CodeGenerationMySqlIntegrationTest {
     @Autowired private DocumentTemplateMapper documentTemplateMapper;
     @Autowired private CtContractMapper contractMapper;
     @Autowired private PayRecordMapper payRecordMapper;
+    @Autowired private CtContractChangeMapper contractChangeMapper;
+    @Autowired private ExpenseApplicationMapper expenseApplicationMapper;
+    @Autowired private MdPartnerMapper partnerMapper;
+    @Autowired private PayApplicationMapper payApplicationMapper;
+    @Autowired private PmProjectMapper projectMapper;
+    @Autowired private MatPurchaseOrderMapper purchaseOrderMapper;
+    @Autowired private MatPurchaseRequestMapper purchaseRequestMapper;
+    @Autowired private MatReceiptMapper receiptMapper;
+    @Autowired private MatRequisitionMapper requisitionMapper;
+    @Autowired private StlSettlementMapper settlementMapper;
+    @Autowired private SubMeasureMapper subMeasureMapper;
+    @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private VarOrderMapper varOrderMapper;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private Environment environment;
+    @Autowired private SqlSession sqlSession;
 
     private long projectId;
     private long contractId;
@@ -128,15 +157,11 @@ class CodeGenerationMySqlIntegrationTest {
 
     @Test
     @Transactional
-    void allSixDeletedCodeMappersPreferLegacy1000AndKeepTenantIsolation() {
-        List<MapperCase> cases = List.of(
-                new MapperCase("bid_cost", "bid_code", "M81MAP-BID-", bidCostMapper),
-                new MapperCase("project_budget", "budget_code", "M81MAP-BUD-", projectBudgetMapper),
-                new MapperCase("biz_document_template", "template_code", "M81MAP-TPL-", documentTemplateMapper),
-                new MapperCase("ct_contract", "contract_code", "M81MAP-CT-", contractMapper),
-                new MapperCase("pay_record", "record_code", "M81MAP-PMT-", payRecordMapper),
-                new MapperCase("contract_revenue", "revenue_code", "M81MAP-RV-", mapper));
+    void allDeletedCodeMappersKeepTenantDateDeletedAndLexicographicScopes() {
+        List<MapperCase> cases = mapperCases();
 
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
+        String previousDay = LocalDate.now().minusDays(1).format(DateTimeUtils.DATE_COMPACT) + "-";
         for (MapperCase mapperCase : cases) {
             List<Long> ids = jdbc.queryForList(
                     "SELECT id FROM " + mapperCase.table() + " WHERE tenant_id=0 ORDER BY id LIMIT 2",
@@ -146,16 +171,91 @@ class CodeGenerationMySqlIntegrationTest {
                 ids = jdbc.queryForList(
                         "SELECT id FROM contract_revenue WHERE tenant_id=0 ORDER BY id LIMIT 2", Long.class);
             }
-            assertEquals(2, ids.size(), mapperCase.table() + " requires two dedicated demo rows");
+            if (ids.size() == 1) {
+                insertSecondMapperFixture(mapperCase, ids.getFirst());
+                ids = jdbc.queryForList(
+                        "SELECT id FROM " + mapperCase.table() + " WHERE tenant_id=0 ORDER BY id LIMIT 2",
+                        Long.class);
+            }
+            assertEquals(2, ids.size(), mapperCase.table() + " requires two controlled rows");
+            String currentPrefix = mapperCase.prefix() + today;
+            String previousPrefix = mapperCase.prefix() + previousDay;
             jdbc.update("UPDATE " + mapperCase.table() + " SET " + mapperCase.codeColumn()
-                    + "=?, deleted_flag=1 WHERE id=?", mapperCase.prefix() + "1000", ids.get(0));
-            jdbc.update("UPDATE " + mapperCase.table() + " SET " + mapperCase.codeColumn()
-                    + "=?, deleted_flag=0 WHERE id=?", mapperCase.prefix() + "998", ids.get(1));
+                    + "=?, deleted_flag=1 WHERE id=?", previousPrefix + "999", ids.get(0));
+            assertNull(mapperCase.source().selectLastCodeByPrefix(currentPrefix, TENANT));
 
-            assertEquals(mapperCase.prefix() + "1000",
-                    mapperCase.source().selectLastCodeByPrefix(mapperCase.prefix(), TENANT));
-            assertNull(mapperCase.source().selectLastCodeByPrefix(mapperCase.prefix(), OTHER_TENANT));
+            jdbc.update("UPDATE " + mapperCase.table() + " SET " + mapperCase.codeColumn()
+                    + "=?, deleted_flag=1 WHERE id=?", currentPrefix + "1000", ids.get(0));
+            jdbc.update("UPDATE " + mapperCase.table() + " SET " + mapperCase.codeColumn()
+                    + "=?, deleted_flag=0 WHERE id=?", currentPrefix + "998", ids.get(1));
+            sqlSession.clearCache();
+
+            assertEquals(currentPrefix + "1000",
+                    mapperCase.source().selectLastCodeByPrefix(currentPrefix, TENANT));
+            assertNull(mapperCase.source().selectLastCodeByPrefix(currentPrefix, OTHER_TENANT));
         }
+    }
+
+    @Test
+    void allM85CodeColumnsHaveTenantScopedUniqueConstraint() {
+        for (MapperCase mapperCase : mapperCases().stream()
+                .filter(candidate -> candidate.prefix().startsWith("M85MAP-"))
+                .toList()) {
+            List<String> uniqueIndexes = jdbc.queryForList("""
+                    SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index)
+                    FROM information_schema.statistics
+                    WHERE table_schema=DATABASE() AND table_name=? AND non_unique=0
+                    GROUP BY index_name
+                    """, String.class, mapperCase.table());
+            String requiredPrefix = "tenant_id," + mapperCase.codeColumn();
+            assertTrue(uniqueIndexes.stream().anyMatch(columns ->
+                            columns.equals(requiredPrefix) || columns.startsWith(requiredPrefix + ",")),
+                    mapperCase.table() + " requires tenant-scoped code uniqueness");
+        }
+    }
+
+    private void insertSecondMapperFixture(MapperCase mapperCase, long sourceId) {
+        long id = IdWorker.getId();
+        switch (mapperCase.table()) {
+            case "ct_contract_change" -> jdbc.update("""
+                    INSERT INTO ct_contract_change(
+                        id,tenant_id,project_id,contract_id,change_code,change_name,change_type)
+                    SELECT ?,tenant_id,project_id,contract_id,?,change_name,change_type
+                    FROM ct_contract_change WHERE id=?
+                    """, id, mapperCase.prefix() + "FIXTURE", sourceId);
+            case "expense_application" -> jdbc.update("""
+                    INSERT INTO expense_application(
+                        id,tenant_id,project_id,contract_id,cost_subject_id,budget_line_id,payee_partner_id,
+                        expense_code,expense_category,expense_date,amount,description)
+                    SELECT ?,tenant_id,project_id,contract_id,cost_subject_id,budget_line_id,payee_partner_id,
+                           ?,expense_category,expense_date,amount,description
+                    FROM expense_application WHERE id=?
+                    """, id, mapperCase.prefix() + "FIXTURE", sourceId);
+            default -> throw new AssertionError(mapperCase.table() + " requires two dedicated demo rows");
+        }
+    }
+
+    private List<MapperCase> mapperCases() {
+        return List.of(
+                new MapperCase("bid_cost", "bid_code", "M81MAP-BID-", bidCostMapper),
+                new MapperCase("project_budget", "budget_code", "M81MAP-BUD-", projectBudgetMapper),
+                new MapperCase("biz_document_template", "template_code", "M81MAP-TPL-", documentTemplateMapper),
+                new MapperCase("ct_contract", "contract_code", "M81MAP-CT-", contractMapper),
+                new MapperCase("pay_record", "record_code", "M81MAP-PMT-", payRecordMapper),
+                new MapperCase("contract_revenue", "revenue_code", "M81MAP-RV-", mapper),
+                new MapperCase("ct_contract_change", "change_code", "M85MAP-CC-", contractChangeMapper),
+                new MapperCase("expense_application", "expense_code", "M85MAP-EXP-", expenseApplicationMapper),
+                new MapperCase("md_partner", "partner_code", "M85MAP-PTN-", partnerMapper),
+                new MapperCase("pay_application", "apply_code", "M85MAP-PAY-", payApplicationMapper),
+                new MapperCase("pm_project", "project_code", "M85MAP-XM-", projectMapper),
+                new MapperCase("mat_purchase_order", "order_code", "M85MAP-PO-", purchaseOrderMapper),
+                new MapperCase("mat_purchase_request", "request_code", "M85MAP-PR-", purchaseRequestMapper),
+                new MapperCase("mat_receipt", "receipt_code", "M85MAP-MR-", receiptMapper),
+                new MapperCase("mat_requisition", "requisition_code", "M85MAP-REQ-", requisitionMapper),
+                new MapperCase("stl_settlement", "settlement_code", "M85MAP-STL-", settlementMapper),
+                new MapperCase("sub_measure", "measure_code", "M85MAP-SM-", subMeasureMapper),
+                new MapperCase("sub_task", "task_code", "M85MAP-SUB-", subTaskMapper),
+                new MapperCase("var_order", "var_code", "M85MAP-VO-", varOrderMapper));
     }
 
     @Test

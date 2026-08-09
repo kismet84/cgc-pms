@@ -185,13 +185,26 @@ test('explicit prompt requests, arms, checks, and completes', () => {
 
 test('failed check continues, repaired check completes', () => {
   const ctx = fixture();
+  const firstCount = path.join(ctx.root, 'first-count');
+  const secondCount = path.join(ctx.root, 'second-count');
+  writeFileSync(path.join(ctx.repository, 'first-check.mjs'), `import{appendFileSync}from'node:fs';appendFileSync(${JSON.stringify(firstCount)},'1');`);
+  writeFileSync(path.join(ctx.repository, 'second-check.mjs'), `import{appendFileSync,existsSync}from'node:fs';appendFileSync(${JSON.stringify(secondCount)},'1');if(!existsSync('repaired.txt'))process.exit(1);`);
   prompt(ctx);
-  assert.equal(arm(ctx).status, 0);
+  assert.equal(arm(ctx, contract({
+    checks: [
+      { name: 'first', type: 'command', executable: 'node', args: ['first-check.mjs'], cwd: '.' },
+      { name: 'second', type: 'command', executable: 'node', args: ['second-check.mjs'], cwd: '.' },
+    ],
+    gitScope: ['first-check.mjs', 'second-check.mjs', 'repaired.txt'],
+  })).status, 0);
   const failed = json(stop(ctx));
   assert.equal(failed.decision, 'block');
   assert.match(failed.reason, /quality_or_security|ready_issue_config/);
-  writeFileSync(path.join(ctx.repository, 'done.txt'), 'OK\n');
+  assert.match(failed.reason, /修复后从首项重跑全部 Completion Contract 检查。/);
+  writeFileSync(path.join(ctx.repository, 'repaired.txt'), 'OK\n');
   assert.deepEqual(json(stop(ctx)), {});
+  assert.equal(readFileSync(firstCount, 'utf8').length, 2);
+  assert.equal(readFileSync(secondCount, 'utf8').length, 2);
   assert.equal(status(ctx).tasks[0].status, 'COMPLETED');
 });
 

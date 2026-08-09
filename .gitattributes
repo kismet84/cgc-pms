@@ -4,6 +4,7 @@
 *.mjs text eol=lf
 *.txt text eol=lf
 *.bat text eol=crlf
+*.cmd text eol=crlf
 *.java text eol=lf
 *.ts text eol=lf
 *.vue text eol=lf
@@ -17,3 +18,6 @@
 .gitattributes text eol=lf
 *.ps1 text eol=lf
 *.psm1 text eol=lf
+Dockerfile text eol=lf
+mvnw text eol=lf
+.factorypath text eol=lf

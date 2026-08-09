@@ -584,7 +584,7 @@ function handleStop() {
       if (state.status === 'BLOCKED_GATE') state.terminalTurnHash = turnHash(payload);
       state = atomicWriteJson(selected.file, state);
       appendEvent(selected.file, state, 'gate-failed', `${result.name} attempt=${attempts}`);
-      const reason = `失败分类 ${result.category}；检查 ${result.name}：${result.detail} 修复后只复验该检查。`;
+      const reason = `失败分类 ${result.category}；检查 ${result.name}：${result.detail} 修复后从首项重跑全部 Completion Contract 检查。`;
       if (state.status === 'BLOCKED_GATE') return output({ continue: false, stopReason: `${reason} 相同失败已达 3 次，停止自动续跑。`, ...notifyTurnStop(payload, root, 'BLOCKED_GATE') });
       return output({ decision: 'block', reason });
     }

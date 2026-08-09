@@ -2,6 +2,7 @@ package com.cgcpms.payment;
 
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
@@ -47,6 +48,7 @@ class PurchaseContractPaymentLimitTest {
             mock(ProjectAccessChecker.class), mock(PaymentApplicationIntegrityService.class),
             mock(PaymentApplicationSourceService.class), mock(SysDictDataService.class),
             mock(FileLifecycleGateway.class),
+            new CodeGenerationService(),
             mock(WorkflowEngine.class));
 
     @BeforeEach

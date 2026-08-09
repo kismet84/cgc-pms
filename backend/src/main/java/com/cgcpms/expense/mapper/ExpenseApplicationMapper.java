@@ -1,6 +1,7 @@
 package com.cgcpms.expense.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cgcpms.common.util.DeletedCodeSource;
 import com.cgcpms.expense.entity.ExpenseApplication;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -10,7 +11,10 @@ import org.apache.ibatis.annotations.Update;
 import java.math.BigDecimal;
 
 @Mapper
-public interface ExpenseApplicationMapper extends BaseMapper<ExpenseApplication> {
+public interface ExpenseApplicationMapper extends BaseMapper<ExpenseApplication>, DeletedCodeSource {
+    @Select("SELECT expense_code FROM expense_application WHERE expense_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY CHAR_LENGTH(expense_code) DESC, expense_code DESC LIMIT 1")
+    String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
+
     @Select("SELECT * FROM expense_application WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     ExpenseApplication selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 

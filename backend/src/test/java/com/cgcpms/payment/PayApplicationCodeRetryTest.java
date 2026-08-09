@@ -1,8 +1,8 @@
 package com.cgcpms.payment;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -32,7 +32,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -71,11 +70,7 @@ class PayApplicationCodeRetryTest {
         PayApplicationService service = newService(mapper, contractMapper, dictDataService);
 
         String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-        PayApplication last = new PayApplication();
-        last.setApplyCode(prefix + "001");
-        Page<PayApplication> page = new Page<>(0, 1);
-        page.setRecords(List.of(last));
-        when(mapper.selectPage(any(Page.class), any())).thenReturn(page);
+        when(mapper.selectLastCodeByPrefix(any(), any())).thenReturn(prefix + "001");
         doThrow(new DuplicateKeyException("dup"))
                 .doAnswer(invocation -> {
                     PayApplication app = invocation.getArgument(0);
@@ -114,9 +109,7 @@ class PayApplicationCodeRetryTest {
                 .thenAnswer(invocation -> invocation.getArgument(1));
         PayApplicationService service = newService(mapper, contractMapper, dictDataService);
 
-        Page<PayApplication> emptyPage = new Page<>(0, 1);
-        emptyPage.setRecords(List.of());
-        when(mapper.selectPage(any(Page.class), any())).thenReturn(emptyPage);
+        when(mapper.selectLastCodeByPrefix(any(), any())).thenReturn(null);
         doAnswer(invocation -> {
             PayApplication app = invocation.getArgument(0);
             app.setId(43L);
@@ -158,6 +151,7 @@ class PayApplicationCodeRetryTest {
                 mock(PaymentApplicationSourceService.class),
                 dictDataService,
                 mock(FileLifecycleGateway.class),
+                new CodeGenerationService(),
                 mock(WorkflowEngine.class));
     }
 }

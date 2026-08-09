@@ -39,6 +39,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class QualitySafetyService {
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
+    private static final int ISSUE_CODE_MAX_SEQUENCE = 999;
     private static final Set<String> INSPECTION_TYPES = Set.of("QUALITY", "SAFETY");
     private static final Set<String> FREQUENCIES = Set.of("SINGLE", "WEEKLY", "MONTHLY");
     private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
@@ -641,7 +642,13 @@ public class QualitySafetyService {
     private String nextIssueCode(QualityInspectionRecord inspection) {
         long count = issueMapper.selectCount(new LambdaQueryWrapper<QualitySafetyIssue>()
                 .eq(QualitySafetyIssue::getTenantId, tenantId()).eq(QualitySafetyIssue::getInspectionId, inspection.getId()));
-        return normalizeCode(inspection.getInspectionCode()) + "-ISS-" + String.format("%03d", count + 1);
+        long sequence = count + 1;
+        if (sequence > ISSUE_CODE_MAX_SEQUENCE) {
+            throw new BusinessException(
+                    "BUSINESS_CODE_SEQUENCE_EXHAUSTED",
+                    "该检查单问题编号已达到999条，请联系管理员");
+        }
+        return normalizeCode(inspection.getInspectionCode()) + "-ISS-" + String.format("%03d", sequence);
     }
 
     private QualitySafetyIssue findIssueByClientRequest(String clientRequestId) {

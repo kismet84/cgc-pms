@@ -12,6 +12,7 @@ import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
@@ -41,7 +42,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -63,6 +63,7 @@ public class ExpenseApplicationService {
     private final WorkflowEngine workflowEngine;
     private final SysDictDataService sysDictDataService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<ExpenseApplicationVO> getPage(long pageNo, long pageSize, Long projectId,
                                                 Long contractId, String approvalStatus) {
@@ -99,9 +100,10 @@ public class ExpenseApplicationService {
         expense.setPaidAmount(BigDecimal.ZERO.setScale(2));
         expense.setApprovalStatus("DRAFT");
         expense.setVersion(0);
-        String prefix = "EXP-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            expense.setExpenseCode(nextCode(prefix, attempt));
+            expense.setExpenseCode(codeGenerationService.nextCode(
+                    expenseMapper, ExpenseApplication::getExpenseCode,
+                    "EXP-", expense.getTenantId(), true, attempt));
             try {
                 expenseMapper.insert(expense);
                 return expense.getId();
@@ -231,24 +233,6 @@ public class ExpenseApplicationService {
             throw new BusinessException("EXPENSE_NOT_FOUND", "费用申请不存在");
         }
         return expense;
-    }
-
-    private String nextCode(String prefix, int offset) {
-        Page<ExpenseApplication> page = expenseMapper.selectPage(new Page<>(0, 1),
-                new LambdaQueryWrapper<ExpenseApplication>()
-                        .eq(ExpenseApplication::getTenantId, UserContext.getCurrentTenantId())
-                        .likeRight(ExpenseApplication::getExpenseCode, prefix)
-                        .orderByDesc(ExpenseApplication::getExpenseCode));
-        int sequence = 1 + offset;
-        if (!page.getRecords().isEmpty()) {
-            String last = page.getRecords().get(0).getExpenseCode();
-            try {
-                sequence = Integer.parseInt(last.substring(last.lastIndexOf('-') + 1)) + 1 + offset;
-            } catch (RuntimeException ignored) {
-                // 非标准历史编号不阻止生成新编号。
-            }
-        }
-        return prefix + String.format("%03d", sequence);
     }
 
     private ExpenseApplicationVO toVO(ExpenseApplication expense) {

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -49,6 +50,7 @@ public class SubTaskService {
     private final SubMeasureMapper subMeasureMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final ProjectExecutionGuard projectExecutionGuard;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<SubTaskVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                      Long partnerId, String status, String taskCode, String taskName) {
@@ -128,8 +130,6 @@ public class SubTaskService {
         projectExecutionGuard.requireActiveWbs(task.getProjectId(), task.getWbsTaskId(), "创建分包任务");
         validateBusinessContext(task.getProjectId(), task.getContractId(), task.getPartnerId());
         // Auto-generate task code: SUB-yyyyMMdd-XXX
-        String prefix = "SUB-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-
         // Default status
         if (task.getStatus() == null || task.getStatus().isBlank()) {
             task.setStatus("NOT_STARTED");
@@ -138,7 +138,9 @@ public class SubTaskService {
         validateDependencyConsistency(task, null);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            task.setTaskCode(nextTaskCode(prefix, attempt));
+            task.setTaskCode(codeGenerationService.nextCode(
+                    subTaskMapper, SubTask::getTaskCode,
+                    "SUB-", task.getTenantId(), true, attempt));
             try {
                 subTaskMapper.insert(task);
                 return task.getId();
@@ -147,26 +149,6 @@ public class SubTaskService {
             }
         }
         throw new BusinessException("SUB_TASK_CODE_CONFLICT", "分包任务编号生成冲突，请重试");
-    }
-
-    private String nextTaskCode(String prefix, int offset) {
-        LambdaQueryWrapper<SubTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SubTask::getTenantId, UserContext.getCurrentTenantId())
-                .likeRight(SubTask::getTaskCode, prefix)
-                .orderByDesc(SubTask::getTaskCode);
-        Page<SubTask> page = new Page<>(0, 1);
-        Page<SubTask> result = subTaskMapper.selectPage(page, wrapper);
-        SubTask last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getTaskCode() != null && last.getTaskCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getTaskCode().substring(prefix.length())) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getTaskCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -1,5 +1,16 @@
 # Current Focus
 
+## 2026-08-10 第85条主线：全仓业务编号统一与任务/交付门禁契约校准本地收口、交付中
+
+- 目标：迁移15个遗留日型本地编号生成器、保护1个质量问题子序号；刷新最终实现SHA的9组本地Live证据；校准长任务全契约复验提示；补齐GitHub `desktop-launcher` required context。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / ISSUE-085-001_CLOSED / GIT_DELIVERY_AUTHORIZED_PENDING`。
+- 审计裁决：`RECHECK-001/003/004`成立，`RECHECK-002`仅当前SHA本地证据缺口成立；生产、目标环境、远端数据库和`release-candidate.yml`建议不适用。
+- 结果：15个服务/13个Mapper统一失败关闭；质量子序号999/1000、长任务复验2/2、干净实现SHA本地Live 9/9共80/80均通过。
+- 保护：GitHub `master` 回读 `strict=true`、15个精确contexts、全部`app_id=15368`，已包含`desktop-launcher`。
+- 边界：仅本地dev/test/demo与既有GitHub Actions；本轮已授权本地实施、仓库GitHub分支保护校准和受保护Git交付，不授权生产、目标环境、强推、保护绕过或发布。
+- 证据：[`质量报告`](../quality/2026-08-10-issue-085-全仓业务编号统一与任务交付门禁契约校准.md)；[`第85条计划`](../plans/第85条主线-全仓业务编号统一与任务交付门禁契约校准任务计划书.md)；受保护Git完整交付待执行。
+- 零悬空：计划全周期新增1、关闭1、净变化`0`；无无载体遗留项。
+
 ## 2026-08-08 第81条主线：本地 Live E2E 证据闭环与通用编号容量保护已合并
 
 - 目标：为9组本地 live E2E 建立安全、可重复、绑定当前 SHA 的统一证据入口；在公共编号服务单点阻止三位日序号超过999。

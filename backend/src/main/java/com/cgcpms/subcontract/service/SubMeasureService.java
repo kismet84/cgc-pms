@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -36,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +66,7 @@ public class SubMeasureService {
     private final SubMeasureIntegrityService integrityService;
     private final ProjectAccessChecker projectAccessChecker;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<SubMeasureVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                         Long partnerId, String status, String measureCode) {
@@ -146,8 +147,6 @@ public class SubMeasureService {
         validateSubTaskBelongsToSameContext(measure);
 
         // Auto-generate measure code: SM-yyyyMMdd-XXX
-        String prefix = "SM-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-
         // Amounts and lifecycle fields become authoritative only after server-side item saving.
         measure.setReportedAmount(BigDecimal.ZERO.setScale(2));
         measure.setApprovedAmount(BigDecimal.ZERO.setScale(2));
@@ -157,7 +156,9 @@ public class SubMeasureService {
         measure.setCostGeneratedFlag(0);
         measure.setStatus("DRAFT");
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            measure.setMeasureCode(nextMeasureCode(prefix, attempt));
+            measure.setMeasureCode(codeGenerationService.nextCode(
+                    subMeasureMapper, SubMeasure::getMeasureCode,
+                    "SM-", measure.getTenantId(), true, attempt));
             try {
                 subMeasureMapper.insert(measure);
                 return measure.getId();
@@ -166,26 +167,6 @@ public class SubMeasureService {
             }
         }
         throw new BusinessException("SUB_MEASURE_CODE_CONFLICT", "分包计量编号生成冲突，请重试");
-    }
-
-    private String nextMeasureCode(String prefix, int offset) {
-        LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SubMeasure::getTenantId, UserContext.getCurrentTenantId())
-                .likeRight(SubMeasure::getMeasureCode, prefix)
-                .orderByDesc(SubMeasure::getMeasureCode);
-        Page<SubMeasure> page = new Page<>(0, 1);
-        Page<SubMeasure> result = subMeasureMapper.selectPage(page, wrapper);
-        SubMeasure last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getMeasureCode() != null && last.getMeasureCode().startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(last.getMeasureCode().substring(last.getMeasureCode().lastIndexOf('-') + 1)) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getMeasureCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

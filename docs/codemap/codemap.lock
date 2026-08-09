@@ -1,7 +1,7 @@
 {
-  "current_commit": "fafd400f228549f563e892a6801be732bf3523a6",
-  "working_tree_dirty": true,
-  "generation_time": "2026-08-09T11:12:41.528Z",
+  "current_commit": "710a3ae51a6cdd7b39f78cc4a047c81df7e6d156",
+  "working_tree_dirty": false,
+  "generation_time": "2026-08-09T22:14:35.397Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -45,23 +45,21 @@
   ],
   "fingerprint_algorithm": {
     "name": "sha256",
-    "version": "repo-path-content-v2",
-    "input": "git tracked and untracked non-ignored paths plus current working-tree bytes",
+    "version": "repo-path-git-object-v3",
+    "input": "git tracked and untracked non-ignored paths plus Git-normalized object IDs",
     "path_order": "ordinal case-sensitive",
-    "record_format": "P:<utf8-path-byte-length>:<utf8-path>C:<content-byte-length>:<raw-content><LF>",
+    "record_format": "P:<utf8-path-byte-length>:<utf8-path>O:<git-object-id-byte-length>:<git-object-id><LF>",
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3860,
-  "repository_file_count": 3860,
-  "included_file_count": 2596,
+  "tracked_file_count": 3863,
+  "repository_file_count": 3863,
+  "included_file_count": 2599,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
-    "stale_modules": [
-      "documentation"
-    ],
-    "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
+    "stale_modules": [],
+    "reason": "Current snapshot matches previous code map inputs."
   },
   "modules": [
     {
@@ -72,7 +70,7 @@
         "plugins/**"
       ],
       "file_count": 86,
-      "fingerprint": "92bb29cf427f8cb295a4e55a85ccd43e6c941c0e2207414551032a93ee3806a3"
+      "fingerprint": "27f438be3eeaae444444a0e8f463346e03d7dc3cb311a9bd58ea2106ce936ef4"
     },
     {
       "id": "backend",
@@ -80,7 +78,7 @@
         "backend/**"
       ],
       "file_count": 1797,
-      "fingerprint": "c59d6043f5c77dd7dae0c23e46dac3cf3d105288224e793e085082ffa667d24b"
+      "fingerprint": "41a6824fdaf7ce44f3e22f8f33013575380cd59a3517e9e57f951f7f2977d113"
     },
     {
       "id": "delivery_tooling",
@@ -91,8 +89,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 274,
-      "fingerprint": "3288687b9d49b85eab64f79117be5b61a63a115d1e188f6b2e4008eb1c8f6367"
+      "file_count": 275,
+      "fingerprint": "37a3f80b840041920db42ba241b3dba3f97780f9dfbf29fee1fad219cd078881"
     },
     {
       "id": "desktop_launcher",
@@ -100,15 +98,15 @@
         "desktop-launcher/**"
       ],
       "file_count": 17,
-      "fingerprint": "2e89390f0d24141eb34238c53d5c8963da92bc63d4912b25c22ce43ad19ab709"
+      "fingerprint": "e5b23fd46665cbd32adb7f78c1a162735759be8a8e027d49fb957707b287b88f"
     },
     {
       "id": "documentation",
       "scope": [
         "docs/**"
       ],
-      "file_count": 126,
-      "fingerprint": "34200233a2c20e88834abd496ef4f18604cc0af8544fd0c7af48013da4b717ea"
+      "file_count": 128,
+      "fingerprint": "f58bd421abcc89a0c52d1e69a6e95ec359c31e75ef3eaa5f21a9e38c10bce160"
     },
     {
       "id": "frontend_v2",
@@ -116,7 +114,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 271,
-      "fingerprint": "0c2bbf12480d4691b50c35abec5efc8a97b78b6d2edf7440ff38726f8d907f4c"
+      "fingerprint": "3577261c006d96d844eea5e67a6ee57edc90f44150d1adcc47f7c2c2078faf39"
     },
     {
       "id": "mobile",
@@ -132,7 +130,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "e8d3fa2dfa5da43e58a7c608da203d08558c2df1ba14eb1156e5244746753c87"
+      "fingerprint": "a1a49510cf34ac2acb599bd6fcbc491ec899b04817b0025c0c471855a44eec25"
     },
     {
       "id": "shared_packages",
@@ -140,7 +138,7 @@
         "packages/**"
       ],
       "file_count": 19,
-      "fingerprint": "8f6204efd97703e4f4d4a9724ce2bb28092bfd9d2ca51f015e7549c3e47f664a"
+      "fingerprint": "ad92d70570306eeeab43e2afe9b74cab54f021319684e31c4c4efe333ad64b21"
     }
   ]
 }

@@ -13,7 +13,7 @@
 
 - [终端用户手册](end-user-manual.md)
 - [管理员手册](admin-manual.md)
-- [Codex 长任务完成门禁、终态摘要与飞书通知](codex-long-task-gate.md)
+- [Codex 长任务完成门禁、失败后全契约复验、终态摘要与飞书通知](codex-long-task-gate.md)
 
 ## 使用边界
 

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
@@ -20,10 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
 @Service
@@ -35,6 +34,7 @@ public class CtContractChangeService {
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
     private final BusinessMatterRegistryService businessMatterRegistryService;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<CtContractChange> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                            String changeType, String approvalStatus, String changeCode) {
@@ -75,7 +75,9 @@ public class CtContractChangeService {
                     "DRAFT 或 TERMINATED 状态的合同禁止创建变更");
 
         // 自动编号: CC-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
-        change.setChangeCode(nextChangeCode());
+        change.setChangeCode(codeGenerationService.nextCode(
+                ctContractChangeMapper, CtContractChange::getChangeCode,
+                "CC-", UserContext.getCurrentTenantId(), true));
 
         // 默认值
         if (change.getApprovalStatus() == null || change.getApprovalStatus().isBlank()) {
@@ -197,7 +199,9 @@ public class CtContractChangeService {
         change.setProjectId(order.getProjectId());
         change.setContractId(order.getContractId());
         change.setSourceVarOrderId(order.getId());
-        change.setChangeCode(nextChangeCode());
+        change.setChangeCode(codeGenerationService.nextCode(
+                ctContractChangeMapper, CtContractChange::getChangeCode,
+                "CC-", UserContext.getCurrentTenantId(), true));
         change.setChangeName("业主核定-" + order.getVarCode() + "-" + order.getVarName());
         change.setChangeType("AMOUNT");
         change.setBeforeAmount(before);
@@ -218,20 +222,6 @@ public class CtContractChangeService {
                 .eq(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_DRAFT)
                 .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
         return change.getId();
-    }
-
-    private String nextChangeCode() {
-        String prefix = "CC-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-        String lastCode = ctContractChangeMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
-        int seq = 1;
-        if (lastCode != null && lastCode.startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", lastCode, e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     private void checkProjectAccess(Long projectId, String action) {

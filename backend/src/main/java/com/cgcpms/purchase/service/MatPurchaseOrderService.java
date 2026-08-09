@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
@@ -41,7 +42,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
@@ -71,6 +71,7 @@ public class MatPurchaseOrderService {
     private final WfInstanceMapper wfInstanceMapper;
     private final PurchaseOrderPricingService pricingService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
@@ -194,7 +195,6 @@ public class MatPurchaseOrderService {
         toInsert.setRemark(order.getRemark());
         toInsert.setTotalAmount(BigDecimal.ZERO);
         // Auto-generate order code: PO-yyyyMMdd-XXX
-        String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         toInsert.setOrderStatus("DRAFT");
         toInsert.setApprovalStatus("DRAFT");
 
@@ -211,7 +211,9 @@ public class MatPurchaseOrderService {
         }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            toInsert.setOrderCode(nextOrderCode(prefix, attempt));
+            toInsert.setOrderCode(codeGenerationService.nextCode(
+                    matPurchaseOrderMapper, MatPurchaseOrder::getOrderCode,
+                    "PO-", toInsert.getTenantId(), true, attempt));
             try {
                 matPurchaseOrderMapper.insert(toInsert);
                 return toInsert.getId();
@@ -220,26 +222,6 @@ public class MatPurchaseOrderService {
             }
         }
         throw new BusinessException("PURCHASE_ORDER_CODE_CONFLICT", "采购订单编号生成冲突，请重试");
-    }
-
-    private String nextOrderCode(String prefix, int offset) {
-        LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatPurchaseOrder::getOrderCode, prefix)
-                .eq(MatPurchaseOrder::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatPurchaseOrder::getOrderCode);
-        Page<MatPurchaseOrder> page = new Page<>(0, 1);
-        Page<MatPurchaseOrder> result = matPurchaseOrderMapper.selectPage(page, wrapper);
-        MatPurchaseOrder last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1 + offset;
-        if (last != null && last.getOrderCode() != null && last.getOrderCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1 + offset;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getOrderCode(), e);
-            }
-        }
-        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

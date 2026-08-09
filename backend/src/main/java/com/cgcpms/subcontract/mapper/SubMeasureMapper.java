@@ -1,6 +1,7 @@
 package com.cgcpms.subcontract.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.cgcpms.common.util.DeletedCodeSource;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -9,7 +10,10 @@ import org.apache.ibatis.annotations.Select;
 import java.math.BigDecimal;
 
 @Mapper
-public interface SubMeasureMapper extends BaseMapper<SubMeasure> {
+public interface SubMeasureMapper extends BaseMapper<SubMeasure>, DeletedCodeSource {
+    @Select("SELECT measure_code FROM sub_measure WHERE measure_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY CHAR_LENGTH(measure_code) DESC, measure_code DESC LIMIT 1")
+    String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);
+
     @Select("SELECT * FROM sub_measure WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     SubMeasure selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
