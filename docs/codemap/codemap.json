@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-08T14:16:49.478Z",
-  "generated_from_commit": "91d0394e661c8207da25bb28cee4032ac35339f9",
+  "generated_at": "2026-08-09T06:33:15.212Z",
+  "generated_from_commit": "e22c6be462b83e9d106c41926ab0ec32a328da50",
   "scope": [
     "frontend-admin-v2",
     "packages/frontend-contracts",
@@ -946,6 +946,55 @@
       ]
     },
     {
+      "id": "readme-sync-gate",
+      "label": "README 与操作手册同步门禁",
+      "type": "governance",
+      "boundary": "本地交付",
+      "layer": 6,
+      "path": "scripts/ci/check-readme-sync.mjs",
+      "role": "由版本化 pre-commit 与 pre-push hook 调用，分别校验暂存区和真实待推送提交中的相关 README/手册同步。",
+      "entrypoints": [
+        {
+          "path": ".githooks/pre-commit",
+          "symbol": "check-readme-sync.mjs --staged"
+        },
+        {
+          "path": ".githooks/pre-push",
+          "symbol": "check-readme-sync.mjs --pre-push"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "check-readme-sync.mjs --range"
+        }
+      ],
+      "tests": [
+        {
+          "path": "scripts/ci/check-readme-sync.test.mjs",
+          "symbol": "README sync gate"
+        },
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "README sync gate"
+        }
+      ],
+      "constraints": [
+        "门禁只读且不自动生成文档；缺少同步内容时失败并列出目标。",
+        "普通模块只绑定最近的非根 README，避免所有代码变更制造根 README 噪声。",
+        "长任务 Hook 显式绑定操作手册及其 README 索引；归档和 codemap 产物不参与判定。",
+        "required CI 以 base/head range 复验，不能用 --no-verify 绕过。"
+      ],
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol": "## 协作规则"
+        },
+        {
+          "path": "docs/standards/codex-task-execution-policy.md",
+          "symbol": "README/手册同步门禁"
+        }
+      ]
+    },
+    {
       "id": "pre-push-quality-gate",
       "label": "前端预推送质量门禁",
       "type": "delivery",
@@ -1777,6 +1826,39 @@
       ]
     },
     {
+      "from": "readme-sync-gate",
+      "to": "repository-governance",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": "scripts/ci/check-readme-sync.mjs",
+          "symbol": "requiredDocuments"
+        }
+      ]
+    },
+    {
+      "from": "readme-sync-gate",
+      "to": "pre-push-quality-gate",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": ".githooks/pre-push",
+          "symbol": "check-readme-sync.mjs --pre-push"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "readme-sync-gate",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": "scripts/ci/test-workflow-contract.ps1",
+          "symbol": "README sync gate"
+        }
+      ]
+    },
+    {
       "from": "pre-push-quality-gate",
       "to": "v2-client",
       "type": "tests",
@@ -2203,6 +2285,15 @@
         "mysql-flyway"
       ],
       "outcome": "既有职责分离、乐观锁、附件证据和状态机形成可审计关闭链。"
+    },
+    {
+      "id": "readme-sync-delivery",
+      "name": "README 与操作手册同步交付",
+      "trigger": "开发者提交暂存改动或推送本地提交",
+      "steps": [
+        "readme-sync-gate"
+      ],
+      "outcome": "相关模块 README 或显式绑定手册进入同一提交/推送范围后才允许继续。"
     },
     {
       "id": "local-live-evidence",

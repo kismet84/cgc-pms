@@ -5,7 +5,7 @@ description: Register and enforce deterministic completion checks for an explici
 
 # Long Task Gate
 
-Use repository Hook and private per-user state. Keep business work, Git delivery, AutoPilot, and existing notifications authoritative in their own workflows.
+Use repository Hook and private per-user state. Every terminal main-thread Stop sends a best-effort Feishu notification through `LTG_FEISHU_CHAT_ID`, including normal completion, failure, and waiting for user input; notification failure warns but never continues or blocks an ordinary task. Keep business work, Git delivery, AutoPilot, and existing notifications authoritative in their own workflows.
 
 ## Activation workflow
 
@@ -20,7 +20,7 @@ Use repository Hook and private per-user state. Keep business work, Git delivery
 
 5. Perform task normally. Hook runs checks only at Stop.
 6. On continuation, fix reported failure and re-run no broad unrelated work. Three identical gate failures stop at `BLOCKED_GATE`.
-7. Notification failure never re-runs checks. Retry only outbox:
+7. Notification failure warns without blocking task completion and never re-runs checks. Retry only outbox:
 
    ```powershell
    node .agents/skills/long-task-gate/scripts/long-task-gate.mjs notify-retry
@@ -53,6 +53,6 @@ Use Bot identity. Store recipient only in private environment variable named by 
 - Checks execute exact executable plus argument arrays with `shell: false`; shell executables and inline command switches are rejected.
 - Paths and check working directories must remain under Git root.
 - State lives under `${CODEX_HOME}/long-task-gate` or default Codex user directory, never repository.
-- Ordinary prompts no-op. Corrupt active state, lock conflict, or contract drift fails closed.
+- Ordinary prompts do not arm the completion gate; their Stop still sends the best-effort notification. Corrupt active state, lock conflict, or contract drift fails closed.
 - Treat Hook as deterministic workflow guardrail, not security sandbox or replacement for native `/goal` persistence.
 - Disable repository Hook through `/hooks` before rollback; do not edit user global Hook or notification config.

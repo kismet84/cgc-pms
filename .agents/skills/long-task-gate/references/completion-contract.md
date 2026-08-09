@@ -48,7 +48,7 @@ Contract is copied into private state when armed. Repository file may then remai
 - All paths are repository-relative, cannot escape Git root, and cannot use symlink traversal.
 - `gitScope` compares newly dirty paths against arm-time baseline; pre-existing dirty paths remain outside task ownership.
 - Notification target value must come from named environment variable. `targetType` is `chat-id` or `user-id`; target value never enters state.
-- Notification disabled is valid. When enabled, missing/invalid target yields `BLOCKED_NOTIFICATION` after two notification-only attempts.
+- Notification disabled is valid for the contract-specific target; repository Stop falls back to `LTG_FEISHU_CHAT_ID`. Missing or invalid notification targets leave the task `COMPLETED`, surface a warning, and keep an unsent outbox for explicit retry.
 
 State transitions:
 
@@ -56,6 +56,6 @@ State transitions:
 REQUESTED -> ARMED -> CHECKING -> REPAIRING -> CHECKING
                           |             \-> BLOCKED_GATE (same failure x3)
                           \-> TASK_PASSED -> NOTIFYING -> COMPLETED
-                                                \-> BLOCKED_NOTIFICATION
+                                                \-> COMPLETED (notification pending)
 REQUESTED|ARMED|REPAIRING|TASK_PASSED -> CANCELLED
 ```

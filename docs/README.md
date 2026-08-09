@@ -34,6 +34,7 @@
 ## 当前工作入口
 
 - [用户手册](manuals/README.md)
+- [Codex 长任务完成门禁与飞书通知](manuals/codex-long-task-gate.md)
 - [培训材料](training/README.md)
 - [CI 失败分类与门禁排障规范](../.agents/skills/cgc-pms-ci-gate-triage/SKILL.md)
 - [Prompt 索引](prompt/README.md)

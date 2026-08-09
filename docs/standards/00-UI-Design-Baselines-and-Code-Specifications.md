@@ -20,7 +20,7 @@
 4. `frontend-admin-v2/src/styles/components.css`、`frontend-admin-v2/src/components/index.ts` 与 `V2*.vue` 定义共享组件外观和行为。
 5. 业务页面只定义业务布局、列宽、换行和字段语义，不复制公共组件材质。
 
-`design-qa.md`、V1.5 计划/质量归档与 `docs/archive/v1.5/ui-v2/m1-design-system-baseline.md` 均为历史或验收记录，不是规范源。发生冲突时以本文和当前实现门禁为准。
+`docs/archive/v1.5/quality/design-qa.md`、V1.5 计划/质量归档与 `docs/archive/v1.5/ui-v2/m1-design-system-baseline.md` 均为历史或验收记录，不是规范源。发生冲突时以本文和当前实现门禁为准。
 
 ## 2. 双前端边界
 

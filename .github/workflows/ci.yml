@@ -448,6 +448,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Verify README and manual sync
+        shell: pwsh
+        env:
+          README_SYNC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          README_SYNC_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci/check-readme-sync.mjs --range "$env:README_SYNC_BASE_SHA" "$env:README_SYNC_HEAD_SHA"
       - name: Verify CI workflow contract
         shell: pwsh
         run: ./scripts/ci/test-workflow-contract.ps1

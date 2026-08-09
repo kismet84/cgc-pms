@@ -1,7 +1,7 @@
 {
   "repoRoot": "D:\\projects-test\\cgc-pms",
   "baseBranch": "master",
-  "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees",
+  "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees\\autopilot",
   "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
   "mode": "codex-desktop-automation",
   "executionHost": "desktop-native",
@@ -26,6 +26,8 @@
       "plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md",
       "AGENTS.md",
       "docs/standards/codex-task-execution-policy.md",
+      "docs/standards/16-本地路径与产物规范.md",
+      "scripts/audit-local-path-layout.ps1",
       ".github/workflows/ci.yml",
       ".github/workflows/post-merge.yml",
       ".github/CODEOWNERS",

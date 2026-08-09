@@ -14,10 +14,13 @@ function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), 'ltg-test-'));
   const repository = path.join(root, 'repo');
   const state = path.join(root, 'state');
+  const larkLog = path.join(root, 'lark.log');
+  const larkMock = path.join(root, 'lark-success.mjs');
   mkdirSync(repository);
   execFileSync('git', ['init', '-q'], { cwd: repository });
+  writeFileSync(larkMock, `import{appendFileSync}from'node:fs';appendFileSync(${JSON.stringify(larkLog)},process.env.LTG_IDEMPOTENCY_KEY_FOR_TEST+'\\n');process.stdout.write(JSON.stringify({data:{message_id:'om_mock'}}));`);
   temporaryRoots.push(root);
-  return { root, repository, state };
+  return { root, repository, state, larkLog, larkMock };
 }
 
 function run(ctx, command, input, extraEnv = {}) {
@@ -53,7 +56,7 @@ function prompt(ctx, text = '$long-task-gate') {
   });
 }
 
-function stop(ctx, extraEnv = {}) {
+function stop(ctx, extraEnv = {}, payloadOverrides = {}) {
   return run(ctx, ['stop'], {
     hook_event_name: 'Stop',
     session_id: 'session-a',
@@ -61,7 +64,8 @@ function stop(ctx, extraEnv = {}) {
     cwd: ctx.repository,
     stop_hook_active: false,
     last_assistant_message: 'done',
-  }, extraEnv);
+    ...payloadOverrides,
+  }, { LONG_TASK_GATE_LARK_MOCK: ctx.larkMock, LTG_FEISHU_CHAT_ID: 'oc_testrecipient', ...extraEnv });
 }
 
 function promptFor(ctx, session, text = '$long-task-gate') {
@@ -82,7 +86,7 @@ function stopFor(ctx, session, extraEnv = {}) {
     cwd: ctx.repository,
     stop_hook_active: false,
     last_assistant_message: 'done',
-  }, { ...extraEnv, CODEX_THREAD_ID: session });
+  }, { LONG_TASK_GATE_LARK_MOCK: ctx.larkMock, LTG_FEISHU_CHAT_ID: 'oc_testrecipient', ...extraEnv, CODEX_THREAD_ID: session });
 }
 
 function contract(overrides = {}) {
@@ -136,12 +140,26 @@ test('repository Hook config has one explicit command per event', () => {
   }
 });
 
-test('ordinary prompt and Stop are side-effect free', () => {
+test('ordinary prompt does not arm and ordinary Stop sends a turn notification', () => {
   const ctx = fixture();
   assert.deepEqual(json(prompt(ctx, 'ordinary long task text')), {});
   assert.equal(existsSync(ctx.state), false);
   assert.deepEqual(json(stop(ctx)), {});
+  assert.deepEqual(json(stop(ctx, {}, { stop_hook_active: true })), {});
+  assert.deepEqual(json(stop(ctx, {}, { turn_id: 'turn-b' })), {});
   assert.equal(existsSync(ctx.state), false);
+  const keys = readFileSync(ctx.larkLog, 'utf8').trim().split(/\r?\n/);
+  assert.equal(keys.length, 2);
+  assert.match(keys[0], /^ltg-turn-[a-f0-9]{32}$/);
+  assert.notEqual(keys[0], keys[1]);
+});
+
+test('ordinary Stop notification failure warns without continuing the task', () => {
+  const ctx = fixture();
+  const result = json(stop(ctx, { LTG_FEISHU_CHAT_ID: '' }));
+  assert.match(result.systemMessage, /飞书任务通知失败/);
+  assert.equal(result.decision, undefined);
+  assert.equal(result.continue, undefined);
 });
 
 test('explicit prompt requests, arms, checks, and completes', () => {
@@ -153,7 +171,7 @@ test('explicit prompt requests, arms, checks, and completes', () => {
   assert.deepEqual(json(stop(ctx)), {});
   const task = status(ctx).tasks[0];
   assert.equal(task.status, 'COMPLETED');
-  assert.equal(task.notificationSent, false);
+  assert.equal(task.notificationSent, true);
 });
 
 test('failed check continues, repaired check completes', () => {
@@ -177,6 +195,7 @@ test('three identical check failures stop automatic continuation', () => {
   const terminal = json(stop(ctx));
   assert.equal(terminal.continue, false);
   assert.equal(status(ctx).tasks[0].status, 'BLOCKED_GATE');
+  assert.match(readFileSync(ctx.larkLog, 'utf8'), /^ltg-turn-[a-f0-9]{32}\n$/);
 });
 
 test('missing contract is finite and a second active task is rejected', () => {
@@ -286,7 +305,7 @@ test('successful notification is sent once with stable idempotency', () => {
   assert.equal(status(ctx).tasks[0].notificationSent, true);
 });
 
-test('notification failure retries without rerunning passed checks', () => {
+test('notification failure does not block and manual retry does not rerun checks', () => {
   const ctx = fixture();
   const count = path.join(ctx.root, 'check-count');
   const check = path.join(ctx.repository, 'check.mjs');
@@ -300,11 +319,21 @@ test('notification failure retries without rerunning passed checks', () => {
     notification: { enabled: true, identity: 'bot', targetType: 'user-id', targetEnv: 'LTG_TEST_USER_ID' },
   }));
   const env = { LONG_TASK_GATE_LARK_MOCK: mock, LTG_TEST_USER_ID: 'ou' + '_testrecipient' };
-  assert.equal(json(stop(ctx, env)).decision, 'block');
-  const terminal = json(stop(ctx, env));
-  assert.equal(terminal.continue, false);
+  const stopped = json(stop(ctx, env));
+  assert.match(stopped.systemMessage, /飞书通知失败/);
+  assert.equal(stopped.decision, undefined);
+  assert.equal(stopped.continue, undefined);
+  assert.deepEqual(json(stop(ctx, env)), {});
   assert.equal(readFileSync(count, 'utf8'), '1');
-  assert.equal(status(ctx).tasks[0].status, 'BLOCKED_NOTIFICATION');
+  assert.equal(status(ctx).tasks[0].status, 'COMPLETED');
+  assert.equal(status(ctx).tasks[0].notificationSent, false);
+  const retried = run(ctx, ['notify-retry'], undefined, {
+    LONG_TASK_GATE_LARK_MOCK: ctx.larkMock,
+    LTG_TEST_USER_ID: 'ou_testrecipient',
+  });
+  assert.equal(retried.status, 0, retried.stderr);
+  assert.equal(readFileSync(count, 'utf8'), '1');
+  assert.equal(status(ctx).tasks[0].notificationSent, true);
 });
 
 test('cancel closes requested state', () => {

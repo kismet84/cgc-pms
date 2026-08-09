@@ -12,7 +12,7 @@ try {
   await client.connect(transport);
   const listed = await client.listTools();
   const names = listed.tools.map((tool) => tool.name).sort();
-  const required = ["kg_collection_runs", "kg_get_artifact", "kg_list_issues", "kg_neighbors", "kg_query", "kg_record_episode", "kg_search", "kg_status", "kg_unresolved_references"];
+  const required = ["kg_call_history", "kg_collection_runs", "kg_get_artifact", "kg_list_issues", "kg_neighbors", "kg_query", "kg_record_episode", "kg_search", "kg_status", "kg_unresolved_references"];
   if (JSON.stringify(names) !== JSON.stringify(required)) throw new Error(`Unexpected tool list: ${names.join(", ")}`);
   const response = await client.callTool({ name: "kg_status", arguments: {} });
   if (response.isError) throw new Error("kg_status returned an MCP error");
@@ -26,6 +26,9 @@ try {
     const observation = await client.callTool({ name, arguments: args });
     if (observation.isError) throw new Error(`${name} returned an MCP error: ${observation.content?.[0]?.text ?? "unknown"}`);
   }
+  const history = await client.callTool({ name: "kg_call_history", arguments: { limit: 20 } });
+  if (history.isError) throw new Error(`kg_call_history returned an MCP error: ${history.content?.[0]?.text ?? "unknown"}`);
+  if (!history.structuredContent?.result?.some((call) => call.tool === "kg_status")) throw new Error("kg_status call was not audited");
   console.log(JSON.stringify({ tools: names, status: "ok" }, null, 2));
 } finally {
   await client.close();

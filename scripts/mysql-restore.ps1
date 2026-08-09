@@ -3,7 +3,7 @@
 # Restores a gzipped or plain SQL dump to a target database.
 #
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File scripts\mysql-restore.ps1 -BackupFile "D:\backups\mysql\cgc_pms_full_20260624_020000.sql.gz"
+#   powershell -ExecutionPolicy Bypass -File scripts\mysql-restore.ps1 -BackupFile "D:\backups\cgc-pms\mysql\cgc_pms_full_20260624_020000.sql.gz"
 #   powershell -ExecutionPolicy Bypass -File scripts\mysql-restore.ps1 -BackupFile "backup.sql" -TargetDatabase "cgc_pms_restore_test"
 #
 # SAFETY: Default target is cgc_pms_restore_test (NOT cgc_pms).

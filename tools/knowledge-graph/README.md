@@ -11,6 +11,7 @@
 - 不把原始日志写入图谱；使用 `kg_record_episode(kind="log-summary")` 记录摘要、来源和时间。
 - 不扫描 Codex 私有会话目录；任务收口时使用 `kg_record_episode(kind="conversation")` 写入结构化摘要。
 - `kg_query` 只接受受限只读 Cypher；写入仅通过固定字段的 `kg_record_episode`。
+- `kg_call_history` 返回最近 1～200 次 MCP 调用的时间、工具名、结果、耗时和进程号；审计写入 `.agent-runtime/knowledge-graph/mcp-calls.jsonl`，不记录查询参数或正文。
 - 当前问题以 `docs/backlog/current-issues.json` 为机器可读唯一快照；采集器确定性校验后生成 `Issue` 节点，不从任意报告文字猜测状态。
 
 ## 本地命令

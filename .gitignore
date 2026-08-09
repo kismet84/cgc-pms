@@ -36,6 +36,7 @@ desktop-launcher/dist/
 desktop-launcher/*.zip
 desktop-launcher/*.pdb
 desktop-launcher/resources/cgc-pms.ico
+.trivy-cache/
 
 # IDE
 .idea/
@@ -103,6 +104,8 @@ admin-state.json
 .codex-autopilot/closeouts.ndjson
 .codex-autopilot/runs/
 .codex-autopilot/checkpoints/
+.codex-autopilot/artifacts/
+.codex-autopilot/issues/
 !.codex-autopilot/ALLOW_TEST_DATA_RESET
 .omc/
 .omo/
@@ -110,6 +113,7 @@ admin-state.json
 .sisyphus/
 .superpowers/
 .worktrees/
+/backups/
 archive/v1.0/private/
 .trae/
 backend/nul

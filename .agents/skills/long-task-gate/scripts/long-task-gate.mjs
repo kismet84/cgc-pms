@@ -16,6 +16,7 @@ const MAX_CAPTURE = 128 * 1024;
 const MAX_EVENT_TEXT = 240;
 const LOCK_STALE_MS = 120_000;
 const BLOCKED_EXECUTABLES = new Set(['bash', 'bash.exe', 'cmd', 'cmd.exe', 'powershell', 'powershell.exe', 'pwsh', 'pwsh.exe', 'sh', 'sh.exe', 'wsl', 'wsl.exe']);
+const TURN_NOTIFICATION = { targetType: 'chat-id', targetEnv: 'LTG_FEISHU_CHAT_ID' };
 
 class GateError extends Error {
   constructor(code, message) {
@@ -71,6 +72,11 @@ function sessionKey(sessionId) {
     throw new GateError('invalid-event', 'Hook session_id 无效。');
   }
   return sha(sessionId).slice(0, 20);
+}
+
+function turnHash(payload) {
+  if (typeof payload.turn_id !== 'string' || !payload.turn_id) throw new GateError('invalid-event', 'Hook turn_id 无效。');
+  return sha(payload.turn_id).slice(0, 20);
 }
 
 function repoStateDir(root) {
@@ -365,17 +371,40 @@ function larkInvocation(args) {
   throw new GateError('lark-cli-missing', 'lark-cli Node 入口不可解析。');
 }
 
-function notify(state, file) {
-  if (!state.contract.notification.enabled) {
-    state.status = 'COMPLETED';
-    state.completedAt = new Date().toISOString();
-    return { state: atomicWriteJson(file, state), ok: true };
-  }
-  const notification = state.contract.notification;
+function sendLarkMessage(notification, text, idempotencyKey) {
   const target = process.env[notification.targetEnv];
   if (typeof target !== 'string' || (notification.targetType === 'chat-id' ? !/^oc_[A-Za-z0-9]+$/.test(target) : !/^ou_[A-Za-z0-9]+$/.test(target))) {
-    return notificationFailure(state, file, '目标环境变量缺失或格式无效。');
+    return { ok: false, detail: '目标环境变量缺失或格式无效。' };
   }
+  const targetFlag = notification.targetType === 'chat-id' ? '--chat-id' : '--user-id';
+  const args = ['im', '+messages-send', '--as', 'bot', targetFlag, target, '--text', text, '--idempotency-key', idempotencyKey, '--format', 'json'];
+  let invocation;
+  try { invocation = larkInvocation(args); } catch (error) { return { ok: false, detail: error.code || 'lark-cli-missing' }; }
+  const result = spawnSync(invocation.executable, invocation.args, {
+    encoding: 'utf8', shell: false, timeout: 30_000, maxBuffer: MAX_CAPTURE, windowsHide: true,
+    env: { ...process.env, LTG_IDEMPOTENCY_KEY_FOR_TEST: idempotencyKey },
+  });
+  if (result.error || result.status !== 0) return { ok: false, detail: result.error?.code || `exit-${result.status}` };
+  let payload;
+  try { payload = JSON.parse(result.stdout); } catch { return { ok: false, detail: 'lark-cli 返回非 JSON。' }; }
+  const messageId = payload.message_id || payload.messageId || payload.data?.message_id || payload.data?.messageId;
+  if (typeof messageId !== 'string' || !messageId) return { ok: false, detail: 'lark-cli JSON 缺少 message id。' };
+  return { ok: true, messageId };
+}
+
+function notifyTurnStop(payload, root, status = 'STOPPED') {
+  try {
+    const idempotencyKey = `ltg-turn-${sha(`${repoKey(root)}:${sessionKey(payload.session_id)}:${turnHash(payload)}`).slice(0, 32)}`;
+    const message = `CGC-PMS Codex 任务已停止\n仓库: ${path.basename(root)}\n状态: ${status}\n说明: 正常完成、失败或等待输入均会通知`;
+    const result = sendLarkMessage(TURN_NOTIFICATION, message, idempotencyKey);
+    return result.ok ? {} : { systemMessage: `飞书任务通知失败：${result.detail}` };
+  } catch (error) {
+    return { systemMessage: `飞书任务通知失败：${error instanceof GateError ? error.message : '未分类错误。'}` };
+  }
+}
+
+function notify(state, file) {
+  const notification = state.contract.notification.enabled ? state.contract.notification : TURN_NOTIFICATION;
   if (!state.outbox) {
     state.outbox = {
       idempotencyKey: `ltg-${sha(`${repoKeyValue(state)}:${state.sessionKey}:${state.contractHash}`).slice(0, 32)}`,
@@ -387,26 +416,15 @@ function notify(state, file) {
   state.outbox.attempts += 1;
   state = atomicWriteJson(file, state);
   appendEvent(file, state, 'notification-attempt', `attempt=${state.outbox.attempts}`);
-  const targetFlag = notification.targetType === 'chat-id' ? '--chat-id' : '--user-id';
-  const args = ['im', '+messages-send', '--as', 'bot', targetFlag, target, '--text', notificationMessage(state), '--idempotency-key', state.outbox.idempotencyKey, '--format', 'json'];
-  let invocation;
-  try { invocation = larkInvocation(args); } catch (error) { return notificationFailure(state, file, error.code || 'lark-cli-missing'); }
-  const result = spawnSync(invocation.executable, invocation.args, {
-    encoding: 'utf8', shell: false, timeout: 30_000, maxBuffer: MAX_CAPTURE, windowsHide: true,
-    env: { ...process.env, LTG_IDEMPOTENCY_KEY_FOR_TEST: state.outbox.idempotencyKey },
-  });
-  if (result.error || result.status !== 0) return notificationFailure(state, file, result.error?.code || `exit-${result.status}`);
-  let payload;
-  try { payload = JSON.parse(result.stdout); } catch { return notificationFailure(state, file, 'lark-cli 返回非 JSON。'); }
-  const messageId = payload.message_id || payload.messageId || payload.data?.message_id || payload.data?.messageId;
-  if (typeof messageId !== 'string' || !messageId) return notificationFailure(state, file, 'lark-cli JSON 缺少 message id。');
+  const result = sendLarkMessage(notification, notificationMessage(state), state.outbox.idempotencyKey);
+  if (!result.ok) return notificationFailure(state, file, result.detail);
   state.outbox.sent = true;
-  state.outbox.messageIdHash = sha(messageId).slice(0, 20);
+  state.outbox.messageIdHash = sha(result.messageId).slice(0, 20);
   state.status = 'COMPLETED';
   state.completedAt = new Date().toISOString();
   state = atomicWriteJson(file, state);
   appendEvent(file, state, 'completed', 'notification-sent');
-  return { state, ok: true };
+  return { state, ok: true, notified: true };
 }
 
 function repoKeyValue(state) {
@@ -417,10 +435,11 @@ function notificationFailure(state, file, detail) {
   state.outbox ||= { idempotencyKey: `ltg-${sha(`${repoKeyValue(state)}:${state.sessionKey}:${state.contractHash}`).slice(0, 32)}`, attempts: 0, sent: false };
   if (state.status !== 'NOTIFYING') state.outbox.attempts += 1;
   state.outbox.lastFailure = String(detail).slice(0, 80);
-  state.status = state.outbox.attempts >= 2 ? 'BLOCKED_NOTIFICATION' : 'TASK_PASSED';
+  state.status = 'COMPLETED';
+  state.completedAt = new Date().toISOString();
   state = atomicWriteJson(file, state);
   appendEvent(file, state, 'notification-failed', `attempt=${state.outbox.attempts}`);
-  return { state, ok: false, blocked: state.status === 'BLOCKED_NOTIFICATION', detail: '飞书通知失败；业务检查未重跑。' };
+  return { state, ok: false, detail: '飞书通知失败；任务已结束，业务检查未重跑。' };
 }
 
 function parseHookInput(expectedEvent) {
@@ -498,26 +517,35 @@ function handleArm(args) {
 function handleStop() {
   const payload = parseHookInput('Stop');
   const root = repoRoot(payload.cwd);
-  if (!existsSync(repoStateDir(root))) return output({});
+  if (!existsSync(repoStateDir(root))) return output(payload.stop_hook_active ? {} : notifyTurnStop(payload, root));
   return withLock(root, () => {
-    const selected = selectState(root, { key: sessionKey(payload.session_id) });
-    if (!selected) return output({});
+    const key = sessionKey(payload.session_id);
+    const selected = selectState(root, { key });
+    if (!selected) {
+      const priorFile = statePath(root, key);
+      if (existsSync(priorFile)) {
+        const prior = readState(priorFile);
+        if (TERMINAL.has(prior.status) && prior.terminalTurnHash === turnHash(payload)) return output({});
+      }
+      return output(payload.stop_hook_active ? {} : notifyTurnStop(payload, root));
+    }
     let state = selected.state;
     if (!state.contract) {
       const fingerprint = sha('missing-contract').slice(0, 20);
       const attempts = state.failure?.fingerprint === fingerprint ? state.failure.attempts + 1 : 1;
       state.failure = { fingerprint, attempts, category: 'ready_issue_config', check: 'completion-contract' };
       state.status = attempts >= 3 ? 'BLOCKED_GATE' : 'REPAIRING';
+      if (state.status === 'BLOCKED_GATE') state.terminalTurnHash = turnHash(payload);
       state = atomicWriteJson(selected.file, state);
       appendEvent(selected.file, state, 'gate-failed', `completion-contract attempt=${attempts}`);
-      if (state.status === 'BLOCKED_GATE') return output({ continue: false, stopReason: 'Completion Contract 连续缺失 3 次，门禁停止自动续跑。' });
+      if (state.status === 'BLOCKED_GATE') return output({ continue: false, stopReason: 'Completion Contract 连续缺失 3 次，门禁停止自动续跑。', ...notifyTurnStop(payload, root, 'BLOCKED_GATE') });
       return output({ decision: 'block', reason: '失败分类 ready_issue_config：Completion Contract 尚未 arm。创建并校验契约后执行 arm，再继续任务。' });
     }
     if (state.status === 'TASK_PASSED' || state.status === 'NOTIFYING') {
+      state.terminalTurnHash = turnHash(payload);
+      state = atomicWriteJson(selected.file, state);
       const result = notify(state, selected.file);
-      if (result.ok) return output({});
-      if (result.blocked) return output({ continue: false, stopReason: result.detail });
-      return output({ decision: 'block', reason: `${result.detail} 仅执行 notify-retry；禁止重跑业务检查。` });
+      return output(result.ok ? {} : { systemMessage: result.detail });
     }
     if (!['ARMED', 'REPAIRING', 'CHECKING'].includes(state.status)) return output({});
     state.status = 'CHECKING';
@@ -529,21 +557,21 @@ function handleStop() {
       const attempts = state.failure?.fingerprint === fingerprint ? state.failure.attempts + 1 : 1;
       state.failure = { fingerprint, attempts, category: result.category, check: result.name };
       state.status = attempts >= 3 ? 'BLOCKED_GATE' : 'REPAIRING';
+      if (state.status === 'BLOCKED_GATE') state.terminalTurnHash = turnHash(payload);
       state = atomicWriteJson(selected.file, state);
       appendEvent(selected.file, state, 'gate-failed', `${result.name} attempt=${attempts}`);
       const reason = `失败分类 ${result.category}；检查 ${result.name}：${result.detail} 修复后只复验该检查。`;
-      if (state.status === 'BLOCKED_GATE') return output({ continue: false, stopReason: `${reason} 相同失败已达 3 次，停止自动续跑。` });
+      if (state.status === 'BLOCKED_GATE') return output({ continue: false, stopReason: `${reason} 相同失败已达 3 次，停止自动续跑。`, ...notifyTurnStop(payload, root, 'BLOCKED_GATE') });
       return output({ decision: 'block', reason });
     }
     state.status = 'TASK_PASSED';
     state.failure = null;
     state.checksPassedAt = new Date().toISOString();
+    state.terminalTurnHash = turnHash(payload);
     state = atomicWriteJson(selected.file, state);
     appendEvent(selected.file, state, 'checks-passed');
     const notification = notify(state, selected.file);
-    if (notification.ok) return output({});
-    if (notification.blocked) return output({ continue: false, stopReason: notification.detail });
-    return output({ decision: 'block', reason: `${notification.detail} 仅重试通知。` });
+    return output(notification.ok ? {} : { systemMessage: notification.detail });
   });
 }
 
@@ -583,13 +611,13 @@ function handleNotifyRetry() {
     const states = discoverStates(root).filter((item) => item.key === key);
     const corrupt = states.find((item) => item.error);
     if (corrupt) throw corrupt.error;
-    const candidates = states.filter(({ state }) => state.sessionKey === key && ['TASK_PASSED', 'NOTIFYING', 'BLOCKED_NOTIFICATION'].includes(state.status));
+    const candidates = states.filter(({ state }) => state.sessionKey === key && (
+      ['TASK_PASSED', 'NOTIFYING', 'BLOCKED_NOTIFICATION'].includes(state.status)
+      || (state.status === 'COMPLETED' && state.outbox?.sent !== true)
+    ));
     if (candidates.length !== 1) throw new GateError('not-notifiable', '没有唯一可重试通知状态。');
     let state = candidates[0].state;
-    if (state.status === 'BLOCKED_NOTIFICATION') {
-      state.status = 'TASK_PASSED';
-      state.outbox.attempts = 1;
-    }
+    if (state.status === 'BLOCKED_NOTIFICATION' || state.status === 'COMPLETED') state.status = 'TASK_PASSED';
     const result = notify(state, candidates[0].file);
     if (!result.ok) throw new GateError('notification-failed', result.detail);
     process.stdout.write(`COMPLETED ${result.state.contract.taskId}\n`);

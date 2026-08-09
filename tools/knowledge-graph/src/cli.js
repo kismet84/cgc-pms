@@ -4,6 +4,7 @@ import { loadConfig } from "./config.js";
 import { createDriver } from "./neo4j.js";
 import { applySchema } from "./schema.js";
 import { collect } from "./collector.js";
+import { ISSUE_CLASSIFICATIONS } from "./issue-registry.js";
 import { listIssues, recordEpisode, status } from "./queries.js";
 
 function requiredValue(args, index, option) {
@@ -17,7 +18,7 @@ export function parseIssueOptions(args) {
   const allowedValues = {
     view: new Set(["summary", "list"]),
     status: new Set(["OPEN", "NEEDS_CONFIRMATION", "FROZEN", "OBSERVATION", "RELEASE_GATE"]),
-    classification: new Set(["STILL_APPLICABLE", "NEEDS_CONFIRMATION", "NON_BLOCKING_OBSERVATION", "OPERATIONAL_RISK", "RELEASE_PREREQUISITE"]),
+    classification: new Set(ISSUE_CLASSIFICATIONS),
     priority: new Set(["P0", "P1", "P2"]),
   };
   const valueOptions = new Map([

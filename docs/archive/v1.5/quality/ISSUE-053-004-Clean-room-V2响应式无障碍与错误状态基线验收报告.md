@@ -45,7 +45,7 @@
 
 ## 浏览器、视觉与降级说明
 
-- 已选概念源：用户选定经营驾驶舱原图，SHA-256 `BA1A7CC8391868F255AC7208753BD03AD2157E37018AEBF182E573B3D30D783B`；稳定锚点为 `design-qa.md` 与 commit `4aaef899ad2624c36580745f7b69c900839831ab`。
+- 已选概念源：用户选定经营驾驶舱原图，SHA-256 `BA1A7CC8391868F255AC7208753BD03AD2157E37018AEBF182E573B3D30D783B`；稳定锚点为 `docs/archive/v1.5/quality/design-qa.md` 与 commit `4aaef899ad2624c36580745f7b69c900839831ab`。
 - Browser/IAB 已优先复用现有浏览器绑定；DOM 快照为空，截图调用返回 `v2M1Tab.playwright.screenshot is not a function`，分类为 `tool_invocation`，按 Ready 允许范围降级到仓库 Playwright + Edge 实浏览器。
 - 对照点：冷灰蓝画布与白色表面、品牌蓝激活态、八域左导航密度、顶部项目/报告期/账户层级、细边框/轻阴影面板、桌面到移动的信息架构均保持。
 - 1440 保留完整域与工作区；1024 有意收敛为图标栏；390 有意使用带遮罩抽屉和底部账户区，保障内容宽度、44px 触控目标与退出可达性。

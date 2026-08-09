@@ -6,6 +6,14 @@ import { execute } from "./neo4j.js";
 import { isBlocked } from "./policy.js";
 
 export const ISSUE_REGISTER_PATH = "docs/backlog/current-issues.json";
+export const ISSUE_CLASSIFICATIONS = [
+  "STILL_APPLICABLE",
+  "NEEDS_CONFIRMATION",
+  "NON_BLOCKING_OBSERVATION",
+  "OPERATIONAL_RISK",
+  "RELEASE_PREREQUISITE",
+  "NOT_APPLICABLE_LOCAL_ONLY",
+];
 
 const candidateSchema = z.object({
   userValue: z.string().min(1).max(4000),
@@ -20,13 +28,7 @@ const issueSchema = z.object({
   issueKey: z.string().min(1).max(200),
   title: z.string().min(1).max(500),
   status: z.enum(["OPEN", "NEEDS_CONFIRMATION", "FROZEN", "OBSERVATION", "RELEASE_GATE"]),
-  classification: z.enum([
-    "STILL_APPLICABLE",
-    "NEEDS_CONFIRMATION",
-    "NON_BLOCKING_OBSERVATION",
-    "OPERATIONAL_RISK",
-    "RELEASE_PREREQUISITE",
-  ]),
+  classification: z.enum(ISSUE_CLASSIFICATIONS),
   priority: z.enum(["P0", "P1", "P2"]),
   blocking: z.boolean(),
   parentIssueKey: z.string().min(1).max(200).nullable().optional(),
@@ -39,7 +41,7 @@ const issueSchema = z.object({
 
 export const issueRegisterSchema = z.object({
   schemaVersion: z.literal(1),
-  versionScope: z.literal("v1.5"),
+  versionScope: z.string().regex(/^v\d+\.\d+$/),
   updatedAt: z.string().datetime({ offset: true }),
   issues: z.array(issueSchema).max(500),
 }).strict();
