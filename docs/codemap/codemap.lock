@@ -1,7 +1,7 @@
 {
-  "current_commit": "95a25317de9b68b870614ed0e597d4876c0b97a5",
+  "current_commit": "710a3ae51a6cdd7b39f78cc4a047c81df7e6d156",
   "working_tree_dirty": false,
-  "generation_time": "2026-08-09T21:53:35.176Z",
+  "generation_time": "2026-08-09T22:14:35.397Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -45,16 +45,16 @@
   ],
   "fingerprint_algorithm": {
     "name": "sha256",
-    "version": "repo-path-content-v2",
-    "input": "git tracked and untracked non-ignored paths plus current working-tree bytes",
+    "version": "repo-path-git-object-v3",
+    "input": "git tracked and untracked non-ignored paths plus Git-normalized object IDs",
     "path_order": "ordinal case-sensitive",
-    "record_format": "P:<utf8-path-byte-length>:<utf8-path>C:<content-byte-length>:<raw-content><LF>",
+    "record_format": "P:<utf8-path-byte-length>:<utf8-path>O:<git-object-id-byte-length>:<git-object-id><LF>",
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3862,
-  "repository_file_count": 3862,
-  "included_file_count": 2598,
+  "tracked_file_count": 3863,
+  "repository_file_count": 3863,
+  "included_file_count": 2599,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
@@ -78,7 +78,7 @@
         "backend/**"
       ],
       "file_count": 1797,
-      "fingerprint": "5bfeeef7adb0bb1b0d4333fc38ef93de70f81d585131e37509c7e2b117853b8f"
+      "fingerprint": "41a6824fdaf7ce44f3e22f8f33013575380cd59a3517e9e57f951f7f2977d113"
     },
     {
       "id": "delivery_tooling",
@@ -90,7 +90,7 @@
         "tools/**"
       ],
       "file_count": 275,
-      "fingerprint": "4ff9cbf63ddf8b8c5e1d568f52cb643b3242f7efd45a4bc806639a7b1d68d365"
+      "fingerprint": "37a3f80b840041920db42ba241b3dba3f97780f9dfbf29fee1fad219cd078881"
     },
     {
       "id": "desktop_launcher",
@@ -105,8 +105,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 127,
-      "fingerprint": "892fb6e6434bde31270ea386e3b3b5a99cf084e202ab9dea6b8961d2d1b38b66"
+      "file_count": 128,
+      "fingerprint": "f58bd421abcc89a0c52d1e69a6e95ec359c31e75ef3eaa5f21a9e38c10bce160"
     },
     {
       "id": "frontend_v2",
@@ -130,7 +130,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "6bc7c5125699770d181e54e67bac43a10a09aa390e2633f4d925872b0ae0baa7"
+      "fingerprint": "a1a49510cf34ac2acb599bd6fcbc491ec899b04817b0025c0c471855a44eec25"
     },
     {
       "id": "shared_packages",
