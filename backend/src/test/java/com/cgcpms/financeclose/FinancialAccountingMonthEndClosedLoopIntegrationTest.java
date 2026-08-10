@@ -2,6 +2,7 @@ package com.cgcpms.financeclose;
 
 import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.service.AccountingEntryService;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -19,10 +20,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -43,7 +47,9 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
     @Autowired FinancialCloseService closeService;
     @Autowired AccountingEntryService entryService;
     @Autowired FinanceIntegrationService integrationService;
+    @Autowired MandatoryAuditService mandatoryAuditService;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setup() {
@@ -85,11 +91,22 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
         assertFalse(((List<?>)closed.get("checks")).isEmpty());
         assertFalse(((List<?>)closed.get("auditTrail")).isEmpty());
         assertFalse(((List<?>) closeService.statements(YEAR, MONTH).get("trialBalance")).isEmpty());
+        String closeCommand = jdbc.queryForObject("""
+                SELECT command_key FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='FINANCE_PERIOD_CLOSED' AND business_id=?
+                """, String.class, TENANT, ((Number) period.get("id")).longValue());
+        assertTrue(closeCommand.startsWith("CLOSE:" + period.get("id") + ":V"));
 
         BusinessException locked = assertThrows(BusinessException.class, () -> closeService.createAdjustment(adjustment("锁账后调整")));
         assertEquals("FINANCE_PERIOD_CLOSED", locked.getCode());
         Map<String,Object> reopened = closeService.reopen(YEAR, MONTH, "审计调整");
         assertEquals("REOPENED", ((Map<?,?>)reopened.get("period")).get("status"));
+        Map<String,Object> reopenAudit = jdbc.queryForMap("""
+                SELECT command_key,payload_json FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='FINANCE_PERIOD_REOPENED' AND business_id=?
+                """, TENANT, ((Number) period.get("id")).longValue());
+        assertTrue(String.valueOf(reopenAudit.get("command_key")).startsWith("REOPEN:" + period.get("id") + ":V"));
+        assertTrue(String.valueOf(reopenAudit.get("payload_json")).contains("审计调整"));
         AccountingEntry afterReopen = closeService.createAdjustment(adjustment("审计调整"));
         assertEquals("DRAFT", afterReopen.getEntryStatus());
     }
@@ -120,6 +137,147 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
         assertEquals("9007199254740993", check.id());
         assertEquals("PASS", check.status());
         assertEquals("123.40", reconciliation.actualAmount());
+    }
+
+    @Test
+    void arAndApReconciliationUsePostedLedgerInsteadOfSelfComparingSubledgers() {
+        closeService.ensurePeriod(YEAR, MONTH);
+        AccountingEntry adjustment = closeService.createAdjustment(new AdjustmentRequest(
+                LocalDate.of(YEAR, MONTH, 15), null, null, "制造独立账差",
+                List.of(
+                        new AdjustmentLine("DEBIT", "1122-AR", "应收账款", null,
+                                new BigDecimal("0.01"), "总账应收差异"),
+                        new AdjustmentLine("CREDIT", "2202-AP", "应付账款", null,
+                                new BigDecimal("0.01"), "总账应付差异"))));
+        TestUserContext.setUser(TENANT, 102L, "reviewer", List.of("FINANCE"));
+        entryService.review(adjustment.getId(), true, "差异测试复核");
+        TestUserContext.setUser(TENANT, 103L, "poster", List.of("FINANCE"));
+        entryService.post(adjustment.getId());
+
+        closeService.runChecks(YEAR, MONTH);
+
+        assertEquals("EXCEPTION", jdbc.queryForObject(
+                "SELECT status FROM finance_account_reconciliation WHERE tenant_id=? AND account_type='AR'",
+                String.class, TENANT));
+        assertEquals(new BigDecimal("0.01"), jdbc.queryForObject(
+                "SELECT difference_amount FROM finance_account_reconciliation WHERE tenant_id=? AND account_type='AR'",
+                BigDecimal.class, TENANT));
+        assertEquals("EXCEPTION", jdbc.queryForObject(
+                "SELECT status FROM finance_account_reconciliation WHERE tenant_id=? AND account_type='AP'",
+                String.class, TENANT));
+    }
+
+    @Test
+    void mandatoryAuditUsesCanonicalPayloadAndChecksMissingOrDamagedFacts() {
+        long businessId = 8819299L;
+        Map<String,Object> first = new LinkedHashMap<>();
+        first.put("z", 1);
+        first.put("a", 2);
+        Map<String,Object> replay = new LinkedHashMap<>();
+        replay.put("a", 2);
+        replay.put("z", 1);
+
+        inTransaction(() -> mandatoryAuditService.finance("PAYMENT_COMPLETED", "PAY_RECORD", businessId,
+                null, "CANONICAL-1", first));
+        mandatoryAuditService.verifyFinance("PAYMENT_COMPLETED", "PAY_RECORD", businessId,
+                "CANONICAL-1", replay);
+        assertEquals("{\"a\":2,\"z\":1}", jdbc.queryForObject("""
+                SELECT payload_json FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='PAYMENT_COMPLETED' AND business_id=?
+                """, String.class, TENANT, businessId));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM mandatory_audit_expectation
+                 WHERE tenant_id=? AND audit_domain='FINANCE' AND business_id=?
+                """, Integer.class, TENANT, businessId));
+
+        jdbc.update("UPDATE finance_audit_event SET payload_hash=? WHERE tenant_id=? AND business_id=?",
+                "0".repeat(64), TENANT, businessId);
+        BusinessException damaged = assertThrows(BusinessException.class,
+                () -> mandatoryAuditService.verifyFinance("PAYMENT_COMPLETED", "PAY_RECORD", businessId,
+                        "CANONICAL-1", replay));
+        assertEquals("MANDATORY_AUDIT_INTEGRITY_VIOLATION", damaged.getCode());
+        closeService.ensurePeriod(YEAR, MONTH);
+        closeService.runChecks(YEAR, MONTH);
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT issue_count FROM finance_period_check
+                 WHERE tenant_id=? AND check_type='MANDATORY_AUDIT_INTEGRITY'
+                """, Integer.class, TENANT));
+
+        jdbc.update("DELETE FROM finance_audit_event WHERE tenant_id=? AND business_id=?", TENANT, businessId);
+        jdbc.update("DELETE FROM mandatory_audit_expectation WHERE tenant_id=? AND business_id=?", TENANT, businessId);
+        jdbc.update("UPDATE finance_period SET closed_at=CURRENT_TIMESTAMP,reopened_at=CURRENT_TIMESTAMP WHERE tenant_id=?", TENANT);
+        Long periodId = jdbc.queryForObject("SELECT id FROM finance_period WHERE tenant_id=?", Long.class, TENANT);
+        inTransaction(() -> mandatoryAuditService.finance("FINANCE_PERIOD_CLOSED", "FINANCE_PERIOD", periodId,
+                null, "CLOSE:" + periodId + ":V1", Map.of("period", "wrong-key")));
+        inTransaction(() -> mandatoryAuditService.finance("FINANCE_PERIOD_REOPENED", "FINANCE_PERIOD", periodId,
+                null, "REOPEN:" + periodId + ":V2", Map.of("period", "wrong-key")));
+        jdbc.update("UPDATE finance_audit_event SET command_key='WRONG-CLOSE' WHERE tenant_id=? AND event_type='FINANCE_PERIOD_CLOSED'", TENANT);
+        jdbc.update("UPDATE finance_audit_event SET command_key='WRONG-REOPEN' WHERE tenant_id=? AND event_type='FINANCE_PERIOD_REOPENED'", TENANT);
+        assertEquals(2, mandatoryAuditService.inspectTenant().missingEvents());
+        assertEquals(2, mandatoryAuditService.inspectTenant().hashMismatches());
+        closeService.runChecks(YEAR, MONTH);
+        assertEquals(4, jdbc.queryForObject("""
+                SELECT issue_count FROM finance_period_check
+                 WHERE tenant_id=? AND check_type='MANDATORY_AUDIT_INTEGRITY'
+                """, Integer.class, TENANT));
+    }
+
+    @Test
+    void mandatoryAuditDenominatorDoesNotFabricateLegacySuccessEvidence() {
+        closeService.ensurePeriod(YEAR, MONTH);
+        int missingBefore = mandatoryAuditService.inspectTenant().missingEvents();
+        jdbc.update("UPDATE finance_period SET closed_at=CURRENT_TIMESTAMP WHERE tenant_id=?", TENANT);
+
+        assertEquals(missingBefore, mandatoryAuditService.inspectTenant().missingEvents());
+    }
+
+    @Test
+    void repeatedCloseAndReopenKeepEveryCommandAsExactAuditDenominator() {
+        Map<String,Object> period = closeService.ensurePeriod(YEAR, MONTH);
+        long periodId = ((Number) period.get("id")).longValue();
+        closeService.runChecks(YEAR, MONTH);
+        closeService.close(YEAR, MONTH, "首次关账");
+        closeService.reopen(YEAR, MONTH, "重新核对");
+        closeService.runChecks(YEAR, MONTH);
+        closeService.close(YEAR, MONTH, "再次关账");
+
+        assertEquals(3, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM mandatory_audit_expectation
+                 WHERE tenant_id=? AND business_type='FINANCE_PERIOD' AND business_id=?
+                """, Integer.class, TENANT, periodId));
+        List<String> closeCommands = jdbc.queryForList("""
+                SELECT command_key FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='FINANCE_PERIOD_CLOSED' AND business_id=?
+                 ORDER BY command_key
+                """, String.class, TENANT, periodId);
+        assertEquals(2, closeCommands.size());
+
+        jdbc.update("""
+                DELETE FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='FINANCE_PERIOD_CLOSED' AND business_id=? AND command_key=?
+                """, TENANT, periodId, closeCommands.getFirst());
+        assertEquals(1, mandatoryAuditService.inspectTenant().missingEvents());
+    }
+
+    @Test
+    void mandatoryExpectationCollisionRollsBackNewEvent() {
+        long businessId = 8819298L;
+        jdbc.update("""
+                INSERT INTO mandatory_audit_expectation
+                    (id,tenant_id,audit_domain,event_type,business_type,business_id,command_key,expected_hash)
+                VALUES(?,?,?,?,?,?,?,?)
+                """, businessId, TENANT, "FINANCE", "PAYMENT_COMPLETED", "PAY_RECORD",
+                businessId, "COLLISION", "0".repeat(64));
+
+        BusinessException conflict = assertThrows(BusinessException.class,
+                () -> inTransaction(() -> mandatoryAuditService.finance("PAYMENT_COMPLETED", "PAY_RECORD",
+                        businessId, null, "COLLISION", Map.of("amount", 1))));
+
+        assertEquals("MANDATORY_AUDIT_EXPECTATION_CONFLICT", conflict.getCode());
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE tenant_id=? AND event_type='PAYMENT_COMPLETED' AND business_id=?
+                """, Integer.class, TENANT, businessId));
     }
 
     @Test
@@ -268,7 +426,12 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
                 new AdjustmentLine("CREDIT", "2202", "应付账款", null, new BigDecimal("100.00"), reason)));
     }
 
+    private void inTransaction(Runnable action) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> action.run());
+    }
+
     private void cleanup() {
+        jdbc.update("DELETE FROM mandatory_audit_expectation WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM finance_audit_event WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM accounting_entry_line WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM accounting_entry WHERE tenant_id=?", TENANT);

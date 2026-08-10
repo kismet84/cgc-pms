@@ -775,8 +775,7 @@ public class BusinessObjectAuthorizer {
         return switch (businessType) {
             case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "PRODUCTION_MEASUREMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
             case "OWNER_MEASUREMENT_SUBMISSION" -> !"SUBMITTED".equals(status);
-            case "SALES_INVOICE" -> "VOIDED".equals(status) || !"UNVERIFIED".equals(verificationStatus);
-            case "COLLECTION_RECORD" -> "REVERSED".equals(status);
+            case "SALES_INVOICE", "COLLECTION_RECORD" -> !"PENDING_EVIDENCE".equals(status);
             default -> true;
         };
     }

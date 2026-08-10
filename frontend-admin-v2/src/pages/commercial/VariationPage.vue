@@ -10,6 +10,7 @@ import type {
   VariationQuery,
   VariationRecord,
   VariationSaveCommand,
+  WbsTaskRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -43,7 +44,7 @@ import {
   updateVariation,
   reviewVariationOwner,
 } from '@/services/commercial'
-import { uploadSiteFile } from '@/services/delivery'
+import { loadSchedule, loadSchedules, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -71,6 +72,7 @@ const projects = ref<ProjectContextOption[]>([])
 const contracts = ref<ContractRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
+const wbsTasks = ref<WbsTaskRecord[]>([])
 const siteEvidenceFile = ref<File | null>(null)
 const ownerFile = ref<File | null>(null)
 const externalDocumentNo = ref('')
@@ -187,6 +189,18 @@ const costSubjectOptions = computed(() => {
   }
   return options
 })
+const wbsTaskOptions = computed(() => {
+  const options = wbsTasks.value.map((item) => ({
+    value: item.id,
+    label: `${item.taskCode} · ${item.taskName}`,
+  }))
+  for (const [index, item] of items.value.entries()) {
+    if (item.wbsTaskId && !options.some((option) => option.value === item.wbsTaskId)) {
+      options.push({ value: item.wbsTaskId, label: `WBS名称缺失（第 ${index + 1} 行）` })
+    }
+  }
+  return options
+})
 
 const APPROVAL_STATUS_LABELS: Record<string, string> = {
   DRAFT: '草稿',
@@ -244,6 +258,7 @@ function blankItem(): VariationItemRecord {
     claimUnitPrice: null,
     claimAmount: null,
     costSubjectId: '',
+    wbsTaskId: '',
     remark: null,
   }
 }
@@ -441,6 +456,7 @@ function cleanItems(): VariationItemRecord[] {
     claimUnitPrice: cleaned(item.claimUnitPrice),
     claimAmount: cleaned(item.claimAmount),
     costSubjectId: item.costSubjectId.trim(),
+    wbsTaskId: item.wbsTaskId?.trim() ?? '',
     remark: cleaned(item.remark),
   }))
 }
@@ -448,8 +464,12 @@ function cleanItems(): VariationItemRecord[] {
 async function saveItems(): Promise<void> {
   await runAction('保存明细', async () => {
     const command = cleanItems()
-    if (command.some((item) => !item.itemName || !item.quantity || !item.costSubjectId)) {
-      throw new TypeError('明细名称、数量和成本科目不能为空')
+    if (
+      command.some(
+        (item) => !item.itemName || !item.quantity || !item.costSubjectId || !item.wbsTaskId,
+      )
+    ) {
+      throw new TypeError('明细名称、数量、WBS任务和成本科目不能为空')
     }
     await saveVariationItems(variationId.value, command, versionOf())
     await loadDetail(true)
@@ -591,11 +611,22 @@ async function loadReferences(): Promise<void> {
       loadPartners(undefined, controller.signal),
       loadCostSubjectOptions(controller.signal),
     ])
+    let taskValues: WbsTaskRecord[] = []
+    const projectId = detail.value?.projectId || form.value.projectId
+    if (projectId) {
+      const activeSchedules = (await loadSchedules(projectId, controller.signal)).filter(
+        (item) => item.status === 'ACTIVE',
+      )
+      if (activeSchedules.length === 1) {
+        taskValues = (await loadSchedule(activeSchedules[0]!.id, controller.signal)).tasks
+      }
+    }
     if (referenceController !== controller) return
     projects.value = projectValues
     contracts.value = contractPage.records
     partners.value = partnerPage.records
     costSubjects.value = subjectValues
+    wbsTasks.value = taskValues
   } catch (error) {
     if (!controller.signal.aborted) {
       errorMessage.value = errorText(error, '业务候选数据加载失败')
@@ -1071,6 +1102,13 @@ onBeforeUnmount(() => {
                 :decimal-scale="2"
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'claimUnitPrice', $event)"
+              />
+              <V2Select
+                :model-value="item.wbsTaskId ?? ''"
+                label="WBS任务"
+                :options="wbsTaskOptions"
+                :disabled="!canEditItems || !isDraft"
+                @update:model-value="updateItem(index, 'wbsTaskId', $event)"
               />
               <V2Select
                 :model-value="item.costSubjectId"

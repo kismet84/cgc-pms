@@ -395,59 +395,17 @@ public class SupplierSourcingService {
 
     public List<SupplierReturn> listSupplierReturns(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询供应商退货记录");
-        return supplierReturnMapper.selectList(new LambdaQueryWrapper<SupplierReturn>()
-                .eq(SupplierReturn::getTenantId, tenantId()).eq(SupplierReturn::getProjectId, projectId)
-                .orderByDesc(SupplierReturn::getReturnDate));
+        return supplierReturnMapper.selectFormalByProject(tenantId(), projectId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public SupplierReturn createSupplierReturn(SupplierReturnCommand command) {
-        MatReceipt receipt = receiptMapper.selectById(command.receiptId());
-        if (receipt == null || !Objects.equals(receipt.getTenantId(), tenantId()))
-            throw new BusinessException("SP_RECEIPT_NOT_FOUND", "验收单不存在");
-        projectAccessChecker.checkAccess(receipt.getProjectId(), "登记供应商退货");
-        if (!"APPROVED".equals(receipt.getApprovalStatus()) || receipt.getOrderId() == null
-                || receipt.getContractId() == null || receipt.getPartnerId() == null)
-            throw new BusinessException("SP_RETURN_RECEIPT_INVALID", "只有已审批且绑定订单、合同和供应商的验收单才能登记退货");
-        if (receipt.getReceiptDate() != null && command.returnDate().isBefore(receipt.getReceiptDate()))
-            throw new BusinessException("SP_RETURN_DATE_INVALID", "退货日期不能早于验收日期");
-        SupplierReturn row = new SupplierReturn();
-        row.setTenantId(tenantId());
-        row.setProjectId(receipt.getProjectId());
-        row.setPartnerId(receipt.getPartnerId());
-        row.setContractId(receipt.getContractId());
-        row.setPurchaseOrderId(receipt.getOrderId());
-        row.setReceiptId(receipt.getId());
-        row.setReturnDate(command.returnDate());
-        row.setReturnQuantity(command.returnQuantity());
-        row.setReturnAmount(money(command.returnAmount()));
-        row.setReason(command.reason().trim());
-        row.setStatus("DRAFT");
-        row.setVersion(0);
-        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            row.setId(null);
-            row.setReturnCode(businessCodeGenerator.next(BusinessCodeGenerator.Rule.SUPPLIER_RETURN, null, attempt));
-            try {
-                supplierReturnMapper.insert(row);
-                return requireSupplierReturn(row.getId());
-            } catch (DuplicateKeyException ignored) {
-                // 编号并发冲突时使用下一序号重试。
-            }
-        }
-        throw new BusinessException("SP_RETURN_DUPLICATE", "供应商退货编号生成冲突，请重试");
+        throw new BusinessException("SUPPLIER_RETURN_LEGACY_WRITE_DISABLED", "供应商退货仅允许通过采购执行退货入口登记");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public SupplierReturn confirmSupplierReturn(Long id) {
-        SupplierReturn row = requireSupplierReturn(id);
-        projectAccessChecker.checkAccess(row.getProjectId(), "确认供应商退货");
-        int updated = supplierReturnMapper.update(null, new LambdaUpdateWrapper<SupplierReturn>()
-                .eq(SupplierReturn::getId, id).eq(SupplierReturn::getTenantId, tenantId())
-                .eq(SupplierReturn::getStatus, "DRAFT")
-                .set(SupplierReturn::getStatus, "CONFIRMED")
-                .set(SupplierReturn::getConfirmedBy, userId()).set(SupplierReturn::getConfirmedAt, LocalDateTime.now()));
-        if (updated != 1) throw new BusinessException("SP_RETURN_IMMUTABLE", "供应商退货已确认，禁止重复确认或修改");
-        return requireSupplierReturn(id);
+        throw new BusinessException("SUPPLIER_RETURN_LEGACY_WRITE_DISABLED", "供应商退货仅允许通过采购执行退货入口确认");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -500,9 +458,8 @@ public class SupplierSourcingService {
                 .eq(StlSettlement::getSettlementStatus, "FINALIZED"));
         if (settlements.isEmpty())
             throw new BusinessException("SP_SETTLEMENT_REQUIRED", "采购合同完成结算后才能确认综合履约评价");
-        int returnCount = Math.toIntExact(supplierReturnMapper.selectCount(new LambdaQueryWrapper<SupplierReturn>()
-                .eq(SupplierReturn::getTenantId, tenantId()).eq(SupplierReturn::getPurchaseOrderId, order.getId())
-                .eq(SupplierReturn::getStatus, "CONFIRMED").between(SupplierReturn::getReturnDate, periodStart, periodEnd)));
+        int returnCount = Math.toIntExact(supplierReturnMapper.countConfirmedFormalByOrder(
+                tenantId(), order.getId(), periodStart, periodEnd));
         boolean hasDeduction = settlements.stream().map(StlSettlement::getDeductionAmount).filter(Objects::nonNull)
                 .anyMatch(amount -> amount.signum() > 0);
         BigDecimal commercialScore = HUNDRED.subtract(BigDecimal.valueOf(Math.min(40, returnCount * 10 + (hasDeduction ? 10 : 0))));
@@ -646,9 +603,8 @@ public class SupplierSourcingService {
         Set<Long> orderIds = orders.stream().map(MatPurchaseOrder::getId).collect(Collectors.toSet());
         List<MatReceipt> receipts = orderIds.isEmpty() ? List.of() : receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
                 .eq(MatReceipt::getTenantId, tenantId()).in(MatReceipt::getOrderId, orderIds).orderByAsc(MatReceipt::getReceiptDate));
-        List<SupplierReturn> supplierReturns = orderIds.isEmpty() ? List.of() : supplierReturnMapper.selectList(
-                new LambdaQueryWrapper<SupplierReturn>().eq(SupplierReturn::getTenantId, tenantId())
-                        .in(SupplierReturn::getPurchaseOrderId, orderIds).orderByAsc(SupplierReturn::getReturnDate));
+        List<SupplierReturn> supplierReturns = orderIds.isEmpty()
+                ? List.of() : supplierReturnMapper.selectFormalByOrders(tenantId(), orderIds);
         List<StlSettlement> settlements = event.getContractId() == null ? List.of() : settlementMapper.selectList(
                 new LambdaQueryWrapper<StlSettlement>().eq(StlSettlement::getTenantId, tenantId())
                         .eq(StlSettlement::getContractId, event.getContractId()).orderByAsc(StlSettlement::getCreatedAt));

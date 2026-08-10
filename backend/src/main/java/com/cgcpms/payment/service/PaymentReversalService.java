@@ -1,6 +1,7 @@
 package com.cgcpms.payment.service;
 
 import com.cgcpms.accounting.service.AccountingEntryService;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.constant.CashbookConstants;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +43,7 @@ public class PaymentReversalService {
     private final CostSummaryService costSummaryService;
     private final ProjectAccessChecker projectAccessChecker;
     private final ContractBudgetAllocationService contractBudgetAllocationService;
+    private final MandatoryAuditService mandatoryAuditService;
 
     @Transactional(rollbackFor = Exception.class)
     public PayRecordVO reverse(Long payRecordId, PaymentReversalRequest request) {
@@ -77,6 +80,8 @@ public class PaymentReversalService {
                     && Objects.equals(duplicate.getReversedAt(), effectiveAt)
                     && Objects.equals(duplicate.getReversalType(), reversalType)
                     && Objects.equals(duplicate.getRemark(), remark)) {
+                mandatoryAuditService.verifyFinance("PAYMENT_REVERSED", "PAY_RECORD", original.getId(),
+                        duplicate.getExternalTxnNo(), reversalAuditPayload(duplicate, reason, reversalType));
                 return payRecordService.toVO(duplicate);
             }
             throw new BusinessException("PAYMENT_REVERSAL_IDEMPOTENCY_CONFLICT", "冲销流水号已被其他业务使用");
@@ -133,7 +138,23 @@ public class PaymentReversalService {
         applicationService.updatePayStatus(application.getId());
         payRecordService.updateContractPaidAmount(application.getContractId());
         costSummaryService.updatePaidAmountAfterCommit(application.getTenantId(), application.getProjectId());
+        auditReversal(original, reversal, reason, reversalType);
         return payRecordService.toVO(reversal);
+    }
+
+    private void auditReversal(PayRecord original, PayRecord reversal, String reason, String reversalType) {
+        mandatoryAuditService.finance("PAYMENT_REVERSED", "PAY_RECORD", original.getId(),
+                original.getProjectId(), reversal.getExternalTxnNo(),
+                reversalAuditPayload(reversal, reason, reversalType));
+    }
+
+    private Map<String, Object> reversalAuditPayload(PayRecord reversal, String reason, String reversalType) {
+        return Map.of(
+                "reversalRecordId", reversal.getId(),
+                "amount", reversal.getPayAmount(),
+                "reversedAt", reversal.getReversedAt(),
+                "reversalType", reversalType,
+                "reason", reason);
     }
 
     /** 记录银行或支付通道失败事实；失败记录不消耗预算、不生成现金日记和凭证。 */

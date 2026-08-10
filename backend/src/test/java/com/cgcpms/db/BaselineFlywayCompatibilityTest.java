@@ -25,7 +25,56 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("288", flyway.info().current().getVersion().getVersion());
+        assertEquals("291", flyway.info().current().getVersion().getVersion());
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='revenue_audit_event' AND COLUMN_NAME='command_key'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='finance_audit_event' AND COLUMN_NAME='command_key'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES",
+                "TABLE_NAME='mandatory_audit_expectation'"));
+        assertEquals(0, count(flyway, "v_business_audit_event", "1=1"));
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO var_order_item(id,tenant_id,var_order_id,wbs_task_id)
+                VALUES(289001,0,289010,999999999)
+                """));
+        execute(flyway, """
+                INSERT INTO revenue_audit_event
+                    (id,tenant_id,event_type,business_type,business_id,command_key,event_at,payload_json,payload_hash)
+                VALUES(289002,0,'TEST','TEST',289020,'CONFIRM',CURRENT_TIMESTAMP,'{}',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO revenue_audit_event
+                    (id,tenant_id,event_type,business_type,business_id,command_key,event_at,payload_json,payload_hash)
+                VALUES(289003,0,'TEST','TEST',289020,'CONFIRM',CURRENT_TIMESTAMP,'{}',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """));
+        execute(flyway, """
+                INSERT INTO finance_audit_event
+                    (id,tenant_id,event_type,business_type,business_id,command_key,event_at,payload_json,payload_hash)
+                VALUES(289004,0,'TEST','TEST',289021,'CONFIRM',CURRENT_TIMESTAMP,'{}',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO finance_audit_event
+                    (id,tenant_id,event_type,business_type,business_id,command_key,event_at,payload_json,payload_hash)
+                VALUES(289005,0,'TEST','TEST',289021,'CONFIRM',CURRENT_TIMESTAMP,'{}',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """));
+        execute(flyway, """
+                INSERT INTO mandatory_audit_expectation
+                    (id,tenant_id,audit_domain,event_type,business_type,business_id,command_key,expected_hash)
+                VALUES(290001,0,'FINANCE','TEST','TEST',290020,'CONFIRM',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO mandatory_audit_expectation
+                    (id,tenant_id,audit_domain,event_type,business_type,business_id,command_key,expected_hash)
+                VALUES(290002,0,'FINANCE','TEST','TEST',290020,'CONFIRM',
+                       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+                """));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='sys_file_object_task'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_catalog'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='project_file_version_link'"));
@@ -179,7 +228,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("288", current.info().current().getVersion().getVersion());
+        assertEquals("291", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "sys_menu", """
                 perms='material:dict:delete' AND deleted_flag=0
                 AND parent_id=(SELECT id FROM sys_menu

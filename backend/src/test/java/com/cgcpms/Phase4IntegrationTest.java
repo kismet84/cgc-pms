@@ -206,12 +206,21 @@ class Phase4IntegrationTest {
     @Transactional
     @DisplayName("场景2: 发票全链路 → 创建PayRecord→登记发票(amount=1000)→验证PENDING→核验VERIFIED→验证关联")
     void test02_invoiceChain() {
+        long costSubjectId = 99400002L;
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,
+                    account_category,level,sort_order,status,created_at,updated_at,deleted_flag)
+                VALUES(?,0,0,'PHASE4-INVOICE-SUBJECT','预付款发票成本','DETAIL',
+                    'COST',1,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, costSubjectId);
+
         // 1. 创建 PayApplication（pay_record.pay_application_id NOT NULL）
         PayApplication app = new PayApplication();
         app.setTenantId(0L);
         app.setProjectId(PROJECT_ID);
         app.setContractId(CONTRACT_ID);
         app.setPartnerId(PARTNER_ID);
+        app.setCostSubjectId(costSubjectId);
         app.setApplyCode("APP-TEST-" + System.currentTimeMillis());
         app.setApplyAmount(new BigDecimal("1000.00"));
         app.setPayType("ADVANCE");

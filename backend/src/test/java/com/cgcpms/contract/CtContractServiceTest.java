@@ -2,6 +2,7 @@ package com.cgcpms.contract;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.entity.ContractBudgetAllocation;
 import com.cgcpms.budget.entity.ProjectBudget;
@@ -859,6 +860,64 @@ class CtContractServiceTest {
         assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("履约结清 — MAIN、SUB、SUBCONTRACT、PURCHASE 只认各自权威终局事实")
+    void settlePerformanceRequiresAuthoritativeFactByContractType() {
+        Long main = insertPerformingContract("业主最终结算合同", "MAIN", null);
+        Long ownerSettlement = IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO owner_settlement(id,tenant_id,project_id,contract_id,customer_id,settlement_code,
+                 settlement_period,settlement_date,gross_amount,tax_amount,retention_amount,net_receivable_amount,due_date,
+                 status,attachment_count,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag,settlement_type)
+                VALUES(?,0,?,?,?,'OS-SETTLE-MAIN','2026-08',CURRENT_DATE,100,0,0,100,CURRENT_DATE,
+                 'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0,'PROGRESS')
+                """, ownerSettlement, PROJECT_ID, main, PARTY_A_ID);
+        assertSettlementFactRequired(main);
+        jdbcTemplate.update("UPDATE owner_settlement SET settlement_type='FINAL' WHERE id=?", ownerSettlement);
+        settleAndAssert(main);
+
+        for (String type : List.of("SUB", "SUBCONTRACT")) {
+            Long contractId = insertPerformingContract(type + "最终结算合同", type, null);
+            jdbcTemplate.update("""
+                    INSERT INTO stl_settlement(id,tenant_id,project_id,contract_id,partner_id,settlement_code,
+                     settlement_type,contract_amount,change_amount,measured_amount,deduction_amount,paid_amount,final_amount,
+                     approval_status,settlement_status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                    VALUES(?,0,?,?,?,?,'FINAL',100,0,100,0,0,100,'APPROVED','FINALIZED',
+                     1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                    """, IdWorker.getId(), PROJECT_ID, contractId, PARTY_B_ID,
+                    "ST-SETTLE-" + type + "-" + contractId);
+            settleAndAssert(contractId);
+        }
+
+        Long purchase = insertPerformingContract("采购终局合同", "PURCHASE", new BigDecimal("100.00"));
+        Long orderId = IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_order(id,tenant_id,project_id,contract_id,partner_id,order_code,order_type,
+                 order_date,delivery_date,total_amount,approval_status,order_status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,?,'PURCHASE',CURRENT_DATE,CURRENT_DATE,100,'APPROVED','APPROVED',
+                 1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, orderId, PROJECT_ID, purchase, PARTY_B_ID, "PO-SETTLE-" + orderId);
+        assertSettlementFactRequired(purchase);
+        jdbcTemplate.update("UPDATE mat_purchase_order SET order_status='COMPLETED' WHERE id=?", orderId);
+        Long payApplicationId = IdWorker.getId();
+        insertPayApplication(payApplicationId, purchase, new BigDecimal("100.00"));
+        PayRecord paid = new PayRecord();
+        paid.setTenantId(TENANT_ID);
+        paid.setProjectId(PROJECT_ID);
+        paid.setContractId(purchase);
+        paid.setPartnerId(PARTY_B_ID);
+        paid.setPayApplicationId(payApplicationId);
+        paid.setPayAmount(new BigDecimal("100.00"));
+        paid.setPayDate(LocalDate.now());
+        paid.setPayStatus("SUCCESS");
+        payRecordMapper.insert(paid);
+        settleAndAssert(purchase);
+
+        Long unsupported = insertPerformingContract("租赁无终局事实合同", "LEASE", null);
+        assertSettlementFactRequired(unsupported);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 删除
     // ═══════════════════════════════════════════════════════════════
@@ -1612,5 +1671,33 @@ class CtContractServiceTest {
         application.setIntegrityVersion("LEGACY_UNVERIFIED");
         application.setVersion(0);
         payApplicationMapper.insert(application);
+    }
+
+    private Long insertPerformingContract(String name, String type, BigDecimal payableAmount) {
+        CtContract contract = buildDraftContract(name);
+        contract.setTenantId(TENANT_ID);
+        contract.setContractCode("CT-SETTLE-" + IdWorker.getId());
+        contract.setContractType(type);
+        contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contract.setPayableAmount(payableAmount);
+        contractMapper.insert(contract);
+        return contract.getId();
+    }
+
+    private void assertSettlementFactRequired(Long contractId) {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.settlePerformance(contractId, currentVersion(contractId)));
+        assertEquals("CONTRACT_SETTLEMENT_FACT_REQUIRED", error.getCode());
+        assertEquals(ContractStatusConstants.STATUS_PERFORMING,
+                contractMapper.selectById(contractId).getContractStatus());
+    }
+
+    private void settleAndAssert(Long contractId) {
+        int version = currentVersion(contractId);
+        contractService.settlePerformance(contractId, version);
+        CtContract settled = contractMapper.selectById(contractId);
+        assertEquals(ContractStatusConstants.STATUS_SETTLED, settled.getContractStatus());
+        assertEquals(version + 1, settled.getVersion());
     }
 }

@@ -51,6 +51,8 @@ class VariationClaimClosedLoopIntegrationTest {
     private static final long PROJECT_ID = 186010L;
     private static final long PARTNER_ID = 186020L;
     private static final long CONTRACT_ID = 186030L;
+    private static final long SCHEDULE_ID = 186040L;
+    private static final long WBS_ID = 186050L;
 
     @Autowired VarOrderService service;
     @Autowired VarOrderMapper orderMapper;
@@ -101,6 +103,7 @@ class VariationClaimClosedLoopIntegrationTest {
         item.setUnitPrice(new BigDecimal("900.00"));
         item.setClaimUnitPrice(new BigDecimal("1500.00"));
         item.setCostSubjectId(subjectId);
+        item.setWbsTaskId(WBS_ID);
         service.saveItems(orderId, List.of(item));
 
         BusinessException noEvidence = assertThrows(BusinessException.class, () -> service.submitForApproval(orderId));
@@ -220,6 +223,28 @@ class VariationClaimClosedLoopIntegrationTest {
             p.setProjectName("变更索赔闭环项目"); p.setStatus("ACTIVE"); p.setApprovalStatus("APPROVED");
             projectMapper.insert(p);
         }
+        jdbc.update("UPDATE pm_project SET status='ACTIVE', approval_status='APPROVED' WHERE id=?", PROJECT_ID);
+        jdbc.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                SELECT ?,0,?,'SCH-V186','变更索赔生效基线','BASELINE',1,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM project_schedule_plan WHERE id=?)
+                """, SCHEDULE_ID, PROJECT_ID, SCHEDULE_ID);
+        jdbc.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                SELECT ?,0,?,?,'WBS-V186','变更索赔WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM project_wbs_task WHERE id=?)
+                """, WBS_ID, PROJECT_ID, SCHEDULE_ID, WBS_ID);
         if (partnerMapper.selectById(PARTNER_ID) == null) {
             MdPartner p = new MdPartner(); p.setId(PARTNER_ID); p.setPartnerCode("O-V186");
             p.setPartnerName("闭环测试业主"); p.setPartnerType("PARTY_A"); p.setBlacklistFlag(0); p.setStatus("ENABLE");

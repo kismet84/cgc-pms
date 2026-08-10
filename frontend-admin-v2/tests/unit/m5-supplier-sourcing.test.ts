@@ -5,13 +5,11 @@ import { SUPPLIER_SOURCING_PERMISSIONS } from '@cgc-pms/frontend-contracts'
 import {
   awardSourcingEvent,
   confirmSupplierPerformance,
-  confirmSupplierReturn,
   createBidEvaluation,
   createSourcingEvent,
   createSupplierBlacklist,
   createSupplierPerformance,
   createSupplierQuote,
-  createSupplierReturn,
   declineSourcingSupplier,
   inviteSourcingSuppliers,
   linkSourcingContract,
@@ -66,7 +64,7 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     expect(headingCard).not.toMatch(/<template #title-extra\b/)
     expect(headingCard).toContain('新建招采事件')
     expect(headingCard).toContain('登记履约评价')
-    expect(headingCard).toContain('登记退货')
+    expect(headingCard).toContain('退货登记统一在采购执行办理')
     const eventCard = source.match(/<V2Card v-else>[\s\S]*?<\/V2Card>/)?.[0] ?? ''
     expect(eventCard).toContain('aria-label="招采事件列表"')
     expect(eventCard).not.toMatch(/<template #title-extra\b/)
@@ -75,19 +73,13 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     expect(performanceCard).toMatch(/<template #title-extra\b/)
     expect(performanceCard).toContain('评价 {{ performance.length }}')
     expect(performanceCard).toContain('退货 {{ returns.length }}')
-    for (const loader of [
-      'loadPurchaseRequests',
-      'loadPurchaseOrders',
-      'loadReceipts',
-      'loadContractPage',
-    ])
+    for (const loader of ['loadPurchaseRequests', 'loadPurchaseOrders', 'loadContractPage'])
       expect(source).toContain(loader)
     for (const model of [
       'form.purchaseRequestId',
       'form.partnerId',
       'form.contractId',
       'form.purchaseOrderId',
-      'form.receiptId',
     ])
       expect(source).toMatch(new RegExp(`<V2Select[\\s\\S]{0,180}v-model="${model}"`))
     expect(source).toContain(
@@ -99,7 +91,9 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     expect(source).toContain('item.requestCode ||')
     expect(source).toContain('item.contractCode} · ${item.contractName')
     expect(source).toContain('item.orderCode ||')
-    expect(source).toContain('item.receiptCode ||')
+    expect(source).not.toContain("show('return')")
+    expect(source).not.toContain('createSupplierReturn')
+    expect(source).not.toContain('confirmSupplierReturn')
     expect(source).not.toContain('{{ projectLabel }}')
     expect(source).not.toMatch(/frontend-admin\/src|Legacy/)
   })
@@ -148,15 +142,6 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     await createSupplierPerformance('O1', '88.5', '良好')
     await confirmSupplierPerformance('PE/1')
     await loadSupplierReturns('P1', signal)
-    await createSupplierReturn({
-      receiptId: 'R1',
-      returnCode: 'RT1',
-      returnDate: '2026-07-24',
-      returnQuantity: '1.0000',
-      returnAmount: '10.00',
-      reason: '不合格',
-    })
-    await confirmSupplierReturn('RT/1')
     await createSupplierBlacklist('PE1', '建议列入')
     await submitSupplierBlacklist('B/1')
     await reviewSupplierBlacklist('B/1', 'APPROVE', '同意')

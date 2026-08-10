@@ -5,13 +5,11 @@ import type {
   PartnerRecord,
   PurchaseOrderRecord,
   PurchaseRequestRecord,
-  ReceiptRecord,
   SourcingEventCommand,
   SourcingEventRecord,
   SourcingTraceRecord,
   SupplierPerformanceRecord,
   SupplierQuoteCommand,
-  SupplierReturnCommand,
   SupplierReturnRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -31,19 +29,16 @@ import {
 import {
   awardSourcingEvent,
   confirmSupplierPerformance,
-  confirmSupplierReturn,
   createBidEvaluation,
   createSourcingEvent,
   createSupplierBlacklist,
   createSupplierPerformance,
   createSupplierQuote,
-  createSupplierReturn,
   declineSourcingSupplier,
   inviteSourcingSuppliers,
   linkSourcingContract,
   loadPurchaseOrders,
   loadPurchaseRequests,
-  loadReceipts,
   loadSourcingEvents,
   loadSourcingTrace,
   loadSupplierPerformance,
@@ -69,7 +64,6 @@ type Action =
   | 'award'
   | 'contract'
   | 'performance'
-  | 'return'
   | 'blacklist'
   | 'review'
   | null
@@ -83,7 +77,6 @@ const returns = ref<SupplierReturnRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
 const purchaseRequests = ref<PurchaseRequestRecord[]>([])
 const purchaseOrders = ref<PurchaseOrderRecord[]>([])
-const receipts = ref<ReceiptRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const selectedId = ref('')
 const pageNo = ref(1)
@@ -151,12 +144,6 @@ const purchaseOrderOptions = computed(() =>
     label: `${item.orderCode || '采购订单编号缺失'} · ${item.partnerName || '供应商信息缺失'}`,
   })),
 )
-const receiptOptions = computed(() =>
-  receipts.value.map((item) => ({
-    value: item.id,
-    label: `${item.receiptCode || '验收单编号缺失'} · ${item.orderCode || '采购订单信息缺失'}`,
-  })),
-)
 const dialogTitle = computed(
   () =>
     ({
@@ -168,7 +155,6 @@ const dialogTitle = computed(
       award: '定标',
       contract: '关联合同',
       performance: '履约评价',
-      return: '登记退货',
       blacklist: '发起黑名单',
       review: '审核黑名单',
     })[action.value ?? ''] ?? '',
@@ -222,8 +208,7 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
       qualityScore: '0',
     })
   if (next === 'review') form.decision = 'APPROVE'
-  if (next === 'return') form.returnDate = new Date().toISOString().slice(0, 10)
-  if (!['event', 'contract', 'performance', 'return'].includes(next)) return
+  if (!['event', 'contract', 'performance'].includes(next)) return
 
   optionController?.abort()
   const controller = new AbortController()
@@ -248,12 +233,6 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
         controller.signal,
       )
       purchaseOrders.value = page.records
-    } else {
-      const page = await loadReceipts(
-        { pageNum: 1, pageSize: 200, projectId: projectId.value || undefined },
-        controller.signal,
-      )
-      receipts.value = page.records
     }
   } catch (error) {
     if (!controller.signal.aborted) {
@@ -450,15 +429,6 @@ async function save(): Promise<void> {
         decimal('serviceScore', '服务协同评分'),
         required('evaluationComment', '评价意见'),
       )
-    } else if (current === 'return') {
-      const payload: SupplierReturnCommand = {
-        receiptId: required('receiptId', '验收单'),
-        returnDate: required('returnDate', '退货日期'),
-        returnQuantity: decimal('returnQuantity', '退货数量'),
-        returnAmount: decimal('returnAmount', '退货金额'),
-        reason: required('reason', '退货原因'),
-      }
-      await createSupplierReturn(payload)
     } else if (current === 'blacklist') {
       await createSupplierBlacklist(targetId.value, required('reason', '列入原因'))
     } else if (current === 'review') {
@@ -534,9 +504,7 @@ onBeforeUnmount(() => {
             @click="show('performance')"
             >登记履约评价</V2Button
           >
-          <V2Button v-if="canPerformance" size="small" variant="secondary" @click="show('return')"
-            >登记退货</V2Button
-          >
+          <span class="supplier-page__write-route">退货登记统一在采购执行办理</span>
         </template>
       </V2Card>
 
@@ -912,14 +880,7 @@ onBeforeUnmount(() => {
                   <td>{{ formatDecimal(item.returnQuantity) }}</td>
                   <td>{{ formatAmount(item.returnAmount) }}</td>
                   <td>{{ label(item.status) }}</td>
-                  <td>
-                    <V2Button
-                      v-if="canPerformance && item.status === 'DRAFT'"
-                      size="small"
-                      @click="act(() => confirmSupplierReturn(item.id), '退货已确认。')"
-                      >确认</V2Button
-                    >
-                  </td>
+                  <td>采购执行</td>
                 </tr>
               </tbody>
             </table>
@@ -1087,26 +1048,6 @@ onBeforeUnmount(() => {
           /><V2Input v-model="form.serviceScore" label="服务协同评分" :decimal-scale="2" required />
           <label class="supplier-page__wide"
             >评价意见<textarea v-model="form.evaluationComment" required />
-          </label>
-        </template>
-        <template v-if="action === 'return'">
-          <V2Select
-            v-model="form.receiptId"
-            label="验收单"
-            :options="receiptOptions"
-            placeholder="选择验收单"
-            required
-          /><V2Input
-            v-model="form.returnCode"
-            label="退货编号"
-            disabled
-            placeholder="创建后由服务端自动生成"
-          />
-          <label>退货日期<input v-model="form.returnDate" type="date" required /></label
-          ><V2Input v-model="form.returnQuantity" label="退货数量" :decimal-scale="2" required />
-          <V2Input v-model="form.returnAmount" label="退货金额" :decimal-scale="2" required /><label
-            class="supplier-page__wide"
-            >退货原因<textarea v-model="form.reason" required />
           </label>
         </template>
         <label v-if="action === 'blacklist'" class="supplier-page__wide"

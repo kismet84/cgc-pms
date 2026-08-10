@@ -51,7 +51,6 @@ import {
   type SupplierPerformanceRecord,
   type SupplierQuoteCommand,
   type SupplierQuoteRecord,
-  type SupplierReturnCommand,
   type SupplierReturnRecord,
   type WarehousePage,
   type WarehouseCommand,
@@ -536,17 +535,6 @@ export const loadSupplierReturns = (projectId: string, signal?: AbortSignal) =>
       projectId: requiredId(projectId, '项目ID'),
     }),
     { signal },
-  )
-
-export const createSupplierReturn = (body: SupplierReturnCommand) =>
-  apiRequest<SupplierReturnRecord, SupplierReturnCommand>(SUPPLY_CHAIN_API.supplierReturns, {
-    method: POST_METHOD,
-    body,
-  })
-
-export const confirmSupplierReturn = (id: string) =>
-  post<SupplierReturnRecord>(
-    `${SUPPLY_CHAIN_API.supplierReturns}/${encodedId(id, '退货ID')}/confirm`,
   )
 
 export const createSupplierBlacklist = (performanceEvaluationId: string, reason: string) =>

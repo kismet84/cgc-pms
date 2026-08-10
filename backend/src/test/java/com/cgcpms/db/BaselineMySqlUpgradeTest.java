@@ -106,7 +106,13 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("288", current.info().current().getVersion().getVersion());
+        assertEquals("291", current.info().current().getVersion().getVersion());
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM information_schema.views
+                WHERE table_schema=DATABASE() AND table_name='v_business_audit_event'
+                  AND security_type='INVOKER'
+                """));
+        assertEquals(0, count(current, "SELECT COUNT(*) FROM v_business_audit_event"));
         assertEquals(1, count(current, """
                 SELECT COUNT(*) FROM ct_contract
                 WHERE id=9251001 AND current_amount=120 AND paid_amount=30

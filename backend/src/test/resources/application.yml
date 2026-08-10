@@ -16,7 +16,7 @@ spring:
     # Fresh B215/H2 and B215/MySQL behavior is covered by dedicated baseline tests;
     # including B215 here would suppress the historical demo fixtures many existing
     # service/controller tests explicitly exercise.
-    locations: classpath:db/migration-h2-legacy,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class
+    locations: classpath:db/migration-h2-legacy,classpath:db/migration-h2-test,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class
   sql:
     init:
       mode: never

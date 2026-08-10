@@ -25,7 +25,7 @@ import {
   submitVariationToOwner,
   updateVariation,
 } from '@/services/commercial'
-import { uploadSiteFile } from '@/services/delivery'
+import { loadSchedule, loadSchedules, uploadSiteFile } from '@/services/delivery'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/commercial', () => ({
@@ -45,7 +45,11 @@ vi.mock('@/services/commercial', () => ({
   updateVariation: vi.fn(),
 }))
 
-vi.mock('@/services/delivery', () => ({ uploadSiteFile: vi.fn() }))
+vi.mock('@/services/delivery', () => ({
+  loadSchedule: vi.fn(),
+  loadSchedules: vi.fn(),
+  uploadSiteFile: vi.fn(),
+}))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -92,6 +96,7 @@ const baseRecord: VariationRecord = {
       claimUnitPrice: '5200.00',
       claimAmount: '54600.00',
       costSubjectId: 'CS1',
+      wbsTaskId: 'W1',
     },
   ],
   ownerSubmissions: [],
@@ -185,6 +190,50 @@ beforeEach(() => {
     .mockResolvedValue([
       { id: 'CS1', subjectCode: '5401', subjectName: '合同履约成本', status: 'ENABLE' },
     ])
+  vi.mocked(loadSchedules)
+    .mockReset()
+    .mockResolvedValue([
+      {
+        id: 'S1',
+        projectId: 'P1',
+        planCode: 'SCH-001',
+        planName: '项目基线',
+        planType: 'BASELINE',
+        versionNo: 1,
+        plannedStartDate: '2026-01-01',
+        plannedEndDate: '2026-12-31',
+        status: 'ACTIVE',
+      },
+    ])
+  vi.mocked(loadSchedule)
+    .mockReset()
+    .mockResolvedValue({
+      id: 'S1',
+      projectId: 'P1',
+      planCode: 'SCH-001',
+      planName: '项目基线',
+      planType: 'BASELINE',
+      versionNo: 1,
+      plannedStartDate: '2026-01-01',
+      plannedEndDate: '2026-12-31',
+      status: 'ACTIVE',
+      tasks: [
+        {
+          id: 'W1',
+          schedulePlanId: 'S1',
+          taskCode: 'WBS-001',
+          taskName: '钢筋工程',
+          plannedStartDate: '2026-01-01',
+          plannedEndDate: '2026-12-31',
+          weightPercent: '100.00',
+          actualProgress: '0.00',
+          status: 'NOT_STARTED',
+        },
+      ],
+      periodPlans: [],
+      latestSnapshot: null,
+      correctiveActions: [],
+    })
   vi.mocked(loadVariation).mockReset().mockResolvedValue(baseRecord)
   vi.mocked(loadVariationTrace).mockReset().mockResolvedValue({ variation: baseRecord })
   vi.mocked(createVariation).mockReset().mockResolvedValue('10')
@@ -283,7 +332,13 @@ describe('M4 variation page', () => {
 
     expect(saveVariationItems).toHaveBeenCalledWith(
       '9',
-      [expect.objectContaining({ quantity: '10.500', claimUnitPrice: '5200.00' })],
+      [
+        expect.objectContaining({
+          quantity: '10.500',
+          claimUnitPrice: '5200.00',
+          wbsTaskId: 'W1',
+        }),
+      ],
       '3',
     )
     expect(loadVariation).toHaveBeenCalledTimes(2)

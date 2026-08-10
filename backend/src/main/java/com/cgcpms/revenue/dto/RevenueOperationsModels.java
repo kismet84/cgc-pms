@@ -41,6 +41,9 @@ public final class RevenueOperationsModels {
             @NotBlank String payerName, @NotNull @Min(1) Integer attachmentCount,
             List<@Valid AmountAllocation> allocations, String remark) {}
 
+    public record AllocationConfirmationRequest(
+            @NotEmpty List<@Valid AmountAllocation> allocations) {}
+
     public record CollectionReverseRequest(@NotBlank String reason, @NotBlank String idempotencyKey) {}
 
     public record ReceivableCreditRequest(

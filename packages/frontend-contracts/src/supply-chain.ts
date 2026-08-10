@@ -174,7 +174,7 @@ export interface SupplierReturnRecord {
   returnQuantity: SupplyChainDecimalString;
   returnAmount: SupplyChainDecimalString;
   reason: string;
-  status: "DRAFT" | "CONFIRMED";
+  status: "CONFIRMED" | "REVERSED";
 }
 
 export interface SupplierBlacklistRecord {
@@ -242,15 +242,6 @@ export interface BidEvaluationCommand {
   deliveryScore: SupplyChainDecimalString;
   qualityScore: SupplyChainDecimalString;
   evaluationComment: string;
-}
-
-export interface SupplierReturnCommand {
-  receiptId: string;
-  returnCode?: string;
-  returnDate: string;
-  returnQuantity: SupplyChainDecimalString;
-  returnAmount: SupplyChainDecimalString;
-  reason: string;
 }
 
 export const SUPPLY_CHAIN_DECIMAL_FIELDS = {

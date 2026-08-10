@@ -1,8 +1,9 @@
 <!-- UI-DESIGN-STANDARD: canonical -->
 
-# CGC-PMS 唯一设计系统标准与门禁
+# 00 CGC-PMS 唯一设计系统标准与门禁
 
-状态：现行、唯一权威
+文档状态：Active
+权威边界：`frontend-admin-v2` 设计系统唯一权威
 
 适用范围：`frontend-admin-v2` 全部页面；Legacy 只读归档不再维护
 

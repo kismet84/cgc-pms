@@ -135,8 +135,9 @@ class FinanceOperationsIntegrationTest {
         assertEquals(receipt.get("collection_record_id"),duplicate.get("collection_record_id"));
         var trace=integrations.traceBankReceipt(((Number)receipt.get("id")).longValue());
         assertNotNull(trace.get("collection"));
-        assertNotNull(trace.get("cashJournal"));
-        assertFalse(((List<?>)trace.get("accountingEntries")).isEmpty());
+        assertEquals("PENDING_EVIDENCE", ((Map<?,?>)trace.get("collection")).get("status"));
+        assertNull(trace.get("cashJournal"));
+        assertTrue(((List<?>)trace.get("accountingEntries")).isEmpty());
         integrations.createForecast(new CashForecastRequest(PROJECT,LocalDate.now(),"BASE",new BigDecimal("100"),new BigDecimal("40"),BigDecimal.ZERO,"MANUAL",null,BigDecimal.ONE));
         assertEquals(0,new BigDecimal("60").compareTo((BigDecimal)integrations.forecastSummary("BASE",LocalDate.now(),LocalDate.now()).get("endingBalance")));
         var pool=integrations.createFundPool(new FundPoolRequest("POOL-IT","测试资金池","CNY","QUOTA"));

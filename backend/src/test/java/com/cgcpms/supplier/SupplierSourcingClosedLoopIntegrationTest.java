@@ -1,11 +1,14 @@
 package com.cgcpms.supplier;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.supplier.dto.SupplierSourcingModels.*;
 import com.cgcpms.supplier.entity.*;
 import com.cgcpms.supplier.service.SupplierSourcingService;
+import com.cgcpms.supplierreturn.dto.SupplierReturnRequest;
+import com.cgcpms.supplierreturn.service.MatSupplierReturnService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
@@ -40,10 +43,14 @@ class SupplierSourcingClosedLoopIntegrationTest {
     private static final long RECEIPT = 99189040L;
     private static final long RECEIPT_ITEM = 99189041L;
     private static final long SETTLEMENT = 99189050L;
+    private static final long QUALITY_DISPOSITION = 99189051L;
+    private static final long LEGACY_RETURN = 99189052L;
     private static final AtomicLong FILE_ID = new AtomicLong(99189100L);
 
     @Autowired SupplierSourcingService service;
+    @Autowired MatSupplierReturnService formalReturnService;
     @Autowired BusinessObjectAuthorizer fileAuthorizer;
+    @Autowired MandatoryAuditService mandatoryAuditService;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper objectMapper;
 
@@ -61,6 +68,7 @@ class SupplierSourcingClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO mat_purchase_order_item(id,tenant_id,order_id,project_id,material_id,unit,quantity,unit_price,amount,received_quantity,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,1,'吨',10,1000,10000,10,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", ORDER_ITEM, ORDER, PROJECT);
         jdbc.update("INSERT INTO mat_receipt(id,tenant_id,project_id,order_id,contract_id,partner_id,receipt_code,receipt_date,quality_status,total_amount,approval_status,cost_generated_flag,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?, 'RC-SP-IT',?,'UNQUALIFIED',10000,'APPROVED',1,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", RECEIPT, PROJECT, ORDER, CONTRACT, SUPPLIER_A, LocalDate.now());
         jdbc.update("INSERT INTO mat_receipt_item(id,tenant_id,receipt_id,order_item_id,material_id,actual_quantity,qualified_quantity,unit_price,amount,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,1,10,0,1000,10000,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", RECEIPT_ITEM, RECEIPT, ORDER_ITEM);
+        jdbc.update("INSERT INTO mat_quality_disposition(id,tenant_id,project_id,receipt_id,receipt_item_id,rejected_quantity,disposition_action,status,resolved_quantity,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,2,'RETURN_TO_SUPPLIER','OPEN',0,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", QUALITY_DISPOSITION, PROJECT, RECEIPT, RECEIPT_ITEM);
         jdbc.update("INSERT INTO stl_settlement(id,tenant_id,project_id,contract_id,partner_id,settlement_code,settlement_type,contract_amount,change_amount,measured_amount,deduction_amount,paid_amount,final_amount,approval_status,settlement_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,'ST-SP-IT','PURCHASE',10000,0,10000,100,0,9900,'APPROVED','FINALIZED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SETTLEMENT, PROJECT, CONTRACT, SUPPLIER_A);
     }
 
@@ -94,12 +102,12 @@ class SupplierSourcingClosedLoopIntegrationTest {
         assertEquals("AWARDED", service.award(event.getId(), new AwardCommand(quoteA.getId(), "综合评分最高，技术、交付和质量保障满足项目要求")).getStatus());
         assertEquals("CONTRACTED", service.linkContract(event.getId(), new LinkContractCommand(CONTRACT)).getStatus());
 
-        SupplierReturn supplierReturn = service.createSupplierReturn(new SupplierReturnCommand(
-                RECEIPT, "SRT-SP-001", LocalDate.now(), new BigDecimal("2"), new BigDecimal("2000"),
-                "到货质量不合格，退回供应商"));
-        assertTrue(supplierReturn.getReturnCode().matches("SRT-\\d{8}-\\d{3}"));
-        supplierReturn = service.confirmSupplierReturn(supplierReturn.getId());
-        assertEquals("CONFIRMED", supplierReturn.getStatus());
+        Long supplierReturnId = formalReturnService.confirm(new SupplierReturnRequest(
+                RECEIPT_ITEM, QUALITY_DISPOSITION, new BigDecimal("2"), LocalDate.now(),
+                "到货质量不合格，退回供应商", "SP-SRT-001"));
+        assertEquals("CONFIRMED", formalReturnService.getById(supplierReturnId).getStatus());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sp_supplier_return_item WHERE return_id=?", Integer.class, supplierReturnId));
 
         SupplierPerformanceEvaluation performance = service.createPerformance(new PerformanceCommand(
                 ORDER, BigDecimal.ZERO, "延期且本批验收不合格，售后响应未达到项目要求"));
@@ -153,6 +161,46 @@ class SupplierSourcingClosedLoopIntegrationTest {
     }
 
     @Test
+    void supplierReturnConfirmAndReverseWriteOneMandatoryAuditFactEach() {
+        SupplierReturnRequest request = new SupplierReturnRequest(
+                RECEIPT_ITEM, QUALITY_DISPOSITION, new BigDecimal("2"), LocalDate.now(),
+                "到货质量不合格，退回供应商", "SP-SRT-AUDIT-001");
+
+        Long returnId = formalReturnService.confirm(request);
+        assertEquals(returnId, formalReturnService.confirm(request));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE event_type='SUPPLIER_RETURN_CONFIRMED' AND business_type='SUPPLIER_RETURN'
+                   AND business_id=? AND command_key='SP-SRT-AUDIT-001' AND LENGTH(payload_hash)=64
+                """, Integer.class, returnId));
+        String confirmedHash = jdbc.queryForObject("""
+                SELECT payload_hash FROM finance_audit_event
+                 WHERE event_type='SUPPLIER_RETURN_CONFIRMED' AND business_id=?
+                """, String.class, returnId);
+        jdbc.update("UPDATE finance_audit_event SET payload_hash=? WHERE event_type='SUPPLIER_RETURN_CONFIRMED' AND business_id=?",
+                "0".repeat(64), returnId);
+        assertEquals("MANDATORY_AUDIT_INTEGRITY_VIOLATION", assertThrows(BusinessException.class,
+                () -> formalReturnService.confirm(request)).getCode());
+        jdbc.update("UPDATE finance_audit_event SET payload_hash=? WHERE event_type='SUPPLIER_RETURN_CONFIRMED' AND business_id=?",
+                confirmedHash, returnId);
+
+        assertEquals(returnId, formalReturnService.reverse(returnId, "供应商确认退货作废"));
+        assertEquals(returnId, formalReturnService.reverse(returnId, "供应商确认退货作废"));
+        assertEquals("REVERSED", formalReturnService.getById(returnId).getStatus());
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE event_type='SUPPLIER_RETURN_REVERSED' AND business_type='SUPPLIER_RETURN'
+                   AND business_id=? AND command_key=? AND LENGTH(payload_hash)=64
+                """, Integer.class, returnId, "REVERSE:" + returnId));
+        int missingBeforeWrongReverseKey = mandatoryAuditService.inspectTenant().missingEvents();
+        jdbc.update("UPDATE finance_audit_event SET command_key='WRONG' WHERE event_type='SUPPLIER_RETURN_REVERSED' AND business_id=?",
+                returnId);
+        assertEquals(missingBeforeWrongReverseKey + 1, mandatoryAuditService.inspectTenant().missingEvents());
+        assertEquals("MANDATORY_AUDIT_EVENT_MISSING", assertThrows(BusinessException.class,
+                () -> formalReturnService.reverse(returnId, "供应商确认退货作废")).getCode());
+    }
+
+    @Test
     void rejectsBlacklistedSupplierAtInvitation() {
         jdbc.update("UPDATE md_partner SET blacklist_flag=1 WHERE id=?", SUPPLIER_C);
         SourcingEvent event = service.createEvent(new EventCommand(PROJECT, REQUEST, "SP-SRC-BL", "黑名单校验",
@@ -163,17 +211,20 @@ class SupplierSourcingClosedLoopIntegrationTest {
     }
 
     @Test
-    void rejectsSupplierReturnBeforeReceiptDateAndDuplicateConfirmation() {
-        BusinessException invalidDate = assertThrows(BusinessException.class, () -> service.createSupplierReturn(
-                new SupplierReturnCommand(RECEIPT, "SRT-SP-EDGE", LocalDate.now().minusDays(1),
-                        BigDecimal.ONE, BigDecimal.ZERO, "退货日期异常")));
-        assertEquals("SP_RETURN_DATE_INVALID", invalidDate.getCode());
+    void legacySupplierReturnWritesFailClosed() {
+        BusinessException disabled = assertThrows(BusinessException.class, () -> service.createSupplierReturn(
+                new SupplierReturnCommand(RECEIPT, "SRT-SP-EDGE", LocalDate.now(),
+                        BigDecimal.ONE, BigDecimal.ZERO, "不合格退货")));
+        assertEquals("SUPPLIER_RETURN_LEGACY_WRITE_DISABLED", disabled.getCode());
+        assertEquals("SUPPLIER_RETURN_LEGACY_WRITE_DISABLED", assertThrows(BusinessException.class,
+                () -> service.confirmSupplierReturn(LEGACY_RETURN)).getCode());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sp_supplier_return WHERE return_code='SRT-SP-EDGE'", Integer.class));
 
-        SupplierReturn row = service.createSupplierReturn(new SupplierReturnCommand(RECEIPT, "SRT-SP-EDGE",
-                LocalDate.now(), BigDecimal.ONE, BigDecimal.ZERO, "不合格退货"));
-        service.confirmSupplierReturn(row.getId());
-        assertEquals("SP_RETURN_IMMUTABLE", assertThrows(BusinessException.class,
-                () -> service.confirmSupplierReturn(row.getId())).getCode());
+        int missingBefore = mandatoryAuditService.inspectTenant().missingEvents();
+        jdbc.update("INSERT INTO sp_supplier_return(id,tenant_id,project_id,partner_id,contract_id,purchase_order_id,receipt_id,return_code,return_date,return_quantity,return_amount,reason,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,?,'SRT-LEGACY-ORPHAN',CURRENT_DATE,1,1000,'历史孤儿表头','CONFIRMED',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", LEGACY_RETURN, PROJECT, SUPPLIER_A, CONTRACT, ORDER, RECEIPT);
+        assertTrue(service.listSupplierReturns(PROJECT).isEmpty());
+        assertEquals(missingBefore, mandatoryAuditService.inspectTenant().missingEvents());
     }
 
     @Test
@@ -249,9 +300,12 @@ class SupplierSourcingClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM mandatory_audit_expectation WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM finance_audit_event WHERE project_id=? AND business_type='SUPPLIER_RETURN'", PROJECT);
         jdbc.update("UPDATE sp_sourcing_event SET awarded_quote_id=NULL,contract_id=NULL WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM sp_blacklist_record WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM sp_performance_evaluation WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM sp_supplier_return_item WHERE return_id IN(SELECT id FROM sp_supplier_return WHERE project_id=?)", PROJECT);
         jdbc.update("DELETE FROM sp_supplier_return WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM sp_bid_evaluation WHERE sourcing_event_id IN(SELECT id FROM sp_sourcing_event WHERE project_id=?)", PROJECT);
         jdbc.update("DELETE FROM sys_file WHERE business_type IN('SUPPLIER_SOURCING','SUPPLIER_QUOTE') AND (business_id IN(SELECT id FROM sp_sourcing_event WHERE project_id=?) OR business_id IN(SELECT id FROM sp_supplier_quote WHERE sourcing_event_id IN(SELECT id FROM sp_sourcing_event WHERE project_id=?)))", PROJECT, PROJECT);
@@ -259,6 +313,7 @@ class SupplierSourcingClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM sp_sourcing_supplier WHERE sourcing_event_id IN(SELECT id FROM sp_sourcing_event WHERE project_id=?)", PROJECT);
         jdbc.update("DELETE FROM sp_sourcing_event WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM stl_settlement WHERE id=?", SETTLEMENT);
+        jdbc.update("DELETE FROM mat_quality_disposition WHERE receipt_item_id=?", RECEIPT_ITEM);
         jdbc.update("DELETE FROM mat_receipt_item WHERE id=?", RECEIPT_ITEM);
         jdbc.update("DELETE FROM mat_receipt WHERE id=?", RECEIPT);
         jdbc.update("DELETE FROM mat_purchase_order_item WHERE id=?", ORDER_ITEM);

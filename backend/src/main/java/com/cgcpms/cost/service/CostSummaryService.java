@@ -179,11 +179,15 @@ public class CostSummaryService {
                 .collect(Collectors.groupingBy(CostItem::getCostSubjectId));
 
         Map<Long, BigDecimal> paidBySubject = paidBySubject(tenantId, projectId);
+        Map<String, Object> latestForecast = latestConfirmedForecast(tenantId, projectId);
+        Map<Long, BigDecimal> estimatedRemainingBySubject = estimatedRemainingBySubject(
+                tenantId, projectId, longNullable(latestForecast.get("id")));
 
         // 4. Build cost subject name map
         Set<Long> subjectIds = new HashSet<>(itemsBySubject.keySet());
         subjectIds.addAll(targetItemBySubject.keySet());
         subjectIds.addAll(paidBySubject.keySet());
+        subjectIds.addAll(estimatedRemainingBySubject.keySet());
         Set<Long> subjectLookupIds = subjectIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> subjectNameMap = Collections.emptyMap();
         if (!subjectLookupIds.isEmpty()) {
@@ -191,12 +195,6 @@ public class CostSummaryService {
             subjectNameMap = subjects.stream()
                     .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
         }
-
-        // 5. Compute project-level values (same for all subjects)
-        BigDecimal projectEstimatedRemainingCost = assembler.computeProjectEstimatedRemainingCost(tenantId, projectId);
-        BigDecimal projectContractIncome = assembler.computeProjectContractIncome(tenantId, projectId);
-        BigDecimal projectConfirmedRevenue = assembler.computeProjectConfirmedRevenue(tenantId, projectId);
-        Map<String, Object> latestForecast = latestConfirmedForecast(tenantId, projectId);
 
         // 6. For each cost subject, calculate and insert summary
         LocalDate today = LocalDate.now();
@@ -226,12 +224,9 @@ public class CostSummaryService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             BigDecimal paidAmount = paidBySubject.getOrDefault(costSubjectId, BigDecimal.ZERO);
-            BigDecimal estimatedRemainingCost = unassignedPayment ? BigDecimal.ZERO : projectEstimatedRemainingCost;
+            BigDecimal estimatedRemainingCost = estimatedRemainingBySubject.getOrDefault(costSubjectId, BigDecimal.ZERO);
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal costDeviation = dynamicCost.subtract(subjectTargetCost);
-            BigDecimal confirmedRevenue = unassignedPayment ? BigDecimal.ZERO : projectConfirmedRevenue;
-            // Keep subject rows aligned with project/batch summaries and the V27 backfill contract.
-            BigDecimal expectedProfit = unassignedPayment ? BigDecimal.ZERO : projectContractIncome.subtract(dynamicCost);
 
             CostSummary summary = new CostSummary();
             summary.setTenantId(tenantId);
@@ -246,14 +241,14 @@ public class CostSummaryService {
             summary.setPaidAmount(paidAmount);
             summary.setEstimatedRemainingCost(estimatedRemainingCost);
             summary.setDynamicCost(dynamicCost);
-            summary.setContractIncome(unassignedPayment ? BigDecimal.ZERO : projectContractIncome);
-            summary.setConfirmedRevenue(confirmedRevenue);
-            summary.setExpectedProfit(expectedProfit);
+            summary.setContractIncome(BigDecimal.ZERO);
+            summary.setConfirmedRevenue(BigDecimal.ZERO);
+            summary.setExpectedProfit(BigDecimal.ZERO);
             summary.setCostDeviation(costDeviation);
             summary.setResponsibilityCost(subjectResponsibility);
-            summary.setForecastAtCompletionCost(unassignedPayment ? BigDecimal.ZERO : decimal(latestForecast.get("forecast_at_completion_amount")));
-            summary.setForecastProfit(unassignedPayment ? BigDecimal.ZERO : decimal(latestForecast.get("forecast_profit_amount")));
-            summary.setProfitMargin(unassignedPayment ? BigDecimal.ZERO : decimal(latestForecast.get("profit_margin")));
+            summary.setForecastAtCompletionCost(BigDecimal.ZERO);
+            summary.setForecastProfit(BigDecimal.ZERO);
+            summary.setProfitMargin(BigDecimal.ZERO);
 
             summaries.add(summary);
         }
@@ -697,6 +692,13 @@ public class CostSummaryService {
     private Map<String, Object> latestConfirmedForecast(Long tenantId, Long projectId) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM cost_forecast WHERE tenant_id=? AND project_id=? AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0 ORDER BY version_no DESC LIMIT 1", tenantId, projectId);
         return rows.isEmpty() ? Collections.emptyMap() : rows.get(0);
+    }
+
+    private Map<Long, BigDecimal> estimatedRemainingBySubject(Long tenantId, Long projectId, Long forecastId) {
+        if (forecastId == null) return Collections.emptyMap();
+        return jdbc.queryForList("SELECT cost_subject_id,estimated_remaining_amount FROM cost_forecast_item WHERE tenant_id=? AND project_id=? AND forecast_id=?", tenantId, projectId, forecastId).stream()
+                .collect(Collectors.toMap(row -> longNullable(row.get("cost_subject_id")),
+                        row -> decimal(row.get("estimated_remaining_amount"))));
     }
 
     private static BigDecimal decimal(Object value) {

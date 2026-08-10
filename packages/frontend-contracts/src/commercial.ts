@@ -230,6 +230,7 @@ export interface VariationItemRecord {
   claimUnitPrice?: DecimalString | null;
   claimAmount?: DecimalString | null;
   costSubjectId: string;
+  wbsTaskId: string;
   remark?: string | null;
 }
 

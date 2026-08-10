@@ -48,7 +48,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
                 .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
-        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'SCHEDULE-IT-P','计划履约测试项目','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'SCHEDULE-IT-P','计划履约测试项目','PREPARING',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
     }
 
     @AfterEach
@@ -119,6 +119,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         service.replaceTasks(schedule, new WbsTaskBatch(1, List.of(task("T1", new BigDecimal("100")))));
         service.submitSchedule(schedule);
         approveAll("PROJECT_SCHEDULE", schedule);
+        jdbc.update("UPDATE pm_project SET status='ACTIVE' WHERE id=?", PROJECT);
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
         BusinessException monthError = assertThrows(BusinessException.class, () -> service.createPeriodPlan(new PeriodPlanRequest(
                 schedule, "WEEKLY", null, "W-NO-MONTH", "无月计划周计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
@@ -173,6 +174,99 @@ class ProjectScheduleClosedLoopIntegrationTest {
         assertEquals("PROJECT_PERIOD_VERSION_CONFLICT", periodConflict.getCode());
         assertEquals(new BigDecimal("50.00"), jdbc.queryForObject(
                 "SELECT target_progress FROM project_period_plan_item WHERE period_plan_id=?", BigDecimal.class, periodId));
+    }
+
+    @Test
+    void activeProjectRejectsOrdinaryBaselineReplacement() {
+        createAndActivateBaseline();
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createSchedule(new ScheduleRequest(PROJECT, null, "绕过纠偏的新基线",
+                        LocalDate.of(2099, 8, 1), LocalDate.of(2099, 8, 31), null)));
+
+        assertEquals("PROJECT_BASELINE_ALREADY_ACTIVE", exception.getCode());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM project_schedule_plan WHERE project_id=? AND status='ACTIVE'",
+                Integer.class, PROJECT));
+    }
+
+    @Test
+    void overlappingWeeklyApprovalFailsClosed() {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject(
+                "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-OVERLAP",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        createAndApprovePeriod(schedule, month, "WEEKLY", "W-OVERLAP-1",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("50"));
+        long overlapping = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
+                null, "W-OVERLAP-2", LocalDate.of(2099, 7, 7), LocalDate.of(2099, 7, 14), null)));
+        jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id=?", overlapping);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.onPeriodApproved(overlapping));
+
+        assertEquals("PROJECT_WEEKLY_PLAN_OVERLAP", exception.getCode());
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM project_period_plan WHERE id=?", String.class, overlapping));
+    }
+
+    @Test
+    void concurrentOverlappingWeeklyApprovalAllowsOnlyOne() throws Exception {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject(
+                "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-CONCURRENT-OVERLAP",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        long first = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
+                null, "W-CONCURRENT-1", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
+        long second = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
+                null, "W-CONCURRENT-2", LocalDate.of(2099, 7, 7), LocalDate.of(2099, 7, 14), null)));
+        jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id IN (?,?)", first, second);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            List<Future<String>> results = List.of(
+                    executor.submit(() -> approvePeriodAfterBarrier(first, ready, start)),
+                    executor.submit(() -> approvePeriodAfterBarrier(second, ready, start)));
+            ready.await();
+            start.countDown();
+            assertEquals(List.of("PROJECT_WEEKLY_PLAN_OVERLAP", "SUCCESS"), results.stream().map(result -> {
+                try { return result.get(); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            }).sorted().toList());
+        }
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_period_plan
+                WHERE id IN (?,?) AND status='APPROVED'
+                """, Integer.class, first, second));
+    }
+
+    @Test
+    void dailySubmissionRevalidatesSavedWeeklyScopeAfterDateChange() {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject(
+                "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-DATE-CHANGE",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        createAndApprovePeriod(schedule, month, "WEEKLY", "W-DATE-CHANGE-1",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("40"));
+        createAndApprovePeriod(schedule, month, "WEEKLY", "W-DATE-CHANGE-2",
+                LocalDate.of(2099, 7, 8), LocalDate.of(2099, 7, 14), taskId, new BigDecimal("60"));
+        jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-05','跨周篡改','DRAFT',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
+        service.replaceDailyProgress(DAILY_LOG, new DailyProgressBatch(List.of(
+                new DailyProgressRequest(taskId, new BigDecimal("20"), new BigDecimal("20"), "第一周进度"))));
+        jdbc.update("UPDATE site_daily_log SET report_date='2099-07-10' WHERE id=?", DAILY_LOG);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> dailyLogService.submit(DAILY_LOG, 0));
+
+        assertEquals("SITE_DAILY_PROGRESS_SCOPE_CHANGED", exception.getCode());
+        assertEquals("DRAFT", jdbc.queryForObject(
+                "SELECT status FROM site_daily_log WHERE id=?", String.class, DAILY_LOG));
+        assertEquals(new BigDecimal("0.00"), jdbc.queryForObject(
+                "SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, taskId));
     }
 
     @Test
@@ -269,6 +363,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         service.replaceTasks(id, new WbsTaskBatch(0, List.of(task("WBS-001", new BigDecimal("100")))));
         service.submitSchedule(id);
         approveAll("PROJECT_SCHEDULE", id);
+        jdbc.update("UPDATE pm_project SET status='ACTIVE' WHERE id=?", PROJECT);
         return id;
     }
 
@@ -279,6 +374,24 @@ class ProjectScheduleClosedLoopIntegrationTest {
             ready.countDown();
             start.await();
             service.submitPeriodPlan(periodId);
+            return "SUCCESS";
+        } catch (BusinessException e) {
+            return e.getCode();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } finally {
+            UserContext.clear();
+        }
+    }
+
+    private String approvePeriodAfterBarrier(long periodId, CountDownLatch ready, CountDownLatch start) {
+        UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
+                .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+        try {
+            ready.countDown();
+            start.await();
+            service.onPeriodApproved(periodId);
             return "SUCCESS";
         } catch (BusinessException e) {
             return e.getCode();

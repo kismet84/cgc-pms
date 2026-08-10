@@ -30,11 +30,14 @@ import {
   createOwnerSettlement,
   createPayment,
   createSalesInvoice,
+  confirmCollection,
+  confirmSalesInvoice,
   creditReceivable,
   deleteExpense,
   deleteInvoice,
   deletePayment,
   loadCollections,
+  loadApprovedContractRevenues,
   loadExpenseApplications,
   loadInvoices,
   loadFundAccounts,
@@ -69,6 +72,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import type {
   BudgetLineRecord,
   CollectionRecord,
+  ContractRevenueRecord,
   CollectionCommand,
   ExpenseApplicationCommand,
   ExpenseApplicationRecord,
@@ -127,6 +131,7 @@ interface FinanceEditor {
   sellerName: string
   buyerName: string
   customerId: string
+  revenueId: string
   settlementPeriod: string
   settlementDate: string
   grossAmount: string
@@ -189,6 +194,7 @@ const emptyEditor = (): FinanceEditor => ({
   sellerName: '',
   buyerName: '',
   customerId: '',
+  revenueId: '',
   settlementPeriod: today().slice(0, 7),
   settlementDate: today(),
   grossAmount: '',
@@ -294,6 +300,7 @@ const costSubjects = ref<CostSubjectOption[]>([])
 const budgetLines = ref<BudgetLineRecord[]>([])
 const payRecords = ref<PayRecordOption[]>([])
 const fundAccounts = ref<FundAccountRecord[]>([])
+const contractRevenues = ref<ContractRevenueRecord[]>([])
 const paymentSources = ref<PaymentSourceOptionRecord[]>([])
 const payTypes = ref<DictDataRecord[]>([])
 const expenseCategories = ref<DictDataRecord[]>([])
@@ -555,6 +562,19 @@ const receivableOptions = computed(() =>
       label: `${item.receivableCode} · 可分配 ${formatAmount(item.outstandingAmount)}`,
     })),
 )
+const approvedRevenueOptions = computed(() =>
+  contractRevenues.value
+    .filter(
+      (item) =>
+        item.approvalStatus === 'APPROVED' &&
+        item.projectId === editor.value?.projectId &&
+        item.contractId === editor.value?.contractId,
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.revenueCode} · 收入确认 ${formatAmount(item.revenueAmount)}`,
+    })),
+)
 const dictionaryOptions = (rows: DictDataRecord[]) =>
   rows.map((item) => ({ value: item.dictValue, label: item.dictLabel }))
 const payTypeOptions = computed(() => dictionaryOptions(payTypes.value))
@@ -610,16 +630,31 @@ async function changeProject(value: string): Promise<void> {
   if (!editor.value) return
   editor.value.projectId = value
   editor.value.contractId = ''
+  editor.value.revenueId = ''
   editor.value.budgetLineId = ''
   editor.value.sourceType = ''
   editor.value.sourceRefId = ''
   paymentSources.value = []
+  contractRevenues.value = []
   await Promise.all([
     loadContracts(value),
     editorKind.value === 'payment' || editorKind.value === 'expense'
       ? loadBudgetLines(value)
       : Promise.resolve(),
   ])
+}
+
+async function changeContract(value: string): Promise<void> {
+  if (!editor.value) return
+  editor.value.contractId = value
+  editor.value.revenueId = ''
+  contractRevenues.value = []
+  if (editorKind.value === 'payment') {
+    await loadPaymentSources()
+  } else if (editorKind.value === 'settlement' && editor.value.projectId && value) {
+    const page = await loadApprovedContractRevenues(editor.value.projectId, value)
+    contractRevenues.value = page.records
+  }
 }
 
 async function loadPaymentSources(): Promise<void> {
@@ -700,6 +735,7 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
   salesInvoiceAttachment.value = null
   collectionAttachment.value = null
   paymentSources.value = []
+  contractRevenues.value = []
   value.projectId = row?.projectId || projectId.value
   value.payType = defaultOption(payTypeOptions.value, 'FINAL')
   value.expenseCategory = defaultOption(
@@ -925,6 +961,7 @@ function settlementCommand(value: FinanceEditor): OwnerSettlementCommand {
   return {
     projectId: required(value.projectId, '项目'),
     contractId: required(value.contractId, '合同'),
+    revenueId: required(value.revenueId, '已审批收入确认'),
     customerId: required(value.customerId, '建设单位'),
     settlementPeriod: required(value.settlementPeriod, '结算期间'),
     settlementDate: required(value.settlementDate, '结算日期'),
@@ -947,7 +984,6 @@ function salesInvoiceCommand(value: FinanceEditor): SalesInvoiceCommand {
     invoiceDate: required(value.invoiceDate, '开票日期'),
     amountWithoutTax: required(value.amountWithoutTax, '不含税金额'),
     taxAmount: required(value.taxAmount, '税额'),
-    attachmentCount: salesInvoiceAttachment.value ? 1 : 0,
     allocations: [
       {
         receivableId: required(value.receivableId, '应收款'),
@@ -968,7 +1004,6 @@ function collectionCommand(value: FinanceEditor): CollectionCommand {
     collectedAt: required(value.collectedAt, '到账时间'),
     amount: required(value.collectionAmount, '回款金额'),
     payerName: required(value.payerName, '付款单位'),
-    attachmentCount: collectionAttachment.value ? 1 : 0,
     allocations: [
       {
         receivableId: required(value.receivableId, '应收款'),
@@ -1041,22 +1076,28 @@ async function save(): Promise<void> {
       )
     } else if (editorKind.value === 'salesInvoice') {
       if (!salesInvoiceAttachment.value) throw new TypeError('销项发票附件不能为空')
-      const salesInvoice = await createSalesInvoice(salesInvoiceCommand(value))
+      const command = salesInvoiceCommand(value)
+      const salesInvoiceId = value.id || (await createSalesInvoice(command)).id
+      value.id = salesInvoiceId
       await uploadSiteFile(
         salesInvoiceAttachment.value,
         'SALES_INVOICE',
-        salesInvoice.id,
+        salesInvoiceId,
         'ELECTRONIC_INVOICE',
       )
+      await confirmSalesInvoice(salesInvoiceId, command.allocations)
     } else {
       if (!collectionAttachment.value) throw new TypeError('银行回单不能为空')
-      const collection = await createCollection(collectionCommand(value))
+      const command = collectionCommand(value)
+      const collectionId = value.id || (await createCollection(command)).id
+      value.id = collectionId
       await uploadSiteFile(
         collectionAttachment.value,
         'COLLECTION_RECORD',
-        collection.id,
+        collectionId,
         'BANK_RECEIPT',
       )
+      await confirmCollection(collectionId, command.allocations ?? [])
     }
     dialog.value = false
     createdPaymentId = ''
@@ -1467,7 +1508,7 @@ onBeforeUnmount(() => controller?.abort())
               :options="contractOptions"
               required
               :disabled="!contractOptions.length"
-              @update:model-value="editorKind === 'payment' && loadPaymentSources()"
+              @update:model-value="changeContract"
             />
             <p v-if="!contractOptions.length">当前项目无可用合同，不能提交。</p>
           </template>
@@ -1638,6 +1679,16 @@ onBeforeUnmount(() => controller?.abort())
           </template>
 
           <template v-else-if="editorKind === 'settlement'">
+            <V2Select
+              v-model="editor.revenueId"
+              label="已审批收入确认"
+              :options="approvedRevenueOptions"
+              required
+              :disabled="!editor.contractId || !approvedRevenueOptions.length"
+            />
+            <p v-if="editor.contractId && !approvedRevenueOptions.length">
+              当前项目合同无已审批收入确认，不能提交。
+            </p>
             <V2Select
               v-model="editor.customerId"
               label="建设单位"

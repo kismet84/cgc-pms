@@ -6,6 +6,7 @@ import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.accounting.mapper.AccountingEntryLineMapper;
 import com.cgcpms.accounting.mapper.AccountingEntryMapper;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeclose.dto.FinancialCloseModels.AdjustmentRequest;
@@ -41,6 +42,7 @@ public class FinancialCloseService {
     private final AccountingEntryLineMapper lineMapper;
     private final AccountingPeriodGuard periodGuard;
     private final ProjectAccessChecker projectAccessChecker;
+    private final MandatoryAuditService mandatoryAuditService;
 
     public List<Map<String, Object>> periods(Integer year) {
         return jdbc.queryForList("SELECT * FROM finance_period WHERE tenant_id=? AND (? IS NULL OR fiscal_year=?) ORDER BY fiscal_year DESC,fiscal_month DESC",
@@ -90,7 +92,27 @@ public class FinancialCloseService {
         issues += addCheck(periodId, "UNBALANCED_ENTRY", unbalanced, Map.of("message", "凭证借贷不平衡"));
         int missingVoucher = count("SELECT COUNT(*) FROM pay_record p WHERE p.tenant_id=? AND p.pay_status='SUCCESS' AND p.deleted_flag=0 AND COALESCE(p.paid_at,pay_date)>=? AND COALESCE(p.paid_at,pay_date)<? AND NOT EXISTS(SELECT 1 FROM accounting_entry e WHERE e.tenant_id=p.tenant_id AND e.pay_record_id=p.id AND e.entry_status='POSTED' AND e.deleted_flag=0)", tenant(), start, endExclusive)
                 + count("SELECT COUNT(*) FROM collection_record c WHERE c.tenant_id=? AND c.status='SUCCESS' AND c.deleted_flag=0 AND c.collected_at>=? AND c.collected_at<? AND NOT EXISTS(SELECT 1 FROM accounting_entry e WHERE e.tenant_id=c.tenant_id AND e.collection_record_id=c.id AND e.entry_status='POSTED' AND e.deleted_flag=0)", tenant(), start.atStartOfDay(), endExclusive.atStartOfDay());
+        missingVoucher += count("""
+                SELECT COUNT(*)
+                  FROM pay_invoice i
+                  JOIN pay_application p ON p.id=i.pay_application_id AND p.tenant_id=i.tenant_id
+                  JOIN finance_audit_event a ON a.tenant_id=i.tenant_id
+                       AND a.event_type='AP_INVOICE_VERIFIED' AND a.business_type='PAY_INVOICE'
+                       AND a.business_id=i.id AND a.event_at<?
+                 WHERE i.tenant_id=? AND i.verify_status='VERIFIED' AND i.deleted_flag=0
+                   AND p.pay_type='ADVANCE' AND p.deleted_flag=0
+                   AND (SELECT COUNT(DISTINCT e.entry_type) FROM accounting_entry e
+                         WHERE e.tenant_id=i.tenant_id AND e.source_type='PAY_INVOICE' AND e.source_id=i.id
+                           AND e.entry_type IN ('ADVANCE_AP_CONFIRMATION','ADVANCE_PREPAY_RECLASS')
+                           AND (e.entry_status='POSTED' OR (e.entry_status='REVERSED' AND e.posted_at IS NOT NULL))
+                           AND e.deleted_flag=0)<2
+                """, endExclusive.atStartOfDay(), tenant());
         issues += addCheck(periodId, "SOURCE_VOUCHER_COMPLETENESS", missingVoucher, Map.of("message", "成功收付款必须存在已过账凭证"));
+
+        MandatoryAuditService.IntegrityReport auditIntegrity = mandatoryAuditService.inspectTenant();
+        issues += addCheck(periodId, "MANDATORY_AUDIT_INTEGRITY", auditIntegrity.issueCount(), Map.of(
+                "missingEvents", auditIntegrity.missingEvents(),
+                "hashMismatches", auditIntegrity.hashMismatches()));
 
         int bankIssues = buildBankReconciliation(periodId, start, endExclusive);
         issues += addCheck(periodId, "BANK_RECONCILIATION", bankIssues, Map.of("message", "银行回单与收付款、现金日记账必须一一匹配"));
@@ -114,12 +136,15 @@ public class FinancialCloseService {
         period = requiredPeriodForUpdate(year, month);
         if (((Number) period.get("issue_count")).intValue() > 0) throw error("FINANCE_PERIOD_ISSUES_EXIST", "月结检查存在未解决异常，禁止结账");
         Long id = longValue(period.get("id"));
+        long version = ((Number) period.get("version")).longValue();
         LocalDate start = date(period.get("start_date"));
         LocalDate end = date(period.get("end_date"));
         jdbc.update("UPDATE accounting_entry SET period_id=? WHERE tenant_id=? AND entry_date BETWEEN ? AND ? AND deleted_flag=0", id, tenant(), start, end);
         updatePeriod("UPDATE finance_period SET status='CLOSED',closed_by=?,closed_at=CURRENT_TIMESTAMP,close_comment=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), blank(comment), id, tenant());
-        audit("FINANCE_PERIOD_CLOSED", "FINANCE_PERIOD", id, Map.of("comment", comment == null ? "" : comment));
+        mandatoryAuditService.finance("FINANCE_PERIOD_CLOSED", "FINANCE_PERIOD", id, null,
+                "CLOSE:" + id + ":V" + version,
+                Map.of("period", YearMonth.of(year, month).toString(), "comment", comment == null ? "" : comment));
         return trace(id);
     }
 
@@ -129,9 +154,12 @@ public class FinancialCloseService {
         Map<String, Object> period = requiredPeriodForUpdate(year, month);
         if (!"CLOSED".equals(period.get("status"))) throw error("FINANCE_PERIOD_NOT_CLOSED", "仅已结账期间可反结账");
         Long id = longValue(period.get("id"));
+        long version = ((Number) period.get("version")).longValue();
         updatePeriod("UPDATE finance_period SET status='REOPENED',reopened_by=?,reopened_at=CURRENT_TIMESTAMP,reopen_reason=?,last_check_at=NULL,issue_count=0,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), reason.trim(), id, tenant());
-        audit("FINANCE_PERIOD_REOPENED", "FINANCE_PERIOD", id, Map.of("reason", reason.trim()));
+        mandatoryAuditService.finance("FINANCE_PERIOD_REOPENED", "FINANCE_PERIOD", id, null,
+                "REOPEN:" + id + ":V" + version,
+                Map.of("period", YearMonth.of(year, month).toString(), "reason", reason.trim()));
         return trace(id);
     }
 
@@ -280,15 +308,54 @@ public class FinancialCloseService {
     private int buildAccountReconciliation(Long periodId, String type, LocalDate start, LocalDate endExclusive) {
         BigDecimal expected; BigDecimal ledger;
         if ("AR".equals(type)) {
-            expected=amount("SELECT COALESCE(SUM(original_amount-collected_amount-credited_amount),0) FROM account_receivable WHERE tenant_id=? AND deleted_flag=0 AND created_at<?",tenant(),endExclusive.atStartOfDay());
-            ledger=amount("SELECT COALESCE(SUM(outstanding_amount),0) FROM account_receivable WHERE tenant_id=? AND deleted_flag=0 AND created_at<?",tenant(),endExclusive.atStartOfDay());
+            expected=amount("""
+                    SELECT COALESCE(SUM(r.original_amount
+                        - COALESCE((SELECT SUM(a.allocated_amount)
+                                      FROM collection_allocation a
+                                      JOIN collection_record c ON c.id=a.collection_id AND c.tenant_id=a.tenant_id
+                                     WHERE a.tenant_id=r.tenant_id AND a.receivable_id=r.id
+                                       AND a.allocation_type='COLLECTION' AND c.deleted_flag=0
+                                       AND c.collected_at<?
+                                       AND (c.status='SUCCESS' OR (c.status='REVERSED' AND c.reversed_at>=?))),0)
+                        - COALESCE((SELECT SUM(x.amount) FROM receivable_adjustment x
+                                     WHERE x.tenant_id=r.tenant_id AND x.receivable_id=r.id
+                                       AND x.status='COMPLETED' AND x.created_at<?),0)),0)
+                      FROM account_receivable r
+                     WHERE r.tenant_id=? AND r.deleted_flag=0 AND r.created_at<?
+                    """, endExclusive.atStartOfDay(), endExclusive.atStartOfDay(), endExclusive.atStartOfDay(),
+                    tenant(), endExclusive.atStartOfDay());
+            ledger=postedBalance("1122-AR", true, endExclusive);
         } else {
-            expected=amount("SELECT COALESCE(SUM(GREATEST(p.approved_amount-COALESCE((SELECT SUM(r.pay_amount) FROM pay_record r WHERE r.tenant_id=p.tenant_id AND r.pay_application_id=p.id AND r.pay_status='SUCCESS' AND r.deleted_flag=0 AND COALESCE(r.paid_at,r.pay_date)<?),0),0)),0) FROM pay_application p WHERE p.tenant_id=? AND p.approval_status='APPROVED' AND p.deleted_flag=0 AND p.created_at<?",endExclusive,tenant(),endExclusive.atStartOfDay());
-            ledger=amount("SELECT COALESCE(SUM(GREATEST(approved_amount-actual_pay_amount,0)),0) FROM pay_application WHERE tenant_id=? AND approval_status='APPROVED' AND deleted_flag=0 AND created_at<?",tenant(),endExclusive.atStartOfDay());
+            expected=amount("""
+                    SELECT COALESCE(SUM(GREATEST(COALESCE(p.approved_amount,p.apply_amount,0)
+                        - COALESCE((SELECT SUM(r.pay_amount) FROM pay_record r
+                                     WHERE r.tenant_id=p.tenant_id AND r.pay_application_id=p.id
+                                       AND r.deleted_flag=0 AND COALESCE(r.paid_at,r.pay_date)<?
+                                       AND (r.pay_status='SUCCESS' OR (r.pay_status='REVERSED' AND r.reversed_at>=?))),0),0)),0)
+                      FROM pay_application p
+                     WHERE p.tenant_id=? AND p.approval_status='APPROVED' AND p.deleted_flag=0
+                       AND COALESCE(p.pay_type,'')<>'ADVANCE'
+                       AND EXISTS(SELECT 1 FROM finance_audit_event a
+                                   WHERE a.tenant_id=p.tenant_id
+                                     AND a.event_type='PAY_APPLICATION_CONFIRMED'
+                                     AND a.business_type='PAY_APPLICATION' AND a.business_id=p.id
+                                     AND a.event_at<?)
+                    """, endExclusive.atStartOfDay(), endExclusive.atStartOfDay(), tenant(), endExclusive.atStartOfDay());
+            ledger=postedBalance("2202-AP", false, endExclusive);
         }
         BigDecimal difference=expected.subtract(ledger).abs(); String status=difference.signum()==0?"MATCHED":"EXCEPTION";
         jdbc.update("INSERT INTO finance_account_reconciliation(id,tenant_id,period_id,account_type,expected_amount,ledger_amount,difference_amount,status,detail_json,reconciled_by,reconciled_at) VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),periodId,type,expected,ledger,difference,status,json(Map.of("periodStart",start.toString(),"periodEndExclusive",endExclusive.toString())),user());
         return addCheck(periodId,type+"_RECONCILIATION","MATCHED".equals(status)?0:1,Map.of("expected",expected,"ledger",ledger,"difference",difference));
+    }
+
+    private BigDecimal postedBalance(String accountCode, boolean debitBalance, LocalDate endExclusive) {
+        String balanceDirection = debitBalance ? "DEBIT" : "CREDIT";
+        return amount("SELECT COALESCE(SUM(CASE WHEN l.direction=? THEN l.amount ELSE -l.amount END),0) FROM accounting_entry e "
+                        + "JOIN accounting_entry_line l ON l.entry_id=e.id AND l.tenant_id=e.tenant_id "
+                        + "WHERE e.tenant_id=? AND e.entry_date<? AND e.deleted_flag=0 AND l.deleted_flag=0 "
+                        + "AND l.account_code=? AND (e.entry_status='POSTED' OR "
+                        + "(e.entry_status='REVERSED' AND e.posted_at IS NOT NULL))",
+                balanceDirection, tenant(), endExclusive, accountCode);
     }
 
     private int addCheck(Long periodId,String type,int issueCount,Object detail){jdbc.update("INSERT INTO finance_period_check(id,tenant_id,period_id,check_type,check_status,issue_count,detail_json,checked_by,checked_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),periodId,type,issueCount==0?"PASS":"FAIL",issueCount,json(detail),user());return issueCount;}

@@ -66,6 +66,7 @@ class AccountingEntryGenerationStrategyTest {
         PayApplication application = new PayApplication();
         application.setTenantId(TENANT_ID);
         application.setCostSubjectId(9001L);
+        application.setPayType("PROGRESS");
         when(recordMapper.selectById(101L)).thenReturn(record);
         when(applicationMapper.selectById(201L)).thenReturn(application);
 
@@ -80,6 +81,23 @@ class AccountingEntryGenerationStrategyTest {
         assertEquals("2202-AP", entry.getLines().get(0).getAccountCode());
         assertEquals(0, new BigDecimal("125.50").compareTo(entry.getLines().get(0).getAmount()));
         assertEquals("CREDIT", entry.getLines().get(1).getDirection());
+        assertEquals("1002-BANK-501", entry.getLines().get(1).getAccountCode());
+        assertEquals(0, entry.getLines().get(0).getAmount().compareTo(entry.getLines().get(1).getAmount()));
+    }
+
+    @Test
+    void advancePaymentStrategyDebitsPrepaymentInsteadOfUnconfirmedPayable() {
+        PayRecord record = successfulPayRecord(TENANT_ID);
+        PayApplication application = new PayApplication();
+        application.setTenantId(TENANT_ID);
+        application.setCostSubjectId(9001L);
+        application.setPayType("ADVANCE");
+        when(recordMapper.selectById(101L)).thenReturn(record);
+        when(applicationMapper.selectById(201L)).thenReturn(application);
+
+        AccountingEntry entry = payStrategy.generate(101L, "PAYMENT");
+
+        assertEquals("1123-PREPAY", entry.getLines().get(0).getAccountCode());
         assertEquals("1002-BANK-501", entry.getLines().get(1).getAccountCode());
         assertEquals(0, entry.getLines().get(0).getAmount().compareTo(entry.getLines().get(1).getAmount()));
     }

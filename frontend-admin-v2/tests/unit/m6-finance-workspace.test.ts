@@ -10,6 +10,7 @@ import {
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import {
   createFundAccount,
+  loadApprovedContractRevenues,
   loadCashForecastCycles,
   loadFinanceOperationsWorkspace,
   loadPaymentApplications,
@@ -24,8 +25,20 @@ import {
 describe('M6 finance workspace contract', () => {
   it('keeps finance endpoints and decimal fields stable', () => {
     expect(FINANCE_API.revenueSettlements).toBe('/revenue-operations/settlements')
+    expect(FINANCE_API.contractRevenues).toBe('/revenue-operations/settlement-revenue-options')
     expect(FINANCE_DECIMAL_FIELDS.payment).toContain('applyAmount')
     expect(FINANCE_DECIMAL_FIELDS.invoice).toContain('invoiceAmount')
+  })
+  it('loads only approved contract revenue candidates in project and contract scope', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ code: '0', data: { records: [], total: 0 } })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await loadApprovedContractRevenues('P/1', 'C/1')
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      '/api/revenue-operations/settlement-revenue-options?projectId=P%2F1&contractId=C%2F1',
+    )
+    vi.unstubAllGlobals()
   })
   it('sends project filter without converting money', async () => {
     const fetchMock = vi.fn(
@@ -150,6 +163,16 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain("'ELECTRONIC_INVOICE'")
     expect(source).not.toContain('allocations: []')
   })
+  it('binds owner settlements to an approved contract revenue fact', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
+      'utf8',
+    )
+    expect(source).toContain("revenueId: required(value.revenueId, '已审批收入确认')")
+    expect(source).toContain('await loadApprovedContractRevenues(editor.value.projectId, value)')
+    expect(source).toContain("item.approvalStatus === 'APPROVED'")
+    expect(source).toContain('label="已审批收入确认"')
+  })
   it('uploads required expense evidence before submission', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
@@ -177,10 +200,23 @@ describe('M6 finance workspace contract', () => {
     )
     expect(source).toContain("fundAccountId: required(value.fundAccountId, '资金账户')")
     expect(source).toContain("throw new TypeError('银行回单不能为空')")
-    expect(source).toContain('await createCollection(collectionCommand(value))')
+    expect(source).toContain(
+      'const collectionId = value.id || (await createCollection(command)).id',
+    )
     expect(source).toContain("'COLLECTION_RECORD',")
     expect(source).toContain("'BANK_RECEIPT'")
+    expect(source).toContain('await confirmCollection(collectionId, command.allocations ?? [])')
     expect(source).toContain("openForm('collection')")
+  })
+  it('confirms sales invoices only after evidence upload', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
+      'utf8',
+    )
+    const upload = source.indexOf("'SALES_INVOICE',")
+    const confirm = source.indexOf('await confirmSalesInvoice(salesInvoiceId, command.allocations)')
+    expect(upload).toBeGreaterThan(0)
+    expect(confirm).toBeGreaterThan(upload)
   })
   it('reverses payment through the authoritative reversal endpoint', async () => {
     const fetchMock = vi.fn(

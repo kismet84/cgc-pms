@@ -301,6 +301,25 @@ class PaymentApplicationClosedLoopIntegrationTest {
         attach("PAYMENT", applicationId);
         applicationService.submitForApproval(applicationId);
         paymentHandler.onApproved(context(instance(applicationId)));
+        AccountingEntry payableConfirmation = accountingEntryMapper.selectOne(new LambdaQueryWrapper<AccountingEntry>()
+                .eq(AccountingEntry::getSourceType, "PAY_APPLICATION")
+                .eq(AccountingEntry::getSourceId, applicationId)
+                .eq(AccountingEntry::getEntryType, "AP_CONFIRMATION"));
+        assertNotNull(payableConfirmation);
+        assertMoney("100.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='PAYMENT-CLOSED-LOOP-SUBJECT'",
+                BigDecimal.class, payableConfirmation.getId()));
+        assertMoney("100.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP'",
+                BigDecimal.class, payableConfirmation.getId()));
+        assertEquals(SUBJECT_ID, jdbcTemplate.queryForObject(
+                "SELECT cost_subject_id FROM accounting_entry_line WHERE entry_id=? AND direction='DEBIT'",
+                Long.class, payableConfirmation.getId()));
+        assertEquals(1L, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE business_type='PAY_APPLICATION' AND business_id=?
+                   AND event_type='PAY_APPLICATION_CONFIRMED'
+                """, Long.class, applicationId));
 
         ProjectBudget budget = budgetMapper.selectById(BUDGET_ID);
         budget.setStatus("CLOSED");
@@ -367,6 +386,10 @@ class PaymentApplicationClosedLoopIntegrationTest {
         duplicateInput.setExternalTxnNo("PAYMENT-CLOSED-LOOP-TXN-001");
         var duplicate = payRecordService.writeback(duplicateInput);
         assertEquals(first.getId(), duplicate.getId());
+        assertEquals(1L, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE business_type='PAY_RECORD' AND business_id=? AND event_type='PAYMENT_COMPLETED'
+                """, Long.class, Long.valueOf(first.getId())));
 
         ProjectBudgetLine pendingLine = lineMapper.selectById(BUDGET_LINE_ID);
         assertMoney("500.00", pendingLine.getReservedAmount());
@@ -499,6 +522,73 @@ class PaymentApplicationClosedLoopIntegrationTest {
         BusinessException missingArchivedEvidence = assertThrows(BusinessException.class,
                 () -> traceService.byCashJournal(journal.getId()));
         assertEquals("PAYMENT_TRACE_INCOMPLETE", missingArchivedEvidence.getCode());
+    }
+
+    @Test
+    @DisplayName("预付款不确认AP，发票核验后显式确认并重分类")
+    void advancePaymentUsesPrepaymentThenInvoiceReclassifiesIt() {
+        Long applicationId = createPayment(new BigDecimal("300.00"), "ADVANCE");
+        saveDirectSource(applicationId, new BigDecimal("300.00"));
+        attach("PAYMENT", applicationId);
+        applicationService.submitForApproval(applicationId);
+        paymentHandler.onApproved(context(instance(applicationId)));
+
+        assertEquals(0L, accountingEntryMapper.selectCount(new LambdaQueryWrapper<AccountingEntry>()
+                .eq(AccountingEntry::getSourceType, "PAY_APPLICATION")
+                .eq(AccountingEntry::getSourceId, applicationId)
+                .eq(AccountingEntry::getEntryType, "AP_CONFIRMATION")));
+
+        PayRecord payment = new PayRecord();
+        payment.setPayApplicationId(applicationId);
+        payment.setPayAmount(new BigDecimal("300.00"));
+        payment.setFundAccountId(FUND_ACCOUNT_ID);
+        payment.setPaidAt(LocalDateTime.now().minusMinutes(1));
+        payment.setPayMethod("BANK_TRANSFER");
+        payment.setExternalTxnNo("PAYMENT-CLOSED-LOOP-ADVANCE-001");
+        var paid = payRecordService.writeback(payment);
+        AccountingEntry paymentEntry = accountingEntryMapper.selectOne(new LambdaQueryWrapper<AccountingEntry>()
+                .eq(AccountingEntry::getPayRecordId, Long.valueOf(paid.getId()))
+                .eq(AccountingEntry::getEntryType, "PAYMENT"));
+        assertNotNull(paymentEntry);
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1123-PREPAY'",
+                BigDecimal.class, paymentEntry.getId()));
+
+        PayInvoice invoice = new PayInvoice();
+        invoice.setPayRecordId(Long.valueOf(paid.getId()));
+        invoice.setInvoiceNo("PAYMENT-CLOSED-LOOP-ADVANCE-INVOICE-001");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setDocumentType("ELECTRONIC_INVOICE");
+        invoice.setInvoiceAmount(new BigDecimal("300.00"));
+        invoice.setInvoiceDate(LocalDate.now());
+        Long invoiceId = invoiceService.create(invoice);
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(Long.valueOf(paid.getId()));
+        allocation.setAllocatedAmount(new BigDecimal("300.00"));
+        invoiceService.saveAllocations(invoiceId, List.of(allocation));
+        attach("INVOICE", invoiceId);
+        invoiceService.verify(invoiceId, "VERIFIED");
+
+        Long confirmationId = jdbcTemplate.queryForObject("""
+                SELECT id FROM accounting_entry
+                 WHERE source_type='PAY_INVOICE' AND source_id=? AND entry_type='ADVANCE_AP_CONFIRMATION'
+                """, Long.class, invoiceId);
+        Long reclassId = jdbcTemplate.queryForObject("""
+                SELECT id FROM accounting_entry
+                 WHERE source_type='PAY_INVOICE' AND source_id=? AND entry_type='ADVANCE_PREPAY_RECLASS'
+                """, Long.class, invoiceId);
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='PAYMENT-CLOSED-LOOP-SUBJECT'",
+                BigDecimal.class, confirmationId));
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP' AND direction='CREDIT'",
+                BigDecimal.class, confirmationId));
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP' AND direction='DEBIT'",
+                BigDecimal.class, reclassId));
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1123-PREPAY'",
+                BigDecimal.class, reclassId));
     }
 
     @Test
@@ -782,6 +872,10 @@ class PaymentApplicationClosedLoopIntegrationTest {
         request.setReversedAt(LocalDateTime.now());
         var reversal = reversalService.reverse(paidId, request);
         var duplicate = reversalService.reverse(paidId, request);
+        assertEquals(1L, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM finance_audit_event
+                 WHERE business_type='PAY_RECORD' AND business_id=? AND event_type='PAYMENT_REVERSED'
+                """, Long.class, paidId));
 
         assertEquals("REVERSED", payRecordService.getById(paidId).getPayStatus());
         assertEquals("REVERSAL", reversal.getPayStatus());
@@ -1010,6 +1104,10 @@ class PaymentApplicationClosedLoopIntegrationTest {
     }
 
     private Long createPayment(BigDecimal amount) {
+        return createPayment(amount, "PROGRESS");
+    }
+
+    private Long createPayment(BigDecimal amount, String payType) {
         PayApplication app = new PayApplication();
         app.setProjectId(PROJECT_ID);
         app.setContractId(CONTRACT_ID);
@@ -1018,7 +1116,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         app.setBudgetLineId(BUDGET_LINE_ID);
         app.setExpenseCategory("LABOR");
         app.setApplyAmount(amount);
-        app.setPayType("PROGRESS");
+        app.setPayType(payType);
         app.setApplyReason("付款闭环集成测试");
         return applicationService.create(app);
     }
@@ -1247,6 +1345,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
     }
 
     private void hardCleanup() {
+        jdbcTemplate.update("DELETE FROM mandatory_audit_expectation WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM finance_audit_event WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM payment_document_link WHERE cash_journal_id IN (SELECT id FROM cash_journal_entry WHERE project_id = ?)", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM cash_journal_change_log WHERE journal_entry_id IN (SELECT id FROM cash_journal_entry WHERE project_id = ?)", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM accounting_entry_line WHERE entry_id IN (SELECT id FROM accounting_entry WHERE project_id = ?)", PROJECT_ID);

@@ -9,6 +9,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.strategy.InvoiceAdvanceEntryGenerationStrategy;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.service.FileTypeValidator;
 import com.cgcpms.file.service.FileLifecycleGateway;
@@ -49,6 +52,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -67,6 +71,8 @@ public class InvoiceService {
     private final JdbcTemplate jdbcTemplate;
     private final SysDictDataService sysDictDataService;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final EntryGenerator entryGenerator;
+    private final MandatoryAuditService mandatoryAuditService;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
@@ -277,6 +283,17 @@ public class InvoiceService {
         if (payInvoiceMapper.updateById(invoice) != 1) {
             throw new BusinessException("VERIFY_STATUS_CONFLICT", "发票核验状态已被并发修改，请刷新后重试");
         }
+        if ("VERIFIED".equals(targetStatus)) {
+            entryGenerator.generateEntry(InvoiceAdvanceEntryGenerationStrategy.SOURCE_TYPE, id,
+                    InvoiceAdvanceEntryGenerationStrategy.AP_CONFIRMATION_ENTRY_TYPE);
+            entryGenerator.generateEntry(InvoiceAdvanceEntryGenerationStrategy.SOURCE_TYPE, id,
+                    InvoiceAdvanceEntryGenerationStrategy.PREPAY_RECLASS_ENTRY_TYPE);
+        }
+        mandatoryAuditService.finance("AP_INVOICE_VERIFIED", "PAY_INVOICE", id, invoice.getProjectId(),
+                "VERIFY:" + targetStatus, Map.of(
+                        "status", targetStatus,
+                        "invoiceAmount", invoice.getInvoiceAmount(),
+                        "payApplicationId", invoice.getPayApplicationId()));
         log.info("Invoice verified: id={}, status={}→{}", id, "PENDING", targetStatus);
     }
 

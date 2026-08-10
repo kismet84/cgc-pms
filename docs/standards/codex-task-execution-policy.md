@@ -11,7 +11,8 @@
 | --- | --- |
 | 中文、授权、脏工作区、安全/数据/生产、破坏性操作、最小验证、Git 授权、零悬空 | `AGENTS.md` |
 | 本地 Docker、backend/frontend、health、dev-login、Vite 代理、浏览器可达性 | `.agents/skills/cgc-pms-runtime-refresh/SKILL.md` |
-| 七类失败分类、CI、PR、同 HEAD SHA、远端 checks | `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md` |
+| 七类失败分类、PowerShell/本地命令预检、CI、PR、同 HEAD SHA、远端 checks | `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md` |
+| Compose 环境文件、配置解析、凭据注入与部署运维命令 | `docs/standards/10-部署运维手册.md` |
 | 主线、Backlog、计划书、阶段控制、正式验收与收口 | `.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md` |
 | 普通 commit、推送、PR、合并与分支清理 | `git-publish-and-cleanup` |
 | 升版本、版本发布、Tag、GitHub Release 与历史 Release 回填 | `.agents/skills/release-skills/SKILL.md` |

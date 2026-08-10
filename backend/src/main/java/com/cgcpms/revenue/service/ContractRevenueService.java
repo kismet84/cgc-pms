@@ -15,6 +15,7 @@ import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -63,6 +64,7 @@ public class ContractRevenueService {
     private final CostItemMapper costItemMapper;
     private final CostSubjectMapper costSubjectMapper;
     private final PmProjectMapper projectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
     private final CtContractMapper contractMapper;
     private final SysFileMapper sysFileMapper;
     private final CostSummaryService costSummaryService;
@@ -83,7 +85,14 @@ public class ContractRevenueService {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<ContractRevenue> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ContractRevenue::getTenantId, tenantId);
-        if (projectId != null) wrapper.eq(ContractRevenue::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看收入确认");
+            wrapper.eq(ContractRevenue::getProjectId, projectId);
+        } else {
+            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            if (projectIds.isEmpty()) return new Page<>(pageNo, pageSize, 0);
+            wrapper.in(ContractRevenue::getProjectId, projectIds);
+        }
         if (contractId != null) wrapper.eq(ContractRevenue::getContractId, contractId);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(ContractRevenue::getApprovalStatus, approvalStatus);
         if (StringUtils.hasText(startDate)) wrapper.ge(ContractRevenue::getRevenueDate, LocalDate.parse(startDate));
@@ -99,6 +108,7 @@ public class ContractRevenueService {
         if (revenue == null) throw new BusinessException("REVENUE_NOT_FOUND", "收入确认单不存在");
         if (!revenue.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REVENUE_NOT_FOUND", "收入确认单不存在");
+        projectAccessChecker.checkAccess(revenue.getProjectId(), "查看收入确认详情");
         return toVO(revenue, resolveNameMaps(List.of(revenue)));
     }
 
@@ -107,6 +117,11 @@ public class ContractRevenueService {
      */
     public ContractRevenueBalanceVO getBalance(Long contractId) {
         Long tenantId = UserContext.getCurrentTenantId();
+        CtContract contract = contractMapper.selectById(contractId);
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        }
+        projectAccessChecker.checkAccess(contract.getProjectId(), "查看合同收入余额");
         List<ContractRevenue> list = mapper.selectList(
                 new LambdaQueryWrapper<ContractRevenue>()
                         .eq(ContractRevenue::getTenantId, tenantId)
@@ -138,6 +153,7 @@ public class ContractRevenueService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ContractRevenue revenue) {
+        projectAccessChecker.checkAccess(revenue.getProjectId(), "创建收入确认");
         if (revenue.getProgressPercent() == null) revenue.setProgressPercent(BigDecimal.ZERO);
         if (revenue.getRevenueTax() == null) revenue.setRevenueTax(BigDecimal.ZERO);
         if (revenue.getBilledAmount() == null) revenue.setBilledAmount(BigDecimal.ZERO);
@@ -173,6 +189,7 @@ public class ContractRevenueService {
     @Transactional(rollbackFor = Exception.class)
     public void update(ContractRevenue revenue) {
         ContractRevenue existing = requireExisting(revenue.getId());
+        projectAccessChecker.checkAccess(existing.getProjectId(), "编辑收入确认");
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_STATUS_NOT_EDITABLE", "仅草稿状态可编辑");
         }
@@ -211,6 +228,7 @@ public class ContractRevenueService {
     public void delete(Long id) {
         lockRevenue(id);
         ContractRevenue existing = requireExisting(id);
+        projectAccessChecker.checkAccess(existing.getProjectId(), "删除收入确认");
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_STATUS_NOT_DELETABLE", "仅草稿状态可删除");
         }
@@ -225,6 +243,7 @@ public class ContractRevenueService {
     public void submitForApproval(Long id) {
         lockRevenue(id);
         ContractRevenue existing = requireExisting(id);
+        projectAccessChecker.checkAccess(existing.getProjectId(), "提交收入确认审批");
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_SUBMIT_INVALID", "仅草稿状态可提交审批");
         }

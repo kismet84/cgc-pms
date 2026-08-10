@@ -104,6 +104,11 @@ public class ProjectAccessChecker {
         return filterAccessible(tenantProjects);
     }
 
+    public void requireAllScope(String action) {
+        if ("ALL".equals(resolveEffectiveDataScope())) return;
+        throw new BusinessException("PROJECT_ALL_SCOPE_REQUIRED", "无权" + action + "全租户项目数据");
+    }
+
     private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope,
                                  Set<Long> memberProjectIds) {
         if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) return true;
