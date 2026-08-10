@@ -41,12 +41,16 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("288", flyway.info().current().getVersion().getVersion());
+        assertEquals("291", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(210, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(211, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
+        assertEquals(1, count("SELECT COUNT(*) FROM information_schema.views "
+                + "WHERE table_schema=DATABASE() AND table_name='v_business_audit_event' "
+                + "AND security_type='INVOKER'"));
+        assertEquals(0, count("SELECT COUNT(*) FROM v_business_audit_event"));
         assertEquals(0, count("SELECT COUNT(*) FROM information_schema.columns "
                 + "WHERE table_schema=DATABASE() AND table_name='wf_idempotency' "
                 + "AND column_name IN ('business_type','business_id','request_hash','response_json')"));

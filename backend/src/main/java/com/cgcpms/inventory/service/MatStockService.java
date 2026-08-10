@@ -785,7 +785,7 @@ public class MatStockService {
                         .eq(MatPurchaseOrder::getTenantId, tenantId)
                         .eq(MatPurchaseOrder::getProjectId, currentWarehouse.getProjectId())
                         .eq(MatPurchaseOrder::getApprovalStatus, "APPROVED")
-                        .eq(MatPurchaseOrder::getOrderStatus, "APPROVED")
+                        .in(MatPurchaseOrder::getOrderStatus, List.of("PERFORMING", "PARTIAL_RECEIVED"))
                         .isNotNull(MatPurchaseOrder::getDeliveryDate)
                         .orderByAsc(MatPurchaseOrder::getDeliveryDate)
                         .orderByAsc(MatPurchaseOrder::getId));

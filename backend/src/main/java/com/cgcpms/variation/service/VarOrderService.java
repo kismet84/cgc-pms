@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -19,6 +18,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.entity.VarOrderItem;
 import com.cgcpms.variation.mapper.VarOrderItemMapper;
@@ -62,6 +62,7 @@ public class VarOrderService {
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectExecutionGuard projectExecutionGuard;
     private final BusinessMatterRegistryService businessMatterRegistryService;
     private final CtContractChangeService ctContractChangeService;
     private final JdbcTemplate jdbcTemplate;
@@ -271,6 +272,8 @@ public class VarOrderService {
             throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
 
         List<VarOrderItem> validItems = normalizeDraftItems(items);
+        validItems.forEach(item -> projectExecutionGuard.requireActiveWbs(
+                order.getProjectId(), item.getWbsTaskId(), "保存签证明细"));
 
         // Delete old items
         varOrderItemMapper.delete(new LambdaQueryWrapper<VarOrderItem>()
@@ -297,7 +300,7 @@ public class VarOrderService {
             totalCost = totalCost.add(item.getAmount());
             totalClaim = totalClaim.add(item.getClaimAmount());
         }
-        Db.saveBatch(validItems, 50);
+        validItems.forEach(varOrderItemMapper::insert);
 
         // Update header reported amount
         int updated = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
@@ -863,6 +866,7 @@ public class VarOrderService {
         vo.setClaimUnitPrice(item.getClaimUnitPrice() != null ? item.getClaimUnitPrice().toPlainString() : null);
         vo.setClaimAmount(item.getClaimAmount() != null ? item.getClaimAmount().toPlainString() : null);
         vo.setCostSubjectId(item.getCostSubjectId() != null ? item.getCostSubjectId().toString() : null);
+        vo.setWbsTaskId(item.getWbsTaskId() != null ? item.getWbsTaskId().toString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? item.getCreatedBy().toString() : null);
         vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DateTimeUtils.DTF) : null);
         vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DateTimeUtils.DTF) : null);

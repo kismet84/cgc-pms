@@ -62,6 +62,7 @@ class PayRequestWorkflowHandlerTest {
         app.setProjectId(10001L);
         app.setContractId(30001L);
         app.setPartnerId(20002L);
+        app.setCostSubjectId(900010L);
         app.setPayType("MATERIAL");
         app.setApplyAmount(new BigDecimal("10000.00"));
         app.setApplyCode("PAY-HDLR-" + System.nanoTime());

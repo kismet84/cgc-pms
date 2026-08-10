@@ -16,6 +16,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,9 @@ class VarOrderWorkflowHandlerTest {
 
     @Autowired
     private WfInstanceMapper wfInstanceMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void setupContext() {
@@ -102,6 +106,28 @@ class VarOrderWorkflowHandlerTest {
     @Transactional
     @DisplayName("ISSUE-004-008: COST方向签证审批生成来源一致成本且重复回调不重复累计")
     void testOnApproved_CostVariationGeneratesCostItemsOnce() {
+        long scheduleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long wbsId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbc.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,10001,?,?,'BASELINE',?,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, scheduleId, "SCH-VAR-HANDLER-" + scheduleId, "签证成本WBS",
+                Math.toIntExact(scheduleId % 1_000_000_000));
+        jdbc.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,10001,?,?,?,
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, wbsId, scheduleId, "WBS-VAR-HANDLER-" + wbsId, "签证成本WBS");
         VarOrder order = new VarOrder();
         order.setProjectId(10001L);
         order.setContractId(30001L);
@@ -118,6 +144,8 @@ class VarOrderWorkflowHandlerTest {
 
         VarOrderItem item1 = item(order.getId(), "签证材料调整", "7000.00", 90001L);
         VarOrderItem item2 = item(order.getId(), "签证人工调整", "5000.00", 90002L);
+        item1.setWbsTaskId(wbsId);
+        item2.setWbsTaskId(wbsId);
         varOrderItemMapper.insert(item1);
         varOrderItemMapper.insert(item2);
 
@@ -142,6 +170,7 @@ class VarOrderWorkflowHandlerTest {
         assertTrue(costs.stream().allMatch(cost -> "VARIATION".equals(cost.getCostType())));
         assertTrue(costs.stream().allMatch(cost -> "CONFIRMED".equals(cost.getCostStatus())));
         assertTrue(costs.stream().allMatch(cost -> cost.getSourceItemId() != null));
+        assertTrue(costs.stream().allMatch(cost -> wbsId == cost.getWbsTaskId()));
     }
 
     @Test

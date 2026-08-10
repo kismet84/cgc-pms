@@ -378,10 +378,10 @@ public class ProductionMeasurementService {
                 string(period.get("period_code")), request.settlementDate(), confirmedTotal, money(request.taxAmount()),
                 money(request.retentionAmount()), request.dueDate(), longValue(contract.get("party_a_id")), attachmentCount,
                 "由业主报量核定自动生成，报量版本=" + submission.get("submission_code"));
-        Map<String, Object> settlement = revenueOperationsService.createSettlement(settlementRequest);
+        Map<String, Object> settlement = revenueOperationsService.createMeasurementSettlement(
+                settlementRequest, longValue(submission.get("measurement_id")), submissionId,
+                decimal(submission.get("submitted_amount")), deductedTotal);
         Long settlementId = longValue(settlement.get("id"));
-        jdbc.update("UPDATE owner_settlement SET production_measurement_id=?,owner_submission_id=?,reported_amount=?,deducted_amount=?,formula_version='OWNER_CONFIRMED_MEASUREMENT_V1',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                submission.get("measurement_id"), submissionId, submission.get("submitted_amount"), deductedTotal, user(), settlementId, tenant());
         jdbc.update("UPDATE owner_measurement_submission SET status='SETTLEMENT_CREATED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", submissionId, tenant());
         jdbc.update("UPDATE production_measurement SET status='SETTLEMENT_CREATED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", user(), submission.get("measurement_id"), tenant());
         return submission(submissionId);

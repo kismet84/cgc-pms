@@ -17,6 +17,7 @@ export const FINANCE_QUERY_PERMISSIONS = {
 export const FINANCE_API = {
   payments: "/pay-applications",
   expenses: "/expenses",
+  contractRevenues: "/revenue-operations/settlement-revenue-options",
   revenueSettlements: "/revenue-operations/settlements",
   invoices: "/invoices",
   revenueReceivables: "/revenue-operations/receivables",
@@ -113,6 +114,15 @@ export interface RevenueQuery {
   projectId?: string;
   status?: string;
 }
+export interface ContractRevenueRecord {
+  id: string;
+  projectId: string;
+  contractId: string;
+  revenueCode: string;
+  revenueAmount: FinanceDecimalString;
+  approvalStatus: string;
+}
+export type ContractRevenuePage = PageResult<ContractRevenueRecord>;
 export interface AmountAllocation {
   receivableId: string;
   amount: FinanceDecimalString;
@@ -120,7 +130,7 @@ export interface AmountAllocation {
 export interface OwnerSettlementCommand {
   projectId: string;
   contractId: string;
-  revenueId?: string;
+  revenueId: string;
   settlementPeriod: string;
   settlementDate: string;
   grossAmount: FinanceDecimalString;
@@ -141,7 +151,6 @@ export interface SalesInvoiceCommand {
   invoiceDate: string;
   amountWithoutTax: FinanceDecimalString;
   taxAmount: FinanceDecimalString;
-  attachmentCount: number;
   allocations: AmountAllocation[];
   remark?: string;
 }
@@ -154,7 +163,6 @@ export interface CollectionCommand {
   collectedAt: string;
   amount: FinanceDecimalString;
   payerName: string;
-  attachmentCount: number;
   allocations?: AmountAllocation[];
   remark?: string;
 }

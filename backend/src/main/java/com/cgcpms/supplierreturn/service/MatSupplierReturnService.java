@@ -2,6 +2,7 @@ package com.cgcpms.supplierreturn.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.cost.entity.CostItem;
@@ -36,6 +37,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -55,12 +57,13 @@ public class MatSupplierReturnService {
     private final ProjectAccessChecker projectAccessChecker;
     private final ContractProcurementPayableService payableService;
     private final PurchaseOrderReceiptStateService orderReceiptStateService;
+    private final MandatoryAuditService mandatoryAuditService;
 
     @Transactional(rollbackFor = Exception.class)
     public Long confirm(SupplierReturnRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
         MatSupplierReturn existing = findByIdempotencyKey(tenantId, request.idempotencyKey());
-        if (existing != null) return existing.getId();
+        if (existing != null) return verifyConfirmedReplay(existing);
 
         // 以验收明细作为合格品和不合格品两类累计退货的共同串行化锚点。
         MatReceiptItem receiptItem = receiptItemMapper.selectForUpdate(request.receiptItemId(), tenantId);
@@ -68,7 +71,7 @@ public class MatSupplierReturnService {
             throw new BusinessException("SUPPLIER_RETURN_RECEIPT_ITEM_NOT_FOUND", "原验收明细不存在");
         }
         existing = findByIdempotencyKey(tenantId, request.idempotencyKey());
-        if (existing != null) return existing.getId();
+        if (existing != null) return verifyConfirmedReplay(existing);
 
         MatReceipt receipt = receiptMapper.selectById(receiptItem.getReceiptId());
         if (receipt == null || !tenantId.equals(receipt.getTenantId())
@@ -134,7 +137,7 @@ public class MatSupplierReturnService {
                     tenantId, receiptItem.getId(), request.quantity());
             if (confirmed != null) {
                 syncReceiptItemDispositionStatus(receiptItem, disposition);
-                return confirmed.getId();
+                return verifyConfirmedReplay(confirmed);
             }
         }
         if (returned.add(request.quantity()).compareTo(nvl(limit)) > 0) {
@@ -199,6 +202,8 @@ public class MatSupplierReturnService {
         }
         orderReceiptStateService.sync(receipt.getOrderId(), tenantId);
         payableService.recalculate(receipt.getContractId(), tenantId);
+        mandatoryAuditService.finance("SUPPLIER_RETURN_CONFIRMED", "SUPPLIER_RETURN", supplierReturn.getId(),
+                supplierReturn.getProjectId(), supplierReturn.getIdempotencyKey(), confirmedAuditPayload(supplierReturn, item));
         return supplierReturn.getId();
     }
 
@@ -213,7 +218,11 @@ public class MatSupplierReturnService {
             throw new BusinessException("SUPPLIER_RETURN_NOT_FOUND", "供应商退货单不存在");
         }
         projectAccessChecker.checkAccess(supplierReturn.getProjectId(), "冲销供应商退货");
-        if ("REVERSED".equals(supplierReturn.getStatus())) return returnId;
+        if ("REVERSED".equals(supplierReturn.getStatus())) {
+            mandatoryAuditService.verifyFinance("SUPPLIER_RETURN_REVERSED", "SUPPLIER_RETURN", returnId,
+                    "REVERSE:" + returnId, reversalAuditPayload(supplierReturn));
+            return returnId;
+        }
         if (!"CONFIRMED".equals(supplierReturn.getStatus())) {
             throw new BusinessException("SUPPLIER_RETURN_NOT_REVERSIBLE", "当前供应商退货状态不允许冲销");
         }
@@ -271,6 +280,8 @@ public class MatSupplierReturnService {
         returnMapper.updateById(supplierReturn);
         orderReceiptStateService.sync(receipt.getOrderId(), tenantId);
         payableService.recalculate(receipt.getContractId(), tenantId);
+        mandatoryAuditService.finance("SUPPLIER_RETURN_REVERSED", "SUPPLIER_RETURN", returnId,
+                supplierReturn.getProjectId(), "REVERSE:" + returnId, reversalAuditPayload(supplierReturn));
         return returnId;
     }
 
@@ -298,6 +309,38 @@ public class MatSupplierReturnService {
         return returnItemMapper.selectList(new LambdaQueryWrapper<MatSupplierReturnItem>()
                 .eq(MatSupplierReturnItem::getTenantId, tenantId)
                 .eq(MatSupplierReturnItem::getReturnId, returnId));
+    }
+
+    private Long verifyConfirmedReplay(MatSupplierReturn supplierReturn) {
+        projectAccessChecker.checkAccess(supplierReturn.getProjectId(), "确认供应商退货");
+        List<MatSupplierReturnItem> items = getItemsInternal(supplierReturn.getTenantId(), supplierReturn.getId());
+        if (items.size() != 1) {
+            throw new BusinessException("SUPPLIER_RETURN_ITEM_MISSING", "供应商退货明细不存在或不唯一");
+        }
+        mandatoryAuditService.verifyFinance("SUPPLIER_RETURN_CONFIRMED", "SUPPLIER_RETURN", supplierReturn.getId(),
+                supplierReturn.getIdempotencyKey(), confirmedAuditPayload(supplierReturn, items.getFirst()));
+        return supplierReturn.getId();
+    }
+
+    private Map<String, Object> confirmedAuditPayload(MatSupplierReturn supplierReturn,
+                                                       MatSupplierReturnItem item) {
+        return Map.of(
+                "receiptId", supplierReturn.getReceiptId(),
+                "contractId", supplierReturn.getContractId(),
+                "purchaseOrderId", supplierReturn.getPurchaseOrderId(),
+                "returnSource", item.getReturnSource(),
+                "quantity", item.getQuantity(),
+                "amount", item.getAmount(),
+                "returnDate", supplierReturn.getReturnDate());
+    }
+
+    private Map<String, Object> reversalAuditPayload(MatSupplierReturn supplierReturn) {
+        return Map.of(
+                "receiptId", supplierReturn.getReceiptId(),
+                "contractId", supplierReturn.getContractId(),
+                "quantity", supplierReturn.getReturnQuantity(),
+                "amount", supplierReturn.getTotalAmount(),
+                "reason", supplierReturn.getReversalReason());
     }
 
     private MatSupplierReturn findConfirmedRejectedReturn(Long tenantId, Long receiptItemId,

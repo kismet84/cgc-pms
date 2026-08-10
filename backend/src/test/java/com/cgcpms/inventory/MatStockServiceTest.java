@@ -966,12 +966,12 @@ class MatStockServiceTest {
         insertWarehouse(warehouseId, 10001L, "WH-INCOMING-CURRENT");
         MatStock current = stockService.stockIn(warehouseId, MATERIAL_ID, new BigDecimal("2.0000"));
 
-        insertPurchaseOrder(9701L, 10001L, "PO-INCOMING-LATER", "2026-08-02", "APPROVED", "APPROVED");
-        insertPurchaseOrder(9702L, 10001L, "PO-INCOMING-EARLY", "2026-08-01", "APPROVED", "APPROVED");
+        insertPurchaseOrder(9701L, 10001L, "PO-INCOMING-LATER", "2026-08-02", "APPROVED", "PERFORMING");
+        insertPurchaseOrder(9702L, 10001L, "PO-INCOMING-EARLY", "2026-08-01", "APPROVED", "PARTIAL_RECEIVED");
         insertPurchaseOrder(9703L, 10002L, "PO-INCOMING-OTHER-PROJECT", "2026-07-30", "APPROVED", "APPROVED");
         insertPurchaseOrder(9704L, 10001L, "PO-INCOMING-DRAFT", "2026-07-29", "DRAFT", "DRAFT");
         insertPurchaseOrder(9705L, 10001L, "PO-INCOMING-COMPLETED", "2026-07-28", "APPROVED", "COMPLETED");
-        insertPurchaseOrder(9706L, 10001L, "PO-INCOMING-NO-DATE", null, "APPROVED", "APPROVED");
+        insertPurchaseOrder(9706L, 10001L, "PO-INCOMING-APPROVED-ONLY", null, "APPROVED", "APPROVED");
 
         insertPurchaseOrderItem(9711L, 9701L, 10001L, MATERIAL_ID, "10.0000", "4.0000");
         insertPurchaseOrderItem(9712L, 9701L, null, MATERIAL_ID, "5.0000", "1.0000");

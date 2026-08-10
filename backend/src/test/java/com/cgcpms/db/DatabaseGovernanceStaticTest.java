@@ -109,7 +109,7 @@ class DatabaseGovernanceStaticTest {
     @Test
     void governanceAssetsCloseLegacyAmbiguityWithoutDestructiveAutomation() throws IOException {
         Path workspace = Path.of("..").toAbsolutePath().normalize();
-        String standards = Files.readString(workspace.resolve("docs/database/database-design-standards.md"));
+        String standards = Files.readString(workspace.resolve("docs/standards/07-数据库与迁移规范.md"));
         assertAll(
                 () -> assertTrue(standards.contains("永久幂等事实")),
                 () -> assertTrue(standards.contains("活动唯一键")),

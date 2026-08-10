@@ -101,6 +101,22 @@ class ContractRevenueServiceTest {
         assertTrue(page.getTotal() >= 0);
     }
 
+    @Test @Transactional @DisplayName("非项目成员不能读取同租户收入确认")
+    void projectScopeAppliesToListDetailAndBalance() {
+        Long id = service.create(revenue("RV-SCOPE-", "DRAFT", "100.00", "0.00"));
+
+        UserContext.set(Jwts.claims().subject("outsider").add("userId", 999999L)
+                .add("username", "outsider").add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of()).build());
+
+        assertTrue(service.getPage(1, 20, null, null, null, null, null).getRecords().stream()
+                .noneMatch(row -> id.equals(row.getId())));
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> service.getById(id)).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> service.getBalance(CONTRACT_ID)).getCode());
+    }
+
     @Test @Transactional @DisplayName("getById → 不存在时抛异常")
     void testGetById_NotFound() {
         assertThrows(BusinessException.class, () -> service.getById(99999999L));

@@ -69,6 +69,7 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
             cost.setTenantId(varOrder.getTenantId());
             cost.setOrgId(null);
             cost.setProjectId(varOrder.getProjectId());
+            cost.setWbsTaskId(item.getWbsTaskId());
             cost.setContractId(varOrder.getContractId());
             cost.setPartnerId(varOrder.getPartnerId());
             cost.setCostType(COST_TYPE);

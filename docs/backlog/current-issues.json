@@ -1,8 +1,32 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-10T05:56:45+08:00",
+  "updatedAt": "2026-08-10T09:43:37+08:00",
   "issues": [
+    {
+      "issueKey": "ISSUE-086-001",
+      "title": "全仓业务闭环权限、状态与事实一致性整改",
+      "status": "IN_PROGRESS",
+      "classification": "OPERATIONAL_RISK",
+      "priority": "P1",
+      "blocking": true,
+      "summary": "当前HEAD已确认15项项目授权、资金证据、合同终态、供应商退货、履约计划、关闭门、独立月结、业务投影和高风险领域审计缺陷；10项业务决策必须先签认，其中D-03/D-04决定AP票款顺序与付款条款2项能力是否升级为缺陷。",
+      "acceptanceCriteria": "第86条计划G0至G5逐项通过；15项确认缺陷取得权限、金额、状态、附件、并发、H2/MySQL和真实V2证据；10项决策全部实施复验、有证据关闭或去重到既有唯一载体，其中2项条件能力按D-03/D-04裁决收口；AR/AP子账与已过账总账独立相等，无部分写入、越权、伪造历史或无载体遗留。",
+      "deferReason": "用户已授权串行实施并在全部收口后执行受保护Git交付；当前按G0至G5推进，历史异常禁止猜测回填。",
+      "candidate": {
+        "userValue": "确保项目数据只对授权人员可见，并让合同、结算、发票、回款、库存、成本、计划和收尾由唯一可追溯事实闭环。",
+        "minimalLoop": "先锁定15项确认缺陷、2项待裁决能力和10项业务决策，再按授权与资金、合同收尾、履约现场、AP月结与投影审计四个最小包顺序实现和复验。",
+        "nonGoals": "不建设权限中台、通用状态机或冲销平台，不创建第二退货表或文件库，不扩展劳务工资设备、移动/BIM、生产或目标环境。",
+        "dependencies": "第86条G1业务决策、实施授权、代码变更前codemap刷新、只读历史数据预检以及本地H2/MySQL/V2验收前置。",
+        "risk": "错误修复可能扩大项目数据范围、造成财务或库存部分写入、篡改历史关系、替换活动WBS或让关闭门误放行。",
+        "readyPreconditions": "已满足：D-01至D-10完成签认，G0数据异常按失败关闭处置，用户明确授权实施；继续受G2至G5门禁约束。"
+      },
+      "sourceRefs": [
+        "docs/plans/第86条主线-全仓业务闭环权限状态与事实一致性整改任务计划书.md",
+        "docs/backlog/current-focus.md",
+        "docs/product-intelligence/project-map.md"
+      ]
+    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

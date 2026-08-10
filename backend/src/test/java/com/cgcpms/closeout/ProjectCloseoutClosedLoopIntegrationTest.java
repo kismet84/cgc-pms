@@ -3,6 +3,7 @@ package com.cgcpms.closeout;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.closeout.dto.ProjectCloseoutModels.*;
+import com.cgcpms.closeout.service.ProjectCloseGateService;
 import com.cgcpms.closeout.service.ProjectCloseoutService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
@@ -52,9 +53,18 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long PROJECT_MEMBER = 99191014L;
     private static final long SUPERSEDED_SCHEDULE = 99191015L;
     private static final long SUPERSEDED_WBS = 99191016L;
+    private static final long TECH_DRAWING = 99191017L;
+    private static final long TECH_VERSION = 99191018L;
+    private static final long TECH_REVIEW = 99191019L;
+    private static final long TECH_RFI = 99191020L;
+    private static final long TECH_DISCLOSURE = 99191021L;
+    private static final long DAILY_LOG = 99191022L;
+    private static final long TECH_REFERENCE = 99191023L;
+    private static final long TECH_ARCHIVE = 99191024L;
     private static final AtomicLong IDS = new AtomicLong(99191100L);
 
     @Autowired ProjectCloseoutService service;
+    @Autowired ProjectCloseGateService gate;
     @Autowired PmProjectService projectService;
     @Autowired BusinessObjectAuthorizer fileAuthorizer;
     @Autowired WorkflowEngine workflowEngine;
@@ -114,7 +124,7 @@ class ProjectCloseoutClosedLoopIntegrationTest {
                 INSERT INTO account_receivable(id,tenant_id,project_id,contract_id,settlement_id,customer_id,receivable_type,
                  receivable_code,original_amount,collected_amount,credited_amount,outstanding_amount,due_date,status,version,
                  created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES(?,0,?,?,?,?, 'REGULAR','AR-REGULAR',900,0,0,900,?,'OPEN',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                VALUES(?,0,?,?,?,?, 'PROGRESS','AR-PROGRESS',900,0,0,900,?,'OPEN',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, REGULAR_RECEIVABLE, PROJECT, CONTRACT, SETTLEMENT, PARTNER, LocalDate.now());
         jdbc.update("""
                 INSERT INTO account_receivable(id,tenant_id,project_id,contract_id,settlement_id,customer_id,receivable_type,
@@ -270,6 +280,65 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     @Test
+    void constructionGateIncludesTechnicalDrawingRfiDisclosureAndArchiveFacts() {
+        jdbc.update("""
+                INSERT INTO tech_drawing(id,tenant_id,project_id,drawing_code,drawing_name,specialty,source_organization,status,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,'TD-CLOSEOUT','竣工施工图','CIVIL','设计单位','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_DRAWING, PROJECT);
+        jdbc.update("""
+                INSERT INTO tech_drawing_version(id,tenant_id,project_id,drawing_id,version_no,received_at,received_by,status,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'V1',CURRENT_TIMESTAMP,1,'RECEIVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_VERSION, PROJECT, TECH_DRAWING);
+        jdbc.update("UPDATE tech_drawing SET current_version_id=? WHERE id=?", TECH_VERSION, TECH_DRAWING);
+        assertTrue(gateCodes().contains("CONSTRUCTION_DRAWING_NOT_APPROVED"));
+
+        jdbc.update("UPDATE tech_drawing_version SET status='APPROVED', approved_at=CURRENT_TIMESTAMP WHERE id=?", TECH_VERSION);
+        jdbc.update("""
+                INSERT INTO tech_drawing_review(id,tenant_id,project_id,drawing_version_id,review_code,review_date,chair_user_id,
+                 participant_summary,conclusion,review_summary,requires_rfi,status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'TR-CLOSEOUT',CURRENT_DATE,1,'参建单位','PASS','会审通过',1,'CONFIRMED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_REVIEW, PROJECT, TECH_VERSION);
+        jdbc.update("""
+                INSERT INTO tech_rfi(id,tenant_id,project_id,drawing_version_id,review_id,rfi_code,subject,question,priority,
+                 raised_by,raised_at,response_due_date,status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'RFI-CLOSEOUT','节点澄清','请确认节点做法','NORMAL',1,CURRENT_TIMESTAMP,CURRENT_DATE,'SUBMITTED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_RFI, PROJECT, TECH_VERSION, TECH_REVIEW);
+        assertTrue(gateCodes().contains("CONSTRUCTION_RFI_OPEN"));
+
+        jdbc.update("UPDATE tech_rfi SET status='CLOSED', closed_by=1, closed_at=CURRENT_TIMESTAMP WHERE id=?", TECH_RFI);
+        jdbc.update("""
+                INSERT INTO tech_disclosure(id,tenant_id,project_id,drawing_version_id,disclosure_code,disclosure_title,
+                 disclosure_date,presenter_user_id,recipient_summary,disclosure_content,status,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'DISC-CLOSEOUT','节点施工交底',CURRENT_DATE,1,'施工班组','按批准图纸施工','DRAFT',
+                 1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_DISCLOSURE, PROJECT, TECH_VERSION);
+        assertTrue(gateCodes().contains("CONSTRUCTION_DISCLOSURE_UNCONFIRMED"));
+
+        jdbc.update("UPDATE tech_disclosure SET status='CONFIRMED', confirmed_by=1, confirmed_at=CURRENT_TIMESTAMP WHERE id=?", TECH_DISCLOSURE);
+        jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,CURRENT_DATE,'节点施工','SUBMITTED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
+        jdbc.update("""
+                INSERT INTO tech_construction_reference(id,tenant_id,project_id,drawing_version_id,disclosure_id,daily_log_id,
+                 wbs_task_id,reference_date,work_area,reference_description,status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,?,?,CURRENT_DATE,'全场','按批准图纸及交底施工','RECORDED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_REFERENCE, PROJECT, TECH_VERSION, TECH_DISCLOSURE, DAILY_LOG, WBS);
+        assertTrue(gateCodes().contains("CONSTRUCTION_REFERENCE_NOT_ARCHIVED"));
+
+        jdbc.update("""
+                INSERT INTO tech_acceptance_archive(id,tenant_id,project_id,drawing_version_id,construction_reference_id,
+                 quality_inspection_id,archive_code,acceptance_date,acceptance_conclusion,archive_location,status,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,?, 'TA-CLOSEOUT',CURRENT_DATE,'PASS','项目档案室','ARCHIVED',
+                 1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, TECH_ARCHIVE, PROJECT, TECH_VERSION, TECH_REFERENCE, QUALITY_INSPECTION);
+        assertFalse(gateCodes().stream().anyMatch(code -> code.startsWith("CONSTRUCTION_DRAWING_")
+                || code.equals("CONSTRUCTION_RFI_OPEN") || code.equals("CONSTRUCTION_DISCLOSURE_UNCONFIRMED")
+                || code.equals("CONSTRUCTION_REFERENCE_NOT_ARCHIVED")));
+    }
+
+    @Test
     void ignoresSupersededScheduleTasksInCloseoutReadiness() {
         long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-SUPERSEDED", LocalDate.now(), null)));
         long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
@@ -345,6 +414,10 @@ class ProjectCloseoutClosedLoopIntegrationTest {
 
     private Long user() { return UserContext.getCurrentUserId(); }
 
+    private List<String> gateCodes() {
+        return gate.constructionCompletion(0L, PROJECT).stream().map(ProjectCloseGateService.GateBlocker::gateCode).toList();
+    }
+
     private void approveAll(String businessType, long businessId) {
         WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
                 .eq(WfInstance::getBusinessType, businessType).eq(WfInstance::getBusinessId, businessId));
@@ -361,6 +434,15 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM tech_acceptance_archive WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_construction_reference WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_disclosure WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_rfi WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_drawing_review WHERE project_id=?", PROJECT);
+        jdbc.update("UPDATE tech_drawing SET current_version_id=NULL WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_drawing_version WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM tech_drawing WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM site_daily_log WHERE id=?", DAILY_LOG);
         jdbc.update("DELETE FROM sys_file WHERE business_type IN('CLOSEOUT_SECTION_ACCEPTANCE','CLOSEOUT_FINAL_ACCEPTANCE','CLOSEOUT_DEFECT','CLOSEOUT_WARRANTY','CLOSEOUT_ARCHIVE_TRANSFER')");
         jdbc.update("DELETE FROM closeout_archive_transfer WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM closeout_defect WHERE project_id=?", PROJECT);

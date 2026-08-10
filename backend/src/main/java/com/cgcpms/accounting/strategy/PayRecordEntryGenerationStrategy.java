@@ -54,11 +54,12 @@ public class PayRecordEntryGenerationStrategy implements EntryGenerationStrategy
 
         AccountingEntryLine debit = new AccountingEntryLine();
         debit.setDirection("DEBIT");
-        debit.setAccountCode("2202-AP");
-        debit.setAccountName("应付账款");
+        boolean advance = "ADVANCE".equals(application.getPayType());
+        debit.setAccountCode(advance ? "1123-PREPAY" : "2202-AP");
+        debit.setAccountName(advance ? "预付账款" : "应付账款");
         debit.setCostSubjectId(application.getCostSubjectId());
         debit.setAmount(record.getPayAmount());
-        debit.setSummary("支付合同款，冲减应付：" + record.getExternalTxnNo());
+        debit.setSummary((advance ? "支付预付款：" : "支付合同款，冲减应付：") + record.getExternalTxnNo());
 
         AccountingEntryLine credit = new AccountingEntryLine();
         credit.setDirection("CREDIT");

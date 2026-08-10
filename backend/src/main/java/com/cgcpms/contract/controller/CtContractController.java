@@ -95,6 +95,14 @@ public class CtContractController {
         return ApiResponse.success();
     }
 
+    @PostMapping("/{id}/settle")
+    @AuditedOperation(type = "SETTLE", businessType = "CONTRACT", businessIdExpression = "#id")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
+    public ApiResponse<Void> settlePerformance(@PathVariable Long id, @RequestParam Integer version) {
+        ctContractService.settlePerformance(id, version);
+        return ApiResponse.success();
+    }
+
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:delete')")

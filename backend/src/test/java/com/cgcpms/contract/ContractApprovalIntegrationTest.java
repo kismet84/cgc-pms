@@ -207,6 +207,16 @@ class ContractApprovalIntegrationTest {
         return contractMapper.selectById(contractId).getVersion();
     }
 
+    @Test
+    @Transactional
+    void settledTransitionRequiresAuthoritativeFinalFact() {
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> contractService.settlePerformance(APPROVED_CONTRACT_ID, currentVersion(APPROVED_CONTRACT_ID)));
+        assertEquals("CONTRACT_SETTLEMENT_FACT_REQUIRED", failure.getCode());
+        assertEquals(ContractStatusConstants.STATUS_PERFORMING,
+                contractMapper.selectById(APPROVED_CONTRACT_ID).getContractStatus());
+    }
+
     // ═══════════════════════════════════════════════════════════
     // 场景1: 提交合同审批
     // ═══════════════════════════════════════════════════════════

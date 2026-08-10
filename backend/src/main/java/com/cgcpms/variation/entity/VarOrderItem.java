@@ -43,4 +43,6 @@ public class VarOrderItem extends BaseEntity {
     private BigDecimal claimAmount;
 
     private Long costSubjectId;
+
+    private Long wbsTaskId;
 }

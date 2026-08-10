@@ -54,6 +54,8 @@ class VarOrderServiceTest {
     private static final long PROJECT_ID  = 10018L;
     private static final long PARTNER_ID  = 20018L;
     private static final long CONTRACT_ID = 30018L;
+    private static final long SCHEDULE_ID = 40018L;
+    private static final long WBS_ID = 50018L;
 
     @Autowired
     private VarOrderService varOrderService;
@@ -125,10 +127,32 @@ class VarOrderServiceTest {
             project.setProjectType("CONSTRUCTION");
             project.setContractAmount(new BigDecimal("5000000.00"));
             project.setTargetCost(new BigDecimal("4200000.00"));
-            project.setStatus("RUNNING");
+            project.setStatus("ACTIVE");
             project.setApprovalStatus("APPROVED");
             projectMapper.insert(project);
         }
+        jdbcTemplate.update("UPDATE pm_project SET status='ACTIVE', approval_status='APPROVED' WHERE id=?", PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                SELECT ?,0,?,'SCH-VAR-018','签证单测生效基线','BASELINE',1,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM project_schedule_plan WHERE id=?)
+                """, SCHEDULE_ID, PROJECT_ID, SCHEDULE_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                SELECT ?,0,?,?,'WBS-VAR-018','签证单测WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM project_wbs_task WHERE id=?)
+                """, WBS_ID, PROJECT_ID, SCHEDULE_ID, WBS_ID);
 
         if (partnerMapper.selectById(PARTNER_ID) == null) {
             MdPartner partner = new MdPartner();
@@ -173,6 +197,12 @@ class VarOrderServiceTest {
                         .eq(WfTemplate::getEnabled, 1));
         assertNotNull(template,
                 "VAR_ORDER审批模板应存在且启用");
+    }
+
+    @Test
+    @DisplayName("签证明细必须具备 WBS 追溯字段")
+    void varOrderItemCarriesWbsTaskReference() throws Exception {
+        assertEquals(Long.class, VarOrderItem.class.getDeclaredField("wbsTaskId").getType());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -270,6 +300,7 @@ class VarOrderServiceTest {
         item1.setUnitPrice(new BigDecimal("200.00"));
         item1.setAmount(new BigDecimal("2000.00"));
         item1.setCostSubjectId(90001L);
+        item1.setWbsTaskId(WBS_ID);
 
         VarOrderItem item2 = new VarOrderItem();
         item2.setVarOrderId(id);
@@ -279,6 +310,7 @@ class VarOrderServiceTest {
         item2.setUnitPrice(new BigDecimal("60.00"));
         item2.setAmount(new BigDecimal("3000.00"));
         item2.setCostSubjectId(90002L);
+        item2.setWbsTaskId(WBS_ID);
 
         varOrderService.saveItems(id, java.util.List.of(item1, item2));
 
@@ -296,6 +328,7 @@ class VarOrderServiceTest {
         item.setUnitPrice(new BigDecimal("100.00"));
         item.setClaimUnitPrice(new BigDecimal("120.00"));
         item.setCostSubjectId(90001L);
+        item.setWbsTaskId(WBS_ID);
         varOrderService.saveItems(id, java.util.List.of(item));
         jdbcTemplate.update("""
                 INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
@@ -358,6 +391,45 @@ class VarOrderServiceTest {
         BusinessException missingCostSubjectEx = assertThrows(BusinessException.class, () ->
                 varOrderService.saveItems(id, java.util.List.of(invalidItem)));
         assertEquals("VAR_ORDER_ITEM_COST_SUBJECT_REQUIRED", missingCostSubjectEx.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("新签证明细缺失或无效WBS时失败且保留原明细")
+    void invalidWbsRejectsBeforeExistingItemsAreDeleted() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-WBS门禁");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+
+        VarOrderItem original = new VarOrderItem();
+        original.setItemName("原明细");
+        original.setQuantity(BigDecimal.ONE);
+        original.setUnitPrice(BigDecimal.ONE);
+        original.setCostSubjectId(90001L);
+        original.setWbsTaskId(WBS_ID);
+        varOrderService.saveItems(id, List.of(original));
+        Integer version = varOrderMapper.selectById(id).getVersion();
+
+        VarOrderItem replacement = new VarOrderItem();
+        replacement.setItemName("非法替换");
+        replacement.setQuantity(BigDecimal.ONE);
+        replacement.setUnitPrice(BigDecimal.ONE);
+        replacement.setCostSubjectId(90001L);
+        BusinessException missing = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(replacement), version));
+        assertEquals("PROJECT_WBS_REQUIRED", missing.getCode());
+
+        replacement.setWbsTaskId(WBS_ID + 1);
+        BusinessException mismatch = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(replacement), version));
+        assertEquals("PROJECT_WBS_MISMATCH", mismatch.getCode());
+        assertEquals("原明细", varOrderItemMapper.selectOne(new LambdaQueryWrapper<VarOrderItem>()
+                .eq(VarOrderItem::getVarOrderId, id)).getItemName());
     }
 
     @Test
@@ -441,6 +513,7 @@ class VarOrderServiceTest {
         item.setUnitPrice(new BigDecimal("800.00"));
         item.setAmount(new BigDecimal("1600.00"));
         item.setCostSubjectId(90001L);
+        item.setWbsTaskId(WBS_ID);
         varOrderService.saveItems(id, java.util.List.of(item));
 
         var detail = varOrderService.getById(id);

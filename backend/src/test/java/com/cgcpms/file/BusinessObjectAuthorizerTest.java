@@ -447,7 +447,7 @@ class BusinessObjectAuthorizerTest {
                 .thenReturn(List.of(Map.of(
                 "tenant_id", TestUserContext.TENANT_0,
                 "project_id", 10014L,
-                "status", "FULLY_ALLOCATED",
+                "status", "PENDING_EVIDENCE",
                 "verification_status", "UNVERIFIED")));
         authorizer.checkUploadAccess("SALES_INVOICE", 52001L, "ELECTRONIC_INVOICE");
         verify(jdbcTemplate).queryForList(
@@ -465,6 +465,20 @@ class BusinessObjectAuthorizerTest {
         BusinessException immutable = assertThrows(BusinessException.class,
                 () -> authorizer.checkDeleteAccess("SALES_INVOICE", 52002L, "SCANNED_INVOICE"));
         assertEquals("REVENUE_DOCUMENT_IMMUTABLE", immutable.getCode());
+
+        when(jdbcTemplate.queryForList(anyString(), eq(52005L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "tenant_id", TestUserContext.TENANT_0,
+                        "project_id", 10014L,
+                        "status", "PENDING_EVIDENCE")));
+        authorizer.checkUploadAccess("COLLECTION_RECORD", 52005L, "BANK_RECEIPT");
+        when(jdbcTemplate.queryForList(anyString(), eq(52006L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "tenant_id", TestUserContext.TENANT_0,
+                        "project_id", 10014L,
+                        "status", "SUCCESS")));
+        assertEquals("REVENUE_DOCUMENT_IMMUTABLE", assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("COLLECTION_RECORD", 52006L, "BANK_RECEIPT")).getCode());
     }
 
     @Test

@@ -15,6 +15,7 @@ public class VarOrderItemVO {
     private String claimUnitPrice;
     private String claimAmount;
     private String costSubjectId;
+    private String wbsTaskId;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

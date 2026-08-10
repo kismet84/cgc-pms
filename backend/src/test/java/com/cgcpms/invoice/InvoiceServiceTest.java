@@ -120,6 +120,8 @@ class InvoiceServiceTest {
         UserContext.set(claims);
 
         // 物理清理本测试关心的数据，防止逻辑删除和并行测试类复用固定主键触发 PK 冲突。
+        jdbcTemplate.update("DELETE FROM mandatory_audit_expectation WHERE project_id = ? AND business_type = 'PAY_INVOICE'", SEED_PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM finance_audit_event WHERE project_id = ? AND business_type = 'PAY_INVOICE'", SEED_PROJECT_ID);
         jdbcTemplate.update("DELETE FROM sys_file WHERE tenant_id = ? AND business_type = 'INVOICE'", TENANT_ID);
         jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);

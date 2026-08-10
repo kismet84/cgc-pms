@@ -676,6 +676,29 @@ class Phase3IntegrationTest {
         assertEquals("APPROVED", approvedChange.getApprovalStatus());
         assertEquals(1, approvedChange.getCostGeneratedFlag());
 
+        long varScheduleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long varWbsId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'BASELINE',?,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, varScheduleId, PROJECT_ID, "PHASE3-VAR-SP-" + varScheduleId,
+                "Phase3签证生效基线", Math.toIntExact(varScheduleId % 1_000_000_000));
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'Phase3签证WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, varWbsId, PROJECT_ID, varScheduleId, "PHASE3-VAR-WBS-" + varWbsId);
+
         // 2. 创建VAR_ORDER（成本支出方向，金额+200000）
         VarOrder varOrder = new VarOrder();
         varOrder.setProjectId(PROJECT_ID);
@@ -699,6 +722,7 @@ class Phase3IntegrationTest {
         varItem.setUnitPrice(new BigDecimal("200.00"));
         varItem.setAmount(new BigDecimal("200000.00"));
         varItem.setCostSubjectId(earthworkSubjectId);
+        varItem.setWbsTaskId(varWbsId);
         varOrderService.saveItems(varOrderId, List.of(varItem));
 
         jdbcTemplate.update("""

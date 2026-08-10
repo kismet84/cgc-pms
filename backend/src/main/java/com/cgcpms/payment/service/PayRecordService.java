@@ -43,6 +43,9 @@ import java.time.LocalDateTime;
 import org.springframework.util.StringUtils;
 import com.cgcpms.accounting.service.EntryGenerator;
 import com.cgcpms.accounting.strategy.PayRecordEntryGenerationStrategy;
+import com.cgcpms.audit.service.MandatoryAuditService;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -64,6 +67,7 @@ public class PayRecordService {
     private final EntryGenerator entryGenerator;
     private final CodeGenerationService codeGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final MandatoryAuditService mandatoryAuditService;
 
     // ---- Query ----
 
@@ -130,6 +134,7 @@ public class PayRecordService {
             log.info("Idempotent writeback hit: duplicate external transaction detected, returning existing record id={}",
                 duplicate.getId());
             costSummaryService.updatePaidAmountAfterCommit(app.getTenantId(), app.getProjectId());
+            verifyPayment(duplicate);
             return toVO(duplicate);
         }
 
@@ -190,8 +195,30 @@ public class PayRecordService {
         updateContractPaidAmount(app.getContractId());
         payApplicationService.updatePayStatus(payApplicationId);
         costSummaryService.updatePaidAmountAfterCommit(app.getTenantId(), app.getProjectId());
+        auditPayment(record);
 
         return toVO(record);
+    }
+
+    private void auditPayment(PayRecord record) {
+        mandatoryAuditService.finance("PAYMENT_COMPLETED", "PAY_RECORD", record.getId(),
+                record.getProjectId(), record.getExternalTxnNo(), paymentAuditPayload(record));
+    }
+
+    private void verifyPayment(PayRecord record) {
+        mandatoryAuditService.verifyFinance("PAYMENT_COMPLETED", "PAY_RECORD", record.getId(),
+                record.getExternalTxnNo(), paymentAuditPayload(record));
+    }
+
+    private Map<String, Object> paymentAuditPayload(PayRecord record) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("payApplicationId", record.getPayApplicationId());
+        payload.put("amount", record.getPayAmount());
+        payload.put("paidAt", record.getPaidAt());
+        payload.put("fundAccountId", record.getFundAccountId());
+        payload.put("payMethod", record.getPayMethod());
+        payload.put("voucherNo", record.getVoucherNo());
+        return payload;
     }
 
     // ---- D4: update contract paid_amount ----

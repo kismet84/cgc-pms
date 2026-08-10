@@ -1,6 +1,9 @@
 package com.cgcpms.payment.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.strategy.PayApplicationEntryGenerationStrategy;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.payment.entity.PayApplication;
@@ -16,6 +19,10 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Business handler for payment request approval workflows.
@@ -31,6 +38,8 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
     private final PaymentApplicationIntegrityService integrityService;
     private final PaymentApplicationSourceService sourceService;
     private final ContractBudgetAllocationService contractBudgetAllocationService;
+    private final EntryGenerator entryGenerator;
+    private final MandatoryAuditService mandatoryAuditService;
 
     @Override
     public String supportBusinessType() {
@@ -74,6 +83,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long payAppId = resolveBusinessId(context.getInstance());
         log.info("付款申请审批通过，重新校验并更新状态 payAppId={}", payAppId);
@@ -97,6 +107,16 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
             throw new BusinessException("PAY_APP_STATUS_CONFLICT",
                     "付款申请记录不存在或已被并发更新，请刷新后重试");
         }
+        boolean advance = "ADVANCE".equals(app.getPayType());
+        if (!advance) {
+            entryGenerator.generateEntry(PayApplicationEntryGenerationStrategy.SOURCE_TYPE, payAppId,
+                    PayApplicationEntryGenerationStrategy.ENTRY_TYPE);
+        }
+        mandatoryAuditService.finance("PAY_APPLICATION_CONFIRMED", "PAY_APPLICATION", payAppId,
+                app.getProjectId(), "APPROVED", Map.of(
+                        "approvedAmount", app.getApplyAmount(),
+                        "payType", Objects.toString(app.getPayType(), ""),
+                        "confirmsAp", !advance));
     }
 
     @Override

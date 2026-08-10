@@ -1,9 +1,12 @@
 package com.cgcpms.revenue.controller;
 
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.result.PageResult;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
-import com.cgcpms.revenue.service.RevenueOperationsService;
+import com.cgcpms.revenue.service.ContractRevenueService;
 import com.cgcpms.revenue.service.RevenueAdvancedService;
+import com.cgcpms.revenue.service.RevenueOperationsService;
+import com.cgcpms.revenue.vo.ContractRevenueVO;
 import com.cgcpms.revenue.vo.RevenueOperationsVOs.*;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import jakarta.validation.Valid;
@@ -24,6 +27,7 @@ import org.springframework.http.*;
 public class RevenueOperationsController {
     private final RevenueOperationsService service;
     private final RevenueAdvancedService advanced;
+    private final ContractRevenueService contractRevenueService;
 
     @PostMapping("/settlements")
     @AuditedOperation(type="CREATE",businessType="OWNER_SETTLEMENT",businessIdExpression="#request.projectId")
@@ -37,6 +41,14 @@ public class RevenueOperationsController {
     @PreAuthorize("hasAuthority('revenue:settlement:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<OwnerSettlementVO> submitSettlement(@PathVariable Long id) {
         return ApiResponse.success(service.ownerSettlementView(service.submitSettlement(id)));
+    }
+
+    @GetMapping("/settlement-revenue-options")
+    @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<PageResult<ContractRevenueVO>> settlementRevenueOptions(
+            @RequestParam Long projectId, @RequestParam Long contractId) {
+        return ApiResponse.success(PageResult.of(contractRevenueService.getPage(
+                1, 200, projectId, contractId, null, null, "APPROVED")));
     }
 
     @GetMapping("/settlements")
@@ -58,6 +70,14 @@ public class RevenueOperationsController {
         return ApiResponse.success(service.salesInvoiceView(service.createSalesInvoice(request)));
     }
 
+    @PostMapping("/sales-invoices/{id}/confirm")
+    @AuditedOperation(type="CONFIRM",businessType="SALES_INVOICE",businessIdExpression="#id")
+    @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<SalesInvoiceVO> confirmInvoice(@PathVariable Long id,
+                                                       @Valid @RequestBody AllocationConfirmationRequest request) {
+        return ApiResponse.success(service.salesInvoiceView(service.confirmSalesInvoice(id, request)));
+    }
+
     @GetMapping("/sales-invoices")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<SalesInvoiceVO>> invoices(@RequestParam(required=false) Long projectId) {
@@ -69,6 +89,14 @@ public class RevenueOperationsController {
     @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CollectionVO> createCollection(@Valid @RequestBody CollectionRequest request) {
         return ApiResponse.success(service.collectionView(service.createCollection(request)));
+    }
+
+    @PostMapping("/collections/{id}/confirm")
+    @AuditedOperation(type="CONFIRM",businessType="COLLECTION_RECORD",businessIdExpression="#id")
+    @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<CollectionVO> confirmCollection(@PathVariable Long id,
+                                                        @Valid @RequestBody AllocationConfirmationRequest request) {
+        return ApiResponse.success(service.collectionView(service.confirmCollection(id, request)));
     }
 
     @GetMapping("/collections")

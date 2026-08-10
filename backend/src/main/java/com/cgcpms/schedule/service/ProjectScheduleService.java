@@ -50,7 +50,24 @@ public class ProjectScheduleService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createSchedule(ScheduleRequest request) {
         projectAccessChecker.checkAccess(request.projectId(), "创建项目计划");
-        projectExecutionGuard.requirePlanningProject(request.projectId(), "创建项目计划");
+        String projectStatus;
+        try {
+            projectStatus = jdbc.queryForObject(
+                    "SELECT status FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                    String.class, request.projectId(), tenant());
+        } catch (EmptyResultDataAccessException e) {
+            throw error("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        if (!Set.of("PREPARING", ACTIVE).contains(projectStatus)) {
+            throw error("PROJECT_STAGE_WRITE_FORBIDDEN", "创建项目计划不允许在项目阶段 " + projectStatus + " 执行");
+        }
+        Integer baselineCount = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_schedule_plan
+                WHERE tenant_id=? AND project_id=? AND plan_type='BASELINE' AND deleted_flag=0
+                """, Integer.class, tenant(), request.projectId());
+        if (ACTIVE.equals(projectStatus) || (baselineCount != null && baselineCount > 0)) {
+            throw error("PROJECT_BASELINE_ALREADY_ACTIVE", "项目基线已存在，后续调整必须通过纠偏修订流程");
+        }
         requireDates(request.plannedStartDate(), request.plannedEndDate(), "PROJECT_SCHEDULE_DATE_INVALID", "项目计划起止日期不合法");
         Integer versionNo = jdbc.queryForObject("SELECT COALESCE(MAX(version_no),0)+1 FROM project_schedule_plan WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), request.projectId());
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -270,6 +287,22 @@ public class ProjectScheduleService {
 
     @Transactional(rollbackFor = Exception.class)
     public void onPeriodApproved(Long id) {
+        Map<String, Object> period = requirePeriod(id, true);
+        if (!"PENDING".equals(string(period.get("status")))) {
+            throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
+        }
+        requireSchedule(longValue(period.get("schedule_plan_id")), true);
+        if ("WEEKLY".equals(string(period.get("period_type")))) {
+            Integer overlaps = jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM project_period_plan
+                    WHERE tenant_id=? AND schedule_plan_id=? AND period_type='WEEKLY' AND status='APPROVED'
+                      AND deleted_flag=0 AND id<>? AND start_date<=? AND end_date>=?
+                    """, Integer.class, tenant(), period.get("schedule_plan_id"), id,
+                    period.get("end_date"), period.get("start_date"));
+            if (overlaps != null && overlaps > 0) {
+                throw error("PROJECT_WEEKLY_PLAN_OVERLAP", "同一计划内已存在日期重叠的已审批周计划");
+            }
+        }
         if (jdbc.update("UPDATE project_period_plan SET status='APPROVED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1)
             throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
     }
@@ -333,11 +366,27 @@ public class ProjectScheduleService {
         projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "提交现场日报");
         Optional<Map<String, Object>> active = findActiveSchedule(log.getProjectId());
         if (active.isEmpty()) throw error("PROJECT_ACTIVE_SCHEDULE_REQUIRED", "提交现场日报前必须存在生效WBS基线");
+        Map<String, Object> schedule = requireSchedule(longValue(active.get().get("id")), true);
+        if (!ACTIVE.equals(string(schedule.get("status")))
+                || !Objects.equals(longValue(schedule.get("project_id")), log.getProjectId())) {
+            throw error("SITE_DAILY_PROGRESS_SCOPE_CHANGED", "日报进度所属项目计划已变化，请刷新后重新填报");
+        }
         List<Map<String, Object>> progress = jdbc.queryForList("SELECT * FROM site_daily_progress WHERE tenant_id=? AND daily_log_id=? ORDER BY id", tenant(), log.getId());
         if (progress.isEmpty()) throw error("SITE_DAILY_PROGRESS_REQUIRED", "已启用项目计划的项目提交现场日报时必须填报实际进度");
-        approvedWeeklyPlan(longValue(active.get().get("id")), log.getReportDate());
+        Map<String, Object> weekly = approvedWeeklyPlan(longValue(schedule.get("id")), log.getReportDate());
+        Set<Long> allowedTasks = new HashSet<>(jdbc.queryForList(
+                "SELECT wbs_task_id FROM project_period_plan_item WHERE tenant_id=? AND period_plan_id=?",
+                Long.class, tenant(), weekly.get("id")));
         for (Map<String, Object> entry : progress) {
             Map<String, Object> task = requireTask(longValue(entry.get("wbs_task_id")));
+            if (!Objects.equals(longValue(entry.get("project_id")), log.getProjectId())
+                    || !Objects.equals(longValue(entry.get("schedule_plan_id")), longValue(schedule.get("id")))
+                    || !Objects.equals(longValue(entry.get("weekly_plan_id")), longValue(weekly.get("id")))
+                    || !Objects.equals(longValue(task.get("project_id")), log.getProjectId())
+                    || !Objects.equals(longValue(task.get("schedule_plan_id")), longValue(schedule.get("id")))
+                    || !allowedTasks.contains(longValue(task.get("id")))) {
+                throw error("SITE_DAILY_PROGRESS_SCOPE_CHANGED", "日报进度所属周计划或WBS范围已变化，请刷新后重新填报");
+            }
             BigDecimal current = decimal(entry.get("current_progress"));
             if (current.compareTo(decimal(task.get("actual_progress"))) < 0)
                 throw error("SITE_DAILY_PROGRESS_CONCURRENT_ROLLBACK", "WBS实际进度已被其他日报推进，请刷新后重新填报");
@@ -349,11 +398,11 @@ public class ProjectScheduleService {
                      version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
                     WHERE id=? AND tenant_id=? AND schedule_plan_id=? AND actual_progress<=?
                     """, current, entry.get("completed_quantity"), status, current, log.getReportDate(), current, log.getReportDate(), user(),
-                    task.get("id"), tenant(), active.get().get("id"), current);
+                    task.get("id"), tenant(), schedule.get("id"), current);
             if (changed != 1)
                 throw error("SITE_DAILY_PROGRESS_CONCURRENT_ROLLBACK", "WBS实际进度已被其他日报推进，请刷新后重新填报");
         }
-        createSnapshot(longValue(active.get().get("id")), log.getReportDate(), log.getId());
+        createSnapshot(longValue(schedule.get("id")), log.getReportDate(), log.getId());
     }
 
     public List<SiteDailyPlannedTaskVO> approvedTasksForDailyLog(Long projectId, LocalDate reportDate) {

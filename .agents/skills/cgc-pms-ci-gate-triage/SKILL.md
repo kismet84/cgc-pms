@@ -31,12 +31,24 @@ description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI �
 - 本地测试、mock E2E、真实浏览器、同 SHA CI 和目标环境证据分别裁决，不得互相替代。
 - 只有分类、修复或恢复、一次等价复验均完成，才能更新门禁状态；失败记录不得被后续重跑覆盖。
 
-### PowerShell 与 ripgrep 调用
+### PowerShell 与本地命令预检
 
-1. PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号；`\"` 不会转义 PowerShell 双引号。包含双引号的检索表达式必须使用 PowerShell 单引号字面量。
-2. 精确文本检索使用 `rg -F`，每个目标通过独立 `-e 'literal'` 传入；只有确需正则语义时才使用正则，不把多个含引号目标拼成双引号包裹的 alternation。
-3. 构建/测试与证据检索分开执行，避免后置检索的退出码覆盖已成功门禁；需要顺序短路时显式检查 `$LASTEXITCODE`。
-4. `regex parse error`、`Unexpected token`、`string is missing the terminator` 归类 `tool_invocation`。保留此前已成功步骤的客观证据，改用单引号或 `rg -F -e` 后只做一次最小复验，同时核对退出码与命中结果。
+1. 每个任务在首次使用外部工具时只探测一次能力和入口；先以 `git rev-parse --show-toplevel` 确认仓库根，再用 `Test-Path` 确认实际脚本或包目录。探测失败后不得继续假设入口存在。
+2. 精确文本检索使用 `rg -F`，每个目标通过独立 `-e 'literal'` 传入。搜索 Git 已跟踪文件时，先探测 `Get-Command rg -ErrorAction SilentlyContinue`：可用则执行 `rg -n -F -e 'literal'`；不可用则执行 `git grep -n -F -e 'literal' -- <pathspec>`。仅搜索未跟踪或仓库外文件时，对明确目录使用 `Get-ChildItem -LiteralPath ... | Select-String -SimpleMatch`，不得扩大到禁止扫描目录。无命中与工具调用失败必须按退出码区分。
+3. 不假设仓库根存在 `package.json`。前端命令从根目录使用 `pnpm --dir frontend-admin-v2 <command>`，执行前确认 `frontend-admin-v2/package.json`；后端命令在 `backend` 目录调用 `& .\mvnw.cmd`。逗号分隔的 Maven 属性必须作为单一参数传入，例如 `& .\mvnw.cmd '-Dtest=A,B,C' test`。
+4. Compose 从仓库根显式传入 `--env-file deploy/.env -f deploy/docker-compose.dev.yml`；遗漏 env 文件或工作目录错误归 `tool_invocation`，本地 env 缺必需键归 `tool_config`，Docker 服务未就绪归 `environment_prerequisite`。配置与凭据处理按 `docs/standards/10-部署运维手册.md` 和 `docs/standards/11-安全规范.md`，不得编造或输出密钥。
+5. PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号；`\"` 不会转义 PowerShell 双引号。包含双引号的检索表达式必须使用 PowerShell 单引号字面量。多行只读 SQL 使用单引号 here-string，经标准输入或原生参数数组传递，不把 SQL 拼入双引号 shell 命令。例如仅在获准的 local/dev/test/demo 容器执行：
+
+```powershell
+$sql = @'
+SELECT 1;
+'@
+$sql | docker exec -i cgc-pms-mysql-dev sh -c 'exec mysql --batch --raw -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+if ($LASTEXITCODE -ne 0) { throw "只读 SQL 执行失败，exit=$LASTEXITCODE" }
+```
+
+6. 构建/测试与证据检索分开执行，避免后置检索的退出码覆盖已成功门禁；需要顺序短路时显式检查 `$LASTEXITCODE`。
+7. `regex parse error`、`Unexpected token`、`string is missing the terminator`、错误工作目录和错误参数绑定归类 `tool_invocation`。保留此前已成功步骤的客观证据，修正调用后只做一次最小复验，同时核对退出码与命中结果，不扩大等价验证范围。
 
 ## CI 分诊
 

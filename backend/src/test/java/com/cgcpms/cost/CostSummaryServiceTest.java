@@ -23,6 +23,7 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +74,9 @@ class CostSummaryServiceTest {
     @Autowired
     private CtContractMapper contractMapper;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private Long testProjectId;
 
     @BeforeEach
@@ -111,17 +115,21 @@ class CostSummaryServiceTest {
         costItemMapper.deleteById(80004L);
         costItemMapper.deleteById(80005L);
         costItemMapper.deleteById(80006L);
+        costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, 80005L);
+        jdbc.update("DELETE FROM cost_forecast_item WHERE tenant_id=? AND project_id=?", TENANT_ID, 80005L);
+        jdbc.update("DELETE FROM cost_forecast WHERE tenant_id=? AND project_id=?", TENANT_ID, 80005L);
+        jdbc.update("DELETE FROM cost_target WHERE tenant_id=? AND project_id=?", TENANT_ID, 80005L);
         costSubjectMapper.deleteById(80001L);
         costSubjectMapper.deleteById(80002L);
         costSubjectMapper.deleteById(80003L);
         costSubjectMapper.deleteById(80004L);
+        costSubjectMapper.deleteById(80005L);
         payRecordMapper.deleteById(80001L);
         payRecordMapper.deleteById(80002L);
         payRecordMapper.deleteById(80003L);
         payApplicationMapper.deleteById(80001L);
         payApplicationMapper.deleteById(80003L);
         contractMapper.deleteById(80005L);
-        costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, 80005L);
         projectMapper.deleteById(80005L);
         TestUserContext.clear();
     }
@@ -615,6 +623,22 @@ class CostSummaryServiceTest {
         subject.setTenantId(TENANT_ID);
         costSubjectMapper.insert(subject);
 
+        CostSubject forecastOnlySubject = new CostSubject();
+        forecastOnlySubject.setId(80005L);
+        forecastOnlySubject.setSubjectName("仅预测科目");
+        forecastOnlySubject.setSubjectCode("FORECAST_ONLY");
+        forecastOnlySubject.setTenantId(TENANT_ID);
+        costSubjectMapper.insert(forecastOnlySubject);
+
+        jdbc.update("INSERT INTO cost_target(id,tenant_id,project_id,version_no,total_target_amount,is_active,approval_status,status) VALUES(?,?,?,'FORECAST-BASE',0,0,'APPROVED','ACTIVE')",
+                80005L, TENANT_ID, reportProjectId);
+        jdbc.update("INSERT INTO cost_forecast(id,tenant_id,project_id,cost_target_id,forecast_code,forecast_name,version_no,forecast_date,bid_cost_amount,target_cost_amount,responsibility_amount,committed_cost_amount,actual_cost_amount,estimated_remaining_amount,forecast_at_completion_amount,contract_income_amount,forecast_profit_amount,cost_variance_amount,profit_margin,status) VALUES(?,?,?,?,'FC-COST-SUM-REPORT','科目ETC回归',1,CURRENT_DATE,0,4000000,0,0,200000,300000,500000,5000000,4500000,0,0.9,'CONTROLLED')",
+                80005L, TENANT_ID, reportProjectId, 80005L);
+        jdbc.update("INSERT INTO cost_forecast_item(id,tenant_id,forecast_id,project_id,cost_subject_id,bid_cost_amount,target_cost_amount,responsibility_amount,committed_cost_amount,actual_cost_amount,estimated_remaining_amount,forecast_at_completion_amount,cost_variance_amount) VALUES(?,?,?,?,?,0,0,0,0,200000,100000,300000,0)",
+                80005L, TENANT_ID, 80005L, reportProjectId, 80004L);
+        jdbc.update("INSERT INTO cost_forecast_item(id,tenant_id,forecast_id,project_id,cost_subject_id,bid_cost_amount,target_cost_amount,responsibility_amount,committed_cost_amount,actual_cost_amount,estimated_remaining_amount,forecast_at_completion_amount,cost_variance_amount) VALUES(?,?,?,?,?,0,0,0,0,0,200000,200000,0)",
+                80006L, TENANT_ID, 80005L, reportProjectId, 80005L);
+
         CostItem materialCost = new CostItem();
         materialCost.setId(80005L);
         materialCost.setTenantId(TENANT_ID);
@@ -654,10 +678,23 @@ class CostSummaryServiceTest {
                 .orElseThrow();
         assertEquals(0, new BigDecimal("4000000.00").compareTo(new BigDecimal(subjectSummary.getTargetCost())));
         assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getActualCost())));
-        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getDynamicCost())));
-        assertEquals(0, new BigDecimal("4800000.00").compareTo(new BigDecimal(subjectSummary.getExpectedProfit())),
-                "科目 expectedProfit 应与项目级口径一致，按 contractIncome-dynamicCost 计算");
-        assertEquals(0, new BigDecimal("-3800000.00").compareTo(new BigDecimal(subjectSummary.getCostDeviation())));
+        assertEquals(0, new BigDecimal("100000.00").compareTo(new BigDecimal(subjectSummary.getEstimatedRemainingCost())));
+        assertEquals(0, new BigDecimal("300000.00").compareTo(new BigDecimal(subjectSummary.getDynamicCost())));
+        assertEquals(0, BigDecimal.ZERO.compareTo(new BigDecimal(subjectSummary.getContractIncome())),
+                "项目合同收入只能出现在项目汇总，不能复制到科目行");
+        assertEquals(0, BigDecimal.ZERO.compareTo(new BigDecimal(subjectSummary.getConfirmedRevenue())),
+                "项目确认收入只能出现在项目汇总，不能复制到科目行");
+        assertEquals(0, BigDecimal.ZERO.compareTo(new BigDecimal(subjectSummary.getExpectedProfit())),
+                "项目利润只能出现在项目汇总，不能复制到科目行");
+        assertEquals(0, BigDecimal.ZERO.compareTo(new BigDecimal(subjectSummary.getForecastProfit())),
+                "项目预测利润只能出现在项目汇总，不能复制到科目行");
+        assertEquals(0, new BigDecimal("-3700000.00").compareTo(new BigDecimal(subjectSummary.getCostDeviation())));
+        CostSummaryVO forecastOnlySummary = result.getSubjects().stream()
+                .filter(s -> "仅预测科目".equals(s.getCostSubjectName()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(forecastOnlySummary.getEstimatedRemainingCost())));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(forecastOnlySummary.getDynamicCost())));
     }
 
     @Test

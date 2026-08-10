@@ -343,7 +343,7 @@ public class ProjectCloseoutService {
         BigDecimal retention = decimal(settlement.get("retention_amount"));
         if (retention.signum() <= 0)
             throw error("CLOSEOUT_RETENTION_REQUIRED", "竣工结算必须形成可追溯的质保金应收");
-        Integer regularCount = jdbc.queryForObject("SELECT COUNT(*) FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND receivable_type='REGULAR' AND deleted_flag=0",
+        Integer regularCount = jdbc.queryForObject("SELECT COUNT(*) FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND receivable_type='PROGRESS' AND deleted_flag=0",
                 Integer.class, tenant(), command.ownerSettlementId());
         Integer retentionCount = jdbc.queryForObject("SELECT COUNT(*) FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND receivable_type='RETENTION' AND deleted_flag=0",
                 Integer.class, tenant(), command.ownerSettlementId());
@@ -366,7 +366,7 @@ public class ProjectCloseoutService {
         Long settlementId = longValue(closeout.get("final_owner_settlement_id"));
         Map<String, Object> totals = jdbc.queryForMap("""
                 SELECT COALESCE(SUM(original_amount),0) original_amount,COALESCE(SUM(outstanding_amount),0) outstanding_amount
-                FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND receivable_type='REGULAR' AND deleted_flag=0
+                FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND receivable_type='PROGRESS' AND deleted_flag=0
                 """, tenant(), settlementId);
         BigDecimal original = decimal(totals.get("original_amount"));
         if (original.signum() <= 0 || decimal(totals.get("outstanding_amount")).signum() != 0)
@@ -375,7 +375,7 @@ public class ProjectCloseoutService {
                 SELECT COALESCE(SUM(a.allocated_amount),0) FROM collection_allocation a
                 JOIN collection_record c ON c.id=a.collection_id
                 JOIN account_receivable r ON r.id=a.receivable_id
-                WHERE a.tenant_id=? AND r.settlement_id=? AND r.receivable_type='REGULAR'
+                WHERE a.tenant_id=? AND r.settlement_id=? AND r.receivable_type='PROGRESS'
                  AND c.status='SUCCESS' AND c.deleted_flag=0 AND r.deleted_flag=0
                 """, BigDecimal.class, tenant(), settlementId);
         if (allocated == null || allocated.compareTo(original) < 0)
@@ -384,7 +384,7 @@ public class ProjectCloseoutService {
                 SELECT COALESCE(SUM(a.allocated_amount),0) FROM collection_allocation a
                 JOIN collection_record c ON c.id=a.collection_id AND c.tenant_id=a.tenant_id
                 JOIN account_receivable r ON r.id=a.receivable_id AND r.tenant_id=a.tenant_id
-                WHERE a.tenant_id=? AND r.settlement_id=? AND r.receivable_type='REGULAR'
+                WHERE a.tenant_id=? AND r.settlement_id=? AND r.receivable_type='PROGRESS'
                   AND c.status='SUCCESS' AND c.deleted_flag=0 AND r.deleted_flag=0
                   AND EXISTS (SELECT 1 FROM cash_journal_entry j
                     WHERE j.tenant_id=c.tenant_id AND j.collection_record_id=c.id

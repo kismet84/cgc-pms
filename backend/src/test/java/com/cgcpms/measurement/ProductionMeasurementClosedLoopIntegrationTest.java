@@ -376,6 +376,12 @@ class ProductionMeasurementClosedLoopIntegrationTest {
 
     private void cleanup() {
         jdbc.update("DELETE FROM sys_file WHERE (business_type='PRODUCTION_MEASUREMENT' AND business_id IN(SELECT id FROM production_measurement WHERE project_id=?)) OR (business_type='OWNER_MEASUREMENT_SUBMISSION' AND business_id IN(SELECT id FROM owner_measurement_submission WHERE project_id=?)) OR (business_type='OWNER_SETTLEMENT' AND business_id IN(SELECT id FROM owner_settlement WHERE project_id=?))", PROJECT, PROJECT, PROJECT);
+        jdbc.update("DELETE FROM mandatory_audit_expectation WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM revenue_audit_event WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM accounting_entry_line WHERE entry_id IN(SELECT id FROM accounting_entry WHERE project_id=?)", PROJECT);
+        jdbc.update("UPDATE accounting_entry SET reversed_entry_id=NULL WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM accounting_entry WHERE project_id=? AND original_entry_id IS NOT NULL", PROJECT);
+        jdbc.update("DELETE FROM accounting_entry WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM account_receivable WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM owner_settlement WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM owner_measurement_review_line WHERE submission_id IN(SELECT id FROM owner_measurement_submission WHERE project_id=?)", PROJECT);

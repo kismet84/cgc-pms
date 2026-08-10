@@ -3,6 +3,8 @@ package com.cgcpms.revenue.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.strategy.OwnerSettlementEntryGenerationStrategy;
+import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -34,9 +36,36 @@ public class RevenueOperationsService {
     private final ProjectAccessChecker projectAccessChecker;
     private final AccountingPeriodGuard periodGuard;
     private final SysDictDataService sysDictDataService;
+    private final MandatoryAuditService mandatoryAuditService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSettlement(OwnerSettlementRequest request) {
+        if (request.revenueId() == null) {
+            throw error("OWNER_SETTLEMENT_SOURCE_REQUIRED", "人工业主结算必须关联已审批收入确认");
+        }
+        return createSettlement(request, null, null, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String,Object> createMeasurementSettlement(OwnerSettlementRequest request, Long measurementId,
+                                                           Long submissionId, BigDecimal reportedAmount,
+                                                           BigDecimal deductedAmount) {
+        Map<String,Object> source = one("""
+                SELECT s.id,m.id measurement_id,s.project_id,s.contract_id,s.status
+                  FROM owner_measurement_submission s
+                  JOIN production_measurement m ON m.id=s.measurement_id AND m.tenant_id=s.tenant_id
+                 WHERE s.id=? AND m.id=? AND s.tenant_id=?
+                """, submissionId, measurementId, tenant());
+        if (source == null || !"CONFIRMED".equals(source.get("status"))
+                || !Objects.equals(longValue(source.get("project_id")), request.projectId())
+                || !Objects.equals(longValue(source.get("contract_id")), request.contractId())) {
+            throw error("OWNER_SETTLEMENT_MEASUREMENT_SOURCE_INVALID", "业主结算计量来源不存在、未核定或上下文不一致");
+        }
+        return createSettlement(request, measurementId, submissionId, reportedAmount, deductedAmount);
+    }
+
+    private Map<String,Object> createSettlement(OwnerSettlementRequest request, Long measurementId, Long submissionId,
+                                                 BigDecimal reportedAmount, BigDecimal deductedAmount) {
         Map<String,Object> contract = requireRevenueContract(request.projectId(), request.contractId(), request.customerId());
         if (request.retentionAmount().compareTo(request.grossAmount()) > 0) {
             throw error("OWNER_SETTLEMENT_RETENTION_EXCEEDED", "保留金不能超过业主确认金额");
@@ -68,6 +97,14 @@ public class RevenueOperationsService {
                  request.settlementPeriod().trim(), request.settlementDate(), gross, money(request.taxAmount()), retention,
                  gross.subtract(retention), request.dueDate(), request.customerId(),
                 0, user(), user(), request.remark());
+        if (submissionId != null) {
+            jdbc.update("""
+                    UPDATE owner_settlement
+                       SET production_measurement_id=?,owner_submission_id=?,reported_amount=?,deducted_amount=?,
+                           formula_version='OWNER_CONFIRMED_MEASUREMENT_V1'
+                     WHERE id=? AND tenant_id=?
+                    """, measurementId, submissionId, money(reportedAmount), money(deductedAmount), id, tenant());
+        }
         return settlement(id);
     }
 
@@ -128,7 +165,13 @@ public class RevenueOperationsService {
                  FOR UPDATE
                 """, id, tenant());
         if (settlement == null) throw error("OWNER_SETTLEMENT_NOT_FOUND", "业主结算不存在");
-        if ("RECEIVABLE_CREATED".equals(settlement.get("status"))) return;
+        if ("RECEIVABLE_CREATED".equals(settlement.get("status"))) {
+            entryGenerator.generateEntry(OwnerSettlementEntryGenerationStrategy.SOURCE_TYPE, id,
+                    OwnerSettlementEntryGenerationStrategy.ENTRY_TYPE);
+            mandatoryAuditService.verifyRevenue("OWNER_SETTLEMENT_AR_CONFIRMED", "OWNER_SETTLEMENT", id,
+                    "RECEIVABLE_CREATED", ownerSettlementAuditPayload(settlement));
+            return;
+        }
         if (jdbc.update("UPDATE owner_settlement SET status='APPROVED',version=version+1 WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1) {
             throw error("OWNER_SETTLEMENT_APPROVAL_STATE_INVALID", "业主结算审批状态不正确");
         }
@@ -136,6 +179,9 @@ public class RevenueOperationsService {
         BigDecimal retention = decimal(settlement.get("retention_amount"));
         if (retention.signum() > 0) createReceivable(settlement, "RETENTION", retention, localDate(settlement.get("due_date")));
         jdbc.update("UPDATE owner_settlement SET status='RECEIVABLE_CREATED',version=version+1 WHERE id=? AND tenant_id=?", id, tenant());
+        entryGenerator.generateEntry(OwnerSettlementEntryGenerationStrategy.SOURCE_TYPE, id,
+                OwnerSettlementEntryGenerationStrategy.ENTRY_TYPE);
+        auditOwnerSettlementReceivable(settlement);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -153,26 +199,78 @@ public class RevenueOperationsService {
         if (total.signum() <= 0 || allocationTotal.compareTo(total) != 0) {
             throw error("SALES_INVOICE_ALLOCATION_UNBALANCED", "销项发票分配金额必须等于价税合计");
         }
-        validateAllocations(request.allocations(), request.projectId(), request.contractId(), request.customerId(), false);
+        validateInvoiceAllocations(request.allocations(), request.projectId(), request.contractId(), request.customerId());
         Long id = IdWorker.getId();
         try {
             jdbc.update("""
                     INSERT INTO sales_invoice(id,tenant_id,project_id,contract_id,customer_id,invoice_code,invoice_no,invoice_type,
                      invoice_date,amount_without_tax,tax_amount,total_amount,allocated_amount,status,verification_status,
                      attachment_count,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'FULLY_ALLOCATED','UNVERIFIED',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,'PENDING_EVIDENCE','UNVERIFIED',0,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                     """, id, tenant(), request.projectId(), request.contractId(), request.customerId(), request.invoiceCode(),
                     request.invoiceNo().trim(), invoiceType, request.invoiceDate(),
-                    money(request.amountWithoutTax()), money(request.taxAmount()), total, total,
-                    request.attachmentCount() == null ? 0 : request.attachmentCount(), user(), user(), request.remark());
-            for (AmountAllocation allocation : request.allocations()) {
-                jdbc.update("INSERT INTO sales_invoice_allocation(id,tenant_id,invoice_id,receivable_id,allocated_amount,created_by,created_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)",
-                        IdWorker.getId(), tenant(), id, allocation.receivableId(), money(allocation.amount()), user());
-            }
+                    money(request.amountWithoutTax()), money(request.taxAmount()), total,
+                    user(), user(), request.remark());
         } catch (DuplicateKeyException e) {
             throw error("SALES_INVOICE_DUPLICATE", "销项发票号码或应收分配重复");
         }
         return one("SELECT * FROM sales_invoice WHERE id=? AND tenant_id=?", id, tenant());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String,Object> confirmSalesInvoice(Long id, AllocationConfirmationRequest request) {
+        if (request.allocations() == null || request.allocations().isEmpty()) {
+            throw error("SALES_INVOICE_ALLOCATION_REQUIRED", "销项发票必须提供应收分配");
+        }
+        Map<String,Object> invoice = one("""
+                SELECT id,project_id,contract_id,customer_id,invoice_code,invoice_no,invoice_type,invoice_date,
+                       amount_without_tax,tax_amount,total_amount,allocated_amount,status,verification_status,
+                       attachment_count,version,remark
+                  FROM sales_invoice
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE
+                """,
+                id, tenant());
+        if (invoice == null) throw error("SALES_INVOICE_NOT_FOUND", "销项发票不存在");
+        projectAccessChecker.checkAccess(longValue(invoice.get("project_id")), "确认销项发票");
+        if (!"PENDING_EVIDENCE".equals(invoice.get("status"))) {
+            if (Set.of("FULLY_ALLOCATED", "ISSUED").contains(string(invoice.get("status")))) {
+                Map<String,Object> result = requireSameInvoiceConfirmation(invoice, request.allocations());
+                mandatoryAuditService.verifyRevenue("SALES_INVOICE_CONFIRMED", "SALES_INVOICE", id, "CONFIRMED",
+                        Map.of("totalAmount", decimal(invoice.get("total_amount"))));
+                return result;
+            }
+            throw error("SALES_INVOICE_CONFIRM_STATE_INVALID", "只有待证据销项发票可以确认");
+        }
+        int attachmentCount = cleanAttachmentCount("SALES_INVOICE", id,
+                List.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE"));
+        if (attachmentCount < 1) throw error("SALES_INVOICE_CLEAN_EVIDENCE_REQUIRED", "销项发票确认前必须上传扫描通过的发票文件");
+        BigDecimal total = decimal(invoice.get("total_amount"));
+        if (allocationTotal(request.allocations()).compareTo(total) != 0) {
+            throw error("SALES_INVOICE_ALLOCATION_UNBALANCED", "销项发票分配金额必须等于价税合计");
+        }
+        validateInvoiceAllocations(request.allocations(), longValue(invoice.get("project_id")),
+                longValue(invoice.get("contract_id")), longValue(invoice.get("customer_id")));
+        for (AmountAllocation allocation : request.allocations()) {
+            jdbc.update("INSERT INTO sales_invoice_allocation(id,tenant_id,invoice_id,receivable_id,allocated_amount,created_by,created_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)",
+                    IdWorker.getId(), tenant(), id, allocation.receivableId(), money(allocation.amount()), user());
+        }
+        if (jdbc.update("""
+                UPDATE sales_invoice
+                   SET allocated_amount=?,status='FULLY_ALLOCATED',attachment_count=?,version=version+1,
+                       updated_by=?,updated_at=CURRENT_TIMESTAMP
+                 WHERE id=? AND tenant_id=? AND status='PENDING_EVIDENCE'
+                """, total, attachmentCount, user(), id, tenant()) != 1) {
+            throw error("SALES_INVOICE_CONFIRM_CONFLICT", "销项发票已被并发确认");
+        }
+        mandatoryAuditService.revenue("SALES_INVOICE_CONFIRMED", "SALES_INVOICE", id,
+                longValue(invoice.get("project_id")), "CONFIRMED", Map.of("totalAmount", total));
+        return one("""
+                SELECT id,project_id,contract_id,customer_id,invoice_code,invoice_no,invoice_type,invoice_date,
+                       amount_without_tax,tax_amount,total_amount,allocated_amount,status,verification_status,
+                       attachment_count,version,remark
+                  FROM sales_invoice
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0
+                """, id, tenant());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -201,16 +299,11 @@ public class RevenueOperationsService {
                     INSERT INTO collection_record(id,tenant_id,project_id,contract_id,customer_id,fund_account_id,collection_code,
                      external_txn_no,collected_at,amount,allocated_amount,unallocated_amount,payer_name,status,attachment_count,
                      version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?, ?,?,?,?,?,?,'SUCCESS',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,0,?,?,'PENDING_EVIDENCE',0,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                     """, id, tenant(), request.projectId(), request.contractId(), request.customerId(), request.fundAccountId(),
-                    "CR-" + id, request.externalTxnNo().trim(), request.collectedAt(), amount, allocated,
-                    amount.subtract(allocated), request.payerName().trim(), request.attachmentCount() == null ? 0 : request.attachmentCount(),
+                    "CR-" + id, request.externalTxnNo().trim(), request.collectedAt(), amount, amount,
+                    request.payerName().trim(),
                     user(), user(), request.remark());
-            for (AmountAllocation allocation : allocations) {
-                applyCollectionAllocation(id, allocation);
-            }
-            insertCollectionJournal(id, request, amount);
-            entryGenerator.generateEntry("COLLECTION_RECORD", id, "COLLECTION");
         } catch (DuplicateKeyException e) {
             Map<String,Object> duplicate = one("SELECT * FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND deleted_flag=0",
                     tenant(), request.externalTxnNo().trim());
@@ -218,6 +311,65 @@ public class RevenueOperationsService {
             throw e;
         }
         return one("SELECT * FROM collection_record WHERE id=? AND tenant_id=?", id, tenant());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String,Object> confirmCollection(Long id, AllocationConfirmationRequest request) {
+        if (request.allocations() == null || request.allocations().isEmpty()) {
+            throw error("COLLECTION_ALLOCATION_REQUIRED", "回款确认必须提供应收分配");
+        }
+        Map<String,Object> collection = one("""
+                SELECT id,project_id,contract_id,customer_id,fund_account_id,collection_code,external_txn_no,
+                       collected_at,amount,allocated_amount,unallocated_amount,payer_name,status,
+                       attachment_count,version,remark
+                  FROM collection_record
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE
+                """,
+                id, tenant());
+        if (collection == null) throw error("COLLECTION_NOT_FOUND", "回款不存在");
+        projectAccessChecker.checkAccess(longValue(collection.get("project_id")), "确认回款");
+        if (!"PENDING_EVIDENCE".equals(collection.get("status"))) {
+            if ("SUCCESS".equals(collection.get("status"))) {
+                Map<String,Object> result = requireSameCollectionConfirmation(collection, request.allocations());
+                mandatoryAuditService.verifyRevenue("COLLECTION_CONFIRMED", "COLLECTION_RECORD", id, "CONFIRMED",
+                        Map.of("amount", decimal(collection.get("amount")),
+                                "allocatedAmount", allocationTotal(request.allocations())));
+                return result;
+            }
+            throw error("COLLECTION_CONFIRM_STATE_INVALID", "只有待证据回款可以确认");
+        }
+        int attachmentCount = cleanAttachmentCount("COLLECTION_RECORD", id, List.of("BANK_RECEIPT"));
+        if (attachmentCount < 1) throw error("COLLECTION_CLEAN_EVIDENCE_REQUIRED", "回款确认前必须上传扫描通过的银行回单");
+        Map<String,Object> account = one("SELECT id,enabled_flag FROM fund_account WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                collection.get("fund_account_id"), tenant());
+        if (account == null || intValue(account.get("enabled_flag")) != 1) {
+            throw error("COLLECTION_ACCOUNT_INVALID", "收款账户不存在或已停用");
+        }
+        BigDecimal amount = decimal(collection.get("amount"));
+        BigDecimal allocated = allocationTotal(request.allocations());
+        if (allocated.compareTo(amount) > 0) throw error("COLLECTION_ALLOCATION_EXCEEDED", "回款分配金额不能超过到账金额");
+        validateAllocations(request.allocations(), longValue(collection.get("project_id")),
+                longValue(collection.get("contract_id")), longValue(collection.get("customer_id")), true);
+        for (AmountAllocation allocation : request.allocations()) applyCollectionAllocation(id, allocation);
+        if (jdbc.update("""
+                UPDATE collection_record
+                   SET allocated_amount=?,unallocated_amount=?,status='SUCCESS',attachment_count=?,version=version+1,
+                       updated_by=?,updated_at=CURRENT_TIMESTAMP
+                 WHERE id=? AND tenant_id=? AND status='PENDING_EVIDENCE'
+                """, allocated, amount.subtract(allocated), attachmentCount, user(), id, tenant()) != 1) {
+            throw error("COLLECTION_CONFIRM_CONFLICT", "回款已被并发确认");
+        }
+        insertCollectionJournal(id, collection, amount);
+        entryGenerator.generateEntry("COLLECTION_RECORD", id, "COLLECTION");
+        mandatoryAuditService.revenue("COLLECTION_CONFIRMED", "COLLECTION_RECORD", id,
+                longValue(collection.get("project_id")), "CONFIRMED", Map.of("amount", amount, "allocatedAmount", allocated));
+        return one("""
+                SELECT id,project_id,contract_id,customer_id,fund_account_id,collection_code,external_txn_no,
+                       collected_at,amount,allocated_amount,unallocated_amount,payer_name,status,
+                       attachment_count,version,remark
+                  FROM collection_record
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0
+                """, id, tenant());
     }
 
     public List<Map<String,Object>> settlements(Long projectId, String status) {
@@ -428,6 +580,21 @@ public class RevenueOperationsService {
         }
     }
 
+    private void auditOwnerSettlementReceivable(Map<String,Object> settlement) {
+        Map<String,Object> payload = ownerSettlementAuditPayload(settlement);
+        mandatoryAuditService.revenue("OWNER_SETTLEMENT_AR_CONFIRMED", "OWNER_SETTLEMENT",
+                longValue(settlement.get("id")), longValue(settlement.get("project_id")),
+                "RECEIVABLE_CREATED", payload);
+    }
+
+    private Map<String,Object> ownerSettlementAuditPayload(Map<String,Object> settlement) {
+        Map<String,Object> payload = new LinkedHashMap<>();
+        payload.put("netReceivableAmount", decimal(settlement.get("net_receivable_amount")));
+        payload.put("retentionAmount", decimal(settlement.get("retention_amount")));
+        payload.put("dueDate", localDate(settlement.get("due_date")));
+        return payload;
+    }
+
     private void applyCollectionAllocation(Long collectionId, AmountAllocation allocation) {
         Map<String,Object> receivable = one("SELECT * FROM account_receivable WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", allocation.receivableId(), tenant());
         BigDecimal amount = money(allocation.amount());
@@ -441,16 +608,46 @@ public class RevenueOperationsService {
                 IdWorker.getId(), tenant(), collectionId, allocation.receivableId(), amount, user());
     }
 
-    private void insertCollectionJournal(Long id, CollectionRequest request, BigDecimal amount) {
-        periodGuard.assertWritable(request.collectedAt().toLocalDate());
+    private void insertCollectionJournal(Long id, Map<String,Object> collection, BigDecimal amount) {
+        LocalDateTime collectedAt = localDateTime(collection.get("collected_at"));
+        periodGuard.assertWritable(collectedAt.toLocalDate());
         jdbc.update("""
                 INSERT INTO cash_journal_entry(id,tenant_id,entry_no,account_id,direction,amount,business_date,counterparty_name,
                  summary,project_id,contract_id,source_type,source_id,collection_record_id,status,closure_due_at,version,
                  created_by,created_at,updated_by,updated_at,deleted_flag,remark)
                 VALUES(?,?,?,?, 'IN',?,?,?,?,?,?,'COLLECTION_RECORD',?,?,'PENDING_ARCHIVE',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                """, IdWorker.getId(), tenant(), "CJ-IN-" + id, request.fundAccountId(), amount,
-                request.collectedAt().toLocalDate(), request.payerName().trim(), "项目回款：" + request.externalTxnNo(),
-                request.projectId(), request.contractId(), id, id, request.collectedAt().plusHours(72), user(), user(), request.remark());
+                """, IdWorker.getId(), tenant(), "CJ-IN-" + id, collection.get("fund_account_id"), amount,
+                collectedAt.toLocalDate(), string(collection.get("payer_name")), "项目回款：" + collection.get("external_txn_no"),
+                collection.get("project_id"), collection.get("contract_id"), id, id, collectedAt.plusHours(72),
+                user(), user(), collection.get("remark"));
+    }
+
+    private void validateInvoiceAllocations(List<AmountAllocation> allocations, Long projectId,
+                                            Long contractId, Long customerId) {
+        Set<Long> ids = new HashSet<>();
+        for (AmountAllocation allocation : allocations) {
+            if (!ids.add(allocation.receivableId())) throw error("RECEIVABLE_ALLOCATION_DUPLICATE", "同一应收不能重复分配");
+            Map<String,Object> row = one("""
+                    SELECT r.project_id,r.contract_id,r.customer_id,r.original_amount,
+                           COALESCE((SELECT SUM(a.allocated_amount)
+                                       FROM sales_invoice_allocation a
+                                       JOIN sales_invoice i ON i.id=a.invoice_id AND i.tenant_id=a.tenant_id
+                                      WHERE a.tenant_id=r.tenant_id AND a.receivable_id=r.id
+                                        AND i.deleted_flag=0 AND i.status<>'REJECTED'),0) invoiced_amount
+                      FROM account_receivable r
+                     WHERE r.id=? AND r.tenant_id=? AND r.deleted_flag=0
+                     FOR UPDATE
+                    """, allocation.receivableId(), tenant());
+            if (row == null || !Objects.equals(longValue(row.get("project_id")), projectId)
+                    || !Objects.equals(longValue(row.get("contract_id")), contractId)
+                    || !Objects.equals(longValue(row.get("customer_id")), customerId)) {
+                throw error("RECEIVABLE_CONTEXT_MISMATCH", "应收不属于同一项目、合同或客户");
+            }
+            BigDecimal available = decimal(row.get("original_amount")).subtract(decimal(row.get("invoiced_amount")));
+            if (money(allocation.amount()).compareTo(available) > 0) {
+                throw error("SALES_INVOICE_RECEIVABLE_EXCEEDED", "销项发票累计分配超过应收原值");
+            }
+        }
     }
 
     private void validateAllocations(List<AmountAllocation> allocations, Long projectId, Long contractId, Long customerId, boolean lock) {
@@ -485,15 +682,16 @@ public class RevenueOperationsService {
                  WHERE tenant_id=? AND collection_id=?
                  ORDER BY receivable_id
                 """, tenant(), longValue(existing.get("id")));
+        boolean pending = "PENDING_EVIDENCE".equals(existing.get("status"));
         boolean same = Objects.equals(longValue(existing.get("project_id")), request.projectId())
                 && Objects.equals(longValue(existing.get("contract_id")), request.contractId())
                 && Objects.equals(longValue(existing.get("customer_id")), request.customerId())
                 && Objects.equals(longValue(existing.get("fund_account_id")), request.fundAccountId())
                 && money(decimal(existing.get("amount"))).compareTo(money(request.amount())) == 0
-                && money(decimal(existing.get("allocated_amount"))).compareTo(allocationTotal(requestedAllocations)) == 0
                 && Objects.equals(string(existing.get("payer_name")), request.payerName().trim())
-                && stored.size() == requested.size();
-        if (same) {
+                && (pending || money(decimal(existing.get("allocated_amount"))).compareTo(allocationTotal(requestedAllocations)) == 0)
+                && (pending || stored.size() == requested.size());
+        if (same && !pending) {
             for (Map<String,Object> row : stored) {
                 BigDecimal expected = requested.get(longValue(row.get("receivable_id")));
                 if (expected == null || expected.compareTo(money(decimal(row.get("allocated_amount")))) != 0) {
@@ -506,6 +704,37 @@ public class RevenueOperationsService {
             throw error("COLLECTION_IDEMPOTENCY_CONFLICT", "银行流水号已被不同回款事实使用");
         }
         return existing;
+    }
+
+    private Map<String,Object> requireSameInvoiceConfirmation(Map<String,Object> invoice,
+                                                              List<AmountAllocation> allocations) {
+        if (!sameStoredAllocations("sales_invoice_allocation", "invoice_id", longValue(invoice.get("id")), allocations)) {
+            throw error("SALES_INVOICE_CONFIRM_IDEMPOTENCY_CONFLICT", "销项发票已按不同应收分配确认");
+        }
+        return invoice;
+    }
+
+    private Map<String,Object> requireSameCollectionConfirmation(Map<String,Object> collection,
+                                                                 List<AmountAllocation> allocations) {
+        if (!sameStoredAllocations("collection_allocation", "collection_id", longValue(collection.get("id")), allocations)) {
+            throw error("COLLECTION_CONFIRM_IDEMPOTENCY_CONFLICT", "回款已按不同应收分配确认");
+        }
+        return collection;
+    }
+
+    private boolean sameStoredAllocations(String table, String ownerColumn, Long ownerId,
+                                          List<AmountAllocation> allocations) {
+        Map<Long,BigDecimal> requested = new HashMap<>();
+        for (AmountAllocation allocation : allocations) {
+            if (requested.put(allocation.receivableId(), money(allocation.amount())) != null) return false;
+        }
+        List<Map<String,Object>> stored = jdbc.queryForList("SELECT receivable_id,allocated_amount FROM " + table
+                + " WHERE tenant_id=? AND " + ownerColumn + "=? ORDER BY receivable_id", tenant(), ownerId);
+        if (stored.size() != requested.size()) return false;
+        return stored.stream().allMatch(row -> {
+            BigDecimal expected = requested.get(longValue(row.get("receivable_id")));
+            return expected != null && expected.compareTo(decimal(row.get("allocated_amount"))) == 0;
+        });
     }
 
     private Map<String,Object> requireRevenueContract(Long projectId, Long contractId, Long customerId) {
@@ -554,6 +783,19 @@ public class RevenueOperationsService {
                        AND f.business_id=(SELECT s.owner_submission_id FROM owner_settlement s
                                           WHERE s.id=? AND s.tenant_id=? AND s.deleted_flag=0)))
                 """, Integer.class, tenant(), settlementId, settlementId, tenant());
+        return count == null ? 0 : count;
+    }
+
+    private int cleanAttachmentCount(String businessType, Long businessId, List<String> documentTypes) {
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenant());
+        parameters.add(businessType);
+        parameters.add(businessId);
+        parameters.addAll(documentTypes);
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sys_file WHERE tenant_id=? AND business_type=?"
+                        + " AND business_id=? AND deleted_flag=0 AND virus_scan_status='CLEAN' AND document_type IN ("
+                        + placeholders(documentTypes.size()) + ")",
+                Integer.class, parameters.toArray());
         return count == null ? 0 : count;
     }
 
@@ -607,6 +849,11 @@ public class RevenueOperationsService {
         if (value instanceof LocalDate date) return date;
         if (value instanceof java.sql.Date date) return date.toLocalDate();
         return LocalDate.parse(value.toString());
+    }
+    private LocalDateTime localDateTime(Object value) {
+        if (value instanceof LocalDateTime dateTime) return dateTime;
+        if (value instanceof java.sql.Timestamp timestamp) return timestamp.toLocalDateTime();
+        return LocalDateTime.parse(value.toString().replace(' ', 'T'));
     }
     private BusinessException error(String code, String message) { return new BusinessException(code, message); }
     private String placeholders(int count) { return String.join(",", Collections.nCopies(count, "?")); }

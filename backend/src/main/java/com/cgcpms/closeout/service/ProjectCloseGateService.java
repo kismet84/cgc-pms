@@ -73,6 +73,36 @@ public class ProjectCloseGateService {
                 WHERE s.tenant_id=? AND w.project_id=? AND s.available_qty>0
                   AND s.deleted_flag=0 AND w.deleted_flag=0
                 """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_DRAWING_NOT_APPROVED", "TECHNICAL", "当前施工图版本尚未批准", """
+                SELECT d.id biz_id FROM tech_drawing d
+                WHERE d.tenant_id=? AND d.project_id=? AND d.status='ACTIVE' AND d.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM tech_drawing_version v
+                    WHERE v.tenant_id=d.tenant_id AND v.id=d.current_version_id AND v.drawing_id=d.id
+                      AND v.status='APPROVED' AND v.deleted_flag=0)
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_RFI_OPEN", "TECHNICAL", "当前施工图版本仍有未关闭RFI", """
+                SELECT r.id biz_id FROM tech_rfi r JOIN tech_drawing d
+                  ON d.tenant_id=r.tenant_id AND d.project_id=r.project_id
+                 AND d.current_version_id=r.drawing_version_id AND d.status='ACTIVE' AND d.deleted_flag=0
+                WHERE r.tenant_id=? AND r.project_id=? AND r.status NOT IN ('CLOSED','CANCELLED') AND r.deleted_flag=0
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_DISCLOSURE_UNCONFIRMED", "TECHNICAL", "当前批准施工图版本仍有未确认技术交底", """
+                SELECT x.id biz_id FROM tech_disclosure x JOIN tech_drawing d
+                  ON d.tenant_id=x.tenant_id AND d.project_id=x.project_id
+                 AND d.current_version_id=x.drawing_version_id AND d.status='ACTIVE' AND d.deleted_flag=0
+                JOIN tech_drawing_version v
+                  ON v.tenant_id=d.tenant_id AND v.id=d.current_version_id AND v.status='APPROVED' AND v.deleted_flag=0
+                WHERE x.tenant_id=? AND x.project_id=? AND x.status<>'CONFIRMED' AND x.deleted_flag=0
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_REFERENCE_NOT_ARCHIVED", "TECHNICAL", "施工引用尚未形成已归档验收记录", """
+                SELECT r.id biz_id FROM tech_construction_reference r JOIN tech_drawing d
+                  ON d.tenant_id=r.tenant_id AND d.project_id=r.project_id
+                 AND d.current_version_id=r.drawing_version_id AND d.status='ACTIVE' AND d.deleted_flag=0
+                WHERE r.tenant_id=? AND r.project_id=? AND r.status='RECORDED' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM tech_acceptance_archive a
+                    WHERE a.tenant_id=r.tenant_id AND a.construction_reference_id=r.id
+                      AND a.status='ARCHIVED' AND a.deleted_flag=0)
+                """, tenant(), projectId);
         addRows(blockers, "CONSTRUCTION_WORKFLOW_RUNNING", "WORKFLOW", "仍有运行中审批流程", """
                 SELECT id biz_id FROM wf_instance WHERE tenant_id=? AND project_id=? AND instance_status='RUNNING'
                 """, tenant(), projectId);
@@ -95,7 +125,7 @@ public class ProjectCloseGateService {
         addRows(blockers, "WARRANTY_TAIL_RECEIVABLE_OPEN", "RECEIVABLE", "竣工尾款尚未全部回收", """
                 SELECT r.id biz_id FROM account_receivable r JOIN project_closeout c
                   ON c.tenant_id=r.tenant_id AND c.final_owner_settlement_id=r.settlement_id
-                WHERE r.tenant_id=? AND c.id=? AND r.receivable_type='REGULAR'
+                WHERE r.tenant_id=? AND c.id=? AND r.receivable_type='PROGRESS'
                   AND r.outstanding_amount>0 AND r.deleted_flag=0
                 """, tenant(), closeoutId);
         addRows(blockers, "WARRANTY_TAIL_CASH_NOT_ARCHIVED", "CASH_JOURNAL", "尾款收款缺少有效已归档现金日记账", """
@@ -103,7 +133,7 @@ public class ProjectCloseGateService {
                   ON a.tenant_id=c.tenant_id AND a.collection_id=c.id
                 JOIN account_receivable r ON r.tenant_id=a.tenant_id AND r.id=a.receivable_id
                 JOIN project_closeout p ON p.tenant_id=r.tenant_id AND p.final_owner_settlement_id=r.settlement_id
-                WHERE c.tenant_id=? AND p.id=? AND r.receivable_type='REGULAR'
+                WHERE c.tenant_id=? AND p.id=? AND r.receivable_type='PROGRESS'
                   AND c.status='SUCCESS' AND c.deleted_flag=0 AND r.deleted_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cash_journal_entry j
                     WHERE j.tenant_id=c.tenant_id AND j.collection_record_id=c.id

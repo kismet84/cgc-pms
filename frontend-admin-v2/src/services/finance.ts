@@ -15,6 +15,7 @@ import {
   type PaymentApplicationBasisRecord,
   type PaymentApplicationSourceRecord,
   type PayRecordOptionPage,
+  type ContractRevenuePage,
   type RevenueQuery,
   type RevenueRecord,
   type OwnerSettlementRecord,
@@ -215,6 +216,18 @@ export const reopenFinancePeriod = (year: number, month: number, reason: string)
 
 export const loadRevenueSettlements = (query: RevenueQuery = {}, signal?: AbortSignal) =>
   apiRequest<OwnerSettlementRecord[]>(withQuery(FINANCE_API.revenueSettlements, query), { signal })
+export const loadApprovedContractRevenues = (
+  projectId: string,
+  contractId: string,
+  signal?: AbortSignal,
+) =>
+  apiRequest<ContractRevenuePage>(
+    withQuery(FINANCE_API.contractRevenues, {
+      projectId,
+      contractId,
+    }),
+    { signal },
+  )
 export const loadReceivables = (query: RevenueQuery = {}, signal?: AbortSignal) =>
   apiRequest<ReceivableRecord[]>(withQuery(FINANCE_API.revenueReceivables, query), { signal })
 export const loadSalesInvoices = (query: RevenueQuery = {}, signal?: AbortSignal) =>
@@ -229,8 +242,21 @@ export const submitOwnerSettlement = (id: string) =>
   })
 export const createSalesInvoice = (body: SalesInvoiceCommand) =>
   apiRequest<SalesInvoiceRecord>(FINANCE_API.revenueSalesInvoices, { method: 'POST', body })
+export const confirmSalesInvoice = (id: string, allocations: SalesInvoiceCommand['allocations']) =>
+  apiRequest<SalesInvoiceRecord>(`${FINANCE_API.revenueSalesInvoices}/${requiredId(id)}/confirm`, {
+    method: 'POST',
+    body: { allocations },
+  })
 export const createCollection = (body: CollectionCommand) =>
   apiRequest<CollectionRecord>(FINANCE_API.revenueCollections, { method: 'POST', body })
+export const confirmCollection = (
+  id: string,
+  allocations: NonNullable<CollectionCommand['allocations']>,
+) =>
+  apiRequest<CollectionRecord>(`${FINANCE_API.revenueCollections}/${requiredId(id)}/confirm`, {
+    method: 'POST',
+    body: { allocations },
+  })
 export const creditReceivable = (
   id: string,
   amount: string,
