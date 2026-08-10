@@ -298,7 +298,7 @@ public class CtContractService {
         CtContract contract = ctContractMapper.selectOne(new LambdaQueryWrapper<CtContract>()
                 .eq(CtContract::getId, contractId)
                 .eq(CtContract::getTenantId, UserContext.getCurrentTenantId())
-                .last("FOR UPDATE"));
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         if (contract == null) throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         projectAccessChecker.checkAccess(contract.getProjectId(), "结清合同履约");
         ensureClientVersionMatches(clientVersion, contract.getVersion());

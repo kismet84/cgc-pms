@@ -1,7 +1,7 @@
 {
-  "current_commit": "d95f2236f3a3306c0a31e39bac12fdd9082a825a",
+  "current_commit": "e503555f10edd87fd6e5706748c7726f60b946e8",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-10T08:10:38.313Z",
+  "generation_time": "2026-08-10T08:31:33.295Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -59,7 +59,7 @@
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "documentation"
+      "backend"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -80,7 +80,7 @@
         "backend/**"
       ],
       "file_count": 1811,
-      "fingerprint": "02dbe4d740476f3fd4744707ee40b2f7c201277e676fc82877d2110b6aa053cf"
+      "fingerprint": "dfcaf1af1a07f9a7a49fdb73f6dc5495f3cc0131a38d6d5ef41ae861231c06f1"
     },
     {
       "id": "delivery_tooling",
