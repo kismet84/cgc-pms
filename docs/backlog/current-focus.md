@@ -1,21 +1,23 @@
 # Current Focus
 
-## 2026-08-11 第88条主线：Codex 提效与遗弃、重复、未完成工作已本地收口
+## 2026-08-11 第88条主线：Codex 提效与遗弃、重复、未完成工作已合并并完成 post-merge
 
 - 目标：降低日常 Codex 成本和默认权限，关闭同名 Skill、过密派工、迁移/CI 缺口、死页、占位通知渠道、PDF spike 与治理资产漂移。
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED / DELIVERY_IN_PROGRESS`；唯一载体为[`第88条主线计划`](../plans/第88条主线-Codex操作提效与遗弃重复未完成工作收口任务计划书.md)。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；唯一载体为[`第88条主线计划`](../plans/第88条主线-Codex操作提效与遗弃重复未完成工作收口任务计划书.md)。
 - 结果：C1～C6、R1～R8 均已实施或有据关闭；V292 H2/MySQL 对称迁移、Flyway fail-close、前端兼容删除、IN_APP 单渠道和正式 PDF 契约完成。
 - 证据：后端迁移/PDF 35、通知 75、MySQL fresh smoke 1；前端全量 506；workflow 14、long-task 15、控制面 12 组、浏览器兼容/403/404/console 与 Codemap 均通过。
+- Git：源 SHA `8167830fd4220a418debab9304e02d48678973a3` 的 Push CI `31413245480`、Pre-PR verifier 与 PR #428 独立 CI `31414270325` 通过；合并 SHA `cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6`，post-merge run `31415288851` 成功。
 - 边界：仅本地 dev/test/demo 与受保护 Git 交付；两个活跃 worktree、两套不等价 restart 入口和受保护目录保持不动。
 - 零悬空：正式 Issue 新增0、关闭0、净变化`0`；删除零引用资产2个，证据不足建议不建 Issue，无无载体遗留项。
 
-## 2026-08-10 第87条主线：治理文档与控制面契约统一整改已本地完成
+## 2026-08-10 第87条主线：治理文档与控制面契约统一整改已合并并完成 post-merge
 
 - 目标：关闭根授权、local-only、失败分类、前端事实、运行等待、AutoPilot Git、long-task CI 和项目地图历史边界八组漂移。
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED / UNIFIED_WITH_MAINLINE_88 / CONTROL_PLANE_CANARY_REQUIRED`；唯一载体为[`第87条主线计划`](../plans/第87条主线-治理文档与控制面契约统一整改任务计划书.md)。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED / UNIFIED_WITH_MAINLINE_88 / CONTROL_PLANE_CANARY_REQUIRED`；唯一载体为[`第87条主线计划`](../plans/第87条主线-治理文档与控制面契约统一整改任务计划书.md)。
 - 架构：复用现有 Skill、配置、脚本、Issue JSON 和 policy suite；不新增治理框架、required context 或第三方依赖。
 - 边界：仅本地文档/控制面整改和受保护 Git 交付；不授权生产、目标环境、强推、保护绕过、Tag 或 Release。
 - 证据：HighRisk policy suite 7/7、控制面关键测试、long-task 15/15、workflow、链接、JSON、Codemap 和 diff 检查通过；新指纹进入 N>1 或无界运行前须显式 `启动迭代-1`。
+- Git：与第88条统一经 PR #428 交付；合并 SHA `cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6`，post-merge run `31415288851` 成功。
 - 零悬空：八组发现全部修复；最终复核四处同范围遗漏全部关闭。新增后续项0、关闭后续项0、净变化`0`，无无载体遗留项。
 
 ## 2026-08-10 第86条主线：全仓业务闭环权限、状态与事实一致性整改已合并

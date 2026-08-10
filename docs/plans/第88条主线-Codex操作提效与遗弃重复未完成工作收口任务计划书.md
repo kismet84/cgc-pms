@@ -3,11 +3,11 @@
 **Goal:** 将两次只读审计中的可执行发现合并为一个无重复、可分阶段验收的实施载体：降低 Codex 日常上下文和推理成本，消除同名 Skill 与过密子智能体策略，补齐迁移和 CI 门禁，删除已证实的死代码与占位实现，并关闭治理资产漂移。 **Architecture:** 复用现有 Codex 配置、根/项目 `AGENTS.md`、项目运行态 Skill、Flyway、现有 CI jobs、现有前后端测试和 Codemap；先保护主线87脏工作区，再按“用户级配置 → 治理载体 → 数据与门禁 → 前端去冗余 → 通知与 PDF 测试 → 正式收口”推进。不新增 Skill、依赖、守护进程、状态库、CI job 或平行工具层，不改生产或目标环境。
 
 > 编制日期：2026-08-10
-> 计划状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED / DELIVERY_IN_PROGRESS`
+> 计划状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`
 > 唯一载体：本计划；两项来源任务只作审计输入，不再另建重复 Backlog
 > 来源：两次只读审计输入
 > 当前代码基线：`master@28ca2aef30f876deb8120b858fea9d248ff08528`
-> 当前工作区：主线87与88已在统一交付分支 `codex/mainline-87-88-closeout` 收口；既有差异均逐项保留并纳入本次验证
+> 交付结果：主线87与88由统一源 SHA `8167830fd4220a418debab9304e02d48678973a3` 经 PR #428 合并为 `master@cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6`
 > 并行工作树：`codex/mainline-82-83-remediation@c9e999b4`、`codex/recovery-side-ci-tier-20260809@fa7a549f`，均未取得清理裁决
 > 开放 PR：`0`；这不等于现有 worktree 或脏改动可删除
 > 环境：仅本地 dev/test/demo；生产、目标环境、生产数据库和非本地验收均不适用
@@ -69,7 +69,7 @@
 | G2 数据与迁移 | fresh H2/MySQL V292 通过；本地 demo 库非 IN_APP 订阅、渠道和发送历史只读统计均为 0 | `PASS` | 有非 IN_APP 记录且无授权时，只阻塞 R5，不阻塞其他独立阶段 |
 | G3 实现闭环 | 用户级配置、治理、迁移/门禁、前端、通知和 PDF 均按最小方案完成；未新增框架、依赖或状态源 | `PASS` | 回到对应阶段，修根因 |
 | G4 本地运行态与验证 | 新 Codex 会话、后端、前端、CI 契约、Codemap 和本地浏览器均通过 | `PASS` | 按统一失败分类处理，不以页面可达代替主线通过 |
-| G5 正式收口 | 当前 diff、风险、回滚、计划/状态回写、独立终审和零悬空统计齐全；受保护 Git 交付已获授权 | `PASS_LOCAL / GIT_IN_PROGRESS` | 保持未完成；不得声明已交付或已上线 |
+| G5 正式收口 | 当前 diff、风险、回滚、计划/状态回写、独立终审和零悬空统计齐全；同 SHA Push CI、Pre-PR、独立 PR CI、合并与 post-merge 证据完整 | `PASS / GIT_MERGED / POST_MERGE_VERIFIED` | 任一远端证据缺失则保持未完成；不得声明已交付或已上线 |
 
 ## 4. 实施阶段
 
@@ -187,7 +187,7 @@
 
 ## 7. 最终验收清单
 
-- [x] G0～G5 依次有当前本地事实证据；远端交付进行中且仅按实际结果声明。
+- [x] G0～G5 依次有当前事实证据；受保护 Git 交付与 post-merge 已按实际结果完成。
 - [x] 日常 Codex 默认 medium、非全局 priority、非默认 Ponytail；权限只在明确受信项目放宽。
 - [x] 单路任务默认 0 个子智能体；双路/高风险任务不超过计划上限；不新增 Skill。
 - [x] 项目运行态 Skill 唯一；稳定 `rg` 已安装到用户 PATH 且无版本哈希；当前 Codex 宿主重启后刷新继承环境。
@@ -236,3 +236,4 @@
 - R7～R8：删除两个零引用资产；第66条历史阻塞关闭；旧计划状态校准；两套不等价 restart 入口与两个活跃 worktree 均保留。既有产品情报三文件由本轮统一承接，官方引用和本地链接已复核。PR #421/#422 的补丁等价、无占用旧分支已删除本地与远端引用。
 - 验证：后端迁移/PDF `35/35`、通知 `75/75`、MySQL fresh smoke `1/1`；前端 focused `66/66`、全量 `506/506`、type-check/build/route-ledger/bundle/边界门禁通过；long-task `15/15`、workflow `14/14`、控制面 12 组及 policy `7/7` 通过；浏览器 403/404、兼容路由和控制台通过。
 - 已处理阻塞：共享 Maven target 竞态、V292 后历史断言漂移、PowerShell 变量插值、旧子智能体策略断言和长 runner 超时均按失败分类修正或串行复验；未放宽生产逻辑或门禁。
+- Git：源 SHA `8167830fd4220a418debab9304e02d48678973a3` 的 Push CI `31413245480` 与 Pre-PR verifier 通过；PR #428 独立 CI `31414270325` 通过并 squash 合并为 `cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6`；post-merge run `31415288851` 成功。
