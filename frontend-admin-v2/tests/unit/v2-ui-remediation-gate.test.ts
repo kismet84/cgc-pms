@@ -83,11 +83,7 @@ describe('全 V2 UI 整改门禁', () => {
       const source = read(path)
       const template = templateOf(source)
       const name = pageName(path)
-      const nativeH1Exceptions = new Set([
-        'auth/LoginPage.vue',
-        'auth/SessionPage.vue',
-        'HealthPage.vue',
-      ])
+      const nativeH1Exceptions = new Set(['auth/LoginPage.vue', 'HealthPage.vue'])
 
       if (/<h1\b[^>]*\bv2-visually-hidden\b/.test(template)) {
         violations.push(`${name}: page H1 must remain visible`)
@@ -177,10 +173,9 @@ describe('全 V2 UI 整改门禁', () => {
     expect(violations).toEqual([])
   })
 
-  it('keeps one shell main landmark and a primary heading on the session page', () => {
+  it('keeps one shell main landmark', () => {
     const standaloneMainPages = new Set([
       'auth/LoginPage.vue',
-      'auth/SessionPage.vue',
       'errors/GlobalErrorPage.vue',
       'HealthPage.vue',
     ])
@@ -190,9 +185,6 @@ describe('全 V2 UI 整改门禁', () => {
       if (standaloneMainPages.has(name)) continue
       expect(templateOf(read(path)), `${name} nested shell main`).not.toMatch(/<main\b/)
     }
-
-    const session = read(resolve(pageRoot, 'auth/SessionPage.vue'))
-    expect(templateOf(session)).toMatch(/<h1>安全会话已恢复<\/h1>/)
   })
 
   it('keeps the 10px shell content inset on workflow routes', () => {
@@ -546,7 +538,6 @@ describe('全 V2 UI 整改门禁', () => {
   it('keeps current browser-comment remediations behind static gates', () => {
     const supplier = read(resolve(sourceRoot, 'pages/supply-chain/SupplierSourcingPage.vue'))
     const purchase = read(resolve(sourceRoot, 'pages/supply-chain/PurchaseExecutionPage.vue'))
-    const budget = read(resolve(sourceRoot, 'pages/commercial/BudgetPage.vue'))
     const contract = read(resolve(sourceRoot, 'pages/commercial/ContractPage.vue'))
 
     expect(purchase).toContain('class="v2-detail-dialog__section"')
@@ -565,13 +556,6 @@ describe('全 V2 UI 整改门禁', () => {
       purchase.indexOf('async function loadPage'),
     )
     expect(detailTableSource).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
-
-    expect(budget).toMatch(
-      /<V2Button\b(?=[^>]*v-if="canAdd")(?=[^>]*size="small")[^>]*>\s*新建预算/,
-    )
-    expect(budget).toContain('class="table-wrap budget-page__availability"')
-    expect(budget).toContain('class="v2-table--compact"')
-    expect(budget).toMatch(/\.budget-page__availability table\s*\{[^}]*min-width:\s*0/)
 
     expect(contract).not.toMatch(/<V2Alert\b[^>]*v-if="errorMessage"/)
     expect(contract).toContain('v-if="!contracts.length && !errorMessage"')

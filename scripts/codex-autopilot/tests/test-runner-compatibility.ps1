@@ -179,7 +179,7 @@ function Invoke-Runner {
   if ($Explain) {
     $args += "-ExplainNextAction"
   } elseif ($Apply) {
-    $args += "-ApplyBacklogSplit"
+    $args += @('-ApplyBacklogSplit','-AuthorizeBranch','-AuthorizeCommit','-AuthorizeMerge')
   } else {
     $args += "-DryRun"
   }

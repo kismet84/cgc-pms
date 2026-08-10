@@ -8,13 +8,13 @@
 - 采购经理
 - 生产经理
 
-本手册适用于 v1.6 当前开发分支。实际菜单、账号和数据范围以当前角色授权及交付环境验证为准。
+本手册适用于 v1.6 当前本地开发环境。实际菜单、账号和数据范围以当前角色授权及本地验证为准；非本地交付当前不适用。
 
 ## 2. 登录与进入系统
 
 ### 2.1 登录入口
 
-- 前端入口通常为本地或交付环境的管理后台首页。
+- 本地前端入口为 `http://localhost:5173/`。
 - 登录失败、账号发放方式、初始密码规则属于实施现场信息，当前需要确认；V1.5 历史材料见[试点账号与审批模板确认清单](../archive/v1.5/training/pilot-account-and-approval-checklist.md)，V1.6 使用前须重新确认。
 
 ### 2.2 首次进入后的判断顺序
@@ -34,13 +34,13 @@
 
 | 业务域 | 常见菜单入口 |
 |------|------|
-| 工作台与预警 | `/dashboard`、`/alert` |
-| 合同与签证 | `/contract`、`/variation` |
-| 成本与目标 | `/cost`、`/cost-subject`、`/cost-target` |
-| 采购与库存 | `/purchase`、`/receipt`、`/inventory`、`/requisition` |
-| 分包与结算 | `/subcontract`、`/settlement` |
-| 付款与发票 | `/payment`、`/invoice` |
-| 审批中心 | `/approval` |
+| 工作台与预警 | `/dashboard`（预警位于驾驶舱） |
+| 合同与签证 | `/contract/ledger`、`/variation/order` |
+| 成本与目标 | `/cost/ledger`、`/cost/subject/taxonomy`、`/cost-budget` |
+| 采购与库存 | `/inventory/purchase-request`、`/purchase/order`、`/purchase/receipt`、`/inventory/stock`、`/inventory/material-requisition` |
+| 分包与结算 | `/subcontract/task`、`/subcontract/measure`、`/settlement/list` |
+| 付款与发票 | `/payment/application`、`/payment/expense`、`/invoice` |
+| 审批中心 | `/approval/todo`、`/approval/done`、`/approval/cc`、`/approval/mine` |
 
 使用原则：
 - 不要求终端用户记住全部路径，只需记住自己角色的主路径。
@@ -61,7 +61,7 @@
 
 ### 4.3 需要确认
 
-- 生产经理若需要展示完整施工进度、劳务、机械、产值能力，当前需要确认，不能按已上线能力培训；V1.5 历史边界见[生产经理能力边界确认单](../archive/v1.5/manuals/production-manager-capability-boundary.md)。
+- 生产经理若需要展示完整施工进度、劳务、机械、产值能力，当前需要确认，不能按已放行能力培训；V1.5 历史边界见[生产经理能力边界确认单](../archive/v1.5/manuals/production-manager-capability-boundary.md)。
 
 ## 5. 核心主路径
 

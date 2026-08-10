@@ -58,7 +58,7 @@ if ($attempt -lt 2) { Write-Error 'deterministic first-attempt failure'; exit 1 
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
   & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root config core.autocrlf false; & git -C $root config core.eol lf; & git -C $root add .; & git -C $root commit -qm 'repair base'
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit -AuthorizeBranch -AuthorizeCommit -AuthorizeMerge 2>&1 | Out-String
   $ErrorActionPreference = $old
   $canonical = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Directory | Where-Object Name -notmatch '-repair-' | Select-Object -First 1
   $result = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $canonical.FullName 'result.json') -Raw | ConvertFrom-Json

@@ -21,6 +21,7 @@ description: Owns cgc-pms AutoPilot triggers, non-bypassable boundaries, and aut
 - 禁止自动发布生产、连接生产数据库、删除仓库外文件、删除 `.git` 或用户目录、读取项目禁止区。
 - 测试数据重置仅限 dev/test/demo、host 为 `localhost` 或 `127.0.0.1`，且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`；缺一即禁止。
 - 自动 commit、merge、push 或生产操作仍需相应明确授权；`autoPush=false` 时禁止自动 push。
+- Git 授权只允许由当次 `autopilot-run-continuous.ps1` 调用显式传入 `-AuthorizeBranch`、`-AuthorizeCommit`、`-AuthorizeMerge`；三项互不推导，配置、state、checkpoint 或历史授权均不能替代，缺失时必须在对应 Git 变更前失败关闭。
 - 控制面行为变化必须纳入指纹。新指纹进入 N>1 或无界执行前，必须由用户明确触发 `启动迭代-1` 并取得该指纹的金丝雀证据。
 
 ## 执行入口

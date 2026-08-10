@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-10T09:04:07.845Z",
-  "generated_from_commit": "d1eea9b6897ac7df8ad67fcd8c67a7ba99c92907",
+  "generated_at": "2026-08-10T16:44:05.939Z",
+  "generated_from_commit": "eaf9c020905fcdaafc903054bf4ed7b69ac2ca18",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
@@ -987,6 +987,42 @@
         {
           "path": "docs/standards/codex-task-execution-policy.md",
           "symbol": "任务路由"
+        }
+      ]
+    },
+    {
+      "id": "command-preflight-gate",
+      "label": "PowerShell 命令前置门禁",
+      "type": "governance",
+      "boundary": "Codex PreToolUse",
+      "layer": 6,
+      "path": ".codex/hooks/pre-tool-use-command-guard.ps1",
+      "role": "在 Windows shell 命令执行前拦截 PowerShell 语法错误、缺失静态读取路径、反引号双引号搜索和混合搜索命令。",
+      "entrypoints": [
+        {
+          "path": ".codex/hooks.json",
+          "symbol": "PreToolUse Bash"
+        },
+        {
+          "path": ".codex/hooks/pre-tool-use-command-guard.ps1",
+          "symbol": "Deny-Command"
+        }
+      ],
+      "tests": [
+        {
+          "path": "scripts/codex-autopilot/test-native-command-semantics.ps1",
+          "symbol": "Assert-CommandDenied"
+        }
+      ],
+      "constraints": [
+        "非 Windows command 保持现有行为；项目 Hook 不改写命令。",
+        "搜索命令独立执行并单独判定退出码；反引号字面量使用单引号。",
+        "静态 Get-Content -LiteralPath 必须在执行前解析到现有目标。"
+      ],
+      "evidence": [
+        {
+          "path": ".codex/hooks/pre-tool-use-command-guard.ps1",
+          "symbol": "Parser.ParseInput"
         }
       ]
     },
@@ -2042,6 +2078,28 @@
       ]
     },
     {
+      "from": "command-preflight-gate",
+      "to": "repository-governance",
+      "type": "guards",
+      "evidence": [
+        {
+          "path": ".codex/hooks/pre-tool-use-command-guard.ps1",
+          "symbol": "Deny-Command"
+        }
+      ]
+    },
+    {
+      "from": "ci-verification",
+      "to": "command-preflight-gate",
+      "type": "tests",
+      "evidence": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "symbol": "test-native-command-semantics.ps1"
+        }
+      ]
+    },
+    {
       "from": "repository-governance",
       "to": "ci-verification",
       "type": "guards",
@@ -2481,6 +2539,7 @@
       "trigger": "本地或 CI 执行治理静态契约",
       "steps": [
         "repository-governance",
+        "command-preflight-gate",
         "ci-verification"
       ],
       "outcome": "根规则、专项 Skill、CI 和发布边界保持一致。"

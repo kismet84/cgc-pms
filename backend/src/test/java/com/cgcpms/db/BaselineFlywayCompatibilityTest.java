@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("291", flyway.info().current().getVersion().getVersion());
+        assertEquals("292", flyway.info().current().getVersion().getVersion());
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
@@ -123,9 +123,26 @@ class BaselineFlywayCompatibilityTest {
                 """));
         assertEquals(10, count(flyway, "cost_subject", "parent_id=(SELECT id FROM cost_subject WHERE subject_code='5401.03')"));
         assertEquals(0, count(flyway, "cost_subject", "subject_code='5401.02' OR subject_code LIKE '5401.02.%'"));
-        assertEquals(21, count(flyway, "cost_subject", """
+        assertEquals(19, count(flyway, "cost_subject", """
                 subject_code='5401.01' OR subject_code LIKE '5401.01.%'
                 OR subject_code='5401.04' OR subject_code LIKE '5401.04.%'
+                """));
+        assertEquals(0, count(flyway, "cost_subject", """
+                subject_code IN ('5401.02.05','5401.02.06','5401.04.06','5401.04.10','5401.04.11',
+                                 '5401.04.12','5401.04.13','5401.04.15','5401.04.16','5401.04.17','5401.04.18')
+                """));
+        assertEquals(9, count(flyway, "sys_menu", """
+                perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
+                          'variation:order:item:edit','cost:target:add','cost:target:edit',
+                          'cost:target:delete','cost:target:activate','cost:summary:refresh')
+                AND deleted_flag=0
+                """));
+        assertEquals(9, count(flyway, "sys_role_menu", """
+                tenant_id=0 AND role_id=2 AND menu_id IN
+                    (21901,21902,21903,21904,22001,22002,22003,22004,22101)
+                """));
+        assertEquals(4, count(flyway, "sys_role_menu", """
+                tenant_id=0 AND role_id=4 AND menu_id IN (21901,21902,21903,21904)
                 """));
         execute(flyway, """
                 INSERT INTO mat_warehouse
@@ -228,7 +245,17 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("291", current.info().current().getVersion().getVersion());
+        assertEquals("292", current.info().current().getVersion().getVersion());
+        assertEquals(9, count(current, "sys_menu", """
+                perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
+                          'variation:order:item:edit','cost:target:add','cost:target:edit',
+                          'cost:target:delete','cost:target:activate','cost:summary:refresh')
+                AND deleted_flag=0
+                """));
+        assertEquals(0, count(current, "cost_subject", """
+                subject_code IN ('5401.02.05','5401.02.06','5401.04.06','5401.04.10','5401.04.11',
+                                 '5401.04.12','5401.04.13','5401.04.15','5401.04.16','5401.04.17','5401.04.18')
+                """));
         assertEquals(1, count(current, "sys_menu", """
                 perms='material:dict:delete' AND deleted_flag=0
                 AND parent_id=(SELECT id FROM sys_menu
@@ -456,7 +483,9 @@ class BaselineFlywayCompatibilityTest {
         List<String> roleMenus = rows(old, """
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
-                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                WHERE role_id<>2690001 AND menu_id NOT IN (605,608,921,932,933,962,963,964,965,966,1090,1091,1092,
+                                                           21901,21902,21903,21904,22001,22002,22003,22004,22101,
+                                                           2690100,2690101,2690111,2690112,2690113,
                                                            27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY tenant_id, role_id, menu_id
                 """);
@@ -465,7 +494,9 @@ class BaselineFlywayCompatibilityTest {
                 FROM sys_role_menu rm
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
-                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (605,608,921,932,933,962,963,964,965,966,1090,1091,1092,
+                                                                 21901,21902,21903,21904,22001,22002,22003,22004,22101,
+                                                                 2690100,2690101,2690111,2690112,2690113,
                                                                  27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY 1
                 """);
@@ -476,7 +507,9 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(roleMenus, rows(current, """
                 SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
                 FROM sys_role_menu
-                WHERE role_id<>2690001 AND menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                WHERE role_id<>2690001 AND menu_id NOT IN (605,608,921,932,933,962,963,964,965,966,1090,1091,1092,
+                                                           21901,21902,21903,21904,22001,22002,22003,22004,22101,
+                                                           2690100,2690101,2690111,2690112,2690113,
                                                            27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY tenant_id, role_id, menu_id
                 """));
@@ -485,7 +518,9 @@ class BaselineFlywayCompatibilityTest {
                 FROM sys_role_menu rm
                 JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
                 WHERE m.perms IS NOT NULL AND m.perms <> ''
-                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (2690100,2690101,2690111,2690112,2690113,
+                  AND rm.role_id<>2690001 AND rm.menu_id NOT IN (605,608,921,932,933,962,963,964,965,966,1090,1091,1092,
+                                                                 21901,21902,21903,21904,22001,22002,22003,22004,22101,
+                                                                 2690100,2690101,2690111,2690112,2690113,
                                                                  27401,27402,27403,27404,28201,28202,28301,28302,28303)
                 ORDER BY 1
                 """));

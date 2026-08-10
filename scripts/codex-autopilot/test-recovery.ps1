@@ -9,6 +9,7 @@ $autoDir = Join-Path $root '.codex-autopilot'
 New-Item -ItemType Directory -Path $autoDir -Force | Out-Null
 
 try {
+  if ((Get-AutopilotRecoveryFailureCategory -Message 'AUTOPILOT_GIT_MERGE_AUTHORIZATION_REQUIRED') -ne 'tool_config') { throw 'missing Git authorization was not classified as tool_config' }
   $none = Get-AutopilotRecoveryDecision -AutoDir $autoDir
   if ($none.action -ne 'NEW_RUN') { throw 'missing lock did not allow a new run' }
 

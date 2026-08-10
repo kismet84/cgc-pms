@@ -169,7 +169,6 @@ describe('M4 budget and measurement contracts', () => {
     const sources = [
       '../packages/frontend-contracts/src/commercial.ts',
       'src/services/commercial.ts',
-      'src/pages/commercial/BudgetPage.vue',
       'src/pages/commercial/ProductionMeasurementPage.vue',
     ]
       .map((file) => readFileSync(resolve(file), 'utf8'))

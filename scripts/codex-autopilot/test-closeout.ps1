@@ -45,6 +45,9 @@ try {
 '@ | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\current-issues.json') -Encoding UTF8
   & git -C $root add .; & git -C $root commit -qm 'base'
   $base = (& git -C $root rev-parse HEAD).Trim()
+  $script:AutopilotBranchAuthorized = $true
+  $script:AutopilotCommitAuthorized = $false
+  $script:AutopilotMergeAuthorized = $false
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId 'ISSUE-900-040' -BaseCommit $base
   New-Item -ItemType Directory -Path (Join-Path $worktree.path 'docs\quality') -Force | Out-Null
   'accepted' | Set-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\issue-900-040.md') -Encoding UTF8
@@ -64,10 +67,21 @@ try {
   $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $registry.issues[0].status = 'FROZEN'
   $registry | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $registryPath -Encoding UTF8
+  $unauthorizedHead = (& git -C $worktree.path rev-parse HEAD).Trim()
+  $unauthorizedIndex = (& git -C $worktree.path diff --cached --name-only) -join "`n"
+  $commitRejected = $false
+  try { Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $base | Out-Null } catch { $commitRejected = $_.Exception.Message -match 'AUTOPILOT_GIT_COMMIT_AUTHORIZATION_REQUIRED' }
+  if (!$commitRejected -or (& git -C $worktree.path rev-parse HEAD).Trim() -ne $unauthorizedHead -or ((& git -C $worktree.path diff --cached --name-only) -join "`n") -ne $unauthorizedIndex) { throw 'closeout changed HEAD or index without commit authorization' }
+  $script:AutopilotCommitAuthorized = $true
   $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if (!$result.commit -or $result.merged) { throw 'unscored closeout did not produce an isolated closeout commit' }
   $unmergedAgain = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if (!$unmergedAgain.idempotent -or $unmergedAgain.score -or $unmergedAgain.closeoutCommit -ne $result.closeoutCommit) { throw 'unscored closeout retry incorrectly required scoring evidence' }
+  $mergeHead = (& git -C $root rev-parse HEAD).Trim()
+  $mergeRejected = $false
+  try { Merge-AutopilotIssueCloseoutCommit -RepoRoot $root -Commit $result.closeoutCommit -ExpectedBaseCommit $base | Out-Null } catch { $mergeRejected = $_.Exception.Message -match 'AUTOPILOT_GIT_MERGE_AUTHORIZATION_REQUIRED' }
+  if (!$mergeRejected -or (& git -C $root rev-parse HEAD).Trim() -ne $mergeHead) { throw 'closeout changed HEAD without merge authorization' }
+  $script:AutopilotMergeAuthorized = $true
   $unscoredMerge = Merge-AutopilotIssueCloseoutCommit -RepoRoot $root -Commit $result.closeoutCommit -ExpectedBaseCommit $base
   if (!$unscoredMerge.merged -or $unscoredMerge.idempotent) { throw 'unscored closeout commit did not fast-forward after idempotent retry' }
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }

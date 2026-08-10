@@ -26,7 +26,7 @@ function Get-AutopilotStallLevel {
 
 function Get-AutopilotRecoveryFailureCategory {
   param([Parameter(Mandatory)][string]$Message)
-  if ($Message -match '(?i)Native command failed|not installed|not available|cannot read run\.lock|AUTOPILOT_POWERSHELL7_REQUIRED') { return 'tool_config' }
+  if ($Message -match '(?i)Native command failed|not installed|not available|cannot read run\.lock|AUTOPILOT_POWERSHELL7_REQUIRED|AUTOPILOT_GIT_[A-Z]+_AUTHORIZATION_REQUIRED') { return 'tool_config' }
   if ($Message -match '(?i)ECONNREFUSED|Docker|database|port|runtime') { return 'environment_prerequisite' }
   return 'integrity_conflict'
 }

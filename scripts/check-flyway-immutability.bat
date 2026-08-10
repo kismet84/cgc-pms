@@ -1,43 +1,65 @@
 @echo off
-REM check-flyway-immutability.bat
-REM Pre-commit hook (Windows): warns if already-committed Flyway migration files are being modified.
-REM Exit code 0 (warning only) — does not block commits.
-REM
-REM Usage: Add to .git/hooks/pre-commit or call from CI:
-REM   scripts\check-flyway-immutability.bat
+REM Blocks changes to already-committed Flyway migrations.
+REM Local mode checks staged changes. CI mode checks an explicit base...HEAD range.
+REM Usage: scripts\check-flyway-immutability.bat [--base sha-or-ref]
 
-setlocal enabledelayedexpansion
+setlocal
 
-set "MIGRATION_DIR=backend\src\main\resources\db\migration"
-set "LEGACY_DIR=backend\src\main\resources\db\migration-legacy"
-set "WARNING=WARNING: Modifying already-applied Flyway migrations. Use new V90+ migrations instead."
+if not exist "backend\src\main\resources\db\migration" goto missing
+if not exist "backend\src\main\resources\db\migration-legacy" goto missing
+if not exist "backend\src\main\resources\db\migration-h2" goto missing
+if not exist "backend\src\main\resources\db\migration-h2-legacy" goto missing
 
-if not exist "%MIGRATION_DIR%" (
-    exit /b 0
-)
+if "%~1"=="" goto scan_staged
+if /I not "%~1"=="--base" goto usage
+if "%~2"=="" goto usage
+if not "%~3"=="" goto usage
+set "BASE=%~2"
+git rev-parse --verify "%BASE%" >nul 2>nul
+if errorlevel 1 goto bad_base
+goto scan_range
 
-REM Find staged, modified (not new) V*.sql files
-set "FOUND="
-for /f "tokens=*" %%f in ('git diff --cached --name-only --diff-filter=M -- "%MIGRATION_DIR%\V*.sql" "%LEGACY_DIR%\V*.sql" 2^>nul') do (
-    if not defined FOUND (
-        echo.
-        echo ============================================================
-        echo %WARNING%
-        echo ============================================================
-        echo Modified migration files:
-        set "FOUND=1"
-    )
-    echo   - %%f
-)
+:scan_staged
+git diff --cached --name-only --diff-filter=MDR -- "backend/src/main/resources/db/migration/V*.sql" "backend/src/main/resources/db/migration-legacy/V*.sql" "backend/src/main/resources/db/migration-h2/V*.sql" "backend/src/main/resources/db/migration-h2-legacy/V*.sql" >nul
+if errorlevel 1 exit /b 2
+for /f "delims=" %%f in ('git diff --cached --name-only --diff-filter=MDR -- "backend/src/main/resources/db/migration/V*.sql" "backend/src/main/resources/db/migration-legacy/V*.sql" "backend/src/main/resources/db/migration-h2/V*.sql" "backend/src/main/resources/db/migration-h2-legacy/V*.sql"') do call :record "%%f"
+goto result
 
-if defined FOUND (
-    echo ============================================================
-    echo Already-applied migrations should NEVER be modified in-place.
-    echo Instead: create a new V{next}__description.sql migration.
-    echo See: docs/standards/07-数据库与迁移规范.md
-    echo ============================================================
-    echo.
-)
+:scan_range
+git diff "%BASE%...HEAD" --name-only --diff-filter=MDR -- "backend/src/main/resources/db/migration/V*.sql" "backend/src/main/resources/db/migration-legacy/V*.sql" "backend/src/main/resources/db/migration-h2/V*.sql" "backend/src/main/resources/db/migration-h2-legacy/V*.sql" >nul
+if errorlevel 1 exit /b 2
+for /f "delims=" %%f in ('git diff "%BASE%...HEAD" --name-only --diff-filter=MDR -- "backend/src/main/resources/db/migration/V*.sql" "backend/src/main/resources/db/migration-legacy/V*.sql" "backend/src/main/resources/db/migration-h2/V*.sql" "backend/src/main/resources/db/migration-h2-legacy/V*.sql"') do call :record "%%f"
+goto result
 
+:record
+if not defined FOUND echo ERROR: Already-committed Flyway migrations changed.
+set "FOUND=1"
+echo   - %~1
+exit /b 0
+
+:result
+if defined FOUND goto blocked
+echo Flyway immutability verified.
 endlocal
 exit /b 0
+
+:blocked
+echo Create a new V{next}__description.sql migration instead.
+echo See: docs/standards/07-数据库与迁移规范.md
+endlocal
+exit /b 1
+
+:bad_base
+echo ERROR: Unknown Flyway immutability base: %BASE%
+endlocal
+exit /b 2
+
+:missing
+echo ERROR: Required Flyway migration directory is missing.
+endlocal
+exit /b 2
+
+:usage
+echo Usage: %~nx0 [--base sha-or-ref]
+endlocal
+exit /b 2

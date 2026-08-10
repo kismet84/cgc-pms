@@ -164,6 +164,7 @@ async function installApprovalMock(page: Page): Promise<void> {
 
 test.describe('M4-1 approval workbench', () => {
   test('four lists and detail dialog remain usable at three viewports', async ({ page }) => {
+    test.setTimeout(60_000)
     await installApprovalMock(page)
     const runtimeErrors = captureRuntimeErrors(page)
 

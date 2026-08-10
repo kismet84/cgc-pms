@@ -201,12 +201,9 @@ export function loadPartners(
   query: PartnerQuery = { pageNo: 1, pageSize: 200, status: 'ENABLE' },
   signal?: AbortSignal,
 ): Promise<{ records: PartnerRecord[] }> {
-  return apiRequest<{ records: PartnerRecord[] }>(
-    withPartnerQuery(COMMERCIAL_API.partners, query),
-    {
-      signal,
-    },
-  )
+  return apiRequest<{ records: PartnerRecord[] }>(withQuery(COMMERCIAL_API.partners, query), {
+    signal,
+  })
 }
 
 export function loadProjectContextOptions(signal?: AbortSignal): Promise<ProjectContextOption[]> {
@@ -824,20 +821,7 @@ export function loadMeasurementSettlementTrace(id: string, signal?: AbortSignal)
   )
 }
 
-function withQuery(path: string, query: ContractQuery): string {
-  const params = new URLSearchParams()
-  for (const [key, value] of Object.entries(query)) {
-    if (typeof value === 'number') {
-      if (Number.isInteger(value) && value > 0) params.set(key, String(value))
-    } else if (value?.trim()) {
-      params.set(key, value.trim())
-    }
-  }
-  const encoded = params.toString()
-  return encoded ? `${path}?${encoded}` : path
-}
-
-function withPartnerQuery(path: string, query: PartnerQuery): string {
+function withQuery(path: string, query: ContractQuery | PartnerQuery): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
     if (typeof value === 'number') {

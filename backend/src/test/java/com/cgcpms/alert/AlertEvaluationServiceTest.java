@@ -6,6 +6,7 @@ import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.mapper.AlertRuleConfigMapper;
 import com.cgcpms.alert.dto.AlertProcessingReportVO;
+import com.cgcpms.alert.notification.AlertNotificationChannel;
 import com.cgcpms.alert.service.AlertEvaluationService;
 import com.cgcpms.alert.service.AlertSubscriptionService;
 import com.cgcpms.common.TestUserContext;
@@ -788,14 +789,11 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("TA8f: notification — 外部渠道通过适配接口占位，不直接复用站内信服务")
-    void testAlertNotification_ExternalChannelsHaveAdapters() {
+    @DisplayName("TA8f: notification — 仅保留真实可用的站内通知适配器")
+    void testAlertNotification_OnlyInAppAdapterRemains() {
         assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.AlertNotificationSender"));
         assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.InAppAlertNotificationSender"));
-        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.EmailAlertNotificationSender"));
-        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.WechatAlertNotificationSender"));
-        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.SmsAlertNotificationSender"));
-        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.AlertNotificationChannelProperties"));
+        assertEquals(Set.of(AlertNotificationChannel.IN_APP), Set.of(AlertNotificationChannel.values()));
     }
 
     @Test
@@ -1214,7 +1212,7 @@ class AlertEvaluationServiceTest {
         alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
                 List.of("COMMERCIAL_MANAGER"), java.util.Map.of(
                         "enabled", true,
-                        "channels", List.of("IN_APP", "EMAIL"),
+                        "channels", List.of("IN_APP"),
                         "domains", List.of("CONTRACT", "PURCHASE"),
                         "minSeverity", "LOW",
                         "notifyOnStatusChanged", true
@@ -1232,7 +1230,7 @@ class AlertEvaluationServiceTest {
         alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
                 List.of("COMMERCIAL_MANAGER"), java.util.Map.of(
                         "enabled", false,
-                        "channels", List.of("EMAIL"),
+                        "channels", List.of(),
                         "domains", List.of("PAYMENT"),
                         "minSeverity", "HIGH",
                         "notifyOnStatusChanged", false
@@ -1247,6 +1245,11 @@ class AlertEvaluationServiceTest {
         assertEquals(List.of("PAYMENT"), narrowed.get("domains"));
         assertEquals("HIGH", narrowed.get("minSeverity"));
         assertEquals(false, narrowed.get("notifyOnStatusChanged"));
+
+        BusinessException unsupported = assertThrows(BusinessException.class, () ->
+                alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                        List.of("COMMERCIAL_MANAGER"), Map.of("channels", List.of("EMAIL"))));
+        assertEquals("ALERT_NOTIFICATION_CHANNEL_UNSUPPORTED", unsupported.getCode());
     }
 
     @Test

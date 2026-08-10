@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-issue-checkpoint.ps1')
 . (Join-Path $scriptDir 'autopilot-recover.ps1')
+$script:AutopilotMergeAuthorized = $true
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-phase-recovery-' + [guid]::NewGuid().ToString('N'))
 $autoDir = Join-Path $root '.codex-autopilot'

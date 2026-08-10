@@ -100,7 +100,7 @@ $state = [ordered]@{
   lastReason = if ($reset) { 'NEW_ITERATION' } else { 'RESUMED' }
   stopReason = ''
   stopRequested = $false
-  autoMerge = [bool](Get-ExistingStateValue 'autoMerge' $true)
+  autoMerge = $false
   autoPush = $false
   allowTestDataReset = [bool](Get-ExistingStateValue 'allowTestDataReset' $true)
 }

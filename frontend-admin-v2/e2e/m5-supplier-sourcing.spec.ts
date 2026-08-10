@@ -251,7 +251,9 @@ test.describe('M5 supplier sourcing V2', () => {
 
   test('loads authorized sourcing facts for all projects', async ({ page }) => {
     await install(page)
+    const projectsLoaded = page.waitForResponse('**/api/project-context/options')
     await page.goto('/supplier-sourcing')
+    await projectsLoaded
     await expect(page).toHaveURL(/\/supplier-sourcing$/)
     const eventTable = page.getByRole('table', { name: '招采事件列表' })
     await expect(eventTable).toBeVisible()

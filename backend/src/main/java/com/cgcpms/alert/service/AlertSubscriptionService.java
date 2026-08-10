@@ -2,7 +2,7 @@ package com.cgcpms.alert.service;
 
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
 import com.cgcpms.alert.notification.AlertNotificationChannel;
-import com.cgcpms.alert.notification.AlertNotificationChannelProperties;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.service.PreferenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,6 @@ public class AlertSubscriptionService {
 
     private final PreferenceService preferenceService;
     private final AlertAccessScopeResolver accessScopeResolver;
-    private final AlertNotificationChannelProperties channelProperties;
 
     public Map<String, Object> getCurrentUserSubscription(Long tenantId, Long userId, Collection<String> roleCodes) {
         Subscription defaults = buildDefaults(roleCodes);
@@ -31,6 +30,7 @@ public class AlertSubscriptionService {
     public Map<String, Object> updateCurrentUserSubscription(Long tenantId, Long userId, Collection<String> roleCodes,
                                                              Map<String, Object> request) {
         Subscription defaults = buildDefaults(roleCodes);
+        validateRequestedChannels(request);
         Subscription requested = fromMap(request);
         Subscription sanitized = sanitizeOverrides(defaults, requested);
         preferenceService.savePreferences(userId, tenantId, Map.of(PREFERENCE_KEY, sanitized.toMap()));
@@ -179,10 +179,22 @@ public class AlertSubscriptionService {
     }
 
     private List<String> availableChannels() {
-        return Arrays.stream(AlertNotificationChannel.values())
-                .filter(channelProperties::isConfigured)
-                .map(AlertNotificationChannel::name)
-                .toList();
+        return List.of(AlertNotificationChannel.IN_APP.name());
+    }
+
+    private void validateRequestedChannels(Map<String, Object> request) {
+        Object rawChannels = request == null ? null : request.get("channels");
+        if (rawChannels == null) {
+            return;
+        }
+        if (!(rawChannels instanceof Collection<?> channels)
+                || channels.stream()
+                .map(String::valueOf)
+                .map(String::trim)
+                .map(channel -> channel.toUpperCase(Locale.ROOT))
+                .anyMatch(channel -> !AlertNotificationChannel.IN_APP.name().equals(channel))) {
+            throw new BusinessException("ALERT_NOTIFICATION_CHANNEL_UNSUPPORTED", "仅支持站内通知渠道 IN_APP");
+        }
     }
 
     private record Subscription(Boolean enabled, List<String> channels, List<String> domains,

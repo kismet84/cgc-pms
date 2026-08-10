@@ -1,6 +1,20 @@
 {
-  "description": "Explicit repository canary for deterministic long-task completion checks.",
+  "description": "Repository hooks for command preflight and deterministic long-task completion checks.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"process.exit(0)\"",
+            "commandWindows": "node -e \"const{spawnSync}=require('node:child_process');const path=require('node:path');const git=spawnSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8',shell:false});if(git.status!==0)process.exit(2);const guard=path.join(git.stdout.trim(),'.codex','hooks','pre-tool-use-command-guard.ps1');const run=spawnSync('pwsh',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',guard],{stdio:'inherit',shell:false});process.exit(run.status??2)\"",
+            "timeout": 5,
+            "statusMessage": "Validating PowerShell command and literal paths"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

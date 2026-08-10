@@ -74,7 +74,7 @@ if (Test-Path $StatePath) {
     startedAt = $null
     lastHeartbeatAt = $Now
     stopRequested = $true
-    autoMerge = $true
+    autoMerge = $false
     autoPush = $false
     allowTestDataReset = $true
   }

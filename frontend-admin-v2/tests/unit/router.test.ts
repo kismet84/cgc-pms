@@ -302,9 +302,9 @@ describe('V2 application-shell routes', () => {
 
     vi.mocked(getCurrentUser).mockResolvedValue(user(['cost:target:query']))
     const budgetRouter = guardedRouter()
-    await budgetRouter.push('/budget?projectId=P1')
+    await budgetRouter.push('/budget?projectId=P1#versions')
     await budgetRouter.isReady()
-    expect(budgetRouter.currentRoute.value.fullPath).toBe('/cost-budget?projectId=P1')
+    expect(budgetRouter.currentRoute.value.fullPath).toBe('/cost-budget?projectId=P1#versions')
   })
 
   it('keeps cost root query and hash on the ledger redirect', async () => {
@@ -412,6 +412,22 @@ describe('V2 application-shell routes', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('keeps the session compatibility entry for anonymous and role-scoped users', async () => {
+    vi.mocked(getCurrentUser).mockRejectedValueOnce(new Error('anonymous'))
+    const anonymousRouter = guardedRouter()
+    await anonymousRouter.push('/session?source=legacy#resume')
+    await anonymousRouter.isReady()
+    expect(anonymousRouter.currentRoute.value.path).toBe('/login')
+    expect(anonymousRouter.currentRoute.value.query.redirect).toBe('/session?source=legacy#resume')
+
+    setActivePinia(createPinia())
+    vi.mocked(getCurrentUser).mockResolvedValueOnce(user(['project:query']))
+    const authenticatedRouter = guardedRouter()
+    await authenticatedRouter.push('/session')
+    await authenticatedRouter.isReady()
+    expect(authenticatedRouter.currentRoute.value.path).toBe('/approval/todo')
   })
 
   it('aligns workflow configuration routing with the API admin gate', async () => {

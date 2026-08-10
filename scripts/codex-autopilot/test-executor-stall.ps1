@@ -99,7 +99,7 @@ Start-Sleep -Seconds 20
     & taskkill.exe /PID $longChild.Id /T /F 2>$null | Out-Null
   }
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit -AuthorizeBranch -AuthorizeCommit -AuthorizeMerge 2>&1 | Out-String
   $ErrorActionPreference = $old
   $state = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
   if ($state.status -ne 'BLOCKED' -or $state.stopReason -ne 'STOP_EXECUTOR_STALL_RETRY_EXHAUSTED') { throw "stalled executor did not stop safely: $output" }

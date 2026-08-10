@@ -1,5 +1,23 @@
 # Current Focus
 
+## 2026-08-11 第88条主线：Codex 提效与遗弃、重复、未完成工作已本地收口
+
+- 目标：降低日常 Codex 成本和默认权限，关闭同名 Skill、过密派工、迁移/CI 缺口、死页、占位通知渠道、PDF spike 与治理资产漂移。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED / DELIVERY_IN_PROGRESS`；唯一载体为[`第88条主线计划`](../plans/第88条主线-Codex操作提效与遗弃重复未完成工作收口任务计划书.md)。
+- 结果：C1～C6、R1～R8 均已实施或有据关闭；V292 H2/MySQL 对称迁移、Flyway fail-close、前端兼容删除、IN_APP 单渠道和正式 PDF 契约完成。
+- 证据：后端迁移/PDF 35、通知 75、MySQL fresh smoke 1；前端全量 506；workflow 14、long-task 15、控制面 12 组、浏览器兼容/403/404/console 与 Codemap 均通过。
+- 边界：仅本地 dev/test/demo 与受保护 Git 交付；两个活跃 worktree、两套不等价 restart 入口和受保护目录保持不动。
+- 零悬空：正式 Issue 新增0、关闭0、净变化`0`；删除零引用资产2个，证据不足建议不建 Issue，无无载体遗留项。
+
+## 2026-08-10 第87条主线：治理文档与控制面契约统一整改已本地完成
+
+- 目标：关闭根授权、local-only、失败分类、前端事实、运行等待、AutoPilot Git、long-task CI 和项目地图历史边界八组漂移。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_AUTHORIZED / UNIFIED_WITH_MAINLINE_88 / CONTROL_PLANE_CANARY_REQUIRED`；唯一载体为[`第87条主线计划`](../plans/第87条主线-治理文档与控制面契约统一整改任务计划书.md)。
+- 架构：复用现有 Skill、配置、脚本、Issue JSON 和 policy suite；不新增治理框架、required context 或第三方依赖。
+- 边界：仅本地文档/控制面整改和受保护 Git 交付；不授权生产、目标环境、强推、保护绕过、Tag 或 Release。
+- 证据：HighRisk policy suite 7/7、控制面关键测试、long-task 15/15、workflow、链接、JSON、Codemap 和 diff 检查通过；新指纹进入 N>1 或无界运行前须显式 `启动迭代-1`。
+- 零悬空：八组发现全部修复；最终复核四处同范围遗漏全部关闭。新增后续项0、关闭后续项0、净变化`0`，无无载体遗留项。
+
 ## 2026-08-10 第86条主线：全仓业务闭环权限、状态与事实一致性整改已合并
 
 - 目标：关闭项目对象授权、合同终态/收尾、票款与回款证据、付款条款、供应商退货、计划日报技术门、独立月结、在途/成本投影和高风险领域审计的已证实断点。
@@ -137,15 +155,15 @@
 - 边界：合并证据不代表非本地发布；生产发布门已按本地-only规则冻结，不进入执行队列。
 - 零悬空：第67条0/0/0；第68条计划周期新增1、关闭1、净变化0；无无载体遗留项。
 
-## 2026-08-03 第66条主线：规则整改完成，M6 G5空间证据阻塞
+## 2026-08-03 第66条主线：规则整改完成，M6历史阻塞已关闭
 
 - 目标：统一授权、AutoPilot触发、数据与安全规范、产物落点、验证门禁、工具路由及本地产物保留规则，消除重复、失效、相互矛盾和误删可复用缓存的风险。
 - 计划：[`第66条主线-项目规则体系冲突整改任务计划书`](../plans/第66条主线-项目规则体系冲突整改任务计划书.md)。
 - 更新基线：`master@1877031fcc0ee72cdea4d8d798dc6ed09c3482a3`；第63～65条已由 PR #384 合并，第66条实施分支为 `codex/mainline-66-rule-governance`。
-- 状态：`RULE_GOVERNANCE_COMPLETED / M6_G0-G4_PASSED / G5_BLOCKED_ALLOCATION_EVIDENCE / BATCH_B_ISOLATED / BATCH_D_NOT_RUN / LOCAL_ONLY`；分支 `codex/mainline-66-rule-governance`。
+- 状态：`HISTORICAL / M0-M5_COMPLETED / M6_G5_CLOSED_EVIDENCE_INSUFFICIENT_BY_MAINLINE_88 / NO_ACTIVE_BACKLOG`。
 - 范围：M0～M5关闭17项规则冲突及漂移；M6将三个白名单目标共 `888,888,550` 字节逻辑内容移动到可回滚隔离区，两套 lockfile 离线恢复下载0包。永久删除、仓库外归档、生产、部署和Git发布未授权。
 - 结论：`RULE-066-012` 已以 tracked 来源锁 + `lark-cli skills` 运行时权威关闭；[M0～M5质量报告](../quality/2026-08-03-issue-066-项目规则体系冲突整改.md)，[M6质量报告](../quality/2026-08-03-issue-066-M6-工作区归档与清理.md)。
-- 零悬空：规则整改阶段新增0、关闭1、净变化-1；M6新增阶段任务1、关闭0、净变化`+1`，唯一载体为第66条计划，无无载体遗留项。
+- 2026-08-10 owner裁决：实际分配量证据不可可靠取得，Batch D 无永久删除授权且无当前业务价值；保持可逆隔离，关闭历史阻塞，不新增 Issue。
 
 ## 2026-08-03 第65条主线：材料字典资料导入与双价展示已合并
 

@@ -12,6 +12,7 @@ Status: active
 - `cli-legacy` 只作为显式兼容与紧急回退路径，不能成为 `desktop-native` 的静默降级。
 - 控制面固定使用 PowerShell 7；缺失时按 `tool_config` fail-close。
 - APPLY 派发、状态落盘和 Git 变更前必须核验 run lock、fencing token 与控制面指纹。
+- Git 分支、index/commit 与 merge 权限必须分别由当次控制面调用显式传入；配置、state、checkpoint 和历史运行不得保存或推导授权，缺少对应权限时在首个相关 Git 变更前 fail-close。
 - stop/pause 在每个关键 checkpoint 生效；已启动 Issue 只允许安全收口，不得据此启动下一任务。
 - 补货只能消费有界候选。权威 ReadySpec 通过确定性校验时可直接生成；否则调用有硬超时和心跳的语义 Planner。
 - Planner 必须逐候选返回 CREATED、REJECTED 或 BLOCKED；只有 CREATED 可写入 Ready，零 Ready 是合法终态。

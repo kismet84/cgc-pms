@@ -11,10 +11,10 @@
 | 项 | 约定 |
 |----|------|
 | 上下文路径 | `/api`（后端 `server.servlet.context-path`） |
-| 前端 baseURL | `/api`（Axios `VITE_API_BASE_URL ?? '/api'`） |
+| 前端 API 前缀 | `/api`（`src/services/request.ts` 固定添加） |
 | 数据格式 | JSON |
 | 字段命名 | lowerCamelCase（JSON） ↔ snake_case（数据库） |
-| 认证方式 | JWT + HttpOnly Cookie（`withCredentials`） |
+| 认证方式 | JWT + HttpOnly 同源 Cookie（Fetch `credentials: 'same-origin'`） |
 
 ## HTTP 方法
 
@@ -38,7 +38,7 @@
 { "code": "COST_TARGET_NOT_FOUND", "message": "目标成本不存在", "traceId": "xxx", "data": null }
 ```
 
-前端拦截器：`code !== "0"` 时统一提示并 reject。业务错误码必须稳定。
+前端 `apiRequest`：`code !== "0"` 时抛出统一 `ApiClientError`，请求生命周期负责提示。业务错误码必须稳定。
 
 ## 分页契约
 

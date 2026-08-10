@@ -4,7 +4,7 @@
 
 当前状态：V1.5 开发版本已封存，V1.6 开发已启动；第58条主线已将新版切为仓库和本地正式前端，Legacy 源码已归档。当前环境与授权边界只读取 [AGENTS.md](../AGENTS.md)，本索引不复制。V1.5 权威结论见[开发版本归档](archive/v1.5/README.md)和[第57条主线正式收口验收报告](archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
 
-最新主线：第86条 G0～G5 已通过，PR #426 已合并且 post-merge 验证完成；状态、计划和证据分别以 Backlog、计划书及质量报告入口为准。
+最新主线：第87、88条已本地收口并进入统一受保护 Git 交付，远端证据以实际完成结果为准；新控制面指纹进入 N>1 或无界运行前须显式 `启动迭代-1`。状态、计划和证据分别以 Backlog、计划书及对应入口为准。
 
 ## 权威层级与文档类型
 
@@ -90,8 +90,6 @@ Skill、插件 references、配置和 Schema 必须保留在所属包内；文�
 - [v1.6 质量报告](quality/README.md)
 - [产品情报、项目地图与迭代决策](product-intelligence/README.md)
 - [v1.6 迭代记录](iterations/README.md)
-- [未来开发计划](未来开发计划.md)
-- [历史开发记录](历史开发记录.md)
 - [数据库最终基线 B215 与平台初始化](database/database-baseline-v215.md)
 - [项目知识图谱工具](../tools/knowledge-graph/README.md)
 

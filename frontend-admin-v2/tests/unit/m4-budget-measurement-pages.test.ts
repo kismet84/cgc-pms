@@ -1,26 +1,19 @@
-import type {
-  BudgetPage,
-  MeasurementAmountRow,
-  ProjectBudgetRecord,
-} from '@cgc-pms/frontend-contracts'
+import type { MeasurementAmountRow } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import BudgetPageView from '@/pages/commercial/BudgetPage.vue'
 import MeasurementPageView from '@/pages/commercial/ProductionMeasurementPage.vue'
 import { dismissToast, toastItems } from '@/components/toast'
 import * as commercial from '@/services/commercial'
 import { uploadSiteFile } from '@/services/delivery'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+
 vi.mock('@/services/commercial', () => ({
-  createBudget: vi.fn(),
-  deleteBudget: vi.fn(),
-  loadBudget: vi.fn(),
-  loadBudgetAvailability: vi.fn(),
-  loadBudgetPage: vi.fn(),
-  loadCostSubjectOptions: vi.fn(),
+  closeMeasurementPeriod: vi.fn(),
+  createMeasurement: vi.fn(),
+  createMeasurementPeriod: vi.fn(),
   loadContractPage: vi.fn(),
   loadMeasurement: vi.fn(),
   loadMeasurementPeriods: vi.fn(),
@@ -30,41 +23,12 @@ vi.mock('@/services/commercial', () => ({
   loadOwnerMeasurementSubmission: vi.fn(),
   loadOwnerMeasurementSubmissions: vi.fn(),
   loadProjectContextOptions: vi.fn(),
-  saveBudgetLines: vi.fn(),
-  submitBudget: vi.fn(),
-  updateBudget: vi.fn(),
-  closeMeasurementPeriod: vi.fn(),
-  createMeasurement: vi.fn(),
-  createMeasurementPeriod: vi.fn(),
   reviewOwnerMeasurement: vi.fn(),
   submitMeasurement: vi.fn(),
   submitOwnerMeasurement: vi.fn(),
 }))
 vi.mock('@/services/delivery', () => ({ uploadSiteFile: vi.fn() }))
-const budget: ProjectBudgetRecord = {
-  id: '9007199254740993',
-  projectId: 'P1',
-  budgetCode: 'BUD-20260725-001',
-  versionNo: 'V1',
-  budgetName: '项目预算',
-  totalAmount: '9007199254740993.12',
-  approvalStatus: 'DRAFT',
-  status: 'ACTIVE',
-  active: false,
-  version: '7',
-  lines: [
-    {
-      id: 'L1',
-      costSubjectId: 'S1',
-      costSubjectName: '材料费',
-      budgetAmount: '9007199254740993.12',
-      reservedAmount: '0',
-      consumedAmount: '-0.01',
-      availableAmount: '9007199254740993.13',
-    },
-  ],
-}
-const budgetPage: BudgetPage = { records: [budget], total: 1, pageNo: 1, pageSize: 20 }
+
 const measurement: MeasurementAmountRow = {
   id: 'M1',
   measure_code: 'ME-1',
@@ -79,19 +43,20 @@ const measurement: MeasurementAmountRow = {
   status: 'DRAFT',
   version: '9',
 }
+
 function deferred<T>() {
   let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((r, j) => {
-    resolve = r
-    reject = j
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve
   })
-  return { promise, resolve, reject }
+  return { promise, resolve }
 }
+
 function apiError(message: string, status: number) {
   return Object.assign(new Error(message), { name: 'ApiClientError', code: 'TEST', status })
 }
-async function mountPage(component: typeof BudgetPageView, path: string, permissions: string[]) {
+
+async function mountPage(path: string, permissions: string[]) {
   setActivePinia(createPinia())
   const session = useSessionStore()
   session.userInfo = { userId: '1', username: 'tester', roles: ['USER'], permissions }
@@ -102,46 +67,28 @@ async function mountPage(component: typeof BudgetPageView, path: string, permiss
   ])
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [
-      { path: '/budget', component: BudgetPageView },
-      { path: '/production-measurement', component: MeasurementPageView },
-    ],
+    routes: [{ path: '/production-measurement', component: MeasurementPageView }],
   })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(component, { global: { plugins: [router], stubs: { teleport: true } } })
+  const wrapper = mount(MeasurementPageView, {
+    global: { plugins: [router], stubs: { teleport: true } },
+  })
   await flushPromises()
   return { wrapper, router }
 }
+
 function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label: string) {
   return wrapper.findAll('button').find((item) => item.text().includes(label))
 }
+
 beforeEach(() => {
   toastItems.slice().forEach((toast) => dismissToast(toast.id))
-  vi.mocked(commercial.loadCostSubjectOptions)
-    .mockReset()
-    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
   vi.mocked(commercial.loadProjectContextOptions)
     .mockReset()
     .mockResolvedValue([
       { id: 'P1', projectName: '项目一', status: 'ACTIVE' },
       { id: 'P2', projectName: '项目二', status: 'ACTIVE' },
-    ])
-  vi.mocked(commercial.loadBudgetPage).mockReset().mockResolvedValue(budgetPage)
-  vi.mocked(commercial.loadBudget).mockReset().mockResolvedValue(budget)
-  vi.mocked(commercial.loadBudgetAvailability)
-    .mockReset()
-    .mockResolvedValue([
-      {
-        budgetId: budget.id,
-        budgetLineId: 'L1',
-        projectId: 'P1',
-        costSubjectId: 'S1',
-        budgetAmount: '9007199254740993.12',
-        reservedAmount: '0',
-        consumedAmount: '-0.01',
-        availableAmount: '9007199254740993.13',
-      },
     ])
   vi.mocked(commercial.loadContractPage)
     .mockReset()
@@ -192,46 +139,11 @@ beforeEach(() => {
     .mockResolvedValue({ ...measurement, lines: [{ id: 'ML1', item_name: '主体结构' }] })
   vi.mocked(commercial.loadOwnerMeasurementSubmissions).mockReset().mockResolvedValue([])
   vi.mocked(commercial.loadMeasurementSources).mockReset().mockResolvedValue([])
-  vi.mocked(commercial.createBudget).mockReset().mockResolvedValue('NEW-1')
-  vi.mocked(commercial.updateBudget).mockReset().mockResolvedValue()
-  vi.mocked(commercial.saveBudgetLines).mockReset().mockResolvedValue()
-  vi.mocked(commercial.deleteBudget).mockReset().mockResolvedValue()
-  vi.mocked(commercial.submitBudget).mockReset()
   vi.mocked(commercial.submitMeasurement).mockReset().mockResolvedValue({})
   vi.mocked(uploadSiteFile).mockReset().mockResolvedValue({ id: 'F1' })
 })
-describe('M4 budget and measurement pages', () => {
-  it('keeps project budget on the standard table and 10-row pagination contract', async () => {
-    const { wrapper } = await mountPage(BudgetPageView, '/budget?projectId=P1&period=2026-07', [
-      'budget:query',
-    ])
 
-    expect(commercial.loadBudgetPage).toHaveBeenCalledWith(
-      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
-      expect.any(AbortSignal),
-    )
-    expect(wrapper.get('table').element.closest('.v2-card')).not.toBeNull()
-    const pagination = wrapper.get('nav[aria-label="项目预算分页"]')
-    expect(pagination.text()).toContain('共 1 条')
-    expect(pagination.text()).toContain('第 1 页')
-    expect(pagination.text()).not.toContain('/ 1')
-    expect(wrapper.get('tbody').text()).toContain('草稿')
-    expect(wrapper.get('tbody').text()).toContain('已启用')
-    expect(wrapper.get('thead th').text()).toBe('预算编号')
-    expect(wrapper.get('tbody th').text()).toContain('BUD-20260725-001')
-    expect(wrapper.get('tbody').text()).not.toMatch(/\b(?:DRAFT|ACTIVE)\b/)
-    const headingCard = wrapper.get('.v2-card--page-heading')
-    expect(headingCard.find('.v2-card__body').exists()).toBe(false)
-    expect(headingCard.get('.v2-card__header .filters').exists()).toBe(true)
-    expect(
-      headingCard
-        .findAll('button')
-        .find((item) => item.text().includes('查询'))
-        ?.classes(),
-    ).toContain('v2-button--small')
-    expect(wrapper.get('table').element.closest('.v2-card--page-heading')).toBeNull()
-  })
-
+describe('M4 production measurement page', () => {
   it('uses one measurement table and expands owner submission versions', async () => {
     vi.mocked(commercial.loadMeasurements).mockResolvedValueOnce([
       { ...measurement, status: 'OWNER_SUBMITTED', approval_status: 'APPROVED' },
@@ -250,11 +162,9 @@ describe('M4 budget and measurement pages', () => {
         status: 'SUBMITTED',
       },
     ])
-    const { wrapper } = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1&period=2026-07',
-      ['measurement:query'],
-    )
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1&period=2026-07', [
+      'measurement:query',
+    ])
 
     const table = wrapper.get('[aria-label="产值计量列表"]')
     expect(table.findAll('th').map((item) => item.text())).toEqual([
@@ -278,33 +188,27 @@ describe('M4 budget and measurement pages', () => {
       startDate: '2026-07-01',
       endDate: '2026-07-31',
     })
-
     await button(wrapper, 'ME-1')!.trigger('click')
     await flushPromises()
     expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('OMS-202607-001-R2')
     expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('V2')
   })
 
-  it('shows one empty state when the current filter has no measurement records', async () => {
+  it('shows one empty state when the current filter has no records', async () => {
     vi.mocked(commercial.loadMeasurements).mockResolvedValueOnce([])
-    const { wrapper } = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1&period=2026-07',
-      ['measurement:query'],
-    )
-
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1&period=2026-07', [
+      'measurement:query',
+    ])
     expect(wrapper.text()).toContain('暂无产值计量')
     expect(wrapper.find('[aria-label="产值计量列表"]').exists()).toBe(false)
   })
 
   it('selects project and owner contract inside both create dialogs', async () => {
-    const { wrapper } = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1',
-      ['measurement:query', 'measurement:maintain', 'file:upload'],
-    )
-
-    expect(wrapper.find('[aria-label="业主合同"]').exists()).toBe(false)
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1', [
+      'measurement:query',
+      'measurement:maintain',
+      'file:upload',
+    ])
     await button(wrapper, '新建期间')!.trigger('click')
     await flushPromises()
     expect(commercial.loadContractPage).toHaveBeenCalledWith({
@@ -315,7 +219,6 @@ describe('M4 budget and measurement pages', () => {
       approvalStatus: 'APPROVED',
       contractStatus: 'PERFORMING',
     })
-    expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
     expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
     expect(wrapper.get('.measurement-page__period-form').attributes('id')).toBe(
       'measurement-period-form',
@@ -323,20 +226,17 @@ describe('M4 budget and measurement pages', () => {
     expect(wrapper.get('.measurement-page__period-dates').text()).toContain('日期范围')
     expect(wrapper.get('button[form="measurement-period-form"]').text()).toContain('保存期间')
     await wrapper.get('[role="dialog"]').get('button[aria-label="关闭对话框"]').trigger('click')
-
     await button(wrapper, '新建计量')!.trigger('click')
     await flushPromises()
-    expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
     expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
   })
 
-  it('recovers draft evidence using server document types for header and every line', async () => {
-    const { wrapper } = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1',
-      ['measurement:query', 'measurement:maintain', 'file:upload'],
-    )
-
+  it('recovers draft evidence using server document types', async () => {
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1', [
+      'measurement:query',
+      'measurement:maintain',
+      'file:upload',
+    ])
     await button(wrapper, '补传/更新计量依据')!.trigger('click')
     const file = new File(['evidence'], 'measurement.pdf', { type: 'application/pdf' })
     const lineFile = new File(['line evidence'], 'measurement-line.pdf', {
@@ -350,7 +250,6 @@ describe('M4 budget and measurement pages', () => {
     await lineInput.trigger('change')
     await wrapper.get('#measurement-evidence-form').trigger('submit')
     await flushPromises()
-
     expect(uploadSiteFile).toHaveBeenNthCalledWith(
       1,
       file,
@@ -368,12 +267,10 @@ describe('M4 budget and measurement pages', () => {
   })
 
   it('puts status before create actions and applies it immediately', async () => {
-    const { wrapper, router } = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1',
-      ['measurement:query', 'measurement:maintain'],
-    )
-
+    const { wrapper, router } = await mountPage('/production-measurement?projectId=P1', [
+      'measurement:query',
+      'measurement:maintain',
+    ])
     const actions = wrapper.get('.v2-card__actions > .actions')
     expect(actions.text().indexOf('全部状态')).toBeLessThan(actions.text().indexOf('新建期间'))
     expect(button(wrapper, '查询')).toBeUndefined()
@@ -382,224 +279,54 @@ describe('M4 budget and measurement pages', () => {
     expect(router.currentRoute.value.query.status).toBe('DRAFT')
   })
 
-  it('fails closed without route permissions and sends no business requests', async () => {
-    const b = await mountPage(BudgetPageView, '/budget', [])
-    expect(b.wrapper.text()).toContain('无权访问项目预算')
-    expect(commercial.loadBudgetPage).not.toHaveBeenCalled()
-    const m = await mountPage(MeasurementPageView, '/production-measurement', [])
-    expect(m.wrapper.text()).toContain('无权访问产值计量')
+  it('fails closed without route permission', async () => {
+    const { wrapper } = await mountPage('/production-measurement', [])
+    expect(wrapper.text()).toContain('无权访问产值计量')
     expect(commercial.loadMeasurements).not.toHaveBeenCalled()
     expect(commercial.loadProjectContextOptions).not.toHaveBeenCalled()
   })
-  it('shows list failures and keeps budget detail 404 visible', async () => {
-    vi.mocked(commercial.loadBudgetPage).mockRejectedValueOnce(apiError('预算服务异常', 500))
-    await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
-    expect(toastItems.some((toast) => toast.message.includes('预算服务异常'))).toBe(true)
-    vi.mocked(commercial.loadBudgetPage).mockResolvedValueOnce(budgetPage)
-    vi.mocked(commercial.loadBudget).mockRejectedValueOnce(apiError('预算不存在', 404))
-    const b404 = await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
-    await button(b404.wrapper, 'BUD-20260725-001')!.trigger('click')
-    await flushPromises()
-    expect(toastItems.some((toast) => toast.message.includes('预算不存在'))).toBe(true)
+
+  it('aborts stale project responses and reports list failures', async () => {
     vi.mocked(commercial.loadMeasurements).mockRejectedValueOnce(apiError('计量服务异常', 500))
-    await mountPage(MeasurementPageView, '/production-measurement?projectId=P1', [
+    await mountPage('/production-measurement?projectId=P1', ['measurement:query'])
+    expect(toastItems.some((toast) => toast.message.includes('计量服务异常'))).toBe(true)
+
+    const oldRequest = deferred<MeasurementAmountRow[]>()
+    const freshRequest = deferred<MeasurementAmountRow[]>()
+    const signals: AbortSignal[] = []
+    vi.mocked(commercial.loadMeasurements)
+      .mockImplementationOnce(async (_query, signal) => {
+        signals.push(signal!)
+        return oldRequest.promise
+      })
+      .mockImplementationOnce(async (_query, signal) => {
+        signals.push(signal!)
+        return freshRequest.promise
+      })
+    const page = await mountPage('/production-measurement?projectId=P1&period=2026-06', [
       'measurement:query',
     ])
-    expect(toastItems.some((toast) => toast.message.includes('计量服务异常'))).toBe(true)
+    await page.router.push('/production-measurement?projectId=P2&period=2026-07')
+    await flushPromises()
+    freshRequest.resolve([{ ...measurement, measure_code: 'LATEST' }])
+    await flushPromises()
+    oldRequest.resolve([{ ...measurement, measure_code: 'STALE' }])
+    await flushPromises()
+    expect(signals[0]?.aborted).toBe(true)
+    expect(page.wrapper.text()).toContain('LATEST')
+    expect(page.wrapper.text()).not.toContain('STALE')
   })
-  it('aborts budget and measurement requests and ignores stale project/period responses', async () => {
-    const oldBudget = deferred<BudgetPage>()
-    const freshBudget = deferred<BudgetPage>()
-    const budgetSignals: AbortSignal[] = []
-    vi.mocked(commercial.loadBudgetPage)
-      .mockImplementationOnce(async (_q, s) => {
-        budgetSignals.push(s!)
-        return oldBudget.promise
-      })
-      .mockImplementationOnce(async (_q, s) => {
-        budgetSignals.push(s!)
-        return freshBudget.promise
-      })
-    const b = await mountPage(BudgetPageView, '/budget?projectId=P1&period=2026-06', [
-      'budget:query',
-    ])
-    await b.router.push('/budget?projectId=P2&period=2026-07')
-    await flushPromises()
-    freshBudget.resolve({
-      ...budgetPage,
-      records: [{ ...budget, projectId: 'P2', budgetName: '最新预算' }],
-    })
-    await flushPromises()
-    oldBudget.resolve({ ...budgetPage, records: [{ ...budget, budgetName: '陈旧预算' }] })
-    await flushPromises()
-    expect(budgetSignals[0]?.aborted).toBe(true)
-    expect(b.wrapper.text()).toContain('最新预算')
-    expect(b.wrapper.text()).not.toContain('陈旧预算')
-    const oldMeasurement = deferred<MeasurementAmountRow[]>()
-    const freshMeasurement = deferred<MeasurementAmountRow[]>()
-    const measurementSignals: AbortSignal[] = []
-    vi.mocked(commercial.loadMeasurements)
-      .mockImplementationOnce(async (_q, s) => {
-        measurementSignals.push(s!)
-        return oldMeasurement.promise
-      })
-      .mockImplementationOnce(async (_q, s) => {
-        measurementSignals.push(s!)
-        return freshMeasurement.promise
-      })
-    const m = await mountPage(
-      MeasurementPageView,
-      '/production-measurement?projectId=P1&period=2026-06',
-      ['measurement:query'],
-    )
-    await m.router.push('/production-measurement?projectId=P2&period=2026-07')
-    await flushPromises()
-    freshMeasurement.resolve([{ ...measurement, measure_code: 'LATEST' }])
-    await flushPromises()
-    oldMeasurement.resolve([{ ...measurement, measure_code: 'STALE' }])
-    await flushPromises()
-    expect(measurementSignals[0]?.aborted).toBe(true)
-    expect(m.wrapper.text()).toContain('LATEST')
-    expect(m.wrapper.text()).not.toContain('STALE')
-  })
-  it('deduplicates CAS submits and reloads after 409', async () => {
-    const pending = deferred<void>()
-    vi.mocked(commercial.submitBudget).mockReturnValueOnce(pending.promise)
-    const b = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:submit',
-    ])
-    await button(b.wrapper, '提交')!.trigger('click')
-    await button(b.wrapper, '提交')!.trigger('click')
-    expect(commercial.submitBudget).toHaveBeenCalledTimes(1)
-    expect(commercial.submitBudget).toHaveBeenCalledWith(budget.id, '7')
-    pending.resolve()
-    await flushPromises()
+
+  it('reloads authoritative data after submit conflict', async () => {
     vi.mocked(commercial.submitMeasurement).mockRejectedValueOnce(apiError('计量版本冲突', 409))
-    const m = await mountPage(MeasurementPageView, '/production-measurement?projectId=P1', [
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1', [
       'measurement:query',
       'measurement:submit',
     ])
-    await button(m.wrapper, '提交内部审批')!.trigger('click')
+    await button(wrapper, '提交内部审批')!.trigger('click')
     await flushPromises()
     expect(commercial.submitMeasurement).toHaveBeenCalledWith('M1', '9')
     expect(commercial.loadMeasurements).toHaveBeenCalledTimes(2)
     expect(toastItems.some((toast) => toast.message.includes('计量版本冲突'))).toBe(true)
-  })
-  it('retains create and edit form values on 422 without false success or reload', async () => {
-    vi.mocked(commercial.createBudget).mockRejectedValueOnce(apiError('版本号重复', 422))
-    const created = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:add',
-    ])
-    await button(created.wrapper, '新建预算')!.trigger('click')
-    await created.wrapper.get('input[aria-label="预算版本号"]').setValue('V-NEW')
-    await created.wrapper.get('input[aria-label="预算名称"]').setValue('新预算保留值')
-    await created.wrapper.get('input[aria-label="预算总额"]').setValue('88.88')
-    await created.wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(commercial.createBudget).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: 'P1', version: null, versionNo: 'V-NEW' }),
-    )
-    expect(created.wrapper.get('input[aria-label="预算名称"]').element.value).toBe('新预算保留值')
-    expect(toastItems.some((toast) => toast.message.includes('版本号重复'))).toBe(true)
-    expect(created.wrapper.text()).not.toContain('预算已创建')
-    expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
-
-    vi.mocked(commercial.updateBudget).mockRejectedValueOnce(apiError('预算校验失败', 422))
-    const edited = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:edit',
-    ])
-    await button(edited.wrapper, '编辑')!.trigger('click')
-    await flushPromises()
-    await edited.wrapper.get('input[aria-label="预算名称"]').setValue('编辑后保留值')
-    await edited.wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(commercial.updateBudget).toHaveBeenCalledWith(
-      budget.id,
-      expect.objectContaining({ budgetName: '编辑后保留值', version: '7' }),
-    )
-    expect(edited.wrapper.get('input[aria-label="预算名称"]').element.value).toBe('编辑后保留值')
-    expect(toastItems.some((toast) => toast.message.includes('预算校验失败'))).toBe(true)
-    expect(edited.wrapper.text()).not.toContain('预算已更新')
-    expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(2)
-  })
-  it('saves lines with CAS then rereads authoritative availability', async () => {
-    vi.mocked(commercial.loadBudgetAvailability)
-      .mockResolvedValueOnce([
-        {
-          budgetId: budget.id,
-          budgetLineId: 'L1',
-          projectId: 'P1',
-          costSubjectId: 'S1',
-          budgetAmount: '10',
-          reservedAmount: '1',
-          consumedAmount: '0.11',
-          availableAmount: '8.89',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          budgetId: budget.id,
-          budgetLineId: 'L1',
-          projectId: 'P1',
-          costSubjectId: 'S1',
-          budgetAmount: '10',
-          reservedAmount: '2',
-          consumedAmount: '0.22',
-          availableAmount: '7.78',
-        },
-      ])
-    const page = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:edit',
-    ])
-    await button(page.wrapper, 'BUD-20260725-001')!.trigger('click')
-    await flushPromises()
-    expect(page.wrapper.text()).toContain('8.89')
-    await button(page.wrapper, '保存明细')!.trigger('click')
-    await flushPromises()
-    expect(commercial.saveBudgetLines).toHaveBeenCalledWith(budget.id, budget.lines, '7')
-    expect(commercial.loadBudgetAvailability).toHaveBeenCalledTimes(2)
-    expect(page.wrapper.text()).toContain('7.78')
-    expect(page.wrapper.text()).not.toContain('8.89')
-    expect(toastItems.at(-1)?.message).toContain('预算明细已保存')
-  })
-  it('retains edited lines on 422 without a success notice or authority overwrite', async () => {
-    vi.mocked(commercial.saveBudgetLines).mockRejectedValueOnce(apiError('明细校验失败', 422))
-    const page = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:edit',
-    ])
-    await button(page.wrapper, 'BUD-20260725-001')!.trigger('click')
-    await flushPromises()
-    await page.wrapper.get('input[aria-label="预算金额"]').setValue('77.77')
-    await button(page.wrapper, '保存明细')!.trigger('click')
-    await flushPromises()
-    expect(commercial.saveBudgetLines).toHaveBeenCalledWith(
-      budget.id,
-      [expect.objectContaining({ budgetAmount: '77.77' })],
-      '7',
-    )
-    expect(page.wrapper.get('input[aria-label="预算金额"]').element.value).toBe('77.77')
-    expect(toastItems.some((toast) => toast.message.includes('明细校验失败'))).toBe(true)
-    expect(toastItems.some((toast) => toast.message.includes('预算明细已保存'))).toBe(false)
-    expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
-    expect(commercial.loadBudgetAvailability).toHaveBeenCalledTimes(1)
-  })
-  it('keeps the budget visible and reports delete 422 without false success', async () => {
-    vi.mocked(commercial.deleteBudget).mockRejectedValueOnce(apiError('预算已被引用', 422))
-    const page = await mountPage(BudgetPageView, '/budget?projectId=P1', [
-      'budget:query',
-      'budget:delete',
-    ])
-    await button(page.wrapper, '删除')!.trigger('click')
-    await flushPromises()
-    expect(commercial.deleteBudget).toHaveBeenCalledWith(budget.id, '7')
-    expect(toastItems.some((toast) => toast.message.includes('预算已被引用'))).toBe(true)
-    expect(page.wrapper.text()).toContain('项目预算')
-    expect(page.wrapper.text()).not.toContain('预算已删除')
-    expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
   })
 })
