@@ -96,7 +96,7 @@ function Complete-AutopilotIssueCloseout {
     [string]$RepoRoot,
     [string]$Worktree,
     [object]$Issue,
-    [bool]$AutoMerge = $true,
+    [bool]$AutoMerge = $false,
     [string]$BaseBranch = 'master',
     [string]$ExpectedBaseCommit = '',
     [object]$ScoreEvidence = $null,

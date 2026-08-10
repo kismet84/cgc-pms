@@ -98,6 +98,7 @@ Assert-SetEqual $summaryNeeds $requiredJobs 'build-summary needs versus gate job
 Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.sql-safety-scan.result','PR push evidence: ${{ needs.pr-push-evidence.result }}') 'build-summary'
 
 $prPushEvidence = Get-JobBlock $workflow 'pr-push-evidence'
+$desktopLauncher = Get-JobBlock $workflow 'desktop-launcher'
 $backendTest = Get-JobBlock $workflow 'backend-test'
 $backendOrder = Get-JobBlock $workflow 'backend-order-sensitive'
 $backendMySql = Get-JobBlock $workflow 'backend-test-mysql'
@@ -113,6 +114,12 @@ Assert-Contains $workflow @('run-name: CI ${{ github.event_name }} ${{ github.ev
 Assert-Contains $workflow @(
   'concurrency:','group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}','cancel-in-progress: true'
 ) 'workflow concurrency cancellation'
+Assert-Contains $sqlSafety @(
+  'name: Verify Flyway migration immutability',
+  'FLYWAY_BASE_SHA: ${{ github.event.pull_request.base.sha }}',
+  'DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}',
+  'bash scripts/check-flyway-immutability.sh --base "$base"'
+) 'Flyway immutability CI gate'
 Assert-Contains $prPushEvidence @(
   'actions: read','contents: read','pull-requests: read',
   'if: github.event_name == ''pull_request'' && github.event.pull_request.head.repo.full_name == github.repository',
@@ -176,6 +183,15 @@ Assert-Contains $backendTest @(
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: backend/target/cgc-pms-backend.jar',
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'
 ) 'backend-test'
+Assert-Contains $desktopLauncher @(
+  'runs-on: windows-2022',
+  'Run AutoPilot control-plane contracts',
+  './scripts/codex-autopilot/test-codex-task-execution-policy.ps1',
+  './scripts/codex-autopilot/test-native-command-semantics.ps1',
+  './scripts/codex-autopilot/test-closeout.ps1',
+  './scripts/codex-autopilot/test-evidence-verification.ps1',
+  './scripts/codex-autopilot/test-control-plane-fingerprint.ps1'
+) 'desktop-launcher AutoPilot contracts'
 if ($backendTest.Contains('-Ptest-order-independence')) { throw 'backend-test must not serialize the order-sensitive profile' }
 Assert-Contains $backendOrder @(
   'needs: pr-push-evidence',"if: needs.pr-push-evidence.outputs.run-full == 'true'",
@@ -240,6 +256,7 @@ Assert-Contains $sqlSafety @(
   'README_SYNC_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
   'node scripts/ci/check-readme-sync.mjs --range "$env:README_SYNC_BASE_SHA" "$env:README_SYNC_HEAD_SHA"',
   './scripts/ci/test-workflow-contract.ps1',
+  'node --test .agents/skills/long-task-gate/tests/long-task-gate.test.mjs',
   './scripts/ci/test-pr-push-evidence.ps1',
   './scripts/check-sql-safety.ps1'
 ) 'sql-safety-scan'

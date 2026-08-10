@@ -63,30 +63,14 @@ try {
 
     $result = [ordered]@{
         issueId = $IssueId
-        dryRun = [bool]$DryRun
+        dryRun = $true
+        previewOnly = $true
         diffCheckPassed = ($diffExit -eq 0)
         diffCheckOutput = @($diffCheck) -join [Environment]::NewLine
         expectedPaths = $ExpectedPaths
         unexpectedPaths = $unexpected
         gitStatus = $statusLines
-        willCommit = (-not $DryRun -and $diffExit -eq 0 -and $unexpected.Count -eq 0)
-    }
-
-    if (-not $DryRun) {
-        if ($diffExit -ne 0) {
-            throw "git diff --check failed"
-        }
-        if ($unexpected.Count -gt 0) {
-            throw ("Unexpected changed paths: " + ($unexpected -join ', '))
-        }
-        if (-not $CommitMessage) {
-            $CommitMessage = $IssueId
-        }
-        & git commit -m $CommitMessage
-        if ($LASTEXITCODE -ne 0) {
-            throw "git commit failed"
-        }
-        $result['commitMessage'] = $CommitMessage
+        willCommit = $false
     }
 
     $result | ConvertTo-Json -Depth 5

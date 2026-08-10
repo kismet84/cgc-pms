@@ -28,6 +28,7 @@ try {
   Invoke-Git @('add','.')
   Invoke-Git @('commit','-qm','base')
   $baseCommit = (& git -C $root rev-parse HEAD).Trim()
+  $script:AutopilotBranchAuthorized = $true
 
   'dirty-main' | Set-Content -LiteralPath (Join-Path $root 'docs\quality\base.md') -Encoding UTF8
   $issue = [pscustomobject]@{

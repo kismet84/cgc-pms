@@ -95,6 +95,14 @@ jobs:
       - name: Run launcher contract tests
         shell: pwsh
         run: ./desktop-launcher/tests/launcher-contract.ps1
+      - name: Run AutoPilot control-plane contracts
+        shell: pwsh
+        run: |
+          ./scripts/codex-autopilot/test-codex-task-execution-policy.ps1
+          ./scripts/codex-autopilot/test-native-command-semantics.ps1
+          ./scripts/codex-autopilot/test-closeout.ps1
+          ./scripts/codex-autopilot/test-evidence-verification.ps1
+          ./scripts/codex-autopilot/test-control-plane-fingerprint.ps1
       - name: Reject unsafe Chromium flags and committed runtime artifacts
         shell: pwsh
         run: |
@@ -459,12 +467,23 @@ jobs:
       - name: Verify CI workflow contract
         shell: pwsh
         run: ./scripts/ci/test-workflow-contract.ps1
+      - name: Run long-task gate tests
+        run: node --test .agents/skills/long-task-gate/tests/long-task-gate.test.mjs
       - name: Verify PR push evidence contract
         shell: pwsh
         run: ./scripts/ci/test-pr-push-evidence.ps1
       - name: Run SQL injection safety scan
         shell: pwsh
         run: ./scripts/check-sql-safety.ps1
+      - name: Verify Flyway migration immutability
+        shell: bash
+        env:
+          FLYWAY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="$FLYWAY_BASE_SHA"
+          if [[ -z "$base" ]]; then base="origin/$DEFAULT_BRANCH"; fi
+          bash scripts/check-flyway-immutability.sh --base "$base"
 
   build-summary:
     if: always()

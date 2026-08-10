@@ -14,6 +14,11 @@ $handoff = ($raw -join "`n") | ConvertFrom-Json
 if ($handoff.decision -ne 'DESKTOP_NATIVE_HANDOFF_REQUIRED' -or $handoff.executionHost -ne 'desktop-native') { throw 'desktop handoff contract is invalid' }
 if ([int]$handoff.nestedModelCliInvocationCount -ne 0) { throw 'desktop handoff reported a nested model invocation' }
 if ($handoff.maxIterations -ne 1) { throw 'desktop handoff lost the iteration limit' }
+if ($handoff.branchAuthorized -or $handoff.commitAuthorized -or $handoff.mergeAuthorized) { throw 'desktop handoff persisted Git authorization by default' }
 if ([string]$handoff.registerCanaryCommand -notmatch 'autopilot-register-canary\.ps1' -or [string]$handoff.registerCanaryCommand -notmatch 'GraphGitCursor') { throw 'desktop handoff omitted the deterministic canary registration command' }
+
+$authorizedRaw = & pwsh -NoProfile -File (Join-Path $scriptDir 'autopilot-run-continuous.ps1') -RepoRoot $repoRoot -MaxIterations 1 -AuthorizeBranch -AuthorizeCommit -AuthorizeMerge
+$authorizedHandoff = ($authorizedRaw -join "`n") | ConvertFrom-Json
+if (!$authorizedHandoff.branchAuthorized -or !$authorizedHandoff.commitAuthorized -or !$authorizedHandoff.mergeAuthorized) { throw 'desktop handoff lost explicit per-run Git authorization' }
 
 Write-Host 'desktop execution host self-test passed'

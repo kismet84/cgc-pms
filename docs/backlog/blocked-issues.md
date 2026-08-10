@@ -1,30 +1,20 @@
 # Blocked Issues
 
-## v1.6 当前生产发布门
+## v1.6 当前本地环境状态
 
-以下三项由 [`current-issues.json`](current-issues.json) 的稳定键承接，继续阻塞生产：
+[`current-issues.json`](current-issues.json) 是状态唯一事实源。项目当前仅有本地开发环境，以下非本地事项均冻结、不阻塞当前本地工作：
 
-| Issue | 状态 | 解除条件摘要 |
+| Issue | 状态 | 当前口径 |
 | --- | --- | --- |
-| `REL-CREDENTIAL-ROTATION` | `RELEASE_GATE` | 目标环境凭据轮换、旧值失效和双人复核证据 |
-| `REL-FILE-RESCAN` | `RELEASE_GATE` | 生产存量文件逐对象真实病毒复扫与处置证据 |
-| `REL-TARGET-SHA-REVALIDATION` | `RELEASE_GATE` | 同一待发布 SHA 的 CI、目标环境迁移、真实角色、备份恢复和回滚证据 |
+| `REL-CREDENTIAL-ROTATION` | `FROZEN / NOT_APPLICABLE_LOCAL_ONLY` | 不得执行；仅当用户明确修改根环境规则并提供非本地环境后重新评估 |
+| `REL-FILE-RESCAN` | `FROZEN / NOT_APPLICABLE_LOCAL_ONLY` | 不得执行；仅当用户明确修改根环境规则并提供非本地环境后重新评估 |
+| `REL-TARGET-SHA-REVALIDATION` | `FROZEN / NOT_APPLICABLE_LOCAL_ONLY` | 同 SHA CI 由具体 Git 交付任务处理；不得规划目标环境复验 |
 
-## 其他需要确认事项
-
-### ISSUE-049-001：历史间接费结果表生产退役确认
-
-- 状态：`environment_prerequisite`。
-- 本地已证明现行链路不依赖 `overhead_allocation_record`，但仓库外 BI、报表或 ETL 消费者需要目标环境签认。
-- 未确认前保留该表；不得自动生成 DROP migration。
+## 其他冻结事项
 
 ### `AUDIT-PROMETHEUS-SCRAPE-AUTH`
 
-- 状态：`NEEDS_CONFIRMATION`。
-- 需要目标环境明确 Prometheus 抓取身份、Secret 责任和网络边界后再决策。
-
-### 分支保护治理观察
-
-- 当前管理员保护已启用；是否追加审批人数或推送主体白名单仍需仓库治理决策。
+- 状态：`FROZEN / OPERATIONAL_RISK`，`blocking=false`。
+- 非本地监控网络、Secret 和真实运行验收当前不适用；除非用户明确修改根环境规则，否则不得重开。
 
 v1.5 已解除阻塞及完整历史见 [Backlog 快照](../archive/v1.5/backlog-snapshot/blocked-issues.md)。

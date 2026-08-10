@@ -97,6 +97,8 @@ admin-state.json
 !.codex/
 .codex/*
 !.codex/hooks.json
+!.codex/hooks/
+!.codex/hooks/pre-tool-use-command-guard.ps1
 .codex-autopilot/*.flag
 .codex-autopilot/state.json
 .codex-autopilot/run.lock

@@ -37,7 +37,10 @@ function New-AutopilotDesktopHandoff {
     [Nullable[int]]$MaxIterations = $null,
     [bool]$DryRun = $false,
     [bool]$ApplyBacklogSplit = $false,
-    [bool]$ExplainNextAction = $false
+    [bool]$ExplainNextAction = $false,
+    [bool]$BranchAuthorized = $false,
+    [bool]$CommitAuthorized = $false,
+    [bool]$MergeAuthorized = $false
   )
 
   return [pscustomobject][ordered]@{
@@ -50,6 +53,9 @@ function New-AutopilotDesktopHandoff {
     dryRun = $DryRun
     applyBacklogSplit = $ApplyBacklogSplit
     explainNextAction = $ExplainNextAction
+    branchAuthorized = $BranchAuthorized
+    commitAuthorized = $CommitAuthorized
+    mergeAuthorized = $MergeAuthorized
     nestedModelCliInvocationCount = 0
     checkpointCommand = "pwsh -NoProfile -File scripts/codex-autopilot/autopilot-checkpoint.ps1 -RepoRoot `"$RepoRoot`""
     registerCanaryCommand = "pwsh -NoProfile -File scripts/codex-autopilot/autopilot-register-canary.ps1 -RepoRoot `"$RepoRoot`" -IssueId <issueId> -ReportPath <reportPath> -GraphGitCursor <graphGitCursor>"

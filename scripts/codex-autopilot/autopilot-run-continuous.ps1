@@ -4,6 +4,9 @@ param(
   [switch]$DryRun,
   [switch]$ApplyBacklogSplit,
   [switch]$ExplainNextAction,
+  [switch]$AuthorizeBranch,
+  [switch]$AuthorizeCommit,
+  [switch]$AuthorizeMerge,
   [Nullable[int]]$MaxIterations = $null,
   [int]$MaxLoops = 20
 )
@@ -24,7 +27,7 @@ if (!(Test-Path -LiteralPath $resolvedConfigPath -PathType Leaf)) { throw "Confi
 $entryConfig = Get-Content -LiteralPath $resolvedConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $resolvedRepoRoot = if ($entryConfig.repoRoot) { [string]$entryConfig.repoRoot } else { $RepoRoot }
 if (Test-AutopilotDesktopNativeHost -Config $entryConfig) {
-  $handoff = New-AutopilotDesktopHandoff -RepoRoot $resolvedRepoRoot -ConfigPath $resolvedConfigPath -MaxIterations $MaxIterations -DryRun ([bool]$DryRun) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit) -ExplainNextAction ([bool]$ExplainNextAction)
+  $handoff = New-AutopilotDesktopHandoff -RepoRoot $resolvedRepoRoot -ConfigPath $resolvedConfigPath -MaxIterations $MaxIterations -DryRun ([bool]$DryRun) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit) -ExplainNextAction ([bool]$ExplainNextAction) -BranchAuthorized ([bool]$AuthorizeBranch) -CommitAuthorized ([bool]$AuthorizeCommit) -MergeAuthorized ([bool]$AuthorizeMerge)
   Write-Output ($handoff | ConvertTo-Json -Depth 5)
   return
 }

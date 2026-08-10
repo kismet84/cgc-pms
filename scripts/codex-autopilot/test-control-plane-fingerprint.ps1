@@ -20,7 +20,20 @@ if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc
 foreach ($skill in @('.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md','.agents/skills/cgc-pms-ci-gate-triage/SKILL.md','.agents/skills/cgc-pms-runtime-refresh/SKILL.md')) {
   if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $skill) { throw "control-plane fingerprint does not cover project execution skill: $skill" }
 }
+foreach ($hookPath in @('.codex/hooks.json','.codex/hooks/pre-tool-use-command-guard.ps1')) {
+  if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $hookPath) { throw "control-plane fingerprint does not cover command preflight hook: $hookPath" }
+}
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/autopilot-execution-host.ps1') { throw 'control-plane fingerprint does not cover execution-host routing' }
+foreach ($gitBehaviorPath in @(
+  'scripts/codex-autopilot/autopilot-native-command.ps1',
+  'scripts/codex-autopilot/autopilot-start.ps1',
+  'scripts/codex-autopilot/autopilot-stop.ps1',
+  'scripts/codex-autopilot/autopilot-kill.ps1',
+  'scripts/codex-autopilot/autopilot-closeout.ps1',
+  'plugins/cgc-pms-autopilot/scripts/local-commit-closeout.ps1'
+)) {
+  if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $gitBehaviorPath) { throw "control-plane fingerprint does not cover Git behavior path: $gitBehaviorPath" }
+}
 if ([int]$realConfig.readyPlanner.timeoutSeconds -lt 600) { throw 'ready Planner timeout budget is below the proven local planning floor' }
 $realPolicy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -PolicyPath $realConfig.controlPlaneCanary.policyPath
 if ($realPolicy.version -ne '2' -or $realPolicy.hash -notmatch '^[a-f0-9]{64}$') { throw 'control-plane policy descriptor is invalid' }

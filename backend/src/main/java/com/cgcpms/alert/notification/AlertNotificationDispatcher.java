@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -60,34 +59,28 @@ public class AlertNotificationDispatcher {
     private void dispatch(Long tenantId, Long userId, AlertLog alert, String eventType,
                           String bizType, String title, String content, Set<String> channels) {
         Set<DispatchKey> sentInAppKeys = new HashSet<>();
-        for (AlertNotificationSender sender : senders.stream()
-                .sorted(Comparator.comparingInt(item -> item.channel().ordinal()))
-                .toList()) {
+        for (AlertNotificationSender sender : senders) {
             AlertNotificationChannel channel = sender.channel();
             if (!isChannelRequested(channels, channel)) {
                 continue;
             }
             DispatchKey key = new DispatchKey(tenantId, alert.getId(), userId, eventType, channel);
-            if (channel == AlertNotificationChannel.IN_APP) {
-                Object lock = inAppLocks.computeIfAbsent(key, ignored -> new Object());
-                try {
-                    synchronized (lock) {
-                        if (sentInAppKeys.contains(key)
-                                || hasSentInAppRecord(tenantId, userId, alert.getId(), eventType)) {
-                            record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
-                                    "SKIPPED", "DUPLICATE_IN_APP_SUPPRESSED");
-                            continue;
-                        }
-                        if (sendAndRecord(sender, tenantId, userId, alert, eventType, bizType, title, content, channel)) {
-                            sentInAppKeys.add(key);
-                        }
+            Object lock = inAppLocks.computeIfAbsent(key, ignored -> new Object());
+            try {
+                synchronized (lock) {
+                    if (sentInAppKeys.contains(key)
+                            || hasSentInAppRecord(tenantId, userId, alert.getId(), eventType)) {
+                        record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
+                                "SKIPPED", "DUPLICATE_IN_APP_SUPPRESSED");
+                        continue;
                     }
-                } finally {
-                    inAppLocks.remove(key, lock);
+                    if (sendAndRecord(sender, tenantId, userId, alert, eventType, bizType, title, content, channel)) {
+                        sentInAppKeys.add(key);
+                    }
                 }
-                continue;
+            } finally {
+                inAppLocks.remove(key, lock);
             }
-            sendAndRecord(sender, tenantId, userId, alert, eventType, bizType, title, content, channel);
         }
     }
 

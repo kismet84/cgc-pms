@@ -255,7 +255,7 @@ function Write-State {
     lastReason = $LastReason
     stopReason = $StopReason
     stopRequested = Test-Path (Join-Path $AutoDir 'stop.flag')
-    autoMerge = if ($config.PSObject.Properties.Name -contains 'autoMerge') { [bool]$config.autoMerge } else { $true }
+    autoMerge = if ($config.PSObject.Properties.Name -contains 'autoMerge') { [bool]$config.autoMerge } else { $false }
     autoPush = $false
     allowTestDataReset = Test-Path (Join-Path $AutoDir 'ALLOW_TEST_DATA_RESET')
     executionHost = if ($script:ExecutionHost) { [string]$script:ExecutionHost } else { [string](Get-AutopilotStateProperty $existing 'executionHost' 'cli-legacy') }

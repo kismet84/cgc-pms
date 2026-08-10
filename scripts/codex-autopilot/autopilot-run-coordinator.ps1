@@ -6,6 +6,9 @@ function Invoke-AutopilotRunCoordinator {
     [switch]$DryRun,
     [switch]$ApplyBacklogSplit,
     [switch]$ExplainNextAction,
+    [switch]$AuthorizeBranch,
+    [switch]$AuthorizeCommit,
+    [switch]$AuthorizeMerge,
     [Nullable[int]]$MaxIterations = $null,
     [int]$MaxLoops = 20
   )
@@ -43,8 +46,11 @@ function Invoke-AutopilotRunCoordinator {
   $executionHost = [string]$runtimeContext.executionHost
   $script:ExecutionHost = $executionHost
   if ($executionHost -eq 'desktop-native') {
-    return New-AutopilotDesktopHandoff -RepoRoot $RepoRoot -ConfigPath $ConfigPath -MaxIterations $MaxIterations -DryRun ([bool]$DryRun) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit) -ExplainNextAction ([bool]$ExplainNextAction)
+    return New-AutopilotDesktopHandoff -RepoRoot $RepoRoot -ConfigPath $ConfigPath -MaxIterations $MaxIterations -DryRun ([bool]$DryRun) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit) -ExplainNextAction ([bool]$ExplainNextAction) -BranchAuthorized ([bool]$AuthorizeBranch) -CommitAuthorized ([bool]$AuthorizeCommit) -MergeAuthorized ([bool]$AuthorizeMerge)
   }
+  $script:AutopilotBranchAuthorized = [bool]$AuthorizeBranch
+  $script:AutopilotCommitAuthorized = [bool]$AuthorizeCommit
+  $script:AutopilotMergeAuthorized = [bool]$AuthorizeMerge
   $configuredBaseBranch = $runtimeContext.baseBranch
   $script:TaskScoringActive = if ($config.PSObject.Properties.Name -contains 'taskScoring') { Test-AutopilotTaskScoringActive $config.taskScoring } else { $false }
   $script:RetrospectiveActive = Test-AutopilotRetrospectiveActive $(if ($config.PSObject.Properties.Name -contains 'taskScoring') { $config.taskScoring } else { $null }) $(if ($config.PSObject.Properties.Name -contains 'retrospective') { $config.retrospective } else { $null })

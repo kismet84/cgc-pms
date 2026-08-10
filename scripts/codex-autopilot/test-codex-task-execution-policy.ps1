@@ -37,8 +37,13 @@ $classifier = Read-RepoText 'plugins\cgc-pms-autopilot\references\classifier-rul
 $classificationSchema = Read-RepoText 'plugins\cgc-pms-autopilot\schemas\classification-result.schema.json'
 $prePrGate = Read-RepoText 'scripts\codex-autopilot\verify-pre-pr-ci.ps1'
 $ciWorkflow = Read-RepoText '.github\workflows\ci.yml'
+$autopilotRunner = Read-RepoText 'scripts\codex-autopilot\autopilot-run-continuous.ps1'
+$autopilotGit = Read-RepoText 'scripts\codex-autopilot\autopilot-native-command.ps1'
+$pluginCommitPreview = Read-RepoText 'plugins\cgc-pms-autopilot\scripts\local-commit-closeout.ps1'
 $backendStandard = Read-RepoText 'docs\standards\04-后端开发规范.md'
 $quickStart = Read-RepoText 'docs\standards\01-快速开始.md'
+$architectureStandard = Read-RepoText 'docs\standards\02-系统架构.md'
+$frontendStandard = Read-RepoText 'docs\standards\05-前端开发规范.md'
 $apiStandard = Read-RepoText 'docs\standards\06-API契约规范.md'
 $databaseStandard = Read-RepoText 'docs\standards\07-数据库与迁移规范.md'
 $permissionStandard = Read-RepoText 'docs\standards\08-权限与审批流程.md'
@@ -47,7 +52,12 @@ $deploymentStandard = Read-RepoText 'docs\standards\10-部署运维手册.md'
 $securityStandard = Read-RepoText 'docs\standards\11-安全规范.md'
 $scoringStandard = Read-RepoText 'docs\standards\14-AutoPilot任务评分与自动改进回顾规范.md'
 $promptIndex = Read-RepoText 'docs\prompt\README.md'
+$acceptancePrompt = Read-RepoText 'docs\prompt\acceptance-closeout-template.md'
 $larkPrompt = Read-RepoText 'docs\prompt\lark-confirmation-flow.md'
+$endUserManual = Read-RepoText 'docs\manuals\end-user-manual.md'
+$blockedIssues = Read-RepoText 'docs\backlog\blocked-issues.md'
+$readyIssues = Read-RepoText 'docs\backlog\ready-issues.md'
+$currentIssues = Read-RepoText 'docs\backlog\current-issues.json' | ConvertFrom-Json
 $databaseGovernanceTest = Read-RepoText 'backend\src\test\java\com\cgcpms\db\DatabaseGovernanceStaticTest.java'
 $envExample = Read-RepoText 'deploy\.env.example'
 $composeDev = Read-RepoText 'deploy\docker-compose.dev.yml'
@@ -61,12 +71,13 @@ if ($agentLineCount -gt 80) { throw "AGENTS.md exceeds 80 lines: $agentLineCount
 Assert-Contains 'AGENTS.md' $agents @(
   '所有回答使用中文','未获明确授权','git branch --show-current','git status --short',
   '保留既有脏改动','禁止自动发布生产','最小相关验证','Git','零悬空收口',
-  '启动迭代-1','普通任务无需显式重读本文件','通常创建1～5个短生命周期子智能体',
-  '存在三个明确独立工作流时最多5个','用户单独发送完整指令“推送”时','不授权无关改动、强推、绕过保护、生产部署或删除目标分支',
+  '启动迭代-1','普通任务无需显式重读本文件','默认不创建',
+  '存在明确独立并行工作或高风险复核时创建 1 个','最多 2 个','用户单独发送完整指令“推送”时','不授权无关改动、强推、绕过保护、生产部署或删除目标分支',
   'docs/codemap/codemap.lock','docs/codemap/codemap.json','regenerate `docs/codemap/codemap.html`',
   '本项目当前仅存在本地开发环境','不得发起、尝试、规划或将非本地环境测试/验收列为阻塞项',
   'Windows/PowerShell 中首次使用搜索工具、包管理器、Compose 或内联 SQL 前','不得在相同错误前提下原样重试'
 )
+if ($agents -match '通常创建1～5个短生命周期子智能体|最多5个') { throw 'repository root retains the retired dense subagent policy' }
 if ($agents -match 'luna_worker') { throw 'repository root hard-depends on an external fixed agent' }
 
 foreach ($directory in @('docs\standards','docs\business')) {
@@ -110,6 +121,28 @@ foreach ($entry in @(
 }
 Assert-Contains 'runtime skill' $runtime @('actuator/health','dev-login','Vite','浏览器')
 Assert-Contains 'mainline skill' $mainline @('**Goal:**','**Architecture:**','正式验收与零悬空','普通主线不读取 AutoPilot')
+
+if ($acceptancePrompt -match '工具配置类|环境前置类|真实质量/安全类') { throw 'acceptance Prompt duplicates the obsolete three-category failure model' }
+Assert-Contains 'acceptance Prompt authority and environment' $acceptancePrompt @('cgc-pms-ci-gate-triage/SKILL.md','环境范围=本地开发环境','是否可上线=不适用')
+
+$frontendContractText = $architectureStandard + $frontendStandard + $apiStandard
+if ($frontendContractText -match '(?i)Axios|Ant Design Vue|VxeTable|ECharts|VITE_API_BASE_URL') { throw 'current frontend standards retain obsolete framework or request-stack claims' }
+Assert-Contains 'frontend current architecture' $architectureStandard @('src/services/request.ts','原生 Fetch','/api','src/navigation/catalog.ts','src/router.ts')
+Assert-Contains 'frontend current standard' $frontendStandard @('原生 Fetch','src/services/','src/navigation/catalog.ts','src/router.ts','@cgc-pms/frontend-contracts')
+Assert-Contains 'frontend current API contract' $apiStandard @('src/services/request.ts','/api','credentials: ''same-origin''')
+if ($endUserManual -match '(?m)`/(?:cost-subject|receipt|requisition)`(?:\s|、|\|)') { throw 'end-user manual retains obsolete route aliases' }
+Assert-Contains 'end-user manual current routes' $endUserManual @('/cost/subject/taxonomy','/purchase/receipt','/inventory/material-requisition')
+Assert-Contains 'blocked issue local-only projection' $blockedIssues @('FROZEN / NOT_APPLICABLE_LOCAL_ONLY','blocking=false')
+Assert-Contains 'ready issue local-only projection' $readyIssues @('FROZEN / NOT_APPLICABLE_LOCAL_ONLY','blocking=false')
+foreach ($releaseKey in @('REL-CREDENTIAL-ROTATION','REL-FILE-RESCAN','REL-TARGET-SHA-REVALIDATION')) {
+  $releaseIssue = @($currentIssues.issues | Where-Object { [string]$_.issueKey -eq $releaseKey })
+  if ($releaseIssue.Count -ne 1 -or [string]$releaseIssue[0].status -ne 'FROZEN' -or [string]$releaseIssue[0].classification -ne 'NOT_APPLICABLE_LOCAL_ONLY' -or [bool]$releaseIssue[0].blocking) {
+    throw "release issue is not frozen for the local-only environment: $releaseKey"
+  }
+  Assert-Contains "blocked projection $releaseKey" $blockedIssues @($releaseKey)
+  Assert-Contains "ready projection $releaseKey" $readyIssues @($releaseKey)
+}
+Assert-Contains 'deployment local-only fence' $deploymentStandard @('FROZEN_REFERENCE / NOT_APPLICABLE_LOCAL_ONLY','不是当前操作指令、验收项或阻塞项')
 
 $canonicalCategories = @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')
 Assert-Contains 'CI skill categories' $ci $canonicalCategories
@@ -288,6 +321,15 @@ $longTaskMetadata = Get-Content -LiteralPath (Join-Path $longTaskSkillRoot 'agen
 Assert-Contains 'long-task Hook contract' $longTaskHookText @('UserPromptSubmit','Stop','commandWindows','long-task-gate.mjs')
 Assert-Contains 'long-task execution boundary' $longTaskScript @('shell: false','BLOCKED_GATE','BLOCKED_NOTIFICATION','--idempotency-key','targetEnv')
 Assert-Contains 'long-task explicit Skill policy' $longTaskMetadata @('allow_implicit_invocation: false')
+Assert-Contains 'long-task required CI execution' $ciWorkflow @('sql-safety-scan:','node --test .agents/skills/long-task-gate/tests/long-task-gate.test.mjs')
+Assert-Contains 'AutoPilot required CI execution' $ciWorkflow @(
+  'desktop-launcher:','runs-on: windows-2022','Run AutoPilot control-plane contracts',
+  './scripts/codex-autopilot/test-codex-task-execution-policy.ps1',
+  './scripts/codex-autopilot/test-native-command-semantics.ps1',
+  './scripts/codex-autopilot/test-closeout.ps1',
+  './scripts/codex-autopilot/test-evidence-verification.ps1',
+  './scripts/codex-autopilot/test-control-plane-fingerprint.ps1'
+)
 if (@($longTaskHooks.hooks.UserPromptSubmit).Count -ne 1 -or @($longTaskHooks.hooks.Stop).Count -ne 1) { throw 'long-task Hook event count is not fail-close' }
 if (($longTaskHookText + $longTaskScript + $longTaskMetadata) -match '(?i)\b(?:ou|oc)_[a-z0-9]{8,}\b|app_secret\s*[:=]|tenant_access_token\s*[:=]') {
   throw 'long-task deliverable contains a fixed recipient or credential'
@@ -313,6 +355,12 @@ Assert-Contains 'CI workflow' $ciWorkflow @(
   'branches-ignore: [master, main]','workflow_dispatch:','pr-push-evidence',
   'verify-pr-push-evidence.ps1','Verify MySQL migration user scope','frontend-v2-gate','supply-chain-security','e2e'
 )
+
+if ([bool]$autopilotConfig.autoMerge) { throw 'AutoPilot autoMerge must default to false' }
+Assert-Contains 'AutoPilot per-run Git authorization entry' $autopilotRunner @('[switch]$AuthorizeBranch','[switch]$AuthorizeCommit','[switch]$AuthorizeMerge')
+Assert-Contains 'AutoPilot centralized Git authorization' $autopilotGit @('AUTOPILOT_GIT_COMMAND_NOT_ALLOWED','AUTOPILOT_GIT_GLOBAL_OPTION_FORBIDDEN','Autopilot$($requiredAuthorization)Authorized','requires explicit authorization for this run')
+Assert-Contains 'plugin commit closeout preview' $pluginCommitPreview @('previewOnly = $true','willCommit = $false')
+if ($pluginCommitPreview -match '(?m)&\s*git\s+commit|Invoke-AutopilotGit[^\r\n]*commit') { throw 'plugin local-commit-closeout still has a real commit path' }
 
 if ([string]$config.baseBranch -ne 'master') { throw 'AutoPilot baseBranch is not aligned with repository policy' }
 $fingerprints = @($config.controlPlaneCanary.fingerprintPaths)

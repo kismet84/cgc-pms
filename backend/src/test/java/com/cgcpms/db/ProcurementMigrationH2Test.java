@@ -40,8 +40,8 @@ class ProcurementMigrationH2Test {
         Flyway current = current("multi_tenant");
         current.migrate();
 
-        assertEquals("291", current.info().current().getVersion().getVersion());
-        assertEquals(21, count(current, """
+        assertEquals("292", current.info().current().getVersion().getVersion());
+        assertEquals(19, count(current, """
                 SELECT COUNT(*) FROM cost_subject
                 WHERE tenant_id=0 AND (subject_code='5401.01' OR subject_code LIKE '5401.01.%'
                    OR subject_code='5401.04' OR subject_code LIKE '5401.04.%')
@@ -61,7 +61,7 @@ class ProcurementMigrationH2Test {
                 WHERE tenant_id=9 AND subject_code='5401.03' AND subject_name='项目目标成本'
                   AND subject_type='TARGET_COST' AND status='ENABLE'
                 """));
-        assertEquals(2, count(current, """
+        assertEquals(0, count(current, """
                 SELECT COUNT(*) FROM cost_subject child
                 JOIN cost_subject parent ON parent.id=child.parent_id AND parent.tenant_id=child.tenant_id
                 WHERE parent.tenant_id=9 AND parent.subject_code='5401.04'
@@ -74,7 +74,7 @@ class ProcurementMigrationH2Test {
                                        '5401.04.12','5401.04.13','5401.04.14','5401.04.16',
                                        '5401.04.17','5401.04.18','5401.04.19')
                 """));
-        assertEquals(2, count(current, """
+        assertEquals(0, count(current, """
                 SELECT COUNT(*) FROM cost_subject
                 WHERE tenant_id IN (0, 9) AND subject_code='5401.04.15' AND deleted_flag=0
                 """));

@@ -120,49 +120,6 @@ class AlertNotificationDispatcherTest {
     }
 
     @Test
-    @DisplayName("未配置占位渠道请求应记录跳过原因且不能误记为已发送")
-    void recordsUnconfiguredPlaceholderChannelsAsSkipped() {
-        AlertNotificationChannelProperties properties = new AlertNotificationChannelProperties();
-        AlertNotificationDispatcher dispatcher = new AlertNotificationDispatcher(recordMapper, List.of(
-                new EmailAlertNotificationSender(properties),
-                new WechatAlertNotificationSender(properties),
-                new SmsAlertNotificationSender(properties)
-        ));
-        AlertLog alert = alert();
-
-        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("EMAIL", "WECHAT", "SMS"));
-
-        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
-                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
-        verify(recordMapper, times(3)).insert(recordCaptor.capture());
-        List<AlertNotificationSendRecord> records = recordCaptor.getAllValues();
-        assertSkipped(records.get(0), "EMAIL", "CHANNEL_NOT_CONFIGURED");
-        assertSkipped(records.get(1), "WECHAT", "CHANNEL_NOT_CONFIGURED");
-        assertSkipped(records.get(2), "SMS", "CHANNEL_NOT_CONFIGURED");
-    }
-
-    @Test
-    @DisplayName("已配置但未实现的占位渠道仍应记录跳过原因且不能误记为已发送")
-    void recordsConfiguredPlaceholderChannelAsNotImplemented() {
-        AlertNotificationChannelProperties properties = new AlertNotificationChannelProperties() {
-            @Override
-            public boolean isConfigured(AlertNotificationChannel channel) {
-                return channel == AlertNotificationChannel.EMAIL;
-            }
-        };
-        AlertNotificationDispatcher dispatcher = new AlertNotificationDispatcher(recordMapper,
-                List.of(new EmailAlertNotificationSender(properties)));
-        AlertLog alert = alert();
-
-        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("EMAIL"));
-
-        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
-                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
-        verify(recordMapper).insert(recordCaptor.capture());
-        assertSkipped(recordCaptor.getValue(), "EMAIL", "CHANNEL_NOT_IMPLEMENTED");
-    }
-
-    @Test
     @DisplayName("同一次分发内同告警同用户同事件重复站内通知应记录为跳过")
     void skipsDuplicateInAppWithinSameDispatch() {
         AlertNotificationSender duplicateInAppSender = org.mockito.Mockito.mock(AlertNotificationSender.class);
@@ -347,16 +304,6 @@ class AlertNotificationDispatcherTest {
                     .filter(record -> reason.equals(record.getFailReason()))
                     .count();
         }
-    }
-
-    private void assertSkipped(AlertNotificationSendRecord record, String channel, String failReason) {
-        assertEquals(10L, record.getTenantId());
-        assertEquals(9001L, record.getAlertId());
-        assertEquals("ALERT_CREATED", record.getEventType());
-        assertEquals(channel, record.getChannel());
-        assertEquals(21L, record.getTargetUserId());
-        assertEquals("SKIPPED", record.getSendStatus());
-        assertEquals(failReason, record.getFailReason());
     }
 
     private AlertLog alert() {

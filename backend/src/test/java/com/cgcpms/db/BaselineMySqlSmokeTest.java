@@ -41,7 +41,24 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("291", flyway.info().current().getVersion().getVersion());
+        assertEquals("292", flyway.info().current().getVersion().getVersion());
+        assertEquals(9, count("""
+                SELECT COUNT(*) FROM sys_menu
+                WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
+                                'variation:order:item:edit','cost:target:add','cost:target:edit',
+                                'cost:target:delete','cost:target:activate','cost:summary:refresh')
+                  AND deleted_flag=0
+                """));
+        assertEquals(9, count("""
+                SELECT COUNT(*) FROM sys_role_menu
+                WHERE tenant_id=0 AND role_id=2 AND menu_id IN
+                    (21901,21902,21903,21904,22001,22002,22003,22004,22101)
+                """));
+        assertEquals(0, count("""
+                SELECT COUNT(*) FROM cost_subject
+                WHERE subject_code IN ('5401.02.05','5401.02.06','5401.04.06','5401.04.10','5401.04.11',
+                                       '5401.04.12','5401.04.13','5401.04.15','5401.04.16','5401.04.17','5401.04.18')
+                """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(211, count("SELECT COUNT(*) FROM information_schema.tables "

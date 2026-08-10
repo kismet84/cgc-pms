@@ -18,6 +18,8 @@ class MigrationIntegrityTest {
 
     private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration-legacy");
     private static final Path H2_MIGRATION_DIR = Path.of("src/main/resources/db/migration-h2-legacy");
+    private static final Path ACTIVE_MIGRATION_DIR = Path.of("src/main/resources/db/migration");
+    private static final Path ACTIVE_H2_MIGRATION_DIR = Path.of("src/main/resources/db/migration-h2");
     private static final Pattern DIRECT_ADD_COST_TARGET_ID = Pattern.compile(
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 
@@ -136,6 +138,37 @@ class MigrationIntegrityTest {
             }
             assertTrue(normalized.contains("delete from cost_subject where id in"));
         }
+    }
+
+    @Test
+    void permissionAndCostSubjectReconciliationIsDualTrack() throws IOException {
+        Path mysqlMigration = ACTIVE_MIGRATION_DIR.resolve(
+                "V292__reconcile_permission_and_cost_subject_facts.sql");
+        Path h2Migration = ACTIVE_H2_MIGRATION_DIR.resolve(
+                "V292__reconcile_permission_and_cost_subject_facts.sql");
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        String mysqlSql = normalizeSql(readString(mysqlMigration));
+        String h2Sql = normalizeSql(readString(h2Migration));
+        for (String sql : List.of(mysqlSql, h2Sql)) {
+            for (String permission : List.of(
+                    "variation:order:add", "variation:order:edit", "variation:order:delete",
+                    "variation:order:item:edit", "cost:target:add", "cost:target:edit",
+                    "cost:target:delete", "cost:target:activate", "cost:summary:refresh")) {
+                assertTrue(sql.contains(permission), permission);
+            }
+            for (String subjectCode : List.of(
+                    "5401.02.05", "5401.02.06", "5401.04.06", "5401.04.10", "5401.04.11",
+                    "5401.04.12", "5401.04.13", "5401.04.15", "5401.04.16", "5401.04.17",
+                    "5401.04.18")) {
+                assertTrue(sql.contains(subjectCode), subjectCode);
+            }
+        }
+        assertTrue(mysqlSql.contains("on duplicate key update"));
+        assertTrue(mysqlSql.contains("insert ignore into sys_role_menu"));
+        assertTrue(h2Sql.contains("merge into sys_menu"));
+        assertTrue(h2Sql.contains("merge into sys_role_menu"));
     }
 
     @Test

@@ -6,6 +6,8 @@
 
 Codex 会从仓库 `.codex/hooks.json` 加载 Hook。首次使用或 Hook 定义变化后，在 `/hooks` 审查并信任当前 hash；不要用本仓库配置覆盖用户全局 Hook 或 `notify`。
 
+Windows `PreToolUse` 还会调用仓库内命令预检：PowerShell 语法错误、缺失的 `-LiteralPath`、带反引号的双引号搜索字面量和混入多条语句的搜索命令会 fail-close。该预检只约束命令形态，不替代授权、沙箱或长任务 Completion Contract。
+
 ## 激活与登记
 
 用户提示必须包含独立标记 `$long-task-gate`。普通“长任务”文字不会激活。

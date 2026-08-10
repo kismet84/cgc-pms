@@ -75,6 +75,39 @@ function Invoke-AutopilotGit {
     [int]$TimeoutSeconds = 120,
     [switch]$ThrowOnFailure
   )
+  $allowedConfigOverrides = @('core.autocrlf=false','core.safecrlf=false','core.longpaths=true')
+  $commandIndex = 0
+  while ($commandIndex -lt $Arguments.Count -and $Arguments[$commandIndex] -eq '-c') {
+    if ($commandIndex + 1 -ge $Arguments.Count -or $Arguments[$commandIndex + 1] -notin $allowedConfigOverrides) {
+      throw 'AUTOPILOT_GIT_GLOBAL_OPTION_FORBIDDEN: only approved wrapper configuration overrides are allowed.'
+    }
+    $commandIndex += 2
+  }
+  if ($commandIndex -ge $Arguments.Count -or ([string]$Arguments[$commandIndex]).StartsWith('-')) {
+    throw 'AUTOPILOT_GIT_GLOBAL_OPTION_FORBIDDEN: callers must not supply Git global options.'
+  }
+  $command = ([string]$Arguments[$commandIndex]).ToLowerInvariant()
+  $subcommand = if ($commandIndex + 1 -lt $Arguments.Count) { ([string]$Arguments[$commandIndex + 1]).ToLowerInvariant() } else { '' }
+  $readOnlyCommands = @('check-ignore','diff','log','ls-files','merge-base','rev-parse','show','show-ref','status')
+  $requiredAuthorization = switch ($command) {
+    { $_ -in @('add','commit') } { 'Commit'; break }
+    'merge' { 'Merge'; break }
+    'worktree' {
+      if ($subcommand -in @('add','remove')) { 'Branch'; break }
+      if ($subcommand -eq 'list') { break }
+      throw "AUTOPILOT_GIT_COMMAND_NOT_ALLOWED: Git $command $subcommand is not an approved control-plane operation."
+    }
+    'branch' { if ($subcommand -ne '--show-current') { 'Branch' }; break }
+    { $_ -in @('switch','checkout') } { 'Branch'; break }
+    { $_ -in $readOnlyCommands } { break }
+    default { throw "AUTOPILOT_GIT_COMMAND_NOT_ALLOWED: Git $command is not an approved control-plane operation." }
+  }
+  if ($requiredAuthorization) {
+    $authorizationVariable = Get-Variable -Name "Autopilot$($requiredAuthorization)Authorized" -Scope Script -ErrorAction SilentlyContinue
+    if ($null -eq $authorizationVariable -or ![bool]$authorizationVariable.Value) {
+      throw "AUTOPILOT_GIT_$($requiredAuthorization.ToUpperInvariant())_AUTHORIZATION_REQUIRED: Git $command $subcommand requires explicit authorization for this run."
+    }
+  }
   $gitArguments = @('-c','core.quotePath=false','-C',$RepoRoot) + @($Arguments)
   return Invoke-AutopilotNativeCommand -FilePath 'git' -Arguments $gitArguments -AcceptedExitCodes $AcceptedExitCodes -TimeoutSeconds $TimeoutSeconds -ThrowOnFailure:$ThrowOnFailure
 }

@@ -3,7 +3,6 @@ import { createRouter, createWebHistory, type Router } from 'vue-router'
 import AppShell from './layouts/AppShell.vue'
 import { firstAccessiblePath, navigationDomains } from './navigation/catalog'
 import LoginPage from './pages/auth/LoginPage.vue'
-import SessionPage from './pages/auth/SessionPage.vue'
 import HealthPage from './pages/HealthPage.vue'
 import { normalizeRedirect } from './services/navigation'
 import { useSessionStore } from './stores/session'
@@ -464,7 +463,6 @@ export const routes: RouteRecordRaw[] = [
   {
     path: '/session',
     name: 'V2Session',
-    component: SessionPage,
   },
   {
     path: '/shell',

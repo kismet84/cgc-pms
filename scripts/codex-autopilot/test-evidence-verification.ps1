@@ -70,6 +70,17 @@ try {
   $multilineClassification = & $classifier -ErrorText "status: fail`ntaskNature: 缺口修复`nReady Issue 不存在或状态不是 Ready" -ExitCode 1 | ConvertFrom-Json
   if ($multilineClassification.category -ne 'ready_issue_config') { throw 'multiline classifier evidence was not passed as one string argument' }
 
+  $script:runtimeProbeCount = 0
+  function Test-AutopilotHealthGate {
+    param([int]$TimeoutSeconds = 10)
+    $script:runtimeProbeCount++
+    return [pscustomobject]@{ status=$(if ($script:runtimeProbeCount -ge 2) { 'pass' } else { 'fail' }); results=@() }
+  }
+  $runtimeTimer = [Diagnostics.Stopwatch]::StartNew()
+  $runtimeResult = Invoke-AutopilotRuntimePreflight -RepoRoot $root -RuntimeRefresh ([pscustomobject]@{ enabled=$true; command='pwsh -NoProfile -Command "exit 0"'; timeoutSeconds=20; waitSeconds=5 })
+  $runtimeTimer.Stop()
+  if ($runtimeResult.status -ne 'pass' -or !$runtimeResult.refreshed -or $script:runtimeProbeCount -ne 2 -or $runtimeTimer.Elapsed.TotalSeconds -ge 5) { throw 'runtime readiness polling did not return immediately after recovery' }
+
   Write-Host 'evidence verification self-test passed'
 } finally {
   Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

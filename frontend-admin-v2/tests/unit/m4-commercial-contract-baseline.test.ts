@@ -6,7 +6,12 @@ import {
   COMMERCIAL_MONEY_FIELDS,
   COMMERCIAL_QUERY_PERMISSIONS,
 } from '@cgc-pms/frontend-contracts'
-import { loadContract, loadContractPage, loadCostSummaryHistory } from '@/services/commercial'
+import {
+  loadContract,
+  loadContractPage,
+  loadCostSummaryHistory,
+  loadPartners,
+} from '@/services/commercial'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -63,6 +68,14 @@ describe('M4 commercial contract baseline', () => {
       body: undefined,
       signal: controller.signal,
     })
+  })
+
+  it('encodes partner filters through the shared commercial query helper', async () => {
+    await loadPartners({ pageNo: 2, pageSize: 20, partnerName: ' 甲方 A&B ', status: '' })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/partners?pageNo=2&pageSize=20&partnerName=%E7%94%B2%E6%96%B9+A%26B',
+    )
   })
 
   it('uses only encoded GET detail and history endpoints', async () => {

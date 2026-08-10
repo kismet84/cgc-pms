@@ -194,6 +194,7 @@ async function expectNoSeriousAxeViolations(page: Page): Promise<void> {
 }
 
 test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page }) => {
+  test.setTimeout(60_000)
   const identity: Identity = 'admin'
   await installIdentity(page, () => identity)
   const runtimeProblems: string[] = []

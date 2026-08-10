@@ -213,7 +213,7 @@ services:
           memory: 1536M
 
   # ===========================================================================
-  # Backend — Spring Boot 3.3 Java 21 REST API (:8080)
+  # Backend — Spring Boot Java 21 REST API (:8080)
   # ===========================================================================
   backend:
     image: ${REGISTRY_URL:-}cgc-pms-backend:${BACKEND_TAG:?BACKEND_TAG must be set}

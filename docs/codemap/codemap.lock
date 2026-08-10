@@ -1,7 +1,7 @@
 {
-  "current_commit": "d1eea9b6897ac7df8ad67fcd8c67a7ba99c92907",
+  "current_commit": "52c11c7dd4ae1f4ac0076a032444d729dc0f706a",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-10T09:04:07.845Z",
+  "generation_time": "2026-08-10T17:10:15.576Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,9 +52,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3877,
-  "repository_file_count": 3877,
-  "included_file_count": 2613,
+  "tracked_file_count": 3871,
+  "repository_file_count": 3871,
+  "included_file_count": 2607,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
@@ -71,16 +71,16 @@
         ".codex-autopilot/**",
         "plugins/**"
       ],
-      "file_count": 86,
-      "fingerprint": "d26804597a78400b1940a349712913539347f72a9afb5ccff96b0a1f4e5df8b5"
+      "file_count": 87,
+      "fingerprint": "4ebaebbfd3495a58d5df421dac061d5900dc3777169da946ada198579a8ff91f"
     },
     {
       "id": "backend",
       "scope": [
         "backend/**"
       ],
-      "file_count": 1811,
-      "fingerprint": "dfcaf1af1a07f9a7a49fdb73f6dc5495f3cc0131a38d6d5ef41ae861231c06f1"
+      "file_count": 1808,
+      "fingerprint": "a431530b8a65b7291dc3caf01d7fac0e94b8c4305cdc3341266c9e3346a1ca33"
     },
     {
       "id": "delivery_tooling",
@@ -91,8 +91,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 275,
-      "fingerprint": "0918b2be53098d122d880a1080cc849008c124f4be32814095330cb8ea1bab10"
+      "file_count": 274,
+      "fingerprint": "376ce4e94185d14ec0f679f3b08420939b692ede3a483c6dc907b8a8ac6cb972"
     },
     {
       "id": "desktop_launcher",
@@ -108,15 +108,15 @@
         "docs/**"
       ],
       "file_count": 128,
-      "fingerprint": "0d6416ae3ac66d25b36c4f77cade85f132213fb130b61974e0be967846f5889e"
+      "fingerprint": "bf2c4fecf52765418583cfdff3a56dd0dc5dfaacf589ba3d838215d59d65393a"
     },
     {
       "id": "frontend_v2",
       "scope": [
         "frontend-admin-v2/**"
       ],
-      "file_count": 271,
-      "fingerprint": "a1f2404253849c3e67a8531ffaa2773ee8be20393ab61ca1c56122630731f533"
+      "file_count": 268,
+      "fingerprint": "aef991ae9863eb216ea7bbaedc2ef5c6924217821982485b1b60e4d694b8a456"
     },
     {
       "id": "mobile",
@@ -132,7 +132,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "f3f04dd2a6658a75f3886131b1d242c017de886fa7fdecd8386b0b849c13a679"
+      "fingerprint": "e3cd818c383b7c20adf681ad9256a45f1fd528cf97f827322aa80a9a0a818c36"
     },
     {
       "id": "shared_packages",

@@ -435,7 +435,7 @@ class AlertControllerTest {
                                 {
                                   "subscription": {
                                     "enabled": true,
-                                    "channels": ["IN_APP", "EMAIL"],
+                                    "channels": ["IN_APP"],
                                     "domains": ["CONTRACT", "PURCHASE"],
                                     "minSeverity": "HIGH",
                                     "notifyOnStatusChanged": false
@@ -454,6 +454,24 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.effectiveSubscription.domains[0]").value("CONTRACT"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.minSeverity").value("HIGH"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.notifyOnStatusChanged").value(false));
+
+        mockMvc.perform(u("/alerts/subscription")
+                        .cookie(roleCookie(DIFFERENT_PROJECT_MEMBER_ID, List.of("COMMERCIAL_MANAGER"), "alert:view"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"subscription": {"channels": ["EMAIL"]}}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALERT_NOTIFICATION_CHANNEL_UNSUPPORTED"));
+
+        mockMvc.perform(u("/alerts/subscription")
+                        .cookie(roleCookie(DIFFERENT_PROJECT_MEMBER_ID, List.of("COMMERCIAL_MANAGER"), "alert:view"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"subscription": {"channels": "EMAIL"}}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALERT_NOTIFICATION_CHANNEL_UNSUPPORTED"));
     }
 
     @Test @Order(10) @DisplayName("PUT /alerts/batch/read -> 支持部分成功")
