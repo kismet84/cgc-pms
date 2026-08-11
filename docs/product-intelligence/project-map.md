@@ -1,15 +1,15 @@
 # CGC-PMS 项目地图
 
-## 2026-08-12 主线91：架构边界与查询性能本地收口
+## 2026-08-12 主线91：架构边界与查询性能已合并并完成 post-merge
 
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；最终代码证据 SHA `b5b8eeaa8d65c848819145b30a04aa229b3b8d1a`（核心实现 `3aa0ec789465`，浏览器门禁 `2a33977cf54a`）。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；最终代码证据 SHA `b5b8eeaa8d65c848819145b30a04aa229b3b8d1a`（核心实现 `3aa0ec789465`，浏览器门禁 `2a33977cf54a`），交付源 HEAD `24499ae89eeb`，实现 PR #433 合并 SHA `6322785c0837`。
 - 目标链：`JWT/黑名单 → 单请求认证快照 → SQL 项目范围 → 四域真分页`；`租户项目批次 → 预警事实快照 → 固定 11 次读`；`通讯 latest/beforeSeq → 100 条页 → 200 DOM 窗口 → SSE 提示/补拉`；`付款/现金/账龄/驾驶舱 → 批量或条件聚合 → 单一金额算法`。
 - 架构边界：保留模块化单体和 Dashboard facade；非财务 Dashboard Query Service 不再继承膨胀基类，SharedSupport 只留 8 个真实共享依赖；采购三套提交工作流进入页面私有 application；展示 helper 移到中性共享层；assembler 显式提取 ID。
 - 预算：认证 MySQL 3；四域每活动视图 1 HTTP 且 `Q(1)=Q(50)`；预警 `11/11/11`；通讯每页 3 查询、≤100 返回、≤200 DOM；财务 Dashboard `17/6/18/3`；非财务单项目 `9/9/14/12/5`、全项目 `8/9/14/12/5`。
 - 数据与索引：本地 MySQL 8.0.46 对分页、游标、预警和财务 SQL 的 `EXPLAIN` 使用 `ref/eq_ref/range` 或索引反向扫描；无无界扫描、无 schema 变化、裁决 `G2_NO_MIGRATION`。
 - PDF：固定 JVM 三场景 90 样本 0 失败；无签认阈值，F13 以证据不足关闭并保持同步链，不引入异步 job、第二队列或新状态机。
 - 第90条边界：整体仍未授权；财务依赖验收 SHA `c47f4fa76c41` 是付款、现金、账龄和财务驾驶舱唯一代码批次，第91条只集成和验收。
-- 验证：后端 2723 项、前端 567 项、H2/MySQL、类型、构建、包体、真实浏览器 8 路由、Codemap、diff 与独立复核通过；仅本地 dev/test/demo，不发起非本地环境或生产动作。
+- 验证：后端 2723 项、前端 567 项、H2/MySQL、类型、构建、包体、真实浏览器 8 路由、Codemap、diff 与独立复核通过；push CI `31541061971`、PR CI `31541836973`、post-merge run `31542616004` 及 pre/post-merge verifier 通过；仅本地 dev/test/demo，不发起非本地环境或生产动作。
 - 载体：[`第91条计划`](../plans/第91条主线-架构边界与查询性能分阶段整改任务计划书.md)、[`收口报告`](../quality/2026-08-12-issue-091-架构边界与查询性能分阶段整改.md)、[`原性能证据`](../quality/2026-08-11-性能审查与最小优化报告.md)。
 - 零悬空：正式 Issue 新增 0、关闭 0、净变化 `0`；13 个发现项全部修复复验或有据关闭，无无载体遗留项。
 
