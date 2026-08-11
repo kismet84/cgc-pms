@@ -117,7 +117,7 @@ public class PmProjectService {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
         // 数据范围校验（非管理员用户）
-        projectAccessChecker.checkAccess(id, "查看");
+        projectAccessChecker.checkAccess(project, "查看");
         return toVO(project);
     }
 
@@ -185,7 +185,7 @@ public class PmProjectService {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
         // 数据范围校验（非管理员用户）
-        projectAccessChecker.checkAccess(project.getId(), "编辑");
+        projectAccessChecker.checkAccess(existing, "编辑");
         project.setProjectType(sysDictDataService.requireEnabledValue(
                 "project_type", project.getProjectType(),
                 "PROJECT_TYPE_INVALID", "项目类型不合法"));

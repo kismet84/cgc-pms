@@ -56,12 +56,79 @@ function Get-JobBlock([string]$Workflow,[string]$JobName) {
   return $match.Value
 }
 
+function Get-StepBlocks([string]$Workflow) {
+  return @(
+    [regex]::Matches(
+      $Workflow,
+      '(?ms)^      - .*?(?=^      - |^  [a-z0-9][a-z0-9-]*:\r?$|\z)'
+    ) | ForEach-Object { $_.Value }
+  )
+}
+
+function Get-ActionSteps([string]$Workflow,[string]$Action) {
+  $actionPattern = [regex]::Escape($Action)
+  $usesPattern = '(?m)^(?:      - |        )uses: ' + $actionPattern + '@[0-9a-f]{40}[ \t]*(?:#.*)?\r?$'
+  return @(
+    Get-StepBlocks $Workflow | Where-Object {
+      $_ -match $usesPattern
+    }
+  )
+}
+
+function Assert-ActionStepInputs(
+  [string]$Workflow,
+  [string]$Action,
+  [int]$ExpectedCount,
+  [string[]]$RequiredInputPatterns,
+  [string]$Name
+) {
+  $steps = @(Get-ActionSteps $Workflow $Action)
+  if ($steps.Count -ne $ExpectedCount) { throw "$Name step count changed: $($steps.Count)" }
+  foreach ($step in $steps) {
+    $withBlock = [regex]::Match(
+      $step,
+      '(?ms)^        with:\r?\n(?<body>.*?)(?=^        [a-zA-Z][a-zA-Z0-9_-]*:|\z)'
+    )
+    if (!$withBlock.Success) { throw "$Name step must declare a with block" }
+    foreach ($pattern in $RequiredInputPatterns) {
+      if ($withBlock.Value -notmatch $pattern) { throw "$Name step has an invalid with block" }
+    }
+  }
+}
+
+function Assert-DependabotActionsConfig([string]$Text) {
+  if ($Text -notmatch '(?m)^version: 2\r?$') { throw 'Dependabot config must use version 2' }
+  $updates = [regex]::Match(
+    $Text,
+    '(?ms)^updates:\r?\n(?<body>.*?)(?=^[a-zA-Z][a-zA-Z0-9_-]*:.*$|\z)'
+  )
+  if (!$updates.Success) { throw 'Dependabot config must declare a root updates mapping' }
+  $actionsUpdates = @(
+    [regex]::Matches(
+      $updates.Value,
+      '(?ms)^  - package-ecosystem: github-actions\r?\n(?<body>.*?)(?=^  - package-ecosystem:|\z)'
+    )
+  )
+  if ($actionsUpdates.Count -ne 1) { throw 'Dependabot must declare exactly one GitHub Actions update block' }
+  Assert-Contains $actionsUpdates[0].Value @(
+    '    directory: /','    schedule:','      interval: weekly','    groups:',
+    '      github-actions:','        patterns:',"          - '*'"
+  ) 'Dependabot GitHub Actions updates'
+}
+
+function Assert-Rejected([scriptblock]$Action,[string]$Name) {
+  $rejected = $false
+  try { & $Action } catch { $rejected = $true }
+  if (!$rejected) { throw "$Name negative self-test did not fail" }
+}
+
 $workflow = Read-RepoText '.github\workflows\ci.yml'
 $postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
 $postMergeVerifier = Read-RepoText 'scripts\ci\verify-post-merge-ci.ps1'
 $codeOwners = Read-RepoText '.github\CODEOWNERS'
 $backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
 $frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
+$dependabot = Read-RepoText '.github\dependabot.yml'
 $dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
 $minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
 foreach ($mutableImageSample in @("services:`n  db:`n    image: postgres:latest", 'docker run --rm postgres:latest')) {
@@ -114,6 +181,12 @@ Assert-Contains $workflow @('run-name: CI ${{ github.event_name }} ${{ github.ev
 Assert-Contains $workflow @(
   'concurrency:','group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}','cancel-in-progress: true'
 ) 'workflow concurrency cancellation'
+if (![regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^permissions:\r?$\n  contents: read\r?$')) {
+  throw 'workflow must default GITHUB_TOKEN permissions to contents: read'
+}
+if ([regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^  [a-z-]+: write\s*$')) {
+  throw 'workflow-level permissions must remain read-only'
+}
 Assert-Contains $sqlSafety @(
   'name: Verify Flyway migration immutability',
   'FLYWAY_BASE_SHA: ${{ github.event.pull_request.base.sha }}',
@@ -129,10 +202,7 @@ Assert-Contains $prPushEvidence @(
   "`$mode = 'bootstrap-full'","`$mode = 'reuse-disabled-full'","`$mode = 'evidence-failed-full'",
   "`$mode = 'fork-full'","`$mode = 'reused-push-ci'"
 ) 'PR push evidence reuse'
-Assert-Contains $workflow @(
-  'trivyColdCache:','description: Run supply-chain scan with an isolated empty Trivy cache',
-  'required: false','default: false','type: boolean'
-) 'workflow_dispatch Trivy cold-cache input'
+if ($workflow.Contains('trivyColdCache')) { throw 'obsolete Trivy cold-cache input must stay removed' }
 if ($workflow.Contains("branches: ['**']")) { throw 'full CI must not rerun after protected default-branch merges' }
 Assert-Contains $postMergeWorkflow @(
   'name: Post-merge verification','branches: [master, main]','actions: read','contents: read','pull-requests: read',
@@ -157,9 +227,34 @@ Assert-SetEqual $postMergeJobs @('post-merge-verification') 'post-merge lightwei
 $postMergeStepCount = [regex]::Matches($postMergeWorkflow,'(?m)^      - (?:name|uses):').Count
 if ($postMergeStepCount -ne 4) { throw "post-merge workflow must remain lightweight: steps=$postMergeStepCount" }
 if ([regex]::IsMatch($postMergeWorkflow,'(?m)^\s+[a-z-]+: write\s*$')) { throw 'post-merge workflow permissions must remain read-only' }
-if ([regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^permissions:')) { throw 'workflow added global permissions' }
 if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 3) { throw 'job-level permissions declaration count changed' }
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
+
+$timeoutMinutes = @{
+  'pr-push-evidence' = 5
+  'desktop-launcher' = 10
+  'backend-test' = 15
+  'backend-order-sensitive' = 10
+  'backend-dependency-scan' = 10
+  'backend-test-mysql' = 10
+  'frontend-lint' = 10
+  'type-check' = 10
+  'frontend-build' = 10
+  'frontend-test' = 10
+  'frontend-dependency-audit' = 10
+  'frontend-v2-gate' = 10
+  'supply-chain-security' = 15
+  'e2e' = 25
+  'sql-safety-scan' = 10
+  'build-summary' = 5
+}
+foreach ($entry in $timeoutMinutes.GetEnumerator()) {
+  Assert-Contains (Get-JobBlock $workflow $entry.Key) @("timeout-minutes: $($entry.Value)") "$($entry.Key) timeout"
+}
+
+Assert-ActionStepInputs $workflow 'actions/checkout' 14 @(
+  '(?m)^          persist-credentials: false\r?$'
+) 'checkout'
 
 foreach ($jobName in @($requiredJobs | Where-Object { $_ -notin @('pr-push-evidence','supply-chain-security','e2e') })) {
   $job = Get-JobBlock $workflow $jobName
@@ -178,11 +273,14 @@ Assert-Contains $e2e @(
 ) 'e2e evidence reuse'
 
 Assert-Contains $backendTest @(
-  'Install CJK font for PDF tests','fonts-arphic-gbsn00lp','test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
-  './mvnw -C verify','./scripts/ci/summarize-surefire.ps1','retention-days: 7',
+  './mvnw -C verify','./scripts/ci/summarize-surefire.ps1','retention-days: 7','retention-days: 14',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: backend/target/cgc-pms-backend.jar',
+  'if-no-files-found: error','compression-level: 0',
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'
 ) 'backend-test'
+foreach ($forbidden in @('Install CJK font for PDF tests','fonts-arphic-gbsn00lp','apt-get')) {
+  if ($backendTest.Contains($forbidden)) { throw "backend-test contains obsolete host font setup: $forbidden" }
+}
 Assert-Contains $desktopLauncher @(
   'runs-on: windows-2022',
   'Run AutoPilot control-plane contracts',
@@ -207,7 +305,11 @@ Assert-Contains $backendMySql @(
   'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: "true"'
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
-Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'
+Assert-Contains $frontendBuild @(
+  'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
+  'if-no-files-found: error','retention-days: 7'
+) 'frontend-build'
+if ($frontendBuild.Contains('if: always()')) { throw 'frontend build artifact must upload only after a successful build' }
 Assert-Contains $frontendV2 @(
   'working-directory: frontend-admin-v2',
   'pnpm check:boundary','pnpm check:route-ledger','pnpm check:design-system'
@@ -215,7 +317,6 @@ Assert-Contains $frontendV2 @(
 Assert-Contains $supplyChain @(
   '[pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]',
   'contents: read','id-token: write','attestations: write',
-  'run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"',
   'run: |','mkdir -p .trivy-cache',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: artifacts/backend',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: artifacts/frontend-dist',
@@ -224,20 +325,10 @@ Assert-Contains $supplyChain @(
   'subject-path: artifacts/frontend-dist.tar.gz',
   'sbom-path: artifacts/frontend-dist.spdx.json',
   'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436',
-  'artifacts/backend:/workspace:ro'
+  'artifacts/backend:/workspace:ro','retention-days: 30'
 ) 'supply-chain-security'
-$trivyCacheStep = [regex]::Match(
-  $supplyChain,
-  '(?ms)^      - name: Restore Trivy vulnerability databases\r?\n(?<body>.*?)(?=^      - (?:name|uses):|\z)'
-)
-if (!$trivyCacheStep.Success) { throw 'Trivy shared-cache restore step is missing' }
-Assert-Contains $trivyCacheStep.Value @(
-  'if: ${{ github.event_name != ''workflow_dispatch'' || inputs.trivyColdCache != true }}',
-  'uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9','path: .trivy-cache',
-  'key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}','restore-keys:'
-) 'conditional Trivy shared-cache restore'
-if ([regex]::Matches($supplyChain,'uses: actions/cache@[0-9a-f]{40}').Count -ne 1) {
-  throw 'supply-chain-security must have exactly one conditional shared-cache restore'
+foreach ($forbidden in @('uses: actions/cache@','TRIVY_CACHE_DATE','Restore Trivy vulnerability databases')) {
+  if ($supplyChain.Contains($forbidden)) { throw "supply-chain-security contains branch-scoped Trivy cache: $forbidden" }
 }
 Assert-Contains $e2e @(
   '[pr-push-evidence, frontend-build]',
@@ -261,7 +352,9 @@ Assert-Contains $sqlSafety @(
   './scripts/check-sql-safety.ps1'
 ) 'sql-safety-scan'
 
-if ([regex]::Matches($workflow,'uses: actions/upload-artifact@[0-9a-f]{40}').Count -ne 9) { throw 'artifact upload count changed' }
+Assert-ActionStepInputs $workflow 'actions/upload-artifact' 9 @(
+  '(?m)^          retention-days: (?:7|14|30)\r?$'
+) 'artifact upload'
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@[0-9a-f]{40}').Count -ne 3) { throw 'artifact download count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 3) { throw 'backend setup composite usage count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-frontend').Count -ne 7) { throw 'frontend setup composite usage count changed' }
@@ -274,6 +367,58 @@ Assert-Contains $frontendAction @(
   'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38',
   'node-version: ''22''','pnpm install --frozen-lockfile'
 ) 'frontend setup action'
+Assert-DependabotActionsConfig $dependabot
+
+$checkoutEscapeSample = @'
+jobs:
+  sample:
+    steps:
+      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        with:
+          persist-credentials: false
+      - id: escaped
+        uses: actions/checkout@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        with:
+          persist-credentials: false
+'@
+Assert-Rejected {
+  Assert-ActionStepInputs $checkoutEscapeSample 'actions/checkout' 1 @(
+    '(?m)^          persist-credentials: false\r?$'
+  ) 'checkout escape sample'
+} 'checkout alternate first key'
+
+$checkoutEnvSample = @'
+jobs:
+  sample:
+    steps:
+      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        env:
+          persist-credentials: false
+'@
+Assert-Rejected {
+  Assert-ActionStepInputs $checkoutEnvSample 'actions/checkout' 1 @(
+    '(?m)^          persist-credentials: false\r?$'
+  ) 'checkout env sample'
+} 'checkout with-block binding'
+
+$artifactEnvSample = @'
+jobs:
+  sample:
+    steps:
+      - uses: actions/upload-artifact@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        env:
+          retention-days: 7
+'@
+Assert-Rejected {
+  Assert-ActionStepInputs $artifactEnvSample 'actions/upload-artifact' 1 @(
+    '(?m)^          retention-days: (?:7|14|30)\r?$'
+  ) 'artifact env sample'
+} 'artifact with-block binding'
+
+$dependabotWrongRootSample = $dependabot -replace '(?m)^updates:', 'not-updates:'
+Assert-Rejected {
+  Assert-DependabotActionsConfig $dependabotWrongRootSample
+} 'Dependabot root updates binding'
 
 foreach ($scriptName in @(
   'verify-mysql-grants.sh','run-frontend-lint.sh','scan-backend-dependencies.sh',
@@ -295,7 +440,14 @@ Assert-Contains $dependencyScanScript @(
 ) 'backend dependency scan script'
 
 $backendPom = Read-RepoText 'backend\pom.xml'
-Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'
+Assert-Contains $backendPom @(
+  '<id>test-order-independence</id>',
+  '<junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>',
+  'junit.jupiter.execution.parallel.enabled = ${junit.jupiter.execution.parallel.enabled}'
+) 'backend test order profile'
+if ($backendPom.Contains('<surefire.parallel>') -or $backendPom.Contains('<surefire.threadCount>')) {
+  throw 'JUnit Platform suite must not advertise ineffective Surefire JUnit 4 parallel properties'
+}
 $frontendPackage = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
 foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:contract','test:e2e:live','test:e2e:migration-gate','check:pre-push')) {
   if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
@@ -369,7 +521,7 @@ Assert-Contains $readmeSyncGate @('--cached','--range','readFileSync(0','merge-b
   requiredJobCount = $requiredJobs.Count
   artifactUploads = 9
   artifactDownloads = 3
-  permissionBlocks = 3
+  permissionBlocks = 4
   postMergeJobs = $postMergeJobs.Count
   postMergeSteps = $postMergeStepCount
 } | ConvertTo-Json -Depth 4

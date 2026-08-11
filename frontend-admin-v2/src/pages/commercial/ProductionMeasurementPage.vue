@@ -41,7 +41,7 @@ import {
   submitOwnerMeasurement,
 } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
-import { reportPeriodBounds } from '@/services/workspace-context'
+import { localDateInputValue, reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 type SourceLine = {
@@ -82,7 +82,7 @@ const evidenceFile = ref<File | null>(null)
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
 let generation = 0
-const today = new Date().toISOString().slice(0, 10)
+const today = localDateInputValue()
 const periodForm = reactive<MeasurementPeriodCommand>({
   projectId: '',
   contractId: '',

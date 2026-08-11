@@ -47,6 +47,7 @@ import {
   submitTechnicalScheme,
 } from '@/services/technical'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue, localDateTimeInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { deliveryLabel } from './labels'
@@ -126,8 +127,8 @@ let projectController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
 
-const today = () => new Date().toISOString().slice(0, 10)
-const now = () => new Date().toISOString().slice(0, 16)
+const today = () => localDateInputValue()
+const now = () => localDateTimeInputValue()
 const projectId = computed(() => workspace.selectedProjectId || '')
 const scopeProjectIds = computed(() =>
   projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),

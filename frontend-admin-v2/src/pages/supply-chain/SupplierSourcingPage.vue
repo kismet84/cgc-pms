@@ -52,6 +52,7 @@ import {
 import { loadContractPage, loadPartners } from '@/services/commercial'
 import { uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
+import { localDateTimeInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -218,7 +219,7 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
       projectId: projectId.value,
       sourcingType: 'INQUIRY',
       currencyCode: 'CNY',
-      deadline: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 16),
+      deadline: localDateTimeInputValue(new Date(Date.now() + 7 * 86_400_000)),
     })
   if (next === 'quote')
     Object.assign(form, { partnerId: supplier, taxRate: '0', deliveryDays: '0' })

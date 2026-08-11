@@ -24,7 +24,7 @@ import {
   useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
-import { reportPeriodBounds } from '@/services/workspace-context'
+import { localDateInputValue, reportPeriodBounds } from '@/services/workspace-context'
 import {
   createSiteDailyLog,
   deleteSiteFile,
@@ -255,7 +255,7 @@ function openCreate(): void {
     : ''
   Object.assign(form, {
     projectId: initialProjectId,
-    reportDate: new Date().toISOString().slice(0, 10),
+    reportDate: localDateInputValue(),
     constructionContent: '',
     issuesDelays: '',
     nextDayPlan: '',

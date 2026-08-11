@@ -26,6 +26,7 @@ import {
 } from '@/components'
 import { loadContract, loadContractItems, loadContractPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue, localMonthInputValue } from '@/services/workspace-context'
 import {
   createSubcontractMeasure,
   createSubcontractTask,
@@ -435,8 +436,8 @@ async function openForm(record?: RecordRow): Promise<void> {
       partnerId: measure?.partnerId || '',
       partnerName: measure?.partnerName || '',
       subTaskId: measure?.subTaskId || '',
-      measurePeriod: measure?.measurePeriod || new Date().toISOString().slice(0, 7),
-      measureDate: measure?.measureDate || new Date().toISOString().slice(0, 10),
+      measurePeriod: measure?.measurePeriod || localMonthInputValue(),
+      measureDate: measure?.measureDate || localDateInputValue(),
       status: measure?.status || 'DRAFT',
       remark: measure?.remark || '',
     })

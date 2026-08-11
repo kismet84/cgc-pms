@@ -105,8 +105,20 @@ describe('CommunicationPage', () => {
     const wrapper = mount(CommunicationPage)
     await flushPromises()
 
-    expect(communication.loadMessages).toHaveBeenNthCalledWith(1, conversation.id, '0', 100)
-    expect(communication.loadMessages).toHaveBeenNthCalledWith(2, conversation.id, '100', 100)
+    expect(communication.loadMessages).toHaveBeenNthCalledWith(
+      1,
+      conversation.id,
+      '0',
+      100,
+      expect.any(AbortSignal),
+    )
+    expect(communication.loadMessages).toHaveBeenNthCalledWith(
+      2,
+      conversation.id,
+      '100',
+      100,
+      expect.any(AbortSignal),
+    )
     expect(wrapper.text()).toContain('最后一条')
     expect(communication.markConversationRead).toHaveBeenCalledWith(conversation.id, '101')
   })
@@ -122,13 +134,20 @@ describe('CommunicationPage', () => {
       body: 'B的消息',
     }
     let resolveA!: (messages: Array<typeof message>) => void
+    let slowSignal: AbortSignal | undefined
     const delayedA = new Promise<Array<typeof message>>((resolve) => {
       resolveA = resolve
     })
     vi.mocked(communication.loadConversations).mockResolvedValue([conversation, conversationB])
     vi.mocked(communication.loadMessages)
       .mockResolvedValueOnce([message])
-      .mockImplementation((id) => (id === conversation.id ? delayedA : Promise.resolve([messageB])))
+      .mockImplementation((id, _afterSeq, _pageSize, signal) => {
+        if (id === conversation.id) {
+          slowSignal = signal
+          return delayedA
+        }
+        return Promise.resolve([messageB])
+      })
     const wrapper = mount(CommunicationPage)
     await flushPromises()
 
@@ -139,6 +158,7 @@ describe('CommunicationPage', () => {
     await buttonA!.trigger('click')
     await buttonB!.trigger('click')
     await flushPromises()
+    expect(slowSignal?.aborted).toBe(true)
     resolveA([messageA])
     await flushPromises()
 

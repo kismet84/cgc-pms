@@ -59,6 +59,7 @@ import {
   type FieldDraft,
 } from '@/services/fieldDrafts'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import { getSessionNamespaceIdentity, useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import V2Tabs from '@/components/V2Tabs.vue'
@@ -119,7 +120,7 @@ let generation = 0
 const localDraft = ref<FieldDraft<QualityDraftPayload> | null>(null)
 let draftRepository: FieldDraftRepository | null = null
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localDateInputValue()
 const projectId = computed(() => workspace.selectedProjectId || '')
 const scopeProjectIds = computed(() =>
   projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),

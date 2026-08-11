@@ -53,6 +53,7 @@ import {
   verifyTailCollection,
 } from '@/services/closeout'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { deliveryLabel } from './labels'
@@ -119,7 +120,7 @@ let projectController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localDateInputValue()
 const factLabel = (value: unknown) => deliveryLabel(typeof value === 'string' ? value : undefined)
 const projectId = computed(() => workspace.selectedProjectId || '')
 const scopeProjectIds = computed(() =>

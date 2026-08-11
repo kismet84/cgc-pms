@@ -7,16 +7,13 @@ on:
   pull_request:
     branches: [master, main]
   workflow_dispatch:
-    inputs:
-      trivyColdCache:
-        description: Run supply-chain scan with an isolated empty Trivy cache
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   BACKEND_JAR_ARTIFACT: backend-jar-${{ github.run_number }}-${{ github.sha }}
@@ -28,6 +25,7 @@ env:
 jobs:
   pr-push-evidence:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       actions: read
       contents: read
@@ -87,8 +85,11 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: windows-2022
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Build Windows x64 launcher
         shell: pwsh
         run: ./desktop-launcher/scripts/build.ps1 -Configuration Release -Architecture x64
@@ -119,14 +120,12 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-backend
-      - name: Install CJK font for PDF tests
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-arphic-gbsn00lp
-          test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf
       - name: Run backend tests with coverage
         run: cd backend && ./mvnw -C verify
         env:
@@ -146,24 +145,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload backend jar
-        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: backend/target/cgc-pms-backend.jar
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
       - name: Upload backend coverage
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}
           path: backend/target/site/jacoco
+          if-no-files-found: ignore
+          retention-days: 14
 
   backend-order-sensitive:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-backend
       - name: Run historically order-sensitive classes under reverse class order
         run: cd backend && ./mvnw -C -Ptest-order-independence -Djacoco.skip=true test
@@ -179,6 +185,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Scan backend high and critical library vulnerabilities
         run: bash ./scripts/ci/scan-backend-dependencies.sh
 
@@ -186,6 +194,7 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_USER: cgc_test
@@ -212,6 +221,8 @@ jobs:
           - 6379:6379
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-backend
       - name: Verify MySQL migration user scope
         shell: bash
@@ -233,13 +244,17 @@ jobs:
           name: backend-mysql-test-reports-${{ github.run_number }}-${{ github.sha }}
           path: backend/target/surefire-reports
           if-no-files-found: ignore
+          retention-days: 7
 
   frontend-lint:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -253,13 +268,17 @@ jobs:
           name: frontend-lint-report-${{ github.run_number }}-${{ github.sha }}
           path: frontend-admin-v2/.ci-artifacts/lint-check.txt
           if-no-files-found: ignore
+          retention-days: 7
 
   type-check:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -270,8 +289,11 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -280,18 +302,22 @@ jobs:
       - name: Check frontend bundle size
         run: cd frontend-admin-v2 && pnpm check:bundle-size
       - name: Upload build artifacts
-        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin-v2/dist
+          if-no-files-found: error
+          retention-days: 7
 
   frontend-test:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -304,13 +330,17 @@ jobs:
           name: ${{ env.FRONTEND_TEST_ARTIFACT }}
           path: frontend-admin-v2/test-results
           if-no-files-found: ignore
+          retention-days: 7
 
   frontend-dependency-audit:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -321,8 +351,11 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -333,6 +366,7 @@ jobs:
 
   supply-chain-security:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs:
       [pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]
     if: needs.pr-push-evidence.outputs.run-full == 'true'
@@ -341,16 +375,6 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - name: Set daily Trivy cache key
-        run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-      - name: Restore Trivy vulnerability databases
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.trivyColdCache != true }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: .trivy-cache
-          key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}
-          restore-keys: |
-            trivy-java-db-${{ runner.os }}-
       - name: Download backend jar
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -417,6 +441,7 @@ jobs:
           path: |
             artifacts/backend/cgc-pms-backend.spdx.json
             artifacts/frontend-dist.spdx.json
+          retention-days: 30
 
   e2e:
     runs-on: ubuntu-latest
@@ -425,6 +450,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-frontend
         with:
           working-directory: frontend-admin-v2
@@ -449,15 +476,18 @@ jobs:
             frontend-admin-v2/playwright-report
             frontend-admin-v2/test-results
           if-no-files-found: ignore
+          retention-days: 14
 
   sql-safety-scan:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Verify README and manual sync
         shell: pwsh
         env:
@@ -488,6 +518,7 @@ jobs:
   build-summary:
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs:
       - pr-push-evidence
       - desktop-launcher

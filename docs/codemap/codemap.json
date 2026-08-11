@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-11T13:29:51.873Z",
-  "generated_from_commit": "383eef6bd217d23e1a8e543f826d82b432880e9c",
+  "generated_at": "2026-08-11T16:07:39.167Z",
+  "generated_from_commit": "e1b7adb238c499fb6a7672682473c30737794e04",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
@@ -505,6 +505,10 @@
         {
           "path": "frontend-admin-v2/tests/unit/communication-page.test.ts",
           "symbol": "describe"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/communication-send-message.test.ts",
+          "symbol": "describe('sendCommunicationMessage')"
         }
       ],
       "constraints": [

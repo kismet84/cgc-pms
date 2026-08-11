@@ -40,6 +40,7 @@ beforeEach(() => {
   })
   vi.mocked(openCommunicationStream).mockReturnValue({ close: vi.fn() } as unknown as EventSource)
   vi.mocked(openNotificationStream).mockReturnValue({ close: vi.fn() })
+  vi.mocked(loadCommunicationUnreadCount).mockResolvedValue({ count: 0 })
 })
 
 describe('AppShell communication unread', () => {
@@ -105,7 +106,7 @@ describe('AppShell communication unread', () => {
     wrapper.unmount()
   })
 
-  it('refreshes notification unread state when each tab stream opens', async () => {
+  it('loads notifications once on first stream open and refreshes after reconnect', async () => {
     useSessionStore().replaceUserInfo({
       tenantId: '1001',
       userId: '1',
@@ -117,7 +118,9 @@ describe('AppShell communication unread', () => {
       { pageNo: 1, pageSize: 8, total: 0, records: [] },
       { count: 3 },
     ])
+    let reopen!: () => void
     vi.mocked(openNotificationStream).mockImplementation((onOpen) => {
+      reopen = onOpen
       onOpen()
       return { close: vi.fn() }
     })
@@ -131,9 +134,92 @@ describe('AppShell communication unread', () => {
     await flushPromises()
 
     expect(openNotificationStream).toHaveBeenCalledTimes(1)
-    expect(loadNotificationSummary).toHaveBeenCalledTimes(2)
+    expect(loadNotificationSummary).toHaveBeenCalledTimes(1)
     expect(wrapper.get('button.app-shell__notification').attributes('aria-label')).toContain(
       '3 条未读',
+    )
+
+    reopen()
+    await flushPromises()
+    expect(loadNotificationSummary).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('ignores first communication handshake and refreshes on messages or reconnect', async () => {
+    let onEvent!: Parameters<typeof openCommunicationStream>[0]
+    let onOpen!: NonNullable<Parameters<typeof openCommunicationStream>[2]>
+    vi.mocked(openCommunicationStream).mockImplementation((event, _error, open) => {
+      onEvent = event
+      onOpen = open!
+      open?.()
+      event({ action: 'REFRESH' })
+      return { close: vi.fn() }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(loadCommunicationUnreadCount).toHaveBeenCalledTimes(1)
+    onEvent({ action: 'PING' })
+    await flushPromises()
+    expect(loadCommunicationUnreadCount).toHaveBeenCalledTimes(1)
+
+    onEvent({ action: 'MESSAGE', conversationId: 'conversation-1' })
+    await flushPromises()
+    expect(loadCommunicationUnreadCount).toHaveBeenCalledTimes(2)
+
+    onOpen()
+    onEvent({ action: 'REFRESH' })
+    await flushPromises()
+    expect(loadCommunicationUnreadCount).toHaveBeenCalledTimes(3)
+    wrapper.unmount()
+  })
+
+  it('keeps newer notification state when an aborted request rejects later', async () => {
+    useSessionStore().replaceUserInfo({
+      tenantId: '1001',
+      userId: '1',
+      username: 'tester',
+      roles: ['USER'],
+      permissions: ['alert:view', 'notification:view'],
+    })
+    let rejectFirst!: (reason: Error) => void
+    let refreshFromEvent!: () => void
+    vi.mocked(loadNotificationSummary)
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirst = reject
+        }),
+      )
+      .mockResolvedValueOnce([{ pageNo: 1, pageSize: 8, total: 0, records: [] }, { count: 7 }])
+    vi.mocked(openNotificationStream).mockImplementation((_onOpen, onEvent) => {
+      refreshFromEvent = onEvent
+      return { close: vi.fn() }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+
+    refreshFromEvent()
+    await flushPromises()
+    expect(wrapper.get('button.app-shell__notification').attributes('aria-label')).toContain(
+      '7 条未读',
+    )
+
+    rejectFirst(new Error('aborted request failed late'))
+    await flushPromises()
+    expect(wrapper.get('button.app-shell__notification').attributes('aria-label')).toContain(
+      '7 条未读',
     )
     wrapper.unmount()
   })

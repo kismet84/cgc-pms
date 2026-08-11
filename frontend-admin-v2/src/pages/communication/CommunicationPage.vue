@@ -9,6 +9,11 @@ import type {
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { V2Card, V2ConfirmDialog } from '@/components'
 import {
+  messageSendFingerprint,
+  sendCommunicationMessage,
+} from '@/pages/communication/application/send-message'
+import { createSessionSendRetryStore } from '@/pages/communication/infrastructure/session-send-retry-store'
+import {
   addConversationMembers,
   closeConversation,
   createConversation,
@@ -52,8 +57,17 @@ const status = ref('')
 const pendingGroupAction = ref<'leave' | 'close' | null>(null)
 const messageList = ref<HTMLElement | null>(null)
 let requestController: AbortController | null = null
+let conversationHistoryController: AbortController | null = null
 let conversationGeneration = 0
-const SEND_RETRY_TTL_MS = 24 * 60 * 60 * 1_000
+const sendMessageDependencies = {
+  retryStore: createSessionSendRetryStore(sessionStorage),
+  now: () => Date.now(),
+  createId: () => crypto.randomUUID(),
+  createDraft: createMessageDraft,
+  deleteDraft: deleteMessageDraft,
+  uploadAttachment: uploadCommunicationAttachment,
+  sendDraft: sendMessage,
+}
 
 const selectedConversation = computed(() =>
   conversations.value.find((item) => item.id === selectedConversationId.value),
@@ -125,6 +139,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   requestController?.abort()
+  conversationHistoryController?.abort()
   window.removeEventListener('communication-refresh', onCommunicationRefresh)
   window.removeEventListener('focus', refreshAfterReconnect)
 })
@@ -178,6 +193,9 @@ async function searchUsers(): Promise<void> {
 
 async function selectConversation(id: string): Promise<void> {
   const token = ++conversationGeneration
+  conversationHistoryController?.abort()
+  const controller = new AbortController()
+  conversationHistoryController = controller
   selectedConversationId.value = id
   members.value = []
   memberTargetId.value = ''
@@ -187,10 +205,17 @@ async function selectConversation(id: string): Promise<void> {
   try {
     const conversation = conversations.value.find((item) => item.id === id)
     const [loaded, loadedMembers] = await Promise.all([
-      loadAllMessages(id),
-      isManageableGroup(conversation) ? loadConversationMembers(id) : Promise.resolve([]),
+      loadAllMessages(id, '0', controller.signal),
+      isManageableGroup(conversation)
+        ? loadConversationMembers(id, controller.signal)
+        : Promise.resolve([]),
     ])
-    if (token !== conversationGeneration || selectedConversationId.value !== id) return
+    if (
+      controller.signal.aborted ||
+      token !== conversationGeneration ||
+      selectedConversationId.value !== id
+    )
+      return
     messages.value = loaded
     members.value = loadedMembers
     await markCurrentRead()
@@ -199,17 +224,23 @@ async function selectConversation(id: string): Promise<void> {
     if (token !== conversationGeneration || selectedConversationId.value !== id) return
     await scrollToLatest()
   } catch {
-    if (token === conversationGeneration) error.value = '消息历史加载失败。'
+    if (!controller.signal.aborted && token === conversationGeneration)
+      error.value = '消息历史加载失败。'
   } finally {
     if (token === conversationGeneration) messagesLoading.value = false
+    if (conversationHistoryController === controller) conversationHistoryController = null
   }
 }
 
-async function loadAllMessages(conversationId: string, afterSeq = '0'): Promise<MessageRecord[]> {
+async function loadAllMessages(
+  conversationId: string,
+  afterSeq = '0',
+  signal?: AbortSignal,
+): Promise<MessageRecord[]> {
   const result: MessageRecord[] = []
   let cursor = afterSeq
   while (true) {
-    const page = await loadMessages(conversationId, cursor, 100)
+    const page = await loadMessages(conversationId, cursor, 100, signal)
     result.push(...page)
     const next = page.at(-1)?.seq
     if (page.length < 100 || !next || next === cursor) return result
@@ -285,75 +316,28 @@ async function createGroup(): Promise<void> {
   }
 }
 
-function retryStorageKey(conversationId: string): string {
-  return `cgc-pms.communication.send.${conversationId}`
-}
-
-interface SendRetryState {
-  id: string
-  createdAt: number
-  fingerprint: string
-  draftId?: string
-}
-
-function sendFingerprint(): string {
-  return JSON.stringify({
-    body: body.value.trim(),
-    files: attachments.value.map(({ name, size, type, lastModified }) => ({
-      name,
-      size,
-      type,
-      lastModified,
-    })),
-  })
-}
-
-async function retryState(conversationId: string, fingerprint: string): Promise<SendRetryState> {
-  const key = retryStorageKey(conversationId)
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(key) ?? '{}') as Partial<SendRetryState>
-    if (
-      saved.id &&
-      typeof saved.createdAt === 'number' &&
-      typeof saved.fingerprint === 'string' &&
-      Date.now() - saved.createdAt < SEND_RETRY_TTL_MS
-    ) {
-      if (saved.fingerprint === fingerprint) return saved as SendRetryState
-      if (saved.draftId) await deleteMessageDraft(saved.draftId).catch(() => undefined)
-    }
-  } catch {
-    sessionStorage.removeItem(key)
-  }
-  const next = { id: crypto.randomUUID(), createdAt: Date.now(), fingerprint }
-  sessionStorage.setItem(key, JSON.stringify(next))
-  return next
-}
-
 async function send(): Promise<void> {
   if (!canSend.value || !selectedConversationId.value) return
   const conversationId = selectedConversationId.value
   const outgoingBody = body.value.trim()
   const outgoingAttachments = [...attachments.value]
-  const fingerprint = sendFingerprint()
+  const fingerprint = messageSendFingerprint(outgoingBody, outgoingAttachments)
   sending.value = true
   error.value = ''
   status.value = '正在发送…'
   try {
-    const retry = await retryState(conversationId, fingerprint)
-    const draft = await createMessageDraft(conversationId, outgoingBody, retry.id)
-    sessionStorage.setItem(
-      retryStorageKey(conversationId),
-      JSON.stringify({ ...retry, draftId: draft.id }),
+    const { message: sent } = await sendCommunicationMessage(
+      {
+        conversationId,
+        body: outgoingBody,
+        attachments: outgoingAttachments,
+      },
+      sendMessageDependencies,
     )
-    for (const file of outgoingAttachments.slice(draft.attachments.length)) {
-      await uploadCommunicationAttachment(file, draft.id)
-    }
-    const sent = draft.seq ? draft : await sendMessage(draft.id)
-    sessionStorage.removeItem(retryStorageKey(conversationId))
     await refreshConversations()
     if (selectedConversationId.value === conversationId) {
       messages.value.push(sent)
-      if (sendFingerprint() === fingerprint) {
+      if (messageSendFingerprint(body.value, attachments.value) === fingerprint) {
         body.value = ''
         attachments.value = []
       }

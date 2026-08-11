@@ -39,6 +39,7 @@ import {
 } from '@/services/commercial'
 import type { CostSubjectOption } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const session = useSessionStore()
@@ -222,7 +223,7 @@ function openForecast(row?: CostControlAmountRow) {
     projectId: projectId.value,
     forecastCode: row ? text(row, 'forecast_code') : '',
     forecastName: row ? text(row, 'forecast_name') : '',
-    forecastDate: row ? text(row, 'forecast_date') : new Date().toISOString().slice(0, 10),
+    forecastDate: row ? text(row, 'forecast_date') : localDateInputValue(),
     items: inputItems.value.map((item) => ({
       costSubjectId: text(item, 'cost_subject_id'),
       estimatedRemainingAmount: text(item, 'recommended_remaining_amount'),

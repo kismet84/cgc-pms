@@ -36,10 +36,9 @@
         <openhtmltopdf.version>1.1.40</openhtmltopdf.version>
         <poi.version>5.5.1</poi.version>
         <noto-sans-sc-font.version>6.1.0</noto-sans-sc-font.version>
-        <!-- Keep test class scheduling deterministic across Windows and Linux. -->
+        <!-- Keep the shared Spring/H2 regression suite deterministic across Windows and Linux. -->
         <surefire.runOrder>alphabetical</surefire.runOrder>
-        <surefire.parallel>classes</surefire.parallel>
-        <surefire.threadCount>2</surefire.threadCount>
+        <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
     </properties>
 
     <dependencyManagement>
@@ -296,8 +295,11 @@
                     <reuseForks>true</reuseForks>
                     <forkCount>1</forkCount>
                     <runOrder>${surefire.runOrder}</runOrder>
-                    <parallel>${surefire.parallel}</parallel>
-                    <threadCount>${surefire.threadCount}</threadCount>
+                    <properties>
+                        <configurationParameters>
+                            junit.jupiter.execution.parallel.enabled = ${junit.jupiter.execution.parallel.enabled}
+                        </configurationParameters>
+                    </properties>
                     <systemPropertyVariables>
                         <spring.devtools.restart.enabled>false</spring.devtools.restart.enabled>
                         <!-- Full regression suite keeps its frozen H2 fixture chain.
@@ -414,7 +416,7 @@
                 <!-- Re-run 12 historically state-sensitive classes in reverse class order and sequentially. -->
                 <test>AlertEvaluationServiceTest,AuthServiceTest,DashboardPerformanceTest,InvoiceValidationTest,PaymentFinancialConsistencyTest,Phase3IntegrationTest,ProductionMeasurementClosedLoopIntegrationTest,ProfileControllerTest,StlSettlementQueryServiceTest,StlSettlementServiceTest,SysUserServiceTest,WorkflowTemplateManagementTest</test>
                 <surefire.runOrder>reversealphabetical</surefire.runOrder>
-                <surefire.threadCount>1</surefire.threadCount>
+                <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
             </properties>
         </profile>
     </profiles>

@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { reportPeriodBounds } from '@/services/workspace-context'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  localDateInputValue,
+  localDateTimeInputValue,
+  localMonthInputValue,
+  reportPeriodBounds,
+} from '@/services/workspace-context'
 
 describe('workspace report-period context', () => {
   it('maps valid periods to inclusive calendar-month bounds', () => {
@@ -14,5 +19,14 @@ describe('workspace report-period context', () => {
     expect(reportPeriodBounds('2026-13')).toBeNull()
     expect(reportPeriodBounds('2026-7')).toBeNull()
     expect(reportPeriodBounds(null)).toBeNull()
+  })
+
+  it('formats date inputs in local time instead of UTC', () => {
+    const date = new Date('2026-08-11T16:05:00.000Z')
+    vi.spyOn(date, 'getTimezoneOffset').mockReturnValue(-480)
+
+    expect(localDateInputValue(date)).toBe('2026-08-12')
+    expect(localMonthInputValue(date)).toBe('2026-08')
+    expect(localDateTimeInputValue(date)).toBe('2026-08-12T00:05')
   })
 })

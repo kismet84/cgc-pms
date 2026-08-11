@@ -15,6 +15,7 @@ import { showToast } from '@/components/toast'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import { formatAmount } from '@/pages/dashboard/model'
 import { uploadSiteFile } from '@/services/delivery'
+import { localDateInputValue } from '@/services/workspace-context'
 import {
   approveCashForecast,
   archiveCashJournal,
@@ -240,7 +241,7 @@ function openFundAccount(): void {
     accountType: 'BANK',
     bankName: '',
     bankAccountNo: '',
-    openingDate: new Date().toISOString().slice(0, 10),
+    openingDate: localDateInputValue(),
     openingBalance: '0.00',
     remark: '',
   }

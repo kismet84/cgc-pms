@@ -19,6 +19,7 @@ import {
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import {
   loadEnabledDictDataByCode,
   type DictDataRecord,
@@ -43,7 +44,7 @@ const form = reactive({
   bidCostId: '',
   direction: 'OUT' as 'IN' | 'OUT',
   amount: '',
-  businessDate: new Date().toISOString().slice(0, 10),
+  businessDate: localDateInputValue(),
   accountId: '',
   costSubjectId: '',
   summary: '',

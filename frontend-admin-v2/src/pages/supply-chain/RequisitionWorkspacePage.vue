@@ -40,7 +40,7 @@ import {
   type RequisitionFormOptions,
 } from '@/services/supply-chain'
 import { isApiClientError } from '@/services/request'
-import { reportPeriodBounds } from '@/services/workspace-context'
+import { localDateInputValue, reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -531,7 +531,7 @@ async function openCreate(): Promise<void> {
     contractId: '',
     warehouseId: '',
     partnerId: '',
-    requisitionDate: new Date().toISOString().slice(0, 10),
+    requisitionDate: localDateInputValue(),
     remark: '',
   })
   editorItems.value = [newEditorItem()]
@@ -684,7 +684,7 @@ function openReturn(): void {
     requisitionItemId,
     originalStockTxnId: '',
     returnQuantity: '',
-    returnDate: new Date().toISOString().slice(0, 10),
+    returnDate: localDateInputValue(),
     returnReason: '',
     idempotencyKey: crypto.randomUUID(),
   })
