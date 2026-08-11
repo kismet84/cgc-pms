@@ -5,8 +5,6 @@ import com.cgcpms.auth.config.SecurityConfig;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
-import com.cgcpms.system.mapper.SysUserMapper;
-import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.filter.TraceIdFilter;
@@ -56,7 +54,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CookieUtils cookieUtils;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider;
-    private final SysUserMapper sysUserMapper;
     private final ObjectProvider<AuthService> authServiceProvider;
     private final Environment environment;
     private final boolean devLoginEnabled;
@@ -68,7 +65,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                    CookieUtils cookieUtils,
                                    ObjectMapper objectMapper,
                                    ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
-                                   SysUserMapper sysUserMapper,
                                    ObjectProvider<AuthService> authServiceProvider,
                                    Environment environment) {
         this.jwtUtils = jwtUtils;
@@ -76,7 +72,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.cookieUtils = cookieUtils;
         this.objectMapper = objectMapper;
         this.tokenBlacklistServiceProvider = tokenBlacklistServiceProvider;
-        this.sysUserMapper = sysUserMapper;
         this.authServiceProvider = authServiceProvider;
         this.environment = environment;
         this.devLoginEnabled = Boolean.parseBoolean(environment.getProperty("auth.dev-login.enabled", "false"));
@@ -100,64 +95,59 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String token = resolveToken(request);
-        if (token == null) {
-            writeUnauthorized(response);
-            return;
-        }
-        if (!jwtUtils.validateToken(token)) {
-            writeUnauthorized(response);
-            return;
-        }
-        // Reject refresh tokens used as API access tokens
-        if (jwtUtils.isRefreshToken(token)) {
-            writeUnauthorized(response);
-            return;
-        }
-        // Check blacklist
-        TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
-        if (blacklistService == null) {
-            boolean blacklistEnabled = environment.getProperty("auth.token-blacklist.enabled", Boolean.class, true);
-            if (blacklistEnabled) {
-                log.error("BLACKLIST_UNAVAILABLE: 已启用令牌黑名单但 TokenBlacklistService 不可用，拒绝本次请求");
-                writeUnauthorized(response);
-                return;
-            }
-            log.debug("令牌黑名单已显式禁用，跳过黑名单检查");
-        } else if (blacklistService.isBlacklisted(token)) {
-            log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问");
-            writeUnauthorized(response);
-            return;
-        }
         try {
-            Claims claims = jwtUtils.parseToken(token);
-            if (!isCurrentCredential(claims)) {
-                writeUnauthorized(response);
-                return;
-            }
-            UserContext.set(claims);
-            if (authorizationSnapshotValidationEnabled && !isCurrentAuthorization(claims)) {
-                writeUnauthorized(response);
-                return;
-            }
-            request.setAttribute(TraceIdFilter.ACCESS_LOG_USER_ID_ATTRIBUTE, UserContext.getCurrentUserId());
-            request.setAttribute(TraceIdFilter.ACCESS_LOG_TENANT_ID_ATTRIBUTE, UserContext.getCurrentTenantId());
-            
-            List<GrantedAuthority> authorities;
             try {
-                authorities = buildAuthorities(claims);
-            } catch (IllegalArgumentException ex) {
-                log.warn("INVALID_PERMISSION_CLAIM: 无法解码权限声明");
+                String token = resolveToken(request);
+                if (token == null || !jwtUtils.validateToken(token)) {
+                    writeUnauthorized(response);
+                    return;
+                }
+                // Reject refresh tokens before any database-backed authentication check.
+                if (jwtUtils.isRefreshToken(token)) {
+                    writeUnauthorized(response);
+                    return;
+                }
+                TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
+                if (blacklistService == null) {
+                    boolean blacklistEnabled = environment.getProperty(
+                            "auth.token-blacklist.enabled", Boolean.class, true);
+                    if (blacklistEnabled) {
+                        log.error("BLACKLIST_UNAVAILABLE: 已启用令牌黑名单但 TokenBlacklistService 不可用，拒绝本次请求");
+                        writeUnauthorized(response);
+                        return;
+                    }
+                    log.debug("令牌黑名单已显式禁用，跳过黑名单检查");
+                } else if (blacklistService.isBlacklisted(token)) {
+                    log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问");
+                    writeUnauthorized(response);
+                    return;
+                }
+
+                Claims claims = jwtUtils.parseToken(token);
+                UserContext.set(claims);
+                boolean current = authorizationSnapshotValidationEnabled
+                        ? isCurrentAuthentication(claims)
+                        : isCurrentCredential(claims);
+                if (!current) {
+                    writeUnauthorized(response);
+                    return;
+                }
+                request.setAttribute(TraceIdFilter.ACCESS_LOG_USER_ID_ATTRIBUTE, UserContext.getCurrentUserId());
+                request.setAttribute(TraceIdFilter.ACCESS_LOG_TENANT_ID_ATTRIBUTE, UserContext.getCurrentTenantId());
+
+                List<GrantedAuthority> authorities = buildAuthorities(claims);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                UserContext.getCurrentUsername(),
+                                null,
+                                authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (RuntimeException exception) {
+                log.warn("AUTHENTICATION_RUNTIME_FAILURE: fail closed with 401 ({})",
+                        exception.getClass().getSimpleName());
                 writeUnauthorized(response);
                 return;
             }
-            
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            UserContext.getCurrentUsername(),
-                            null,
-                            authorities);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);
         } finally {
             UserContext.clear();
@@ -227,19 +217,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .toList();
     }
 
-    protected boolean isCurrentCredential(Claims claims) {
-        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
-        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
-        String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
-        if (userId == null || tenantId == null || version == null || version.isBlank()) return false;
-        SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
-        return user != null && tenantId.equals(user.getTenantId()) && "ENABLE".equals(user.getStatus())
-                && version.equals(jwtUtils.credentialVersion(user.getPassword()));
+    protected boolean isCurrentAuthentication(Claims claims) {
+        AuthService authService = authServiceProvider.getIfAvailable();
+        return authService != null && authService.isCurrentAuthentication(claims);
     }
 
-    protected boolean isCurrentAuthorization(Claims claims) {
+    protected boolean isCurrentCredential(Claims claims) {
         AuthService authService = authServiceProvider.getIfAvailable();
-        return authService != null && authService.isCurrentAuthorization(claims);
+        return authService != null && authService.isCurrentCredential(claims);
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {
