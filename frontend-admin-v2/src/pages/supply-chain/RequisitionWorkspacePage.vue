@@ -343,7 +343,7 @@ async function loadPage(): Promise<void> {
     )
     if (generation !== listGeneration) return
     records.value = page.records
-    total.value = Number(page.total ?? 0)
+    total.value = page.total ?? 0
     if (editorOpen.value) return
     if (selected.value) {
       const refreshed = page.records.find((item) => item.id === selected.value?.id)
@@ -471,7 +471,7 @@ async function loadWarehouseStocks(candidateProjectId: string, warehouseId: stri
     warehouseId,
   })
   stocks.value = page.records
-  stockFilterReady.value = Number(page.total ?? 0) <= page.records.length
+  stockFilterReady.value = (page.total ?? 0) <= page.records.length
 }
 
 function changeMaterial(row: EditorItem, value: string): void {

@@ -94,7 +94,7 @@ export async function loadAllContracts(
   const pageSize = 200
   const first = await loadContractPage({ ...query, pageNo: 1, pageSize }, signal)
   const records = [...first.records]
-  const pageCount = Math.ceil(Number(first.total) / pageSize)
+  const pageCount = Math.ceil(first.total / pageSize)
   for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
     const page = await loadContractPage({ ...query, pageNo, pageSize }, signal)
     records.push(...page.records)
