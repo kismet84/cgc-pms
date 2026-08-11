@@ -2,7 +2,7 @@
 
 ## 2026-08-12 主线91：架构边界与查询性能本地收口
 
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；最终代码证据 SHA `2a33977cf54add580734d5bccb1aac0518fdd4bf`（核心实现 `3aa0ec789465`）。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；最终代码证据 SHA `b5b8eeaa8d65c848819145b30a04aa229b3b8d1a`（核心实现 `3aa0ec789465`，浏览器门禁 `2a33977cf54a`）。
 - 目标链：`JWT/黑名单 → 单请求认证快照 → SQL 项目范围 → 四域真分页`；`租户项目批次 → 预警事实快照 → 固定 11 次读`；`通讯 latest/beforeSeq → 100 条页 → 200 DOM 窗口 → SSE 提示/补拉`；`付款/现金/账龄/驾驶舱 → 批量或条件聚合 → 单一金额算法`。
 - 架构边界：保留模块化单体和 Dashboard facade；非财务 Dashboard Query Service 不再继承膨胀基类，SharedSupport 只留 8 个真实共享依赖；采购三套提交工作流进入页面私有 application；展示 helper 移到中性共享层；assembler 显式提取 ID。
 - 预算：认证 MySQL 3；四域每活动视图 1 HTTP 且 `Q(1)=Q(50)`；预警 `11/11/11`；通讯每页 3 查询、≤100 返回、≤200 DOM；财务 Dashboard `17/6/18/3`；非财务单项目 `9/9/14/12/5`、全项目 `8/9/14/12/5`。
