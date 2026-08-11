@@ -1,124 +1,73 @@
 package com.cgcpms.dashboard.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
-import com.cgcpms.alert.entity.AlertLog;
-import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
-import com.cgcpms.cost.entity.CostSubject;
-import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.cost.entity.CostSummary;
-import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.mapper.CostSubjectMapper;
-import com.cgcpms.cost.mapper.CostSummaryMapper;
-import com.cgcpms.cost.service.CostSummaryService;
-import com.cgcpms.cost.vo.CostProjectSummaryVO;
-import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.dashboard.vo.*;
-import com.cgcpms.inventory.entity.MatStock;
-import com.cgcpms.inventory.entity.MatWarehouse;
-import com.cgcpms.inventory.mapper.MatStockMapper;
-import com.cgcpms.inventory.mapper.MatWarehouseMapper;
-import com.cgcpms.material.entity.MdMaterial;
-import com.cgcpms.material.mapper.MdMaterialMapper;
-import com.cgcpms.partner.entity.MdPartner;
-import com.cgcpms.partner.mapper.MdPartnerMapper;
-import com.cgcpms.payment.entity.PayRecord;
-import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
-import com.cgcpms.purchase.entity.MatPurchaseOrder;
-import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
-import com.cgcpms.purchase.entity.MatPurchaseRequest;
-import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
-import com.cgcpms.receipt.entity.MatReceipt;
-import com.cgcpms.receipt.entity.MatReceiptItem;
-import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
-import com.cgcpms.receipt.mapper.MatReceiptMapper;
-import com.cgcpms.requisition.entity.MatRequisition;
-import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
-import com.cgcpms.tech.entity.TechItem;
-import com.cgcpms.tech.mapper.TechItemMapper;
-import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
-import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowConstants;
-import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
-import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Slf4j
-@Service
-public class DashboardProjectBusinessService extends DashboardSharedSupport {
+import static com.cgcpms.dashboard.service.DashboardViewSupport.*;
 
+@Service
+@Transactional(readOnly = true)
+public class DashboardProjectBusinessService {
+
+    private final PmProjectMapper projectMapper;
+    private final CtContractMapper ctContractMapper;
+    private final WfTaskMapper wfTaskMapper;
+    private final WfInstanceMapper wfInstanceMapper;
+    private final StlSettlementMapper stlSettlementMapper;
+    private final VarOrderMapper varOrderMapper;
+    private final SubMeasureMapper subMeasureMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final CtContractChangeMapper ctContractChangeMapper;
 
     public DashboardProjectBusinessService(
-            CostSummaryService costSummaryService,
-            CostSummaryMapper costSummaryMapper,
-            CostSubjectMapper costSubjectMapper,
-            CostItemMapper costItemMapper,
             PmProjectMapper projectMapper,
             CtContractMapper ctContractMapper,
             CtContractChangeMapper ctContractChangeMapper,
             WfTaskMapper wfTaskMapper,
             WfInstanceMapper wfInstanceMapper,
-            PayRecordMapper payRecordMapper,
             StlSettlementMapper stlSettlementMapper,
             VarOrderMapper varOrderMapper,
             SubMeasureMapper subMeasureMapper,
-            AlertLogMapper alertLogMapper,
-            MatPurchaseRequestMapper purchaseRequestMapper,
-            MatPurchaseRequestItemMapper purchaseRequestItemMapper,
-            MatPurchaseOrderMapper purchaseOrderMapper,
-            MatPurchaseOrderItemMapper purchaseOrderItemMapper,
-            MatReceiptMapper receiptMapper,
-            MatReceiptItemMapper receiptItemMapper,
-            MatRequisitionMapper requisitionMapper,
-            MatWarehouseMapper warehouseMapper,
-            MatStockMapper stockMapper,
-            TechItemMapper techItemMapper,
-            MdPartnerMapper partnerMapper,
-            MdMaterialMapper materialMapper,
-            SysUserMapper userMapper,
             ProjectAccessChecker projectAccessChecker) {
-        super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectMapper = projectMapper;
+        this.ctContractMapper = ctContractMapper;
+        this.wfTaskMapper = wfTaskMapper;
+        this.wfInstanceMapper = wfInstanceMapper;
+        this.stlSettlementMapper = stlSettlementMapper;
+        this.varOrderMapper = varOrderMapper;
+        this.subMeasureMapper = subMeasureMapper;
         this.projectAccessChecker = projectAccessChecker;
         this.ctContractChangeMapper = ctContractChangeMapper;
     }
@@ -180,7 +129,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         List<DashboardProjectSummaryVO> lagging = Stream.of(project)
                 .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(periodCutoff)
                         && !"COMPLETED".equals(p.getStatus()))
-                .map(this::toProjectSummary)
+                .map(DashboardViewSupport::toProjectSummary)
                 .collect(Collectors.toList());
         vo.setLaggingProjects(lagging);
         vo.setLaggingProjectCount((long) lagging.size());
@@ -230,7 +179,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                         .le(CtContract::getEndDate, cutoff)
                         .ge(CtContract::getEndDate, windowStart)
                         .eq(CtContract::getContractStatus, "PERFORMING"));
-        vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
+        vo.setExpiringContracts(expiringContracts.stream().map(DashboardViewSupport::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
         return vo;
@@ -389,7 +338,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 : selectedMonth.atEndOfMonth().plusDays(1);
         List<DashboardProjectSummaryVO> lagging = activeProjects.stream()
                 .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(periodCutoff))
-                .map(this::toProjectSummary)
+                .map(DashboardViewSupport::toProjectSummary)
                 .collect(Collectors.toList());
         vo.setLaggingProjects(lagging);
         vo.setLaggingProjectCount((long) lagging.size());
@@ -430,7 +379,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 .le(CtContract::getEndDate, cutoff)
                 .ge(CtContract::getEndDate, windowStart)
                 .eq(CtContract::getContractStatus, "PERFORMING"));
-        vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
+        vo.setExpiringContracts(expiringContracts.stream().map(DashboardViewSupport::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
         return vo;
@@ -588,6 +537,36 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                     return item;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private PmProject requireProject(Long tenantId, Long projectId) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "请指定项目");
+        }
+        PmProject project = projectMapper.selectById(projectId);
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        return project;
+    }
+
+    private Map<Long, WfInstance> batchLoadInstances(List<WfTask> tasks) {
+        if (CollectionUtils.isEmpty(tasks)) {
+            return Collections.emptyMap();
+        }
+        Set<Long> instanceIds = tasks.stream()
+                .map(WfTask::getInstanceId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (instanceIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Long tenantId = UserContext.getCurrentTenantId();
+        return wfInstanceMapper.selectList(new LambdaQueryWrapper<WfInstance>()
+                        .eq(WfInstance::getTenantId, tenantId)
+                        .in(WfInstance::getId, instanceIds))
+                .stream()
+                .collect(Collectors.toMap(WfInstance::getId, instance -> instance, (left, right) -> left));
     }
 
     private Comparator<CtContractChange> changeComparator() {

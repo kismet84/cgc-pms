@@ -75,6 +75,18 @@ describe('M5 purchase request, order and receipt contract', () => {
       resolve(process.cwd(), 'src/pages/supply-chain/PurchaseExecutionPage.vue'),
       'utf8',
     )
+    const applicationSource = [
+      'save-purchase-request.ts',
+      'save-purchase-order.ts',
+      'save-material-receipt.ts',
+    ]
+      .map((file) =>
+        readFileSync(
+          resolve(process.cwd(), 'src/pages/supply-chain/purchase-execution/application', file),
+          'utf8',
+        ),
+      )
+      .join('\n')
     expect(source).toContain("route.path === '/purchase/order'")
     expect(source).toContain("route.path === '/purchase/receipt'")
     expect(source).toContain('attachmentDocumentType')
@@ -97,6 +109,14 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).not.toContain('qualifiedQuantity')
     expect(source).toContain('await loadPage()')
     expect(source).toContain('await selectRecord(refreshed)')
+    expect(source).toContain('let listController: AbortController | null = null')
+    expect(source).toContain('let listGeneration = 0')
+    expect(source).toContain('./purchase-execution/application/save-purchase-order')
+    expect(applicationSource).toContain("kind: 'FROM_REQUEST'")
+    expect(applicationSource).toContain("kind: 'CREATE_EXCEPTION'")
+    expect(applicationSource).toContain("kind: 'EDIT'")
+    expect(applicationSource).toContain('await dependencies.deleteDraft(id)')
+    expect(applicationSource).toContain('rollbackFailed')
     expect(source).toContain('loadOrderItemsForReceipt')
     expect(source).toContain('loadMaterials')
     expect(source).toContain('loadPurchaseRequestFormOptions')

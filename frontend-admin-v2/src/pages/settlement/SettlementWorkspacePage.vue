@@ -25,7 +25,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/shared/display'
 import { loadContractPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'

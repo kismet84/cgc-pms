@@ -125,15 +125,12 @@ describe('M3 technical management closed loop', () => {
     expect(pageSource).toContain('traceController?.abort()')
     expect(pageSource).toContain('await loadProject(true)')
     expect(pageSource).toContain('kind="loading"')
-    expect(pageSource).toContain('kind="empty"')
     expect(pageSource).not.toContain('state="loading"')
     expect(pageSource).not.toContain('state="empty"')
     expect(pageSource).toContain('description="正在加载方案、图纸、RFI、交底和归档状态。"')
     expect(pageSource).toContain('aria-label="图纸 RFI 技术闭环"')
-    expect(pageSource).toContain('v-if="!loading && !scopeProjectIds.length && !errorMessage"')
-    expect(pageSource.indexOf('title="图纸 RFI 技术闭环"')).toBeLessThan(
-      pageSource.indexOf('title="暂无可访问项目"'),
-    )
+    expect(pageSource).not.toContain('scopeProjectIds')
+    expect(pageSource).not.toContain('workspace.projects.map')
     expect(pageSource).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
     expect(pageSource).toContain('label="前版图纸"')
     expect(pageSource).toContain(':options="userOptions(form.responsibleUserId)"')
@@ -145,21 +142,14 @@ describe('M3 technical management closed loop', () => {
   it('partitions the closed loop into six lazy-rendered business tabs with existing actions', () => {
     expect(pageSource).toContain("const activeTab = ref<TechnicalTab>('scheme')")
     expect(pageSource).toContain('const visibleTabs = computed(() => [')
-    for (const tab of [
-      "{ value: 'scheme', label: '技术方案'",
-      "{ value: 'drawing', label: '图纸管理'",
-      "{ value: 'review', label: '图纸会审'",
-      "{ value: 'rfi', label: 'RFI'",
-      "{ value: 'disclosure', label: '技术交底'",
-      "{ value: 'archive', label: '验收归档'",
-    ])
-      expect(pageSource).toContain(tab)
+    for (const label of ['技术方案', '图纸管理', '图纸会审', 'RFI', '技术交底', '验收归档'])
+      expect(pageSource).toContain(`label: '${label}'`)
     expect(pageSource).toContain('aria-label="技术闭环业务分区"')
     expect(pageSource).toContain('const prioritizedRfis = computed(() =>')
     expect(pageSource).toContain('v-for="(rfi, index) in pagedRfis"')
     expect(pageSource).toContain(':id="`technical-panel-${activeTab}`"')
     expect(pageSource).toContain(':aria-labelledby="`technical-tab-${activeTab}`"')
-    expect(pageSource).toContain("() => scopeProjectIds.value.join('|')")
+    expect(pageSource).toContain('watch(projectId, () => void loadProject(), { immediate: true })')
     expect(pageSource.match(/v-if="activeTab === '[a-z]+'"/g)).toHaveLength(6)
 
     const headingCard = pageSource.slice(

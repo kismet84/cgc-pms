@@ -11,6 +11,9 @@ import type {
   TechnicalDrawing,
   TechnicalOverview,
   TechnicalRfi,
+  TechnicalScheme,
+  TechnicalWorkspace,
+  TechnicalWorkspaceCounts,
 } from '@cgc-pms/frontend-contracts'
 import {
   V2ActionMenu,
@@ -39,6 +42,7 @@ import {
   createTechnicalScheme,
   loadDrawingTrace,
   loadTechnicalOverview,
+  loadTechnicalWorkspace,
   receiveDrawingVersion,
   receiveTechnicalDrawing,
   respondTechnicalRfi,
@@ -47,6 +51,7 @@ import {
   submitTechnicalScheme,
 } from '@/services/technical'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue, localDateTimeInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { deliveryLabel } from './labels'
@@ -64,6 +69,16 @@ type DialogKind =
   | 'archive'
   | null
 type TechnicalTab = 'scheme' | 'drawing' | 'review' | 'rfi' | 'disclosure' | 'archive'
+type PageKey =
+  | 'schemes'
+  | 'drawings'
+  | 'versions'
+  | 'reviews'
+  | 'rfis'
+  | 'responses'
+  | 'disclosures'
+  | 'references'
+  | 'archives'
 type Target =
   | TechnicalDrawing
   | DrawingVersion
@@ -97,6 +112,7 @@ const workspace = useWorkspaceStore()
 const overview = ref<TechnicalOverview>(emptyOverview())
 const trace = ref<DrawingTrace | null>(null)
 const loading = ref(false)
+const loadedOnce = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 watch(errorMessage, (value) => {
@@ -120,18 +136,35 @@ const pages = reactive({
   references: 1,
   archives: 1,
 })
+const serverCounts = reactive<TechnicalWorkspaceCounts>({
+  scheme: 0,
+  drawing: 0,
+  review: 0,
+  rfi: 0,
+  disclosure: 0,
+  archive: 0,
+})
+const serverTotals = reactive<Record<PageKey, number>>({
+  schemes: 0,
+  drawings: 0,
+  versions: 0,
+  reviews: 0,
+  rfis: 0,
+  responses: 0,
+  disclosures: 0,
+  references: 0,
+  archives: 0,
+})
 const pageSlice = <T,>(rows: T[], pageNo: number) =>
   rows.slice((pageNo - 1) * pageSize, pageNo * pageSize)
 let projectController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
 
-const today = () => new Date().toISOString().slice(0, 10)
-const now = () => new Date().toISOString().slice(0, 16)
+const today = () => localDateInputValue()
+const now = () => localDateTimeInputValue()
 const projectId = computed(() => workspace.selectedProjectId || '')
-const scopeProjectIds = computed(() =>
-  projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
-)
+const allProjects = computed(() => !projectId.value)
 const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
 const currentUserLabel = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
@@ -153,11 +186,13 @@ const approvedVersions = computed(() =>
   overview.value.versions.filter((item) => item.status === 'APPROVED'),
 )
 const availableReferences = computed(() =>
-  overview.value.constructionReferences.filter(
-    (item) =>
-      item.status === 'RECORDED' &&
-      !overview.value.archives.some((archive) => archive.constructionReferenceId === item.id),
-  ),
+  allProjects.value
+    ? overview.value.constructionReferences
+    : overview.value.constructionReferences.filter(
+        (item) =>
+          item.status === 'RECORDED' &&
+          !overview.value.archives.some((archive) => archive.constructionReferenceId === item.id),
+      ),
 )
 const openRfiCount = computed(
   () => overview.value.rfis.filter((item) => !['CLOSED', 'CANCELLED'].includes(item.status)).length,
@@ -169,26 +204,63 @@ const prioritizedRfis = computed(() =>
       Number(['CLOSED', 'CANCELLED'].includes(right.status)),
   ),
 )
-const pagedSchemes = computed(() => pageSlice(overview.value.schemes, pages.schemes))
-const pagedDrawings = computed(() => pageSlice(overview.value.drawings, pages.drawings))
-const pagedVersions = computed(() => pageSlice(overview.value.versions, pages.versions))
-const pagedReviews = computed(() => pageSlice(overview.value.reviews, pages.reviews))
-const pagedRfis = computed(() => pageSlice(prioritizedRfis.value, pages.rfis))
-const pagedResponses = computed(() => pageSlice(overview.value.responses, pages.responses))
-const pagedDisclosures = computed(() => pageSlice(overview.value.disclosures, pages.disclosures))
-const pagedReferences = computed(() => pageSlice(availableReferences.value, pages.references))
-const pagedArchives = computed(() => pageSlice(overview.value.archives, pages.archives))
+const pageRows = <T,>(rows: T[], pageNo: number) =>
+  allProjects.value ? rows : pageSlice(rows, pageNo)
+const pagedSchemes = computed(() => pageRows(overview.value.schemes, pages.schemes))
+const pagedDrawings = computed(() => pageRows(overview.value.drawings, pages.drawings))
+const pagedVersions = computed(() => pageRows(overview.value.versions, pages.versions))
+const pagedReviews = computed(() => pageRows(overview.value.reviews, pages.reviews))
+const pagedRfis = computed(() => pageRows(prioritizedRfis.value, pages.rfis))
+const pagedResponses = computed(() => pageRows(overview.value.responses, pages.responses))
+const pagedDisclosures = computed(() => pageRows(overview.value.disclosures, pages.disclosures))
+const pagedReferences = computed(() => pageRows(availableReferences.value, pages.references))
+const pagedArchives = computed(() => pageRows(overview.value.archives, pages.archives))
 function resetPages(): void {
   for (const key of Object.keys(pages) as Array<keyof typeof pages>) pages[key] = 1
 }
 const visibleTabs = computed(() => [
-  { value: 'scheme', label: '技术方案', count: overview.value.schemes.length },
-  { value: 'drawing', label: '图纸管理', count: overview.value.drawings.length },
-  { value: 'review', label: '图纸会审', count: overview.value.reviews.length },
-  { value: 'rfi', label: 'RFI', count: openRfiCount.value },
-  { value: 'disclosure', label: '技术交底', count: overview.value.disclosures.length },
-  { value: 'archive', label: '验收归档', count: overview.value.archives.length },
+  {
+    value: 'scheme',
+    label: '技术方案',
+    count: allProjects.value ? serverCounts.scheme : overview.value.schemes.length,
+  },
+  {
+    value: 'drawing',
+    label: '图纸管理',
+    count: allProjects.value ? serverCounts.drawing : overview.value.drawings.length,
+  },
+  {
+    value: 'review',
+    label: '图纸会审',
+    count: allProjects.value ? serverCounts.review : overview.value.reviews.length,
+  },
+  { value: 'rfi', label: 'RFI', count: allProjects.value ? serverCounts.rfi : openRfiCount.value },
+  {
+    value: 'disclosure',
+    label: '技术交底',
+    count: allProjects.value ? serverCounts.disclosure : overview.value.disclosures.length,
+  },
+  {
+    value: 'archive',
+    label: '验收归档',
+    count: allProjects.value ? serverCounts.archive : overview.value.archives.length,
+  },
 ])
+const pageTotals = computed<Record<PageKey, number>>(() =>
+  allProjects.value
+    ? serverTotals
+    : {
+        schemes: overview.value.schemes.length,
+        drawings: overview.value.drawings.length,
+        versions: overview.value.versions.length,
+        reviews: overview.value.reviews.length,
+        rfis: overview.value.rfis.length,
+        responses: overview.value.responses.length,
+        disclosures: overview.value.disclosures.length,
+        references: availableReferences.value.length,
+        archives: overview.value.archives.length,
+      },
+)
 const reviewCandidate = computed(() =>
   overview.value.versions.find((item) => item.status === 'RECEIVED'),
 )
@@ -297,43 +369,86 @@ function versionLabel(id?: string | null): string {
   return item ? `${item.drawingCode ?? '图纸'}-${item.versionNo}` : '未识别图纸版本'
 }
 
-async function loadProject(preserveNotice = false): Promise<void> {
-  resetPages()
+const primaryPageKeys: Record<TechnicalTab, PageKey> = {
+  scheme: 'schemes',
+  drawing: 'drawings',
+  review: 'reviews',
+  rfi: 'rfis',
+  disclosure: 'disclosures',
+  archive: 'references',
+}
+const secondaryPageKeys: Partial<Record<TechnicalTab, PageKey>> = {
+  drawing: 'versions',
+  rfi: 'responses',
+  archive: 'archives',
+}
+
+function applyWorkspace(result: TechnicalWorkspace): void {
+  const next = emptyOverview()
+  const primary = result.primary.records
+  const secondary = result.secondary?.records ?? []
+  if (result.view === 'scheme') next.schemes = primary as TechnicalScheme[]
+  if (result.view === 'drawing') {
+    next.drawings = primary as TechnicalDrawing[]
+    next.versions = secondary as DrawingVersion[]
+  }
+  if (result.view === 'review') next.reviews = primary as DrawingReview[]
+  if (result.view === 'rfi') {
+    next.rfis = primary as TechnicalRfi[]
+    next.responses = secondary as RfiResponse[]
+  }
+  if (result.view === 'disclosure') next.disclosures = primary as TechnicalDisclosure[]
+  if (result.view === 'archive') {
+    next.constructionReferences = primary as ConstructionReference[]
+    next.archives = secondary as AcceptanceArchive[]
+  }
+  overview.value = next
+  Object.assign(serverCounts, result.counts)
+  for (const key of Object.keys(serverTotals) as PageKey[]) serverTotals[key] = 0
+  serverTotals[primaryPageKeys[result.view]] = result.primary.total
+  const secondaryKey = secondaryPageKeys[result.view]
+  if (secondaryKey) serverTotals[secondaryKey] = result.secondary?.total ?? 0
+}
+
+async function loadProject(preserveNotice = false, reset = true): Promise<void> {
+  if (reset) resetPages()
   projectController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
   overview.value = emptyOverview()
   trace.value = null
-  if (!scopeProjectIds.value.length) return
   const controller = new AbortController()
   projectController = controller
-  loading.value = true
+  loading.value = !loadedOnce.value
   if (!preserveNotice) clearNotice()
   try {
-    // ponytail: fan-out stays simple; add a server aggregate endpoint only if project counts make it slow.
-    const loaded = await Promise.all(
-      scopeProjectIds.value.map((id) => loadTechnicalOverview(id, controller.signal)),
-    )
+    const loaded = projectId.value
+      ? await loadTechnicalOverview(projectId.value, controller.signal)
+      : await loadTechnicalWorkspace(
+          {
+            view: activeTab.value,
+            pageNo: pages[primaryPageKeys[activeTab.value]],
+            pageSize,
+            secondaryPageNo:
+              pages[secondaryPageKeys[activeTab.value] ?? primaryPageKeys[activeTab.value]],
+          },
+          controller.signal,
+        )
     if (requestGeneration === generation) {
-      overview.value = {
-        schemes: loaded.flatMap((item) => item.schemes),
-        drawings: loaded.flatMap((item) => item.drawings),
-        versions: loaded.flatMap((item) => item.versions),
-        reviews: loaded.flatMap((item) => item.reviews),
-        rfis: loaded.flatMap((item) => item.rfis),
-        responses: loaded.flatMap((item) => item.responses),
-        disclosures: loaded.flatMap((item) => item.disclosures),
-        constructionReferences: loaded.flatMap((item) => item.constructionReferences),
-        archives: loaded.flatMap((item) => item.archives),
-        constructionFacts: loaded.flatMap((item) => item.constructionFacts),
-        qualityInspections: loaded.flatMap((item) => item.qualityInspections),
-      }
+      if (projectId.value) overview.value = loaded as TechnicalOverview
+      else applyWorkspace(loaded as TechnicalWorkspace)
+      loadedOnce.value = true
     }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '技术管理事实加载失败')
   } finally {
     if (requestGeneration === generation) loading.value = false
   }
+}
+
+function setPage(key: PageKey, pageNo: number): void {
+  pages[key] = pageNo
+  if (allProjects.value) void loadProject(false, false)
 }
 async function openTrace(drawing: TechnicalDrawing, preserveNotice = false): Promise<void> {
   traceController?.abort()
@@ -578,12 +693,11 @@ async function act(action: () => Promise<unknown>, message: string): Promise<voi
   }
 }
 
-watch(
-  () => scopeProjectIds.value.join('|'),
-  () => void loadProject(),
-  { immediate: true },
-)
-watch(activeTab, resetPages)
+watch(projectId, () => void loadProject(), { immediate: true })
+watch(activeTab, () => {
+  resetPages()
+  if (allProjects.value) void loadProject(false, false)
+})
 onBeforeUnmount(() => {
   projectController?.abort()
   traceController?.abort()
@@ -592,22 +706,11 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="technical-page" aria-label="图纸 RFI 技术闭环">
-    <V2Card
-      v-if="!loading && !scopeProjectIds.length && !errorMessage"
-      title="图纸 RFI 技术闭环"
-      :heading-level="1"
-    />
     <V2PageState
       v-if="loading"
       kind="loading"
       title="正在加载技术事实"
       description="正在加载方案、图纸、RFI、交底和归档状态。"
-    />
-    <V2PageState
-      v-else-if="!scopeProjectIds.length && !errorMessage"
-      kind="empty"
-      title="暂无可访问项目"
-      description="当前账号没有可查看的项目。"
     />
     <template v-else>
       <V2Card title="图纸 RFI 技术闭环" :heading-level="1">
@@ -735,9 +838,10 @@ onBeforeUnmount(() => {
         <p v-else>暂无技术方案。</p>
         <template #footer>
           <V2Pagination
-            v-model:page-no="pages.schemes"
-            :total="overview.schemes.length"
+            :page-no="pages.schemes"
+            :total="pageTotals.schemes"
             label="技术方案分页"
+            @update:page-no="setPage('schemes', $event)"
           />
         </template>
       </V2Card>
@@ -794,9 +898,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无图纸。</p>
             <V2Pagination
-              v-model:page-no="pages.drawings"
-              :total="overview.drawings.length"
+              :page-no="pages.drawings"
+              :total="pageTotals.drawings"
               label="图纸分页"
+              @update:page-no="setPage('drawings', $event)"
             />
           </section>
 
@@ -834,9 +939,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无图纸版本。</p>
             <V2Pagination
-              v-model:page-no="pages.versions"
-              :total="overview.versions.length"
+              :page-no="pages.versions"
+              :total="pageTotals.versions"
               label="图纸版本分页"
+              @update:page-no="setPage('versions', $event)"
             />
           </section>
         </div>
@@ -910,9 +1016,10 @@ onBeforeUnmount(() => {
         </section>
         <template #footer>
           <V2Pagination
-            v-model:page-no="pages.reviews"
-            :total="overview.reviews.length"
+            :page-no="pages.reviews"
+            :total="pageTotals.reviews"
             label="图纸会审分页"
+            @update:page-no="setPage('reviews', $event)"
           />
         </template>
       </V2Card>
@@ -976,9 +1083,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无 RFI 记录。</p>
             <V2Pagination
-              v-model:page-no="pages.rfis"
-              :total="overview.rfis.length"
+              :page-no="pages.rfis"
+              :total="pageTotals.rfis"
               label="RFI 分页"
+              @update:page-no="setPage('rfis', $event)"
             />
           </section>
 
@@ -1025,9 +1133,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无设计回复。</p>
             <V2Pagination
-              v-model:page-no="pages.responses"
-              :total="overview.responses.length"
+              :page-no="pages.responses"
+              :total="pageTotals.responses"
               label="设计回复分页"
+              @update:page-no="setPage('responses', $event)"
             />
           </section>
         </div>
@@ -1087,9 +1196,10 @@ onBeforeUnmount(() => {
         </section>
         <template #footer>
           <V2Pagination
-            v-model:page-no="pages.disclosures"
-            :total="overview.disclosures.length"
+            :page-no="pages.disclosures"
+            :total="pageTotals.disclosures"
             label="技术交底分页"
+            @update:page-no="setPage('disclosures', $event)"
           />
         </template>
       </V2Card>
@@ -1135,9 +1245,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无待归档施工依据。</p>
             <V2Pagination
-              v-model:page-no="pages.references"
-              :total="availableReferences.length"
+              :page-no="pages.references"
+              :total="pageTotals.references"
               label="施工依据分页"
+              @update:page-no="setPage('references', $event)"
             />
           </section>
 
@@ -1175,9 +1286,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-else>暂无验收归档。</p>
             <V2Pagination
-              v-model:page-no="pages.archives"
-              :total="overview.archives.length"
+              :page-no="pages.archives"
+              :total="pageTotals.archives"
               label="验收归档分页"
+              @update:page-no="setPage('archives', $event)"
             />
           </section>
         </div>

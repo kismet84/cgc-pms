@@ -1,3 +1,5 @@
+import type { PageResult } from "./api";
+
 export type TechnicalStatus =
   | "ACTIVE"
   | "DRAFT"
@@ -140,6 +142,39 @@ export interface TechnicalOverview {
   constructionFacts: ConstructionFact[];
   qualityInspections: QualityInspectionFact[];
 }
+export type TechnicalWorkspaceView =
+  "scheme" | "drawing" | "review" | "rfi" | "disclosure" | "archive";
+export interface TechnicalWorkspaceCounts {
+  scheme: number;
+  drawing: number;
+  review: number;
+  rfi: number;
+  disclosure: number;
+  archive: number;
+}
+export type TechnicalWorkspaceRow =
+  | TechnicalScheme
+  | TechnicalDrawing
+  | DrawingVersion
+  | DrawingReview
+  | TechnicalRfi
+  | RfiResponse
+  | TechnicalDisclosure
+  | ConstructionReference
+  | AcceptanceArchive;
+export interface TechnicalWorkspace {
+  view: TechnicalWorkspaceView;
+  counts: TechnicalWorkspaceCounts;
+  primary: PageResult<TechnicalWorkspaceRow>;
+  secondary?: PageResult<TechnicalWorkspaceRow> | null;
+}
+export interface TechnicalWorkspaceQuery {
+  view: TechnicalWorkspaceView;
+  pageNo: number;
+  pageSize: number;
+  secondaryPageNo: number;
+  projectId?: string;
+}
 export interface DrawingTrace {
   drawing: TechnicalDrawing;
   versions: DrawingVersion[];
@@ -239,6 +274,7 @@ export interface ArchiveCommand {
 }
 
 export const TECHNICAL_API = {
+  workspace: "/technical-management/workspace",
   overview: "/technical-management/overview",
   schemes: "/technical-management/schemes",
   submitScheme: (id: string) => `/technical-management/schemes/${id}/submit`,

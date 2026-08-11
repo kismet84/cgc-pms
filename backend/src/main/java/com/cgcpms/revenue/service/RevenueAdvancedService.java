@@ -139,11 +139,33 @@ public class RevenueAdvancedService {
                 +placeholders(projectIds.size())+") AND (? IS NULL OR status=?) ORDER BY planned_date,id",args.toArray());
     }
 
+    @Transactional(readOnly = true)
     public Map<String,Object> aging(Long projectId){
         projectAccessChecker.checkAccess(projectId, "查看应收账龄");
+        LocalDate today = LocalDate.now();
+        Long tenantId = tenant();
+        Map<String,Object> buckets = jdbc.queryForMap("""
+                SELECT
+                  COALESCE(SUM(CASE WHEN due_date >= ? THEN outstanding_amount ELSE 0 END), 0) AS current_amount,
+                  COALESCE(SUM(CASE WHEN due_date BETWEEN ? AND ? THEN outstanding_amount ELSE 0 END), 0) AS days_1_to_30,
+                  COALESCE(SUM(CASE WHEN due_date BETWEEN ? AND ? THEN outstanding_amount ELSE 0 END), 0) AS days_31_to_60,
+                  COALESCE(SUM(CASE WHEN due_date BETWEEN ? AND ? THEN outstanding_amount ELSE 0 END), 0) AS days_61_to_90,
+                  COALESCE(SUM(CASE WHEN due_date <= ? THEN outstanding_amount ELSE 0 END), 0) AS days_over_90
+                FROM account_receivable
+                WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND outstanding_amount>0
+                """,
+                today,
+                today.minusDays(30), today.minusDays(1),
+                today.minusDays(60), today.minusDays(31),
+                today.minusDays(90), today.minusDays(61),
+                today.minusDays(91),
+                tenantId, projectId);
         Map<String,Object> r=new LinkedHashMap<>();
-        r.put("current",agingBucket(projectId,-99999,0));r.put("days1To30",agingBucket(projectId,1,30));
-        r.put("days31To60",agingBucket(projectId,31,60));r.put("days61To90",agingBucket(projectId,61,90));r.put("daysOver90",agingBucket(projectId,91,99999));
+        r.put("current",decimal(column(buckets,"current_amount")));
+        r.put("days1To30",decimal(column(buckets,"days_1_to_30")));
+        r.put("days31To60",decimal(column(buckets,"days_31_to_60")));
+        r.put("days61To90",decimal(column(buckets,"days_61_to_90")));
+        r.put("daysOver90",decimal(column(buckets,"days_over_90")));
         return r;
     }
 
@@ -247,7 +269,7 @@ public class RevenueAdvancedService {
 
     public byte[] exportAudit(Long projectId){projectAccessChecker.checkAccess(projectId,"导出收入审计");List<Map<String,Object>> rows=jdbc.queryForList("SELECT r.receivable_code,r.original_amount,r.collected_amount,r.outstanding_amount,r.due_date,r.status,c.collection_code,c.external_txn_no,c.amount collection_amount FROM account_receivable r LEFT JOIN collection_allocation a ON a.receivable_id=r.id AND a.allocation_type='COLLECTION' LEFT JOIN collection_record c ON c.id=a.collection_id WHERE r.tenant_id=? AND r.project_id=? AND r.deleted_flag=0 ORDER BY r.due_date,r.id",tenant(),projectId);StringBuilder csv=new StringBuilder("receivableCode,original,collected,outstanding,dueDate,status,collectionCode,externalTxnNo,collectionAmount\r\n");for(Map<String,Object>row:rows){csv.append(csv(row.get("receivable_code"))).append(',').append(csv(row.get("original_amount"))).append(',').append(csv(row.get("collected_amount"))).append(',').append(csv(row.get("outstanding_amount"))).append(',').append(csv(row.get("due_date"))).append(',').append(csv(row.get("status"))).append(',').append(csv(row.get("collection_code"))).append(',').append(csv(row.get("external_txn_no"))).append(',').append(csv(row.get("collection_amount"))).append("\r\n");}return csv.toString().getBytes(StandardCharsets.UTF_8);}
 
-    private BigDecimal agingBucket(Long projectId,int min,int max){BigDecimal total=BigDecimal.ZERO;for(Map<String,Object>row:jdbc.queryForList("SELECT due_date,outstanding_amount FROM account_receivable WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND outstanding_amount>0",tenant(),projectId)){long days=ChronoUnit.DAYS.between(localDate(row.get("due_date")),LocalDate.now());if(days>=min&&days<=max)total=total.add(decimal(row.get("outstanding_amount")));}return total.setScale(2,RoundingMode.HALF_UP);}
+    private Object column(Map<String,Object> row,String name){return row.entrySet().stream().filter(entry->name.equalsIgnoreCase(entry.getKey())).map(Map.Entry::getValue).findFirst().orElse(null);}
     private int insertIssues(Long runId,String query){List<Map<String,Object>>rows=jdbc.queryForList(query,tenant());for(Map<String,Object>r:rows)jdbc.update("INSERT INTO revenue_reconciliation_issue(id,tenant_id,run_id,dimension_type,business_id,issue_code,expected_amount,actual_amount,status,detail,created_at) VALUES(?,?,?,?,?,?,?,?,'OPEN',?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),runId,r.get("dimension_type"),r.get("business_id"),r.get("issue_code"),r.get("expected_amount"),r.get("actual_amount"),r.get("detail"));return rows.size();}
     private void audit(String event,String type,Long businessId,Long projectId,Object payload){String body=json(payload);jdbc.update("INSERT INTO revenue_audit_event(id,tenant_id,event_type,business_type,business_id,project_id,operator_id,event_at,archive_bucket,payload_json,payload_hash) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,'HOT',?,?)",IdWorker.getId(),tenant(),event,type,businessId,projectId,user(),body,sha256(body));}
     private Map<String,Object> requireSameCredit(Map<String,Object> existing,Long receivableId,BigDecimal amount,String reason){

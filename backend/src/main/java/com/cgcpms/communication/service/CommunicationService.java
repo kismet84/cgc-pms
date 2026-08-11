@@ -298,6 +298,7 @@ public class CommunicationService {
                 """, userId(), tenantId(), conversationId);
     }
 
+    @Transactional(readOnly = true)
     public List<MessageRecord> messages(long conversationId, long afterSeq, int pageSize) {
         MemberAccess member = requireMember(conversationId, userId(), true);
         int limit = Math.min(100, Math.max(1, pageSize));
@@ -316,6 +317,33 @@ public class CommunicationService {
                 id(rs.getLong("seq")), rs.getString("body"), rs.getString("sender_name"),
                 rs.getObject("created_at", LocalDateTime.class), List.of()),
                 tenantId(), conversationId, lowerBound, member.leaveSeq(), member.leaveSeq(), limit);
+        return attachFiles(messages);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessageRecord> messagesBefore(long conversationId, long beforeSeq, int pageSize) {
+        if (beforeSeq < 0) {
+            throw new BusinessException("COMMUNICATION_CURSOR_INVALID", "消息游标不能为负数");
+        }
+        MemberAccess member = requireMember(conversationId, userId(), true);
+        int limit = Math.min(100, Math.max(1, pageSize));
+        List<MessageRecord> messages = jdbcTemplate.query("""
+                SELECT msg.id,msg.conversation_id,msg.sender_id,msg.seq,msg.body,msg.created_at,
+                       COALESCE(u.real_name,u.username) AS sender_name
+                FROM communication_message msg
+                JOIN sys_user u ON u.tenant_id=msg.tenant_id AND u.id=msg.sender_id
+                WHERE msg.tenant_id=? AND msg.conversation_id=? AND msg.status='SENT' AND msg.deleted_flag=0
+                  AND msg.seq>? AND (? IS NULL OR msg.seq<=?)
+                  AND (?=0 OR msg.seq<?)
+                ORDER BY msg.seq DESC
+                LIMIT ?
+                """, (rs, ignored) -> new MessageRecord(
+                id(rs.getLong("id")), id(rs.getLong("conversation_id")), id(rs.getLong("sender_id")),
+                id(rs.getLong("seq")), rs.getString("body"), rs.getString("sender_name"),
+                rs.getObject("created_at", LocalDateTime.class), List.of()),
+                tenantId(), conversationId, member.joinSeq(), member.leaveSeq(), member.leaveSeq(),
+                beforeSeq, beforeSeq, limit);
+        java.util.Collections.reverse(messages);
         return attachFiles(messages);
     }
 

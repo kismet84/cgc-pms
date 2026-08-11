@@ -3,6 +3,22 @@ export interface ReportPeriodBounds {
   endDate: string
 }
 
+function localIsoValue(date: Date): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString()
+}
+
+export function localDateInputValue(date = new Date()): string {
+  return localIsoValue(date).slice(0, 10)
+}
+
+export function localMonthInputValue(date = new Date()): string {
+  return localIsoValue(date).slice(0, 7)
+}
+
+export function localDateTimeInputValue(date = new Date()): string {
+  return localIsoValue(date).slice(0, 16)
+}
+
 export function reportPeriodBounds(period: string | null | undefined): ReportPeriodBounds | null {
   const match = /^(\d{4})-(\d{2})$/.exec(period ?? '')
   if (!match) return null

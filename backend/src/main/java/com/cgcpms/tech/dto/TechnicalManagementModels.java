@@ -1,5 +1,6 @@
 package com.cgcpms.tech.dto;
 
+import com.cgcpms.common.result.PageResult;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,9 +9,24 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public final class TechnicalManagementModels {
     private TechnicalManagementModels() {}
+
+    public record Workspace(
+            String view,
+            WorkspaceCounts counts,
+            PageResult<Map<String, Object>> primary,
+            PageResult<Map<String, Object>> secondary) {}
+
+    public record WorkspaceCounts(
+            long scheme,
+            long drawing,
+            long review,
+            long rfi,
+            long disclosure,
+            long archive) {}
 
     public record SchemeCommand(
             @NotNull Long projectId,

@@ -8,6 +8,7 @@ import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +17,6 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Set;
-import io.jsonwebtoken.Claims;
 
 @Slf4j
 @Service
@@ -79,33 +79,67 @@ public class AuthService {
     /** Fail closed for tokens issued before password reset, disabled users, or tenant changes. */
     public boolean isCurrentCredential(Claims claims) {
         if (claims == null) return false;
-        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
-        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
-        String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
-        if (userId == null || tenantId == null || version == null || version.isBlank()) return false;
-        SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
-        return user != null && tenantId.equals(user.getTenantId())
-                && ENABLED_STATUS.equals(user.getStatus())
-                && version.equals(jwtUtils.credentialVersion(user.getPassword()));
+        try {
+            Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+            Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+            if (userId == null || tenantId == null) return false;
+            SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
+            return matchesCurrentCredential(claims, tenantId, user);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    /** Load credential and authorization state once per access-token request and fail closed. */
+    public boolean isCurrentAuthentication(Claims claims) {
+        if (claims == null) return false;
+        try {
+            Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+            Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+            if (userId == null || tenantId == null) return false;
+
+            SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
+            Set<String> roles = Set.copyOf(getRoleCodes(tenantId, userId));
+            Set<String> permissions = Set.copyOf(getPermissionCodes(tenantId, userId));
+            return matchesCurrentCredential(claims, tenantId, user)
+                    && matchesCurrentAuthorization(claims, roles, permissions);
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     /** Fail closed when roles or permissions changed after an access token was issued. */
     public boolean isCurrentAuthorization(Claims claims) {
         if (claims == null) return false;
-        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
-        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
-        if (userId == null || tenantId == null) return false;
         try {
+            Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+            Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+            if (userId == null || tenantId == null) return false;
             SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
-            if (user == null || !ENABLED_STATUS.equals(user.getStatus())) {
+            if (user == null || !tenantId.equals(user.getTenantId()) || !ENABLED_STATUS.equals(user.getStatus())) {
                 return false;
             }
-            return Set.copyOf(getRoleCodes(tenantId, userId)).equals(Set.copyOf(roleClaim(claims)))
-                    && Set.copyOf(getPermissionCodes(tenantId, userId)).equals(
-                    Set.copyOf(JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS))));
+            Set<String> roles = Set.copyOf(getRoleCodes(tenantId, userId));
+            Set<String> permissions = Set.copyOf(getPermissionCodes(tenantId, userId));
+            return matchesCurrentAuthorization(claims, roles, permissions);
         } catch (RuntimeException exception) {
             return false;
         }
+    }
+
+    private boolean matchesCurrentCredential(Claims claims, Long tenantId, SysUser user) {
+        String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
+        return version != null && !version.isBlank()
+                && user != null
+                && tenantId.equals(user.getTenantId())
+                && ENABLED_STATUS.equals(user.getStatus())
+                && version.equals(jwtUtils.credentialVersion(user.getPassword()));
+    }
+
+    private boolean matchesCurrentAuthorization(Claims claims, Set<String> roles, Set<String> permissions) {
+        return roles.equals(Set.copyOf(roleClaim(claims)))
+                && permissions.equals(Set.copyOf(
+                JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS))));
     }
 
     private List<String> roleClaim(Claims claims) {

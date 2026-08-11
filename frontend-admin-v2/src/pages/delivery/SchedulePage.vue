@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { formatDecimal } from '@/pages/dashboard/model'
+import { formatDecimal } from '@/shared/display'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   CorrectiveActionCommand,
@@ -25,6 +25,7 @@ import {
   showToast,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import {
   calculateScheduleSnapshot,
   createCorrectiveAction,
@@ -113,7 +114,7 @@ const correctiveForm = reactive<CorrectiveActionCommand>({
   dueDate: '',
   remark: '',
 })
-const snapshotDate = ref(new Date().toISOString().slice(0, 10))
+const snapshotDate = ref(localDateInputValue())
 
 const projectId = computed(() => workspace.selectedProjectId || '')
 const scheduleId = computed(() =>
@@ -229,7 +230,7 @@ async function openDetail(scheduleId: string, preserveNotice = false): Promise<v
     const current = await loadSchedule(scheduleId, detailController.signal)
     if (requestId !== detailRequestId.value) return
     detail.value = current
-    snapshotDate.value = new Date().toISOString().slice(0, 10)
+    snapshotDate.value = localDateInputValue()
   } catch (error) {
     if (!detailController.signal.aborted && requestId === detailRequestId.value) {
       detail.value = null
@@ -272,7 +273,7 @@ function openCreate(): void {
     projectId: initialProjectId,
     planCode: '',
     planName: '项目基线计划',
-    plannedStartDate: new Date().toISOString().slice(0, 10),
+    plannedStartDate: localDateInputValue(),
     plannedEndDate: '',
     remark: '',
   })
@@ -332,7 +333,7 @@ function openWbs(): void {
 function addTaskRow(): void {
   wbsRows.value.push(
     emptyTask(
-      detail.value?.plannedStartDate ?? new Date().toISOString().slice(0, 10),
+      detail.value?.plannedStartDate ?? localDateInputValue(),
       detail.value?.plannedEndDate ?? '',
     ),
   )
@@ -368,7 +369,7 @@ async function saveWbs(): Promise<void> {
 
 function openPeriod(periodType: PeriodType): void {
   if (!detail.value) return
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateInputValue()
   Object.assign(periodForm, {
     schedulePlanId: detail.value.id,
     periodType,

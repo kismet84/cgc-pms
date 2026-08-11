@@ -1,3 +1,5 @@
+import type { PageResult } from "./api";
+
 export type QualityPlanStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 export type QualityIssueStatus =
   "OPEN" | "RECTIFYING" | "PENDING_REINSPECTION" | "CLOSED";
@@ -97,6 +99,31 @@ export interface QualityTraceRecord {
   costItem?: Record<string, unknown> | null;
 }
 
+export type QualityWorkspaceView =
+  "plan" | "inspection" | "rectification" | "reinspection" | "consequence";
+
+export interface QualityWorkspaceCounts {
+  plan: number;
+  inspection: number;
+  rectification: number;
+  reinspection: number;
+  consequence: number;
+}
+
+export type QualityPlanRef = Pick<
+  QualityPlanRecord,
+  "id" | "projectId" | "planCode" | "planName" | "status"
+>;
+
+export interface QualityWorkspace {
+  view: QualityWorkspaceView;
+  page: PageResult<
+    QualityPlanRecord | QualityInspectionRecord | QualityIssueRecord
+  >;
+  counts: QualityWorkspaceCounts;
+  selectedPlanRef?: QualityPlanRef | null;
+}
+
 export interface QualityPlanCommand {
   projectId: string;
   planCode?: string;
@@ -167,6 +194,7 @@ export interface QualityConsequenceCommand {
 }
 
 export const QUALITY_API = {
+  workspace: "/quality-safety/workspace",
   plans: "/quality-safety/plans",
   plan: (id: string) => `/quality-safety/plans/${id}`,
   activatePlan: (id: string) => `/quality-safety/plans/${id}/activate`,

@@ -1,120 +1,72 @@
 package com.cgcpms.dashboard.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
-import com.cgcpms.alert.entity.AlertLog;
-import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.contract.entity.CtContract;
-import com.cgcpms.contract.mapper.CtContractMapper;
-import com.cgcpms.cost.entity.CostSubject;
-import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.cost.entity.CostSummary;
-import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.mapper.CostSubjectMapper;
-import com.cgcpms.cost.mapper.CostSummaryMapper;
-import com.cgcpms.cost.service.CostSummaryService;
-import com.cgcpms.cost.vo.CostProjectSummaryVO;
-import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.dashboard.vo.*;
-import com.cgcpms.inventory.entity.MatStock;
-import com.cgcpms.inventory.entity.MatWarehouse;
-import com.cgcpms.inventory.mapper.MatStockMapper;
-import com.cgcpms.inventory.mapper.MatWarehouseMapper;
-import com.cgcpms.material.entity.MdMaterial;
-import com.cgcpms.material.mapper.MdMaterialMapper;
-import com.cgcpms.partner.entity.MdPartner;
-import com.cgcpms.partner.mapper.MdPartnerMapper;
-import com.cgcpms.payment.entity.PayRecord;
-import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
-import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
-import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.mapper.MatRequisitionMapper;
-import com.cgcpms.settlement.entity.StlSettlement;
-import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.tech.entity.TechItem;
 import com.cgcpms.tech.mapper.TechItemMapper;
 import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
-import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.mapper.SysUserMapper;
-import com.cgcpms.variation.entity.VarOrder;
-import com.cgcpms.variation.mapper.VarOrderMapper;
-import com.cgcpms.workflow.WorkflowConstants;
-import com.cgcpms.workflow.WorkflowBusinessTypes;
-import com.cgcpms.workflow.entity.WfInstance;
-import com.cgcpms.workflow.entity.WfTask;
-import com.cgcpms.workflow.mapper.WfInstanceMapper;
-import com.cgcpms.workflow.mapper.WfTaskMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
-import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Slf4j
-@Service
-public class DashboardMaterialRoleService extends DashboardSharedSupport {
+import static com.cgcpms.dashboard.service.DashboardViewSupport.*;
 
+@Service
+@Transactional(readOnly = true)
+public class DashboardMaterialRoleService {
+
+    private final PmProjectMapper projectMapper;
+    private final MatPurchaseRequestMapper purchaseRequestMapper;
+    private final MatPurchaseOrderMapper purchaseOrderMapper;
+    private final MatReceiptMapper receiptMapper;
+    private final MatRequisitionMapper requisitionMapper;
+    private final SubMeasureMapper subMeasureMapper;
+    private final TechItemMapper techItemMapper;
+    private final DashboardMaterialLookupService lookupService;
     private final ProjectAccessChecker projectAccessChecker;
 
     public DashboardMaterialRoleService(
-            CostSummaryService costSummaryService,
-            CostSummaryMapper costSummaryMapper,
-            CostSubjectMapper costSubjectMapper,
-            CostItemMapper costItemMapper,
             PmProjectMapper projectMapper,
-            CtContractMapper ctContractMapper,
-            WfTaskMapper wfTaskMapper,
-            WfInstanceMapper wfInstanceMapper,
-            PayRecordMapper payRecordMapper,
-            StlSettlementMapper stlSettlementMapper,
-            VarOrderMapper varOrderMapper,
             SubMeasureMapper subMeasureMapper,
-            AlertLogMapper alertLogMapper,
             MatPurchaseRequestMapper purchaseRequestMapper,
-            MatPurchaseRequestItemMapper purchaseRequestItemMapper,
             MatPurchaseOrderMapper purchaseOrderMapper,
-            MatPurchaseOrderItemMapper purchaseOrderItemMapper,
             MatReceiptMapper receiptMapper,
-            MatReceiptItemMapper receiptItemMapper,
             MatRequisitionMapper requisitionMapper,
-            MatWarehouseMapper warehouseMapper,
-            MatStockMapper stockMapper,
             TechItemMapper techItemMapper,
-            MdPartnerMapper partnerMapper,
-            MdMaterialMapper materialMapper,
-            SysUserMapper userMapper,
+            DashboardMaterialLookupService lookupService,
             ProjectAccessChecker projectAccessChecker) {
-        super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectMapper = projectMapper;
+        this.subMeasureMapper = subMeasureMapper;
+        this.purchaseRequestMapper = purchaseRequestMapper;
+        this.purchaseOrderMapper = purchaseOrderMapper;
+        this.receiptMapper = receiptMapper;
+        this.requisitionMapper = requisitionMapper;
+        this.techItemMapper = techItemMapper;
+        this.lookupService = lookupService;
         this.projectAccessChecker = projectAccessChecker;
     }
 
@@ -205,17 +157,19 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
         List<MatPurchaseOrder> mapOrders = selectedMonth != null
                 ? Stream.of(orders, overdueOrders, scoreOrders).flatMap(Collection::stream).distinct().collect(Collectors.toList())
                 : orders;
-        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, mapOrders, receipts);
-        Map<Long, String> ownerNameMap = ownerNameMap(tenantId, requests);
-        Map<Long, String> requestSummaryMap = requestSummaryMap(tenantId, requests);
-        Map<Long, String> orderSummaryMap = orderSummaryMap(tenantId, mapOrders);
-        Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, orderSummaryMap);
+        DashboardMaterialLookupService.PurchaseSnapshot snapshot = lookupService.loadPurchase(
+                tenantId, requests, mapOrders, receipts, scoreOrders, allReceipts, projectIds);
+        Map<Long, String> partnerNameMap = snapshot.partnerNames();
+        Map<Long, String> ownerNameMap = snapshot.ownerNames();
+        Map<Long, String> requestSummaryMap = snapshot.requestSummaries();
+        Map<Long, String> orderSummaryMap = snapshot.orderSummaries();
+        Map<Long, String> receiptSummaryMap = snapshot.receiptSummaries();
 
         vo.setPendingRequestCount(requests.stream().filter(r -> !"APPROVED".equals(r.getApprovalStatus())).count());
         vo.setActiveOrderCount(orders.stream().filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus())).count());
         vo.setOverdueDeliveryCount((long) overdueOrders.size());
         vo.setPendingReceiptCount((long) pendingReceipts.size());
-        vo.setLowStockItemCount(countLowStockItems(tenantId, projectIds));
+        vo.setLowStockItemCount(snapshot.lowStockItemCount());
         vo.setTotalOrderAmount(orders.stream()
                 .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -250,7 +204,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 .limit(5)
                 .map(r -> toBusinessItem("MATERIAL_RECEIPT", r, projectNameMap, partnerNameMap, receiptSummaryMap))
                 .collect(Collectors.toList()));
-        vo.setSupplierScores(supplierScores(scoreOrders, allReceipts, partnerNameMap));
+        vo.setSupplierScores(supplierScores(scoreOrders, allReceipts, partnerNameMap, snapshot));
         return vo;
     }
 
@@ -266,27 +220,31 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
         return projectAccessChecker.filterAccessible(projects);
     }
 
+    private PmProject requireProject(Long tenantId, Long projectId) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "请指定项目");
+        }
+        PmProject project = projectMapper.selectById(projectId);
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        return project;
+    }
+
     private List<DashboardSupplierScoreVO> supplierScores(List<MatPurchaseOrder> orders,
                                                            List<MatReceipt> receipts,
-                                                           Map<Long, String> partnerNameMap) {
+                                                           Map<Long, String> partnerNameMap,
+                                                           DashboardMaterialLookupService.PurchaseSnapshot snapshot) {
         if (orders.isEmpty()) return Collections.emptyList();
         Set<Long> orderIds = orders.stream().map(MatPurchaseOrder::getId).collect(Collectors.toSet());
-        List<MatPurchaseOrderItem> orderItems = purchaseOrderItemMapper.selectList(
-                new LambdaQueryWrapper<MatPurchaseOrderItem>().in(MatPurchaseOrderItem::getOrderId, orderIds));
-        Map<Long, List<MatPurchaseOrderItem>> orderItemsByOrder = orderItems.stream()
-                .collect(Collectors.groupingBy(MatPurchaseOrderItem::getOrderId));
+        Map<Long, List<MatPurchaseOrderItem>> orderItemsByOrder = snapshot.orderItemsByOrder();
 
         List<MatReceipt> approvedReceipts = receipts.stream()
                 .filter(r -> "APPROVED".equals(r.getApprovalStatus()) && r.getOrderId() != null
                         && orderIds.contains(r.getOrderId()) && r.getReceiptDate() != null)
                 .sorted(Comparator.comparing(MatReceipt::getReceiptDate))
                 .collect(Collectors.toList());
-        Set<Long> receiptIds = approvedReceipts.stream().map(MatReceipt::getId).collect(Collectors.toSet());
-        Map<Long, List<MatReceiptItem>> receiptItemsByReceipt = receiptIds.isEmpty()
-                ? Collections.emptyMap()
-                : receiptItemMapper.selectList(new LambdaQueryWrapper<MatReceiptItem>()
-                        .in(MatReceiptItem::getReceiptId, receiptIds)).stream()
-                .collect(Collectors.groupingBy(MatReceiptItem::getReceiptId));
+        Map<Long, List<MatReceiptItem>> receiptItemsByReceipt = snapshot.receiptItemsByReceipt();
         Map<Long, List<MatReceipt>> receiptsByOrder = approvedReceipts.stream()
                 .collect(Collectors.groupingBy(MatReceipt::getOrderId));
 
@@ -412,15 +370,17 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                     .collect(Collectors.toList());
         }
 
-        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, businessPartnerIds(receipts, requisitions, measures));
-        Map<Long, String> ownerNameMap = userNameMap(tenantId, businessUserIds(receipts, requisitions));
-        Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, Collections.emptyMap());
+        DashboardMaterialLookupService.ProductionSnapshot snapshot = lookupService.loadProduction(
+                tenantId, receipts, requisitions, measures, projectIds);
+        Map<Long, String> partnerNameMap = snapshot.partnerNames();
+        Map<Long, String> ownerNameMap = snapshot.ownerNames();
+        Map<Long, String> receiptSummaryMap = snapshot.receiptSummaries();
 
         vo.setReceiptCount((long) receipts.size());
         vo.setRequisitionCount((long) requisitions.size());
         vo.setPendingStockOutCount(requisitions.stream().filter(r -> r.getStockOutFlag() == null || r.getStockOutFlag() == 0).count());
         vo.setSubMeasureCount((long) measures.size());
-        vo.setLowStockItemCount(countLowStockItems(tenantId, projectIds));
+        vo.setLowStockItemCount(snapshot.lowStockItemCount());
         vo.setConfirmedMeasureAmount(measures.stream()
                 .filter(m -> "APPROVED".equals(m.getApprovalStatus()) || "CONFIRMED".equals(m.getStatus()))
                 .map(m -> m.getApprovedAmount() != null ? m.getApprovedAmount() : BigDecimal.ZERO)
@@ -471,7 +431,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                     .collect(Collectors.toList());
         }
 
-        Map<Long, String> ownerNameMap = userNameMap(tenantId, items.stream()
+        Map<Long, String> ownerNameMap = lookupService.loadUserNames(tenantId, items.stream()
                 .map(TechItem::getResponsibleUserId)
                 .collect(Collectors.toSet()));
 
@@ -481,7 +441,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 && !"CLOSED".equals(i.getItemStatus())).count());
         vo.setOpenIssueCount(items.stream().filter(i -> "TECH_ISSUE".equals(i.getItemType())
                 && !"CLOSED".equals(i.getItemStatus())).count());
-        vo.setOverdueCount(items.stream().filter(this::isChiefEngineerOverdueItem).count());
+        vo.setOverdueCount(items.stream().filter(DashboardViewSupport::isChiefEngineerOverdueItem).count());
 
         vo.setPendingReviews(items.stream()
                 .filter(i -> "TECH_REVIEW".equals(i.getItemType()) && !"CLOSED".equals(i.getItemStatus()))
@@ -499,7 +459,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 .map(i -> toTechBusinessItem("TECH_ISSUE", i, projectNameMap, ownerNameMap))
                 .collect(Collectors.toList()));
         vo.setOverdueItems(items.stream()
-                .filter(this::isChiefEngineerOverdueItem)
+                .filter(DashboardViewSupport::isChiefEngineerOverdueItem)
                 .limit(5)
                 .map(i -> toTechBusinessItem(i.getItemType(), i, projectNameMap, ownerNameMap))
                 .collect(Collectors.toList()));

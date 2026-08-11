@@ -12,11 +12,14 @@ import type {
   QualityIssueCommand,
   QualityIssueRecord,
   QualityPlanCommand,
+  QualityPlanRef,
   QualityPlanRecord,
   QualityRectificationCommand,
   QualityRectificationRecord,
   QualityReinspectionCommand,
   QualityTraceRecord,
+  QualityWorkspaceCounts,
+  QualityWorkspaceView,
   SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
@@ -42,10 +45,8 @@ import {
   createQualityIssue,
   createQualityPlan,
   createQualityRectification,
-  loadQualityInspections,
-  loadQualityIssues,
-  loadQualityPlans,
   loadQualityTrace,
+  loadQualityWorkspace,
   reinspectQualityRectification,
   submitQualityConsequence,
   submitQualityInspection,
@@ -59,12 +60,13 @@ import {
   type FieldDraft,
 } from '@/services/fieldDrafts'
 import { isApiClientError } from '@/services/request'
+import { localDateInputValue } from '@/services/workspace-context'
 import { getSessionNamespaceIdentity, useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import V2Tabs from '@/components/V2Tabs.vue'
 import { deliveryLabel } from './labels'
 
-type QualityTab = 'plan' | 'inspection' | 'rectification' | 'reinspection' | 'consequence'
+type QualityTab = QualityWorkspaceView
 type DialogKind =
   | 'plan'
   | 'inspection'
@@ -89,6 +91,7 @@ const workspace = useWorkspaceStore()
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
+const workspaceLoaded = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 watch(errorMessage, (value) => {
@@ -99,9 +102,23 @@ const plans = ref<QualityPlanRecord[]>([])
 const inspections = ref<QualityInspectionRecord[]>([])
 const issues = ref<QualityIssueRecord[]>([])
 const selectedPlanId = ref('')
-const activeTab = ref<QualityTab>('plan')
+const selectedPlanRef = ref<QualityPlanRef | null>(null)
+const activeTab = ref<QualityTab>(
+  typeof route.query.tab === 'string' &&
+    ['plan', 'inspection', 'rectification', 'reinspection', 'consequence'].includes(route.query.tab)
+    ? (route.query.tab as QualityTab)
+    : 'plan',
+)
 const pageSize = 10
 const pageNo = ref(1)
+const activeTotal = ref(0)
+const workspaceCounts = ref<QualityWorkspaceCounts>({
+  plan: 0,
+  inspection: 0,
+  rectification: 0,
+  reinspection: 0,
+  consequence: 0,
+})
 const activeInspection = ref<QualityInspectionRecord | null>(null)
 const activeIssue = ref<QualityIssueRecord | null>(null)
 const activeRectification = ref<QualityRectificationRecord | null>(null)
@@ -113,56 +130,32 @@ const dialog = ref<DialogKind>(null)
 const evidence = ref<File | null>(null)
 const evidenceTarget = ref<EvidenceTarget | null>(null)
 let projectController: AbortController | null = null
-let inspectionController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
+let loadScheduled = false
 const localDraft = ref<FieldDraft<QualityDraftPayload> | null>(null)
 let draftRepository: FieldDraftRepository | null = null
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localDateInputValue()
 const projectId = computed(() => workspace.selectedProjectId || '')
-const scopeProjectIds = computed(() =>
-  projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
-)
-const selectedPlan = computed(
-  () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
-)
+const hasProjectScope = computed(() => Boolean(projectId.value || workspace.projects.length))
+const selectedPlan = computed(() => selectedPlanRef.value)
 const rectificationIssues = computed(() =>
-  issues.value.filter(
-    (item) =>
-      item.status !== 'PENDING_REINSPECTION' &&
-      !(item.status === 'CLOSED' && item.responsiblePartnerId),
-  ),
+  activeTab.value === 'rectification' ? issues.value : [],
 )
-const reinspectionIssues = computed(() =>
-  issues.value.filter((item) => item.status === 'PENDING_REINSPECTION'),
-)
-const consequenceIssues = computed(() =>
-  issues.value.filter((item) => item.status === 'CLOSED' && item.responsiblePartnerId),
-)
-const pageSlice = <T,>(rows: T[]) =>
-  rows.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize)
-const pagedPlans = computed(() => pageSlice(plans.value))
-const pagedInspections = computed(() => pageSlice(inspections.value))
-const pagedRectificationIssues = computed(() => pageSlice(rectificationIssues.value))
-const pagedReinspectionIssues = computed(() => pageSlice(reinspectionIssues.value))
-const pagedConsequenceIssues = computed(() => pageSlice(consequenceIssues.value))
-const activeTotal = computed(
-  () =>
-    ({
-      plan: plans.value.length,
-      inspection: inspections.value.length,
-      rectification: rectificationIssues.value.length,
-      reinspection: reinspectionIssues.value.length,
-      consequence: consequenceIssues.value.length,
-    })[activeTab.value],
-)
+const reinspectionIssues = computed(() => (activeTab.value === 'reinspection' ? issues.value : []))
+const consequenceIssues = computed(() => (activeTab.value === 'consequence' ? issues.value : []))
+const pagedPlans = computed(() => plans.value)
+const pagedInspections = computed(() => inspections.value)
+const pagedRectificationIssues = computed(() => rectificationIssues.value)
+const pagedReinspectionIssues = computed(() => reinspectionIssues.value)
+const pagedConsequenceIssues = computed(() => consequenceIssues.value)
 const visibleTabs = computed(() => [
-  { value: 'plan', label: '检查计划', count: plans.value.length },
-  { value: 'inspection', label: '检查记录', count: inspections.value.length },
-  { value: 'rectification', label: '问题整改', count: rectificationIssues.value.length },
-  { value: 'reinspection', label: '复检闭环', count: reinspectionIssues.value.length },
-  { value: 'consequence', label: '后果追踪', count: consequenceIssues.value.length },
+  { value: 'plan', label: '检查计划', count: workspaceCounts.value.plan },
+  { value: 'inspection', label: '检查记录', count: workspaceCounts.value.inspection },
+  { value: 'rectification', label: '问题整改', count: workspaceCounts.value.rectification },
+  { value: 'reinspection', label: '复检闭环', count: workspaceCounts.value.reinspection },
+  { value: 'consequence', label: '后果追踪', count: workspaceCounts.value.consequence },
 ])
 const activePaginationLabel = computed(
   () =>
@@ -317,50 +310,44 @@ function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' |
 }
 
 async function loadProject(preserveNotice = false): Promise<void> {
-  pageNo.value = 1
   projectController?.abort()
-  inspectionController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
-  const previousSelectedPlanId = selectedPlanId.value
   plans.value = []
   inspections.value = []
   issues.value = []
   trace.value = null
   traceFiles.value = []
-  if (!scopeProjectIds.value.length) {
-    selectedPlanId.value = ''
-    return
-  }
   const controller = new AbortController()
   projectController = controller
   loading.value = true
   if (!preserveNotice) clearNotice()
   try {
-    // ponytail: fan-out stays simple; add a server aggregate endpoint only if project counts make it slow.
-    const loaded = await Promise.all(
-      scopeProjectIds.value.map(async (id) =>
-        Promise.all([
-          loadQualityPlans(id, controller.signal),
-          loadQualityIssues(id, undefined, controller.signal),
-        ]),
-      ),
+    const loaded = await loadQualityWorkspace(
+      {
+        view: activeTab.value,
+        pageNo: pageNo.value,
+        pageSize,
+        projectId: projectId.value || undefined,
+        planId: selectedPlanId.value || undefined,
+      },
+      controller.signal,
     )
     if (requestGeneration !== generation) return
-    plans.value = loaded.flatMap(([projectPlans]) => projectPlans)
-    issues.value = loaded.flatMap(([, projectIssues]) => projectIssues)
-    const requestedPlanId = planQueryValue()
-    selectedPlanId.value = plans.value.some((plan) => plan.id === requestedPlanId)
-      ? requestedPlanId
-      : plans.value.some((plan) => plan.id === previousSelectedPlanId)
-        ? previousSelectedPlanId
-        : (plans.value[0]?.id ?? '')
-    if (requestedPlanId && requestedPlanId !== selectedPlanId.value) {
+    workspaceCounts.value = loaded.counts
+    activeTotal.value = loaded.page.total
+    workspaceLoaded.value = true
+    selectedPlanRef.value = loaded.selectedPlanRef ?? null
+    selectedPlanId.value = selectedPlanRef.value?.id ?? ''
+    if (activeTab.value === 'plan') plans.value = loaded.page.records as QualityPlanRecord[]
+    else if (activeTab.value === 'inspection')
+      inspections.value = loaded.page.records as QualityInspectionRecord[]
+    else issues.value = loaded.page.records as QualityIssueRecord[]
+    if (planQueryValue() && planQueryValue() !== selectedPlanId.value) {
       const query = { ...route.query }
       delete query.planId
       await router.replace({ query, hash: route.hash })
     }
-    await loadInspections()
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '质量安全事实加载失败')
   } finally {
@@ -368,18 +355,13 @@ async function loadProject(preserveNotice = false): Promise<void> {
   }
 }
 
-async function loadInspections(): Promise<void> {
-  pageNo.value = 1
-  inspectionController?.abort()
-  inspections.value = []
-  if (!selectedPlanId.value) return
-  const controller = new AbortController()
-  inspectionController = controller
-  try {
-    inspections.value = await loadQualityInspections(selectedPlanId.value, controller.signal)
-  } catch (error) {
-    if (!controller.signal.aborted) errorMessage.value = errorText(error, '检查记录加载失败')
-  }
+function scheduleProjectLoad(): void {
+  if (loadScheduled) return
+  loadScheduled = true
+  queueMicrotask(() => {
+    loadScheduled = false
+    void loadProject()
+  })
 }
 
 function selectPlan(planId: string): void {
@@ -822,31 +804,42 @@ const submitDraftRectification = (item: QualityRectificationRecord) => {
 }
 
 watch(
-  () => scopeProjectIds.value.join('|'),
-  () => void loadProject(),
+  projectId,
+  (_value, previous) => {
+    if (previous !== undefined) {
+      selectedPlanId.value = ''
+      selectedPlanRef.value = null
+      if (planQueryValue()) {
+        const query = { ...route.query }
+        delete query.planId
+        void router.replace({ query, hash: route.hash })
+      }
+    } else selectedPlanId.value = planQueryValue()
+    pageNo.value = 1
+    scheduleProjectLoad()
+  },
   { immediate: true },
 )
 watch(
   () => route.query.planId,
   () => {
     const planId = planQueryValue()
-    if (
-      !planId ||
-      planId === selectedPlanId.value ||
-      !plans.value.some((plan) => plan.id === planId)
-    )
-      return
+    if (!planId || planId === selectedPlanId.value) return
     selectedPlanId.value = planId
-    void loadInspections()
+    pageNo.value = 1
+    scheduleProjectLoad()
   },
 )
 watch(activeTab, () => {
   pageNo.value = 1
+  scheduleProjectLoad()
+})
+watch(pageNo, () => {
+  scheduleProjectLoad()
 })
 onBeforeUnmount(() => {
   generation += 1
   projectController?.abort()
-  inspectionController?.abort()
   traceController?.abort()
   draftRepository = null
 })
@@ -855,18 +848,18 @@ onBeforeUnmount(() => {
 <template>
   <section class="quality-page" aria-label="质量安全整改闭环">
     <V2Card
-      v-if="!loading && !scopeProjectIds.length && !errorMessage"
+      v-if="!loading && !hasProjectScope && !errorMessage"
       title="质量安全整改闭环"
       :heading-level="1"
     ></V2Card>
     <V2PageState
-      v-if="loading"
+      v-if="loading && !workspaceLoaded"
       kind="loading"
       title="正在加载质量安全事实"
       description="读取计划和问题链。"
     />
     <V2PageState
-      v-else-if="!scopeProjectIds.length && !errorMessage"
+      v-else-if="!hasProjectScope && !errorMessage"
       kind="empty"
       title="暂无可访问项目"
       description="当前账号没有可查看的项目。"

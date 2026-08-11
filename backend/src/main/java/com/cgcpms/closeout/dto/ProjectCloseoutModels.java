@@ -74,4 +74,15 @@ public final class ProjectCloseoutModels {
     public record CloseProjectCommand(
             @NotNull LocalDate actualCompletionDate,
             @NotBlank @Size(max = 500) String reason) {}
+
+    public record WorkspaceRow(
+            String projectId,
+            String projectName,
+            String closeoutId,
+            String closeoutCode,
+            String status,
+            long sectionAcceptanceCount,
+            long finalAcceptanceCount,
+            long warrantyCount,
+            long defectCount) {}
 }

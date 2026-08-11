@@ -27,8 +27,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("PDF Recognition Unit Tests")
 class InvoiceRecognitionTest {
+
+    private static final String BUNDLED_FONT = "fonts/ttf/NotoSansSC/NotoSansSC-Regular.ttf";
 
     @Autowired
     private InvoiceService invoiceService;
@@ -67,22 +69,7 @@ class InvoiceRecognitionTest {
 
     @BeforeAll
     static void setUpClass() throws IOException {
-        // Locate a Chinese-capable TrueType font
-        File fontFile = findChineseFont();
-        if (fontFile == null) {
-            // If no Chinese font is available, we still generate a minimal PDF with
-            // Latin fallback text so that non-Chinese-regex tests can run.
-            System.err.println("WARNING: No Chinese font found — Chinese regex extraction tests may fail.");
-        }
-
-        // Generate the sample-invoice.pdf bytes in memory
-        if (fontFile != null) {
-            sampleInvoiceBytes = createPdfWithText(fontFile, INVOICE_TEXT_LINES);
-        } else {
-            // Fallback: Latin-only text
-            sampleInvoiceBytes = createPdfWithText(null,
-                    new String[] { "Invoice No: 12345678", "VAT Special Invoice", "Amount: 150000.00" });
-        }
+        sampleInvoiceBytes = createPdfWithText(INVOICE_TEXT_LINES);
 
         Path samplePdf = tempDir.resolve("sample-invoice.pdf");
         Files.write(samplePdf, sampleInvoiceBytes);
@@ -95,7 +82,6 @@ class InvoiceRecognitionTest {
     @Order(1)
     @DisplayName("Should extract fields from valid Chinese invoice PDF")
     void shouldExtractFieldsFromValidPdf() {
-        Assumptions.assumeTrue(findChineseFont() != null, "Chinese-capable font is required for this PDF extraction test");
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", sampleInvoiceBytes.length, false, sampleInvoiceBytes);
 
@@ -225,9 +211,7 @@ class InvoiceRecognitionTest {
     @Order(6)
     @DisplayName("Should handle multi-page PDF")
     void shouldHandleMultiPagePdf() throws IOException {
-        File fontFile = findChineseFont();
-        Assumptions.assumeTrue(fontFile != null, "Chinese-capable font is required for this PDF extraction test");
-        byte[] multiPageBytes = createMultiPagePdf(fontFile);
+        byte[] multiPageBytes = createMultiPagePdf();
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", multiPageBytes.length, false, multiPageBytes);
 
@@ -320,11 +304,10 @@ class InvoiceRecognitionTest {
     /**
      * Create a PDF with the given lines of text, each on a new line.
      *
-     * @param fontFile Chinese-capable font file, or null for Helvetica (Latin-only)
      * @param lines    text lines to embed
      * @return PDF bytes
      */
-    private static byte[] createPdfWithText(File fontFile, String... lines) throws IOException {
+    private static byte[] createPdfWithText(String... lines) throws IOException {
         PDDocument doc = new PDDocument();
         try {
             PDPage page = new PDPage(PDRectangle.A4);
@@ -332,11 +315,7 @@ class InvoiceRecognitionTest {
 
             PDPageContentStream cs = new PDPageContentStream(doc, page);
             cs.beginText();
-            if (fontFile != null) {
-                cs.setFont(PDType0Font.load(doc, fontFile), 11);
-            } else {
-                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 11);
-            }
+            cs.setFont(loadBundledFont(doc), 11);
             cs.setLeading(18);
             // Position near top-left
             cs.newLineAtOffset(50, 750);
@@ -403,19 +382,16 @@ class InvoiceRecognitionTest {
      * Create a 2-page PDF. Page 1 has one invoice number/type, page 2 has different ones.
      * Verifies that multi-page text is concatenated and first-match regex behavior.
      */
-    private static byte[] createMultiPagePdf(File fontFile) throws IOException {
+    private static byte[] createMultiPagePdf() throws IOException {
         PDDocument doc = new PDDocument();
         try {
+            PDType0Font font = loadBundledFont(doc);
             // Page 1: VAT_SPECIAL with invoice 99999999
             PDPage page1 = new PDPage(PDRectangle.A4);
             doc.addPage(page1);
             PDPageContentStream cs1 = new PDPageContentStream(doc, page1);
             cs1.beginText();
-            if (fontFile != null) {
-                cs1.setFont(PDType0Font.load(doc, fontFile), 11);
-            } else {
-                cs1.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 11);
-            }
+            cs1.setFont(font, 11);
             cs1.setLeading(18);
             cs1.newLineAtOffset(50, 750);
             cs1.showText("发票号码：99999999");
@@ -431,11 +407,7 @@ class InvoiceRecognitionTest {
             doc.addPage(page2);
             PDPageContentStream cs2 = new PDPageContentStream(doc, page2);
             cs2.beginText();
-            if (fontFile != null) {
-                cs2.setFont(PDType0Font.load(doc, fontFile), 11);
-            } else {
-                cs2.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 11);
-            }
+            cs2.setFont(font, 11);
             cs2.setLeading(18);
             cs2.newLineAtOffset(50, 750);
             cs2.showText("发票号码：12345678");
@@ -452,24 +424,13 @@ class InvoiceRecognitionTest {
         }
     }
 
-    /**
-     * Locate a Chinese-capable TrueType font on the current system.
-     * Returns {@code null} if none found.
-     */
-    private static File findChineseFont() {
-        String configured = System.getProperty("document.spike.font");
-        String[] candidates = {
-                configured == null ? "" : configured,
-                "C:/Windows/Fonts/simhei.ttf",       // Windows — SimHei
-                "C:/Windows/Fonts/Deng.ttf",         // Windows — DengXian
-                "/usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf", // Linux — Arphic TrueType
-        };
-        for (String path : candidates) {
-            File f = new File(path);
-            if (f.exists() && f.canRead()) {
-                return f;
+    private static PDType0Font loadBundledFont(PDDocument document) throws IOException {
+        ClassLoader classLoader = InvoiceRecognitionTest.class.getClassLoader();
+        try (InputStream stream = classLoader.getResourceAsStream(BUNDLED_FONT)) {
+            if (stream == null) {
+                throw new IOException("Bundled Chinese font is missing: " + BUNDLED_FONT);
             }
+            return PDType0Font.load(document, stream);
         }
-        return null;
     }
 }

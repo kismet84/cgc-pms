@@ -14,7 +14,7 @@ import {
 } from '@/components'
 import { showToast } from '@/components/toast'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
-import { dashboardStatusLabel, formatAmount } from '@/pages/dashboard/model'
+import { dashboardStatusLabel, formatAmount } from '@/shared/display'
 import {
   loadBudget,
   loadBudgetPage,
@@ -67,6 +67,7 @@ import {
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
+import { localDateInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type {
@@ -167,7 +168,7 @@ interface ReversalEditor {
   reason: string
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localDateInputValue()
 const emptyEditor = (): FinanceEditor => ({
   id: '',
   projectId: '',

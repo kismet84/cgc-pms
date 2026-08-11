@@ -20,6 +20,8 @@ import {
   type TechnicalOverview,
   type TechnicalRfi,
   type TechnicalScheme,
+  type TechnicalWorkspace,
+  type TechnicalWorkspaceQuery,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
@@ -28,6 +30,18 @@ export function loadTechnicalOverview(projectId: string, signal?: AbortSignal) {
     `${TECHNICAL_API.overview}?projectId=${encoded(projectId)}`,
     { signal },
   ).then((row) => normalize(row) as unknown as TechnicalOverview)
+}
+export function loadTechnicalWorkspace(query: TechnicalWorkspaceQuery, signal?: AbortSignal) {
+  const params = new URLSearchParams({
+    view: query.view,
+    pageNo: String(query.pageNo),
+    pageSize: String(query.pageSize),
+    secondaryPageNo: String(query.secondaryPageNo),
+  })
+  if (query.projectId) params.set('projectId', required(query.projectId))
+  return apiRequest<Record<string, unknown>>(`${TECHNICAL_API.workspace}?${params}`, {
+    signal,
+  }).then((row) => normalize(row) as unknown as TechnicalWorkspace)
 }
 export function createTechnicalScheme(command: SchemeCommand) {
   return write<TechnicalScheme, SchemeCommand>(TECHNICAL_API.schemes, command)

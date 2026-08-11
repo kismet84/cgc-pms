@@ -2,9 +2,11 @@ package com.cgcpms.supplier.controller;
 
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.result.PageResult;
 import com.cgcpms.supplier.dto.SupplierSourcingModels.*;
 import com.cgcpms.supplier.entity.*;
 import com.cgcpms.supplier.service.SupplierSourcingService;
+import com.cgcpms.supplier.service.SupplierSourcingQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +19,28 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SupplierSourcingController {
     private final SupplierSourcingService service;
+    private final SupplierSourcingQueryService queryService;
+
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('supplier:sourcing:query')")
+    public ApiResponse<WorkspacePage> workspace(
+            @RequestParam(defaultValue = "1") int eventPageNo,
+            @RequestParam(defaultValue = "1") int performancePageNo,
+            @RequestParam(defaultValue = "1") int returnPageNo,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(queryService.workspace(
+                eventPageNo, performancePageNo, returnPageNo, pageSize, projectId));
+    }
+
+    @GetMapping("/performance-candidates")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('supplier:performance:evaluate')")
+    public ApiResponse<PageResult<PerformanceCandidateRow>> performanceCandidates(
+            @RequestParam(defaultValue = "1") int pageNo,
+            @RequestParam(defaultValue = "100") int pageSize,
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(queryService.performanceCandidates(pageNo, pageSize, projectId));
+    }
 
     @GetMapping("/events")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('supplier:sourcing:query')")

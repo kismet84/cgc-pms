@@ -4,6 +4,7 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.closeout.dto.ProjectCloseoutModels.*;
 import com.cgcpms.closeout.service.ProjectCloseoutService;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.result.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +22,15 @@ public class ProjectCloseoutController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('closeout:query')")
     public ApiResponse<Map<String, Object>> overview(@RequestParam Long projectId) {
         return ApiResponse.success(service.overview(projectId));
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('closeout:query')")
+    public ApiResponse<PageResult<WorkspaceRow>> page(
+            @RequestParam(defaultValue = "1") int pageNo,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(service.page(pageNo, pageSize, projectId));
     }
 
     @PostMapping

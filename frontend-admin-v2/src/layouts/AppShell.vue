@@ -223,10 +223,12 @@ onBeforeUnmount(() => {
 
 function clearNotifications(): void {
   notificationController?.abort()
+  notificationController = null
   notificationStream?.close()
   notificationStream = null
   notificationItems.value = []
   notificationUnreadCount.value = null
+  notificationLoading.value = false
   notificationError.value = ''
 }
 
@@ -256,23 +258,38 @@ async function refreshCommunicationUnread(): Promise<void> {
 function startCommunication(): void {
   clearCommunication()
   void refreshCommunicationUnread()
+  let opened = false
+  let skipHandshake = true
   communicationStream = openCommunicationStream(
     (event) => {
-      void refreshCommunicationUnread()
-      if (event.action !== 'PING') {
-        window.dispatchEvent(new CustomEvent('communication-refresh', { detail: event }))
+      const handshake =
+        event.action === 'REFRESH' && !event.conversationId && !event.messageId && !event.seq
+      if (handshake && skipHandshake) {
+        skipHandshake = false
+        return
       }
+      if (event.action === 'PING') return
+      void refreshCommunicationUnread()
+      window.dispatchEvent(new CustomEvent('communication-refresh', { detail: event }))
     },
     undefined,
-    () => void refreshCommunicationUnread(),
+    () => {
+      skipHandshake = true
+      if (opened) void refreshCommunicationUnread()
+      else opened = true
+    },
   )
 }
 
 function startNotifications(): void {
   clearNotifications()
   void refreshNotifications()
+  let opened = false
   notificationStream = openNotificationStream(
-    () => void refreshNotifications(),
+    () => {
+      if (opened) void refreshNotifications()
+      else opened = true
+    },
     () => void refreshNotifications(),
   )
 }
@@ -280,21 +297,26 @@ function startNotifications(): void {
 async function refreshNotifications(): Promise<void> {
   if (!canRequestNotifications.value) return
   notificationController?.abort()
-  notificationController = new AbortController()
+  const controller = new AbortController()
+  notificationController = controller
   notificationLoading.value = true
   notificationError.value = ''
   try {
-    const [page, unread] = await loadNotificationSummary(notificationController.signal)
+    const [page, unread] = await loadNotificationSummary(controller.signal)
+    if (controller.signal.aborted || notificationController !== controller) return
     notificationItems.value = page.records
     notificationUnreadCount.value = unread.count
   } catch {
-    if (!notificationController.signal.aborted) {
+    if (!controller.signal.aborted && notificationController === controller) {
       notificationItems.value = []
       notificationUnreadCount.value = null
       notificationError.value = '通知摘要加载失败'
     }
   } finally {
-    if (!notificationController.signal.aborted) notificationLoading.value = false
+    if (notificationController === controller) {
+      notificationController = null
+      notificationLoading.value = false
+    }
   }
 }
 

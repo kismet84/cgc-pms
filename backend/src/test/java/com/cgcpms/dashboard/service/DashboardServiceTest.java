@@ -146,21 +146,13 @@ abstract class DashboardServiceTestSupport {
         projectMapper.insert(project);
         Long projectId = project.getId();
 
-        // Contract
-        CtContract contract = new CtContract();
-        contract.setTenantId(TENANT_ID);
-        contract.setProjectId(projectId);
-        contract.setContractCode("CT-" + suffix);
-        contract.setContractName("Contract " + suffix);
-        contract.setContractType("SUB");
-        contract.setContractAmount(new BigDecimal("5000000.00"));
-        contract.setCurrentAmount(new BigDecimal("5500000.00"));
-        contract.setPaidAmount(new BigDecimal("2000000.00"));
-        contract.setApprovalStatus("APPROVED");
-        contract.setContractStatus("PERFORMING");
-        contract.setEndDate(expiringContractDate);
-        ctContractMapper.insert(contract);
-        Long contractId = contract.getId();
+        MdPartner ownerPartner = new MdPartner();
+        ownerPartner.setTenantId(TENANT_ID);
+        ownerPartner.setPartnerCode("OWNER-" + suffix);
+        ownerPartner.setPartnerName("业主-" + suffix);
+        ownerPartner.setPartnerType("CUSTOMER");
+        ownerPartner.setStatus("ENABLE");
+        partnerMapper.insert(ownerPartner);
 
         MdPartner partner = new MdPartner();
         partner.setTenantId(TENANT_ID);
@@ -170,6 +162,24 @@ abstract class DashboardServiceTestSupport {
         partner.setStatus("ENABLE");
         partnerMapper.insert(partner);
         Long partnerId = partner.getId();
+
+        // Contract
+        CtContract contract = new CtContract();
+        contract.setTenantId(TENANT_ID);
+        contract.setProjectId(projectId);
+        contract.setContractCode("CT-" + suffix);
+        contract.setContractName("Contract " + suffix);
+        contract.setContractType("SUB");
+        contract.setPartyAId(ownerPartner.getId());
+        contract.setPartyBId(partnerId);
+        contract.setContractAmount(new BigDecimal("5000000.00"));
+        contract.setCurrentAmount(new BigDecimal("5500000.00"));
+        contract.setPaidAmount(new BigDecimal("2000000.00"));
+        contract.setApprovalStatus("APPROVED");
+        contract.setContractStatus("PERFORMING");
+        contract.setEndDate(expiringContractDate);
+        ctContractMapper.insert(contract);
+        Long contractId = contract.getId();
 
         MdMaterial material = new MdMaterial();
         material.setTenantId(TENANT_ID);

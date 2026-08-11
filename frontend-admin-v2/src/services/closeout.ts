@@ -4,6 +4,7 @@ import {
   type CloseProjectCommand,
   type CloseoutOverview,
   type CloseoutTrace,
+  type CloseoutWorkspaceRow,
   type DefectCommand,
   type DefectVerificationCommand,
   type FinalAcceptanceCommand,
@@ -13,6 +14,7 @@ import {
   type SectionAcceptanceCommand,
   type SettlementBindingCommand,
   type WarrantyCommand,
+  type PageResult,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
@@ -21,6 +23,20 @@ export function loadCloseoutOverview(projectId: string, signal?: AbortSignal) {
     `${CLOSEOUT_API.overview}?projectId=${encoded(projectId)}`,
     { signal },
   ).then((row) => normalize(row) as unknown as CloseoutOverview)
+}
+
+export function loadCloseoutPage(
+  query: { pageNo: number; pageSize: number; projectId?: string },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    pageNo: String(query.pageNo),
+    pageSize: String(query.pageSize),
+  })
+  if (query.projectId?.trim()) params.set('projectId', query.projectId.trim())
+  return apiRequest<Record<string, unknown>>(`${CLOSEOUT_API.page}?${params.toString()}`, {
+    signal,
+  }).then((row) => normalize(row) as unknown as PageResult<CloseoutWorkspaceRow>)
 }
 
 export function initiateProjectCloseout(command: InitiateCloseoutCommand) {

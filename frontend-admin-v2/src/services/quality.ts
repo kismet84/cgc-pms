@@ -12,6 +12,8 @@ import {
   type QualityRectificationRecord,
   type QualityReinspectionCommand,
   type QualityTraceRecord,
+  type QualityWorkspace,
+  type QualityWorkspaceView,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
@@ -23,6 +25,26 @@ export type QualityRectificationWorkflowRecord = Omit<QualityRectificationRecord
 export type QualityConsequenceWorkflowRecord = Omit<QualityConsequenceRecord, 'status'> & {
   status: string
   approvalInstanceId?: string | null
+}
+
+export function loadQualityWorkspace(
+  query: {
+    view: QualityWorkspaceView
+    pageNo: number
+    pageSize: number
+    projectId?: string
+    planId?: string
+  },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    view: query.view,
+    pageNo: String(query.pageNo),
+    pageSize: String(query.pageSize),
+  })
+  if (query.projectId?.trim()) params.set('projectId', query.projectId.trim())
+  if (query.planId?.trim()) params.set('planId', query.planId.trim())
+  return apiRequest<QualityWorkspace>(`${QUALITY_API.workspace}?${params.toString()}`, { signal })
 }
 
 export function loadQualityPlans(projectId: string, signal?: AbortSignal) {

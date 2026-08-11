@@ -1,6 +1,7 @@
 package com.cgcpms.quality.dto;
 
 import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.common.result.PageResult;
 import com.cgcpms.quality.entity.*;
 import jakarta.validation.constraints.*;
 
@@ -89,4 +90,24 @@ public final class QualitySafetyModels {
             QualityConsequence consequence,
             QualityPartnerEvaluation evaluation,
             CostItem costItem) {}
+
+    public record Workspace(
+            String view,
+            PageResult<?> page,
+            WorkspaceCounts counts,
+            PlanRef selectedPlanRef) {}
+
+    public record WorkspaceCounts(
+            long plan,
+            long inspection,
+            long rectification,
+            long reinspection,
+            long consequence) {}
+
+    public record PlanRef(
+            String id,
+            String projectId,
+            String planCode,
+            String planName,
+            String status) {}
 }

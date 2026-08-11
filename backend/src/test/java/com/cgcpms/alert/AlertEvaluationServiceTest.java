@@ -1574,6 +1574,28 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TA14c3: 规则治理 — INVALID 告警不阻断新的有效告警")
+    void testRuleGovernance_InvalidAlertNeverSuppresses() {
+        deleteRuleConfig("CONTRACT_OVERDUE");
+        deleteAlerts("CONTRACT_OVERDUE");
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 24);
+        AlertLog invalid = insertDedupAlert(testProjectId, "CONTRACT_OVERDUE", "CONTRACT", "CONTRACT_TERM",
+                "P:" + testProjectId + ":R:CONTRACT_OVERDUE", LocalDateTime.now().minusMinutes(1));
+        invalid.setProcessStatus("INVALID");
+        alertLogMapper.updateById(invalid);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        assertEquals(2, alertsByRuleType("CONTRACT_OVERDUE").size(),
+                "INVALID 仅保留审计事实，不应参与去重阻断");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TA14d: 规则治理 — 去重键不串并不同规则、业务键和项目边界")
     void testRuleGovernance_DedupKeySeparatesRuleSourceAndProjectBoundaries() {
         deleteRuleConfig("CONTRACT_OVERDUE");

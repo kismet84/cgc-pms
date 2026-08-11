@@ -2,6 +2,7 @@ package com.cgcpms.communication.controller;
 
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.communication.service.CommunicationEventService;
 import com.cgcpms.communication.service.CommunicationService;
@@ -123,9 +124,15 @@ public class CommunicationController {
     @PreAuthorize(VIEW)
     public ApiResponse<List<CommunicationService.MessageRecord>> messages(
             @PathVariable long id,
-            @RequestParam(defaultValue = "0") long afterSeq,
+            @RequestParam(required = false) Long afterSeq,
+            @RequestParam(required = false) Long beforeSeq,
             @RequestParam(defaultValue = "50") int pageSize) {
-        return ApiResponse.success(service.messages(id, afterSeq, pageSize));
+        if (afterSeq != null && beforeSeq != null) {
+            throw new BusinessException("COMMUNICATION_CURSOR_CONFLICT", "消息游标不能同时向前和向后读取");
+        }
+        return ApiResponse.success(beforeSeq == null
+                ? service.messages(id, afterSeq == null ? 0 : afterSeq, pageSize)
+                : service.messagesBefore(id, beforeSeq, pageSize));
     }
 
     @PostMapping("/conversations/{id}/drafts")

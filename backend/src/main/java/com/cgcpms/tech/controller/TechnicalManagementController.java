@@ -3,10 +3,15 @@ package com.cgcpms.tech.controller;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.tech.dto.TechnicalManagementModels.*;
+import com.cgcpms.tech.service.TechnicalManagementQueryService;
 import com.cgcpms.tech.service.TechnicalManagementService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,8 +19,21 @@ import java.util.Map;
 @RestController
 @RequestMapping("/technical-management")
 @RequiredArgsConstructor
+@Validated
 public class TechnicalManagementController {
     private final TechnicalManagementService service;
+    private final TechnicalManagementQueryService queryService;
+
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('technical:query')")
+    public ApiResponse<Workspace> workspace(
+            @RequestParam @Pattern(regexp = "scheme|drawing|review|rfi|disclosure|archive") String view,
+            @RequestParam @Min(1) int pageNo,
+            @RequestParam @Min(1) @Max(100) int pageSize,
+            @RequestParam(defaultValue = "1") @Min(1) int secondaryPageNo,
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(queryService.workspace(view, pageNo, pageSize, secondaryPageNo, projectId));
+    }
 
     @GetMapping("/overview")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('technical:query')")

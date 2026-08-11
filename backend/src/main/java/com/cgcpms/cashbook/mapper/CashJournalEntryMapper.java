@@ -2,7 +2,9 @@ package com.cgcpms.cashbook.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Constants;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.cashbook.dto.CashJournalQuery;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
@@ -11,6 +13,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -59,4 +62,95 @@ public interface CashJournalEntryMapper extends BaseMapper<CashJournalEntry> {
             """)
     List<CashJournalEntry> selectOverdueForTenant(@Param("tenantId") Long tenantId,
                                                    @Param("now") LocalDateTime now);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            <script>
+            SELECT
+              COALESCE(SUM(CASE
+                WHEN (status = 'ARCHIVED' OR (status = 'REVERSED' AND archived_at IS NOT NULL))
+                 AND direction = 'IN' THEN amount
+                ELSE 0 END), 0) AS cash_in,
+              COALESCE(SUM(CASE
+                WHEN (status = 'ARCHIVED' OR (status = 'REVERSED' AND archived_at IS NOT NULL))
+                 AND direction = 'OUT' THEN amount
+                ELSE 0 END), 0) AS cash_out,
+              COALESCE(SUM(CASE
+                WHEN (status = 'ARCHIVED' OR (status = 'REVERSED' AND archived_at IS NOT NULL))
+                 AND EXISTS (
+                   SELECT 1 FROM cost_subject subject
+                   WHERE subject.tenant_id = cash_journal_entry.tenant_id
+                     AND subject.id = cash_journal_entry.cost_subject_id
+                     AND subject.deleted_flag = 0
+                     AND subject.account_category = 'COST'
+                 )
+                THEN CASE WHEN direction = 'OUT' THEN amount ELSE -amount END
+                ELSE 0 END), 0) AS actual_bid_expense,
+              COALESCE(SUM(CASE
+                WHEN status IN ('DRAFT', 'PENDING_ARCHIVE') THEN 1
+                ELSE 0 END), 0) AS pending_count
+            FROM cash_journal_entry
+            WHERE tenant_id = #{tenantId}
+              AND deleted_flag = 0
+            <if test="ew != null and ew.sqlSegment != null and ew.sqlSegment != ''">
+              AND ${ew.sqlSegment} /* SQL-SAFETY: fixed-sql-fragment - server-built LambdaQueryWrapper with bound values */
+            </if>
+            </script>
+            """)
+    CashJournalAggregate selectSummaryAggregate(@Param("tenantId") Long tenantId,
+                                                @Param(Constants.WRAPPER) Wrapper<CashJournalEntry> wrapper);
+
+    class CashJournalAggregate {
+        private BigDecimal cashIn;
+        private BigDecimal cashOut;
+        private BigDecimal actualBidExpense;
+        private Long pendingCount;
+
+        public CashJournalAggregate() {
+        }
+
+        public CashJournalAggregate(BigDecimal cashIn, BigDecimal cashOut,
+                                    BigDecimal actualBidExpense, Long pendingCount) {
+            this.cashIn = cashIn;
+            this.cashOut = cashOut;
+            this.actualBidExpense = actualBidExpense;
+            this.pendingCount = pendingCount;
+        }
+
+        public static CashJournalAggregate empty() {
+            return new CashJournalAggregate(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0L);
+        }
+
+        public BigDecimal getCashIn() {
+            return cashIn;
+        }
+
+        public void setCashIn(BigDecimal cashIn) {
+            this.cashIn = cashIn;
+        }
+
+        public BigDecimal getCashOut() {
+            return cashOut;
+        }
+
+        public void setCashOut(BigDecimal cashOut) {
+            this.cashOut = cashOut;
+        }
+
+        public BigDecimal getActualBidExpense() {
+            return actualBidExpense;
+        }
+
+        public void setActualBidExpense(BigDecimal actualBidExpense) {
+            this.actualBidExpense = actualBidExpense;
+        }
+
+        public Long getPendingCount() {
+            return pendingCount;
+        }
+
+        public void setPendingCount(Long pendingCount) {
+            this.pendingCount = pendingCount;
+        }
+    }
 }

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-11T13:29:51.873Z",
-  "generated_from_commit": "383eef6bd217d23e1a8e543f826d82b432880e9c",
+  "generated_at": "2026-08-11T22:01:26.342Z",
+  "generated_from_commit": "b5b8eeaa8d65c848819145b30a04aa229b3b8d1a",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
@@ -64,16 +64,34 @@
         {
           "path": "frontend-admin-v2/e2e/shell-live.spec.ts",
           "symbol": "test.describe"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/purchase-execution-application.test.ts",
+          "symbol": "describe"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/dashboard-model.test.ts",
+          "symbol": "describe"
         }
       ],
       "constraints": [
         "正式前端仅映射 frontend-admin-v2；旧 frontend-admin 被排除。",
-        "业务请求统一经 /api。"
+        "业务请求统一经 /api。",
+        "采购申请、订单和验收写入编排位于页面私有 application 用例；页面保留表单、竞态和反馈。",
+        "跨业务展示格式只依赖 shared/display；非 Dashboard 页面不得反向导入 dashboard/model。"
       ],
       "evidence": [
         {
           "path": "frontend-admin-v2/src/services/request.ts",
           "symbol": "export async function apiRequest"
+        },
+        {
+          "path": "frontend-admin-v2/src/pages/supply-chain/PurchaseExecutionPage.vue",
+          "symbol": "savePurchaseOrder"
+        },
+        {
+          "path": "frontend-admin-v2/src/shared/display.ts",
+          "symbol": "formatAmount"
         }
       ]
     },
@@ -363,16 +381,33 @@
         {
           "path": "backend/src/test/java/com/cgcpms/purchase/handler/PurchaseOrderWorkflowHandlerTest.java",
           "symbol": "class PurchaseOrderWorkflowHandlerTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/receipt/service/MatReceiptAssemblerTest.java",
+          "symbol": "class MatReceiptAssemblerTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/requisition/service/MatRequisitionAssemblerTest.java",
+          "symbol": "class MatRequisitionAssemblerTest"
         }
       ],
       "constraints": [
         "节点聚合 purchase、receipt、inventory、material。",
-        "采购审批由工作流驱动。"
+        "采购审批由工作流驱动。",
+        "收料和领料 assembler 使用显式实体 ID 提取函数；不得用反射或吞掉提取异常。"
       ],
       "evidence": [
         {
           "path": "backend/src/main/java/com/cgcpms/purchase/service/MatPurchaseOrderService.java",
           "symbol": "workflowEngine.submitPurchaseOrder"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/receipt/service/MatReceiptAssembler.java",
+          "symbol": "resolveEntities"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/requisition/service/MatRequisitionAssembler.java",
+          "symbol": "resolveEntities"
         }
       ]
     },
@@ -470,16 +505,29 @@
         {
           "path": "backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java",
           "symbol": "class AlertEvaluationServiceTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/alert/service/AlertRuleEvaluatorBatchTest.java",
+          "symbol": "class AlertRuleEvaluatorBatchTest"
         }
       ],
       "constraints": [
         "通知事实按租户和用户持久化；SSE 只承载可丢失提示，客户端必须通过列表或未读数补读。",
-        "浏览器订阅使用认证 Cookie，不得把 clientId 当成授权依据。"
+        "浏览器订阅使用认证 Cookie，不得把 clientId 当成授权依据。",
+        "预警按租户和最多500项目批量加载事实；九类 evaluator 循环内不得访问 Mapper，历史和本批 dedupKey 共同去重。"
       ],
       "evidence": [
         {
           "path": "backend/src/main/java/com/cgcpms/notification/service/NotificationService.java",
           "symbol": "public class NotificationService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java",
+          "symbol": "evaluateProjects"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/alert/service/AlertRuleEvaluator.java",
+          "symbol": "BatchSnapshot"
         }
       ]
     },
@@ -503,13 +551,23 @@
           "symbol": "class CommunicationServiceTest"
         },
         {
+          "path": "backend/src/test/java/com/cgcpms/communication/CommunicationControllerTest.java",
+          "symbol": "class CommunicationControllerTest"
+        },
+        {
           "path": "frontend-admin-v2/tests/unit/communication-page.test.ts",
           "symbol": "describe"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/communication-send-message.test.ts",
+          "symbol": "describe('sendCommunicationMessage')"
         }
       ],
       "constraints": [
         "消息序号在会话行锁内生成；客户端消息ID按租户和发送人幂等。",
-        "附件复用文件域并要求草稿归属、成员资格和 CLEAN 状态。"
+        "附件复用文件域并要求草稿归属、成员资格和 CLEAN 状态。",
+        "afterSeq 保持向前兼容；beforeSeq 使用排他向前游标，首次历史请求最多100条、DOM窗口最多200条。",
+        "浏览历史时 SSE 只标记新消息，不推进已读；跳到最新后才更新已读位置。"
       ],
       "evidence": [
         {
@@ -519,6 +577,14 @@
         {
           "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationEventService.java",
           "symbol": "public SseEmitter subscribe"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/communication/service/CommunicationService.java",
+          "symbol": "messagesBefore"
+        },
+        {
+          "path": "frontend-admin-v2/src/pages/communication/CommunicationPage.vue",
+          "symbol": "loadPreviousMessages"
         }
       ]
     },
@@ -599,6 +665,131 @@
       ]
     },
     {
+      "id": "bounded-project-workspaces",
+      "label": "有界项目工作台查询",
+      "type": "query-orchestration",
+      "boundary": "后端与浏览器",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/{tech,quality,closeout,supplier}",
+      "role": "技术、质量、收尾和供应商工作台的服务端授权下推、真分页及单请求聚合。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/tech/controller/TechnicalManagementController.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/controller/QualitySafetyController.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/closeout/controller/ProjectCloseoutController.java",
+          "symbol": "page"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/supplier/controller/SupplierSourcingController.java",
+          "symbol": "workspace"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/tech/TechnicalManagementWorkspacePaginationTest.java",
+          "symbol": "class TechnicalManagementWorkspacePaginationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/quality/QualitySafetyWorkspacePaginationTest.java",
+          "symbol": "class QualitySafetyWorkspacePaginationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/closeout/ProjectCloseoutWorkspacePaginationTest.java",
+          "symbol": "class ProjectCloseoutWorkspacePaginationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/supplier/SupplierSourcingWorkspacePaginationTest.java",
+          "symbol": "class SupplierSourcingWorkspacePaginationTest"
+        }
+      ],
+      "constraints": [
+        "tenant、项目成员和角色数据范围在 SQL 内失败关闭；projectId 只能额外收窄，不能扩大权限。",
+        "活动视图服务端真分页并稳定排序；查询数不随可见项目数增长，返回记录不超过 pageSize。",
+        "前端切页和切视图使用 AbortController 与 generation 拒绝迟到响应，不再按项目扇出请求。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/project/auth/ProjectAccessChecker.java",
+          "symbol": "sqlScope"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/tech/service/TechnicalManagementQueryService.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyQueryService.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/supplier/service/SupplierSourcingQueryService.java",
+          "symbol": "workspace"
+        }
+      ]
+    },
+    {
+      "id": "dashboard-query-orchestration",
+      "label": "Dashboard 查询编排",
+      "type": "query-orchestration",
+      "boundary": "后端",
+      "layer": 3,
+      "path": "backend/src/main/java/com/cgcpms/dashboard",
+      "role": "保持 Dashboard DTO 和路由不变，按角色拆分项目、材料、成本和财务只读查询。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/controller/DashboardController.java",
+          "symbol": "class DashboardController"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardService.java",
+          "symbol": "class DashboardService"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/dashboard/service/DashboardFinanceQueryBudgetTest.java",
+          "symbol": "class DashboardFinanceQueryBudgetTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/dashboard/service/DashboardNonFinanceQueryBudgetTest.java",
+          "symbol": "class DashboardNonFinanceQueryBudgetTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/dashboard/controller/DashboardControllerTest.java",
+          "symbol": "class DashboardControllerTest"
+        }
+      ],
+      "constraints": [
+        "Controller 和 DashboardService 仅作兼容 facade；DTO、路由、权限和金额语义保持单一。",
+        "项目与材料角色服务不继承财务共享基类；关系实体批量加载，业务循环内 Mapper 为零。",
+        "SharedSupport 只保留 Cost/Finance 的真实共同依赖与四个共用 helper，不承载采购、库存或展示逻辑。",
+        "财务四模式与非财务五视图使用精确 SQL 预算；项目数增长不得增加查询次数。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardProjectBusinessService.java",
+          "symbol": "class DashboardProjectBusinessService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardMaterialRoleService.java",
+          "symbol": "class DashboardMaterialRoleService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardMaterialLookupService.java",
+          "symbol": "class DashboardMaterialLookupService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardViewSupport.java",
+          "symbol": "class DashboardViewSupport"
+        }
+      ]
+    },
+    {
       "id": "finance-accounting",
       "label": "资金与核算",
       "type": "domain",
@@ -616,11 +807,26 @@
         {
           "path": "backend/src/test/java/com/cgcpms/payment/PayRecordCashJournalIntegrationTest.java",
           "symbol": "class PayRecordCashJournalIntegrationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/payment/PaymentTraceQueryBudgetIntegrationTest.java",
+          "symbol": "class PaymentTraceQueryBudgetIntegrationTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/cashbook/CashJournalPrivacyTest.java",
+          "symbol": "class CashJournalPrivacyTest"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/revenue/RevenueAdvancedAgingTest.java",
+          "symbol": "class RevenueAdvancedAgingTest"
         }
       ],
       "constraints": [
         "节点聚合 payment 与 cashbook。",
-        "支付归档后才形成正式现金日记账影响。"
+        "支付归档后才形成正式现金日记账影响。",
+        "付款追踪每100个申请批量组装，业务循环内无 Mapper/JDBC；台账查询按租户、项目和业务键有界。",
+        "现金摘要使用条件聚合且账户数不增加查询；未归档即冲销的流水不得进入余额或收支。",
+        "应收账龄五桶由单条可移植条件聚合 SQL 计算，边界互斥且金额为空时返回零。"
       ],
       "evidence": [
         {
@@ -630,6 +836,14 @@
         {
           "path": "backend/src/main/java/com/cgcpms/cashbook/service/CashJournalService.java",
           "symbol": "public class CashJournalService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/payment/service/PaymentTraceService.java",
+          "symbol": "assembleBatch"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/revenue/service/RevenueAdvancedService.java",
+          "symbol": "aging"
         }
       ]
     },
@@ -936,12 +1150,17 @@
         {
           "path": "frontend-admin-v2/tests/unit/document-template-page.test.ts",
           "symbol": "DocumentTemplatePage"
+        },
+        {
+          "path": "backend/src/test/java/com/cgcpms/document/DocumentGenerationLocalBenchmarkTest.java",
+          "symbol": "class DocumentGenerationLocalBenchmarkTest"
         }
       ],
       "constraints": [
         "每个已启用审批业务类型必须由唯一 Provider 返回完整详情和可选字段目录。",
         "画布只保存受控 JSON；HTML 和 PDF 由服务端编译生成。",
-        "字段目录不得暴露审批记录、内部主键、附件或未授权敏感信息。"
+        "字段目录不得暴露审批记录、内部主键、附件或未授权敏感信息。",
+        "PDF 本地基准默认跳过并固定 JVM 参数；没有签认阈值时只能以证据不足关闭，不得引入异步状态或第二队列。"
       ],
       "evidence": [
         {
@@ -955,6 +1174,10 @@
         {
           "path": "frontend-admin-v2/src/components/document/DocumentCanvas.vue",
           "symbol": "defineProps"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/document/renderer/OpenHtmlToPdfDocumentRenderer.java",
+          "symbol": "class OpenHtmlToPdfDocumentRenderer"
         }
       ]
     },
@@ -2458,6 +2681,129 @@
         {
           "path": "backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java",
           "symbol": "codeGenerationService.nextCode"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "bounded-project-workspaces",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/technical.ts",
+          "symbol": "loadTechnicalWorkspace"
+        },
+        {
+          "path": "frontend-admin-v2/src/services/quality.ts",
+          "symbol": "loadQualityWorkspace"
+        },
+        {
+          "path": "frontend-admin-v2/src/services/closeout.ts",
+          "symbol": "loadCloseoutPage"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "bounded-project-workspaces",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/tech/controller/TechnicalManagementController.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/controller/QualitySafetyController.java",
+          "symbol": "workspace"
+        }
+      ]
+    },
+    {
+      "from": "bounded-project-workspaces",
+      "to": "mysql-flyway",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/tech/service/TechnicalManagementQueryService.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/quality/service/QualitySafetyQueryService.java",
+          "symbol": "workspace"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/supplier/service/SupplierSourcingQueryService.java",
+          "symbol": "workspace"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "dashboard-query-orchestration",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/dashboard.ts",
+          "symbol": "loadDashboard"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "dashboard-query-orchestration",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/controller/DashboardController.java",
+          "symbol": "class DashboardController"
+        }
+      ]
+    },
+    {
+      "from": "dashboard-query-orchestration",
+      "to": "project-contract-cost",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardProjectBusinessService.java",
+          "symbol": "class DashboardProjectBusinessService"
+        }
+      ]
+    },
+    {
+      "from": "dashboard-query-orchestration",
+      "to": "supply-inventory",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardMaterialLookupService.java",
+          "symbol": "class DashboardMaterialLookupService"
+        }
+      ]
+    },
+    {
+      "from": "dashboard-query-orchestration",
+      "to": "finance-accounting",
+      "type": "reads",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardFinanceManagementService.java",
+          "symbol": "class DashboardFinanceManagementService"
+        },
+        {
+          "path": "backend/src/main/java/com/cgcpms/dashboard/service/DashboardCostService.java",
+          "symbol": "class DashboardCostService"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "supply-inventory",
+      "type": "calls",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/pages/supply-chain/PurchaseExecutionPage.vue",
+          "symbol": "savePurchaseRequest"
         }
       ]
     },

@@ -136,13 +136,16 @@ describe('M3 project request baseline', () => {
       expect(source).toContain('workspace.selectedProjectId')
     }
     expect(catalog).not.toContain('projectAllowAll: false')
-    for (const page of [
-      'QualitySafetyPage.vue',
-      'TechnicalManagementPage.vue',
-      'ProjectCloseoutPage.vue',
-    ]) {
+    const boundedWorkspaces = {
+      'QualitySafetyPage.vue': 'loadQualityWorkspace',
+      'TechnicalManagementPage.vue': 'loadTechnicalWorkspace',
+      'ProjectCloseoutPage.vue': 'loadCloseoutPage',
+    }
+    for (const [page, loader] of Object.entries(boundedWorkspaces)) {
       const source = readFileSync(resolve(`src/pages/delivery/${page}`), 'utf-8')
-      expect(source).toContain('scopeProjectIds')
+      expect(source).not.toContain('scopeProjectIds')
+      expect(source).not.toContain('workspace.projects.map')
+      expect(source).toContain(loader)
     }
     expect(readFileSync(resolve('src/pages/delivery/QualitySafetyPage.vue'), 'utf-8')).toMatch(
       /async function runWrite[\s\S]*if \(!projectId\.value\)/,

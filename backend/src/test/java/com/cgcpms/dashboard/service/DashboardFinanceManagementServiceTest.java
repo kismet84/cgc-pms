@@ -73,6 +73,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -84,6 +85,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @ActiveProfiles("local")
@@ -96,6 +101,9 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
     @Autowired private CashJournalEntryMapper cashJournalEntryMapper;
     @Autowired private CostSummaryService costSummaryService;
     @Autowired private JdbcTemplate jdbc;
+    @MockitoSpyBean private WfTaskMapper countedWfTaskMapper;
+    @MockitoSpyBean private WfInstanceMapper countedWfInstanceMapper;
+    @MockitoSpyBean private AlertLogMapper countedAlertLogMapper;
 
     @Test
     @Transactional
@@ -116,6 +124,25 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNull(previousManagement.getActiveProjectCount());
         assertNull(currentManagement.getActiveProjectCount());
         assertTrue(currentManagement.getUnavailableMetrics().contains("activeProjectCount"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史管理视图不读取当前待办、实例或实时预警")
+    void historicalManagementSkipsRealtimeRiskQueries() {
+        SeedResult sr = seed("HISTORY_NO_REALTIME_RISK");
+        clearInvocations(countedWfTaskMapper, countedWfInstanceMapper, countedAlertLogMapper);
+
+        ManagementDashboardVO historical = dashboardService.getManagementView(
+                sr.projectId, YearMonth.now().minusMonths(1).toString());
+
+        assertNull(historical.getTotalPendingTaskCount());
+        assertNull(historical.getTotalRiskCount());
+        assertTrue(historical.getOverdueItems().isEmpty());
+        assertTrue(historical.getMajorRisks().isEmpty());
+        verify(countedWfTaskMapper, never()).selectList(any());
+        verify(countedWfInstanceMapper, never()).selectList(any());
+        verify(countedAlertLogMapper, never()).selectList(any());
     }
 
     @Test
@@ -151,6 +178,27 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertEquals("0", breakdown.getRemainingAmount());
         assertEquals("109.09", breakdown.getPaymentRatio());
         assertEquals(2, breakdown.getPaymentRecords().size());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("实时超付沿用合同金额事实，不被合同当前履约状态改写")
+    void realtimeOverRatioKeepsContractStatusIndependentSemantics() {
+        SeedResult sr = seed("FIN_OVER_RATIO_STATUS");
+        PayRecord paid = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, sr.projectId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        paid.setPayAmount(new BigDecimal("6000000.00"));
+        payRecordMapper.updateById(paid);
+        CtContract contract = ctContractMapper.selectById(paid.getContractId());
+        contract.setContractStatus("SETTLED");
+        ctContractMapper.updateById(contract);
+
+        FinanceDashboardVO vo = dashboardService.getFinanceView(sr.projectId);
+
+        assertEquals("1000000.00", vo.getOverRatioAmount());
+        assertEquals(1, vo.getOverRatioPayments().size());
+        assertTrue(vo.getContractFundBreakdowns().isEmpty());
     }
 
     @Test
@@ -320,6 +368,86 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertEquals("100000.00", historical.getTotalPaidAmount());
         assertTrue(historical.getContractFundBreakdowns().isEmpty());
         assertTrue(historical.getUnavailableMetrics().contains("contractFundBreakdowns"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史空项目集保持不可追溯指标为 unavailable，而非伪造零值")
+    void historicalEmptyProjectSetKeepsUnavailableMetricContract() {
+        SeedResult visible = seed("FIN_HISTORY_EMPTY_VISIBLE");
+        SeedResult hidden = seed("FIN_HISTORY_EMPTY_HIDDEN");
+        long scopedUserId = 88_301L;
+        String roleCode = applySelfScope(visible.projectId, hidden.projectId, scopedUserId);
+        TestUserContext.setUser(TENANT_ID, scopedUserId + 99, "finance-history-empty", List.of(roleCode));
+
+        FinanceDashboardVO historical = dashboardService.getFinanceView(
+                null, YearMonth.now().minusMonths(1).toString());
+
+        assertNull(historical.getPendingPaymentAmount());
+        assertNull(historical.getPendingPaymentCount());
+        assertNull(historical.getApprovedUnpaidAmount());
+        assertNull(historical.getTotalContractAmount());
+        assertNull(historical.getBudgetAmount());
+        assertNull(historical.getBudgetReservedAmount());
+        assertNull(historical.getBudgetConsumedAmount());
+        assertNull(historical.getBudgetExecutionRate());
+        assertEquals("0.00", historical.getTotalPaidAmount());
+        assertEquals("0.00", historical.getCashOutflowAmount());
+        assertTrue(historical.getUnavailableMetrics().containsAll(List.of(
+                "pendingPaymentAmount", "pendingPaymentCount", "approvedUnpaidAmount",
+                "totalContractAmount", "budgetAmount", "budgetReservedAmount",
+                "budgetConsumedAmount", "budgetExecutionRate", "contractFundBreakdowns")));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史管理视图按创建时间保留项目，不受计划开始日期漂移影响")
+    void historicalManagementSurvivesPlannedStartDateDrift() {
+        SeedResult sr = seed("MGMT_HISTORY_PROJECT_DRIFT");
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        PmProject project = projectMapper.selectById(sr.projectId);
+        project.setStatus("CLOSED");
+        project.setPlannedStartDate(YearMonth.now().plusMonths(2).atDay(1));
+        projectMapper.updateById(project);
+        jdbc.update("UPDATE pm_project SET created_at=? WHERE id=?",
+                previous.atDay(1).atStartOfDay(), sr.projectId);
+
+        ManagementDashboardVO historical = dashboardService.getManagementView(
+                sr.projectId, previous.toString());
+
+        assertEquals(List.of(sr.projectId.toString()), historical.getProjectRankings().stream()
+                .map(DashboardProjectSummaryVO::getProjectId).toList());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史月末使用下月起点排他边界，保留亚秒归档并排除月内冲销")
+    void historicalMonthEndUsesExclusiveNextMonthBoundary() {
+        SeedResult sr = seed("FIN_HISTORY_NANO_BOUNDARY");
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        LocalDateTime monthEndSubsecond = previous.atEndOfMonth().atTime(23, 59, 59, 500_000_000);
+        jdbc.update("UPDATE pm_project SET created_at=? WHERE id=?",
+                previous.atDay(1).atStartOfDay(), sr.projectId);
+
+        PayRecord payment = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, sr.projectId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        payment.setPayDate(previous.atDay(10));
+        payment.setPaidAt(previous.atDay(10).atTime(10, 0));
+        payment.setPayStatus("REVERSED");
+        payment.setReversedAt(monthEndSubsecond);
+        payRecordMapper.updateById(payment);
+
+        CashJournalEntry journal = journal(sr.projectId, "FIN-HISTORY-NANO", 91_401L,
+                "ARCHIVED", new BigDecimal("12.34"));
+        journal.setBusinessDate(previous.atEndOfMonth());
+        journal.setArchivedAt(monthEndSubsecond);
+        cashJournalEntryMapper.insert(journal);
+
+        FinanceDashboardVO historical = dashboardService.getFinanceView(sr.projectId, previous.toString());
+
+        assertEquals(0, new BigDecimal(historical.getTotalPaidAmount()).compareTo(BigDecimal.ZERO));
+        assertEquals(new BigDecimal("12.34"), new BigDecimal(historical.getCashOutflowAmount()));
     }
 
     // ========================================================================

@@ -2,7 +2,10 @@ package com.cgcpms.dashboard.controller;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +31,26 @@ class DashboardControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtUtils jwtUtils;
+    @Autowired private SysUserMapper sysUserMapper;
 
-    private static final long ADMIN_ID = 1L;
-    private static final String ADMIN_USERNAME = "admin";
-    private static final long TENANT_ID = 0L;
+    private static final long ADMIN_ID = 910010001L;
+    private static final String ADMIN_USERNAME = "dashboard-controller-test-admin";
+    private static final long TENANT_ID = 91001L;
+
+    @BeforeEach
+    void ensureAuthenticatedUserExists() {
+        if (sysUserMapper.selectCredentialByTenantAndId(TENANT_ID, ADMIN_ID) != null) {
+            return;
+        }
+        SysUser admin = new SysUser();
+        admin.setId(ADMIN_ID);
+        admin.setTenantId(TENANT_ID);
+        admin.setUsername(ADMIN_USERNAME);
+        admin.setPassword("{noop}dashboard-controller-test-only");
+        admin.setStatus("ENABLE");
+        admin.setIsAdmin(1);
+        sysUserMapper.insert(admin);
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(

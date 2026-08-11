@@ -21,7 +21,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/shared/display'
 import {
   MaterialSearchPicker,
   V2Badge,
@@ -83,6 +83,20 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import {
+  NewMaterialReceiptSaveError,
+  saveMaterialReceipt,
+  submitSavedMaterialReceipt,
+} from './purchase-execution/application/save-material-receipt'
+import {
+  NewPurchaseOrderSaveError,
+  savePurchaseOrder,
+  submitSavedPurchaseOrder,
+} from './purchase-execution/application/save-purchase-order'
+import {
+  savePurchaseRequest,
+  submitSavedPurchaseRequest,
+} from './purchase-execution/application/save-purchase-request'
 
 type Mode = 'request' | 'order' | 'receipt'
 type ListRecord = PurchaseRequestRecord | PurchaseOrderRecord | ReceiptRecord
@@ -110,6 +124,25 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
+const purchaseRequestApplication = {
+  create: createPurchaseRequest,
+  submit: submitPurchaseRequest,
+}
+const purchaseOrderApplication = {
+  create: createPurchaseOrder,
+  createFromRequest: createPurchaseOrderFromRequest,
+  update: updatePurchaseOrder,
+  saveItems: savePurchaseOrderItems,
+  deleteDraft: deletePurchaseOrder,
+  submit: submitPurchaseOrder,
+}
+const materialReceiptApplication = {
+  create: createReceipt,
+  update: updateReceipt,
+  saveItems: saveReceiptItems,
+  deleteDraft: deleteReceipt,
+  submit: submitReceipt,
+}
 const records = ref<ListRecord[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -799,37 +832,42 @@ async function saveOrderEdit(): Promise<void> {
   const id = selected.value.id
   try {
     if (!orderItemEdits.value.length) throw new TypeError('采购订单至少需要一条明细')
-    await updatePurchaseOrder(id, {
-      projectId: requiredOrderEdit('projectId', '项目'),
-      contractId: requiredOrderEdit('contractId', '采购合同'),
-      partnerId: requiredOrderEdit('partnerId', '供应商'),
-      orderCode: requiredOrderEdit('orderCode', '采购订单号'),
-      orderType: optionalOrderEdit('orderType'),
-      orderDate: requiredOrderEdit('orderDate', '订单日期'),
-      deliveryDate: requiredOrderEdit('deliveryDate', '交付日期'),
-      deliveryTerms: requiredOrderEdit('deliveryTerms', '交付条件'),
-      exceptionPurchaseFlag: Number(orderEditForm.exceptionPurchaseFlag || '0'),
-      exceptionReason: optionalOrderEdit('exceptionReason'),
-      remark: optionalOrderEdit('remark'),
-    })
-    await savePurchaseOrderItems(
-      id,
-      orderItemEdits.value.map(({ source, budgetLineId, unitPrice, taxRate }, index) => ({
-        orderId: id,
-        requestItemId: source.requestItemId,
-        wbsTaskId: source.wbsTaskId,
-        budgetLineId: requiredSourceId(budgetLineId, `第${index + 1}条预算科目`),
-        projectId: source.projectId,
-        materialId: requiredSourceId(source.materialId, `第${index + 1}条物料`),
-        unit: source.unit,
-        quantity: source.quantity,
-        unitPrice: positiveValue(unitPrice, `第${index + 1}条单价`),
-        priceSource: source.priceSource,
-        priceSourceReceiptItemId: source.priceSourceReceiptItemId,
-        taxRate: taxRateValue(taxRate, `第${index + 1}条税率`),
-        receivedQuantity: source.receivedQuantity,
-        remark: source.remark,
-      })),
+    await savePurchaseOrder(
+      {
+        kind: 'EDIT',
+        id,
+        command: {
+          projectId: requiredOrderEdit('projectId', '项目'),
+          contractId: requiredOrderEdit('contractId', '采购合同'),
+          partnerId: requiredOrderEdit('partnerId', '供应商'),
+          orderCode: requiredOrderEdit('orderCode', '采购订单号'),
+          orderType: optionalOrderEdit('orderType'),
+          orderDate: requiredOrderEdit('orderDate', '订单日期'),
+          deliveryDate: requiredOrderEdit('deliveryDate', '交付日期'),
+          deliveryTerms: requiredOrderEdit('deliveryTerms', '交付条件'),
+          exceptionPurchaseFlag: Number(orderEditForm.exceptionPurchaseFlag || '0'),
+          exceptionReason: optionalOrderEdit('exceptionReason'),
+          remark: optionalOrderEdit('remark'),
+        },
+        items: (id) =>
+          orderItemEdits.value.map(({ source, budgetLineId, unitPrice, taxRate }, index) => ({
+            orderId: id,
+            requestItemId: source.requestItemId,
+            wbsTaskId: source.wbsTaskId,
+            budgetLineId: requiredSourceId(budgetLineId, `第${index + 1}条预算科目`),
+            projectId: source.projectId,
+            materialId: requiredSourceId(source.materialId, `第${index + 1}条物料`),
+            unit: source.unit,
+            quantity: source.quantity,
+            unitPrice: positiveValue(unitPrice, `第${index + 1}条单价`),
+            priceSource: source.priceSource,
+            priceSourceReceiptItemId: source.priceSourceReceiptItemId,
+            taxRate: taxRateValue(taxRate, `第${index + 1}条税率`),
+            receivedQuantity: source.receivedQuantity,
+            remark: source.remark,
+          })),
+      },
+      purchaseOrderApplication,
     )
     orderEditOpen.value = false
     await loadPage()
@@ -1419,7 +1457,6 @@ async function save(): Promise<void> {
   if (busy.value) return
   busy.value = true
   errorMessage.value = ''
-  let createdId = ''
   try {
     let id: string
     if (mode.value === 'request') {
@@ -1437,7 +1474,7 @@ async function save(): Promise<void> {
           remark: item.remark.trim() || undefined,
         })),
       }
-      id = await createPurchaseRequest(command)
+      id = await savePurchaseRequest(command, purchaseRequestApplication)
     } else if (mode.value === 'order') {
       if (orderCreateMode.value === 'FROM_REQUEST') {
         const command: PurchaseOrderFromRequestCommand = {
@@ -1450,7 +1487,7 @@ async function save(): Promise<void> {
           remark: optional('remark'),
         }
         // 服务端按申请审批快照复制明细并定价；前端不提交金额、数量或订单明细事实。
-        id = await createPurchaseOrderFromRequest(command)
+        id = await savePurchaseOrder({ kind: 'FROM_REQUEST', command }, purchaseOrderApplication)
       } else {
         const command: PurchaseOrderCommand = {
           projectId: required('projectId', '项目'),
@@ -1464,26 +1501,28 @@ async function save(): Promise<void> {
           exceptionReason: required('exceptionReason', '例外原因'),
           remark: optional('remark'),
         }
-        id = await createPurchaseOrder(command)
-        createdId = id
-        if (canSaveItems.value) {
-          await savePurchaseOrderItems(
-            id,
-            orderItemDrafts.value.map((item, index) => ({
-              orderId: id,
-              projectId: command.projectId,
-              materialId: requiredDraft(item.materialId, `第${index + 1}条物料`),
-              budgetLineId: requiredDraft(item.budgetLineId, `第${index + 1}条预算科目`),
-              quantity: positiveValue(item.quantity, `第${index + 1}条订单数量`),
-              unitPrice: positiveValue(item.unitPrice, `第${index + 1}条服务端单价`),
-              taxRate: taxRateValue(item.taxRate, `第${index + 1}条税率`),
-              unit: item.unit.trim() || undefined,
-              priceSource: item.priceSource || undefined,
-              priceSourceReceiptItemId: item.priceSourceReceiptItemId || undefined,
-              remark: item.remark.trim() || undefined,
-            })),
-          )
-        }
+        id = await savePurchaseOrder(
+          {
+            kind: 'CREATE_EXCEPTION',
+            command,
+            saveItems: canSaveItems.value,
+            items: (id) =>
+              orderItemDrafts.value.map((item, index) => ({
+                orderId: id,
+                projectId: command.projectId,
+                materialId: requiredDraft(item.materialId, `第${index + 1}条物料`),
+                budgetLineId: requiredDraft(item.budgetLineId, `第${index + 1}条预算科目`),
+                quantity: positiveValue(item.quantity, `第${index + 1}条订单数量`),
+                unitPrice: positiveValue(item.unitPrice, `第${index + 1}条服务端单价`),
+                taxRate: taxRateValue(item.taxRate, `第${index + 1}条税率`),
+                unit: item.unit.trim() || undefined,
+                priceSource: item.priceSource || undefined,
+                priceSourceReceiptItemId: item.priceSourceReceiptItemId || undefined,
+                remark: item.remark.trim() || undefined,
+              })),
+          },
+          purchaseOrderApplication,
+        )
       }
     } else {
       const command: ReceiptCommand = {
@@ -1501,24 +1540,26 @@ async function save(): Promise<void> {
         receiptMode: (form.receiptMode || 'INVENTORY') as ReceiptCommand['receiptMode'],
         remark: optional('remark'),
       }
-      id = editingReceiptId.value || (await createReceipt(command))
-      if (editingReceiptId.value) await updateReceipt(id, command)
-      else createdId = id
-      if (canSaveItems.value) {
-        await saveReceiptItems(id, [
-          {
-            receiptId: id,
-            orderItemId: required('orderItemId', '订单明细'),
-            materialId: optional('materialId'),
-            wbsTaskId: optional('wbsTaskId'),
-            budgetLineId: optional('budgetLineId'),
-            acceptedQuantity: decimal('acceptedQuantity', '验收数量'),
-            useLocation: optional('useLocation'),
-          },
-        ])
-      }
+      id = await saveMaterialReceipt(
+        {
+          id: editingReceiptId.value || undefined,
+          command,
+          saveItems: canSaveItems.value,
+          items: (id) => [
+            {
+              receiptId: id,
+              orderItemId: required('orderItemId', '订单明细'),
+              materialId: optional('materialId'),
+              wbsTaskId: optional('wbsTaskId'),
+              budgetLineId: optional('budgetLineId'),
+              acceptedQuantity: decimal('acceptedQuantity', '验收数量'),
+              useLocation: optional('useLocation'),
+            },
+          ],
+        },
+        materialReceiptApplication,
+      )
     }
-    createdId = ''
     editingReceiptId.value = ''
     dialogOpen.value = false
     await loadPage()
@@ -1526,16 +1567,15 @@ async function save(): Promise<void> {
     if (created) await selectRecord(created)
     showToast('success', '操作成功', `${title.value}已保存，列表与详情已更新`)
   } catch (error) {
-    const failure = errorText(error, `${title.value}保存失败`)
-    if (createdId) {
-      try {
-        if (mode.value === 'order') await deletePurchaseOrder(createdId)
-        else await deleteReceipt(createdId)
-        errorMessage.value = `${failure}；本次新建草稿已回滚`
-      } catch (rollbackError) {
-        errorMessage.value = `${failure}；草稿回滚失败：${errorText(rollbackError, '需要人工核对')}`
-      }
-    } else errorMessage.value = failure
+    if (
+      error instanceof NewPurchaseOrderSaveError ||
+      error instanceof NewMaterialReceiptSaveError
+    ) {
+      const failure = errorText(error.saveError, `${title.value}保存失败`)
+      errorMessage.value = error.rollbackFailed
+        ? `${failure}；草稿回滚失败：${errorText(error.rollbackError, '需要人工核对')}`
+        : `${failure}；本次新建草稿已回滚`
+    } else errorMessage.value = errorText(error, `${title.value}保存失败`)
     showToast('error', `${title.value}保存失败`, errorMessage.value)
   } finally {
     busy.value = false
@@ -1547,9 +1587,11 @@ async function submitSelected(): Promise<void> {
   busy.value = true
   errorMessage.value = ''
   try {
-    if (mode.value === 'request') await submitPurchaseRequest(selected.value.id)
-    else if (mode.value === 'order') await submitPurchaseOrder(selected.value.id)
-    else await submitReceipt(selected.value.id)
+    if (mode.value === 'request') {
+      await submitSavedPurchaseRequest(selected.value.id, purchaseRequestApplication)
+    } else if (mode.value === 'order') {
+      await submitSavedPurchaseOrder(selected.value.id, purchaseOrderApplication)
+    } else await submitSavedMaterialReceipt(selected.value.id, materialReceiptApplication)
     const id = selected.value.id
     await loadPage()
     const refreshed = records.value.find((record) => record.id === id)

@@ -1,8 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { flushPromises, mount } from '@vue/test-utils'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CommunicationPage from '@/pages/communication/CommunicationPage.vue'
 import * as communication from '@/services/communication'
 import { useSessionStore } from '@/stores/session'
@@ -19,6 +19,7 @@ vi.mock('@/services/communication', () => ({
   loadCommunicationUsers: vi.fn(),
   loadConversations: vi.fn(),
   loadMessages: vi.fn(),
+  loadPreviousMessages: vi.fn(),
   markConversationRead: vi.fn(),
   removeConversationMember: vi.fn(),
   renameConversation: vi.fn(),
@@ -27,6 +28,8 @@ vi.mock('@/services/communication', () => ({
   updateConversationRole: vi.fn(),
   uploadCommunicationAttachment: vi.fn(),
 }))
+
+enableAutoUnmount(afterEach)
 
 const conversation = {
   id: '9007199254740993',
@@ -65,7 +68,7 @@ beforeEach(() => {
   vi.mocked(communication.loadConversations).mockResolvedValue([conversation])
   vi.mocked(communication.loadConversationMembers).mockResolvedValue([])
   vi.mocked(communication.loadCommunicationUsers).mockResolvedValue([])
-  vi.mocked(communication.loadMessages).mockResolvedValue([message])
+  vi.mocked(communication.loadPreviousMessages).mockResolvedValue([message])
   vi.mocked(communication.markConversationRead).mockResolvedValue()
 })
 
@@ -90,25 +93,106 @@ describe('CommunicationPage', () => {
     )
   })
 
-  it('pulls every message page after reconnect boundaries', async () => {
-    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+  it('loads only the latest bounded page on first render', async () => {
+    const latestPage = Array.from({ length: 100 }, (_, index) => ({
       ...message,
       id: 'message-' + String(index + 1),
-      seq: String(index + 1),
+      seq: String(9901 + index),
       body: '消息' + String(index + 1),
     }))
-    const last = { ...message, id: 'message-101', seq: '101', body: '最后一条' }
-    vi.mocked(communication.loadMessages)
-      .mockResolvedValueOnce(firstPage)
-      .mockResolvedValueOnce([last])
+    vi.mocked(communication.loadPreviousMessages).mockResolvedValueOnce(latestPage)
 
     const wrapper = mount(CommunicationPage)
     await flushPromises()
 
-    expect(communication.loadMessages).toHaveBeenNthCalledWith(1, conversation.id, '0', 100)
-    expect(communication.loadMessages).toHaveBeenNthCalledWith(2, conversation.id, '100', 100)
-    expect(wrapper.text()).toContain('最后一条')
-    expect(communication.markConversationRead).toHaveBeenCalledWith(conversation.id, '101')
+    expect(communication.loadPreviousMessages).toHaveBeenCalledTimes(1)
+    expect(communication.loadPreviousMessages).toHaveBeenNthCalledWith(
+      1,
+      conversation.id,
+      '0',
+      100,
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.findAll('.communication-page__messages article')).toHaveLength(100)
+    expect(communication.markConversationRead).toHaveBeenCalledWith(conversation.id, '10000')
+  })
+
+  it('prepends older pages without exceeding the 200-message DOM window', async () => {
+    const page = (start: number) =>
+      Array.from({ length: 100 }, (_, index) => ({
+        ...message,
+        id: `message-${start + index}`,
+        seq: String(start + index),
+        body: `消息-${start + index}`,
+      }))
+    vi.mocked(communication.loadPreviousMessages)
+      .mockResolvedValueOnce(page(9901))
+      .mockResolvedValueOnce(page(9801))
+      .mockResolvedValueOnce(page(9701))
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+
+    const loadEarlier = () =>
+      wrapper.findAll('button').find((button) => button.text().includes('加载更早消息'))!
+    await loadEarlier().trigger('click')
+    await flushPromises()
+    await loadEarlier().trigger('click')
+    await flushPromises()
+
+    const articles = wrapper.findAll('.communication-page__messages article')
+    expect(articles).toHaveLength(200)
+    expect(articles[0]!.text()).toContain('消息-9701')
+    expect(articles.at(-1)!.text()).toContain('消息-9900')
+    expect(wrapper.text()).not.toContain('消息-10000')
+    expect(communication.markConversationRead).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not append SSE while browsing history and jumps to one latest snapshot', async () => {
+    const page = (start: number) =>
+      Array.from({ length: 100 }, (_, index) => ({
+        ...message,
+        id: `message-${start + index}`,
+        seq: String(start + index),
+        body: `消息-${start + index}`,
+      }))
+    vi.mocked(communication.loadPreviousMessages)
+      .mockResolvedValueOnce(page(9901))
+      .mockResolvedValueOnce(page(9801))
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('加载更早消息'))!
+      .trigger('click')
+    await flushPromises()
+    vi.mocked(communication.markConversationRead).mockClear()
+
+    window.dispatchEvent(
+      new CustomEvent('communication-refresh', {
+        detail: { action: 'REFRESH', conversationId: conversation.id, seq: '10001' },
+      }),
+    )
+    await flushPromises()
+
+    expect(communication.loadPreviousMessages).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('有新消息，跳至最新')
+    expect(communication.markConversationRead).not.toHaveBeenCalled()
+
+    vi.mocked(communication.loadPreviousMessages).mockResolvedValueOnce(page(9902))
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('有新消息，跳至最新'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(communication.loadPreviousMessages).toHaveBeenLastCalledWith(
+      conversation.id,
+      '0',
+      100,
+      expect.any(AbortSignal),
+    )
+    expect(communication.markConversationRead).toHaveBeenCalledWith(conversation.id, '10001')
+    expect(wrapper.findAll('.communication-page__messages article')).toHaveLength(100)
   })
 
   it('ignores stale history when a later conversation wins', async () => {
@@ -122,13 +206,20 @@ describe('CommunicationPage', () => {
       body: 'B的消息',
     }
     let resolveA!: (messages: Array<typeof message>) => void
+    let slowSignal: AbortSignal | undefined
     const delayedA = new Promise<Array<typeof message>>((resolve) => {
       resolveA = resolve
     })
     vi.mocked(communication.loadConversations).mockResolvedValue([conversation, conversationB])
-    vi.mocked(communication.loadMessages)
+    vi.mocked(communication.loadPreviousMessages)
       .mockResolvedValueOnce([message])
-      .mockImplementation((id) => (id === conversation.id ? delayedA : Promise.resolve([messageB])))
+      .mockImplementation((id, _beforeSeq, _pageSize, signal) => {
+        if (id === conversation.id) {
+          slowSignal = signal
+          return delayedA
+        }
+        return Promise.resolve([messageB])
+      })
     const wrapper = mount(CommunicationPage)
     await flushPromises()
 
@@ -139,6 +230,7 @@ describe('CommunicationPage', () => {
     await buttonA!.trigger('click')
     await buttonB!.trigger('click')
     await flushPromises()
+    expect(slowSignal?.aborted).toBe(true)
     resolveA([messageA])
     await flushPromises()
 
@@ -181,7 +273,7 @@ describe('CommunicationPage', () => {
     }
     let resolveSend!: (value: typeof message) => void
     vi.mocked(communication.loadConversations).mockResolvedValue([conversation, conversationB])
-    vi.mocked(communication.loadMessages).mockImplementation((id) =>
+    vi.mocked(communication.loadPreviousMessages).mockImplementation((id) =>
       Promise.resolve(id === conversationB.id ? [messageB] : [message]),
     )
     vi.mocked(communication.createMessageDraft).mockResolvedValue({

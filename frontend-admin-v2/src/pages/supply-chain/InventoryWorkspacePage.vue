@@ -23,7 +23,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/shared/display'
 import {
   createStockTransfer,
   createWarehouse,

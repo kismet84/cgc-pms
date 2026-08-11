@@ -25,7 +25,7 @@ import {
   showToast,
   useToastMessage,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount } from '@/shared/display'
 import {
   type CostSubjectOption,
   createVariation,

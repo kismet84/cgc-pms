@@ -49,6 +49,9 @@ import {
   type SourcingTraceRecord,
   type SupplierBlacklistRecord,
   type SupplierPerformanceRecord,
+  type SupplierPerformanceCandidatePage,
+  type SupplierSourcingWorkspacePage,
+  type SupplierSourcingWorkspaceQuery,
   type SupplierQuoteCommand,
   type SupplierQuoteRecord,
   type SupplierReturnRecord,
@@ -482,6 +485,24 @@ export const loadSourcingEvents = (projectId: string, signal?: AbortSignal) =>
     withQuery(SUPPLY_CHAIN_API.supplierSourcingEvents, {
       projectId: requiredId(projectId, '项目ID'),
     }),
+    { signal },
+  )
+
+export const loadSupplierSourcingWorkspace = (
+  query: SupplierSourcingWorkspaceQuery = {},
+  signal?: AbortSignal,
+) =>
+  apiRequest<SupplierSourcingWorkspacePage>(
+    withQuery(SUPPLY_CHAIN_API.supplierSourcingWorkspace, query),
+    { signal },
+  )
+
+export const loadSupplierPerformanceCandidates = (
+  query: { pageNo?: number; pageSize?: number; projectId?: string } = {},
+  signal?: AbortSignal,
+) =>
+  apiRequest<SupplierPerformanceCandidatePage>(
+    withQuery(SUPPLY_CHAIN_API.supplierPerformanceCandidates, query),
     { signal },
   )
 

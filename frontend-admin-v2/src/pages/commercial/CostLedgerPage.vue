@@ -2,7 +2,7 @@
 import type { CostLedgerQuery, CostLedgerRecord } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount } from '@/shared/display'
 import { V2Button, V2Card, V2Dialog, V2Input, V2PageState, showToast } from '@/components'
 import { loadCostLedger, loadCostLedgerPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'

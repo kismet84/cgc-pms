@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 class RevenueCollectionClosedLoopIntegrationTest {
     private static final long PROJECT = 99171001L;
     private static final long CUSTOMER = 99171002L;
+    private static final long CONTRACTOR = 99171007L;
     private static final long CONTRACT = 99171003L;
     private static final long REVENUE = 99171004L;
     private static final long ACCOUNT = 99171005L;
@@ -65,7 +66,8 @@ class RevenueCollectionClosedLoopIntegrationTest {
         cleanup();
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'REV-IT-P','收入闭环测试项目','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-CUSTOMER','测试业主','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CUSTOMER);
-        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'REV-IT-C','业主总包合同','MAIN',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, CUSTOMER, CUSTOMER);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-CONTRACTOR','测试承包方','CONTRACTOR','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACTOR);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'REV-IT-C','业主总包合同','MAIN',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, CUSTOMER, CONTRACTOR);
         jdbc.update("INSERT INTO contract_revenue(id,tenant_id,project_id,contract_id,revenue_code,revenue_date,progress_percent,revenue_amount,revenue_tax,revenue_amount_with_tax,billed_amount,billed_tax,approval_status,formula_version,attachment_count,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,'REV-IT-R',CURRENT_DATE,50,8000,0,8000,0,0,'APPROVED','REVENUE_PROGRESS_V1',1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", REVENUE, PROJECT, CONTRACT);
         jdbc.update("INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,enabled_flag,version,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-A','回款账户','BANK',CURRENT_DATE,1000,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", ACCOUNT);
         jdbc.update("INSERT INTO finance_integration_endpoint(id,tenant_id,endpoint_type,endpoint_code,endpoint_name,enabled_flag,version,created_at,updated_at) VALUES(?,0,'ERP','REV-IT-ENDPOINT','收入集成测试端点',1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",ENDPOINT);
@@ -265,6 +267,26 @@ class RevenueCollectionClosedLoopIntegrationTest {
     }
 
     @Test
+    void agingKeepsAllFiveBoundaryBuckets() {
+        int[] overdueDays = {-1, 0, 1, 30, 31, 60, 61, 90, 91};
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < overdueDays.length; i++) {
+            BigDecimal amount = BigDecimal.valueOf(i + 1L);
+            long receivableId = createReceivable("AGING-" + i, amount);
+            jdbc.update("UPDATE account_receivable SET due_date=? WHERE id=?",
+                    today.minusDays(overdueDays[i]), receivableId);
+        }
+
+        Map<String, Object> result = advanced.aging(PROJECT);
+
+        assertEquals(new BigDecimal("3.00"), result.get("current"));
+        assertEquals(new BigDecimal("7.00"), result.get("days1To30"));
+        assertEquals(new BigDecimal("11.00"), result.get("days31To60"));
+        assertEquals(new BigDecimal("15.00"), result.get("days61To90"));
+        assertEquals(new BigDecimal("9.00"), result.get("daysOver90"));
+    }
+
+    @Test
     void concurrentDuplicateBankCallbacksCreateOneDraftAndConfirmationCreatesOneJournalAndEntry() throws Exception {
         long ar = createReceivable("2026-10", new BigDecimal("300"));
         LocalDateTime collectedAt = LocalDateTime.now();
@@ -448,6 +470,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM fund_account WHERE id=?", ACCOUNT);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", CUSTOMER);
+        jdbc.update("DELETE FROM md_partner WHERE id=?", CONTRACTOR);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
     }
 }

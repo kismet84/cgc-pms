@@ -9,7 +9,6 @@ import com.cgcpms.alert.dto.AlertRuleEffectVO;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertLifecycleEvent;
 import com.cgcpms.alert.entity.AlertNotificationSendRecord;
-import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLifecycleEventMapper;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.mapper.AlertNotificationSendRecordMapper;
@@ -48,6 +47,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertEvaluationService {
 
+    private static final int MAX_EVALUATION_BATCH_SIZE = 500;
+
     private final AlertLogMapper alertLogMapper;
     private final PmProjectMapper projectMapper;
     private final PmProjectMemberMapper projectMemberMapper;
@@ -79,15 +80,18 @@ public class AlertEvaluationService {
             LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(PmProject::getStatus, "ACTIVE");
             List<PmProject> activeProjects = projectMapper.selectList(wrapper);
-            Set<Long> cashJournalTenants = new LinkedHashSet<>();
+            Map<Long, List<Long>> projectsByTenant = activeProjects.stream()
+                    .collect(Collectors.groupingBy(PmProject::getTenantId, LinkedHashMap::new,
+                            Collectors.mapping(PmProject::getId, Collectors.toList())));
+            Set<Long> cashJournalTenants = new LinkedHashSet<>(projectsByTenant.keySet());
 
             log.info("Found {} active projects for alert evaluation", activeProjects.size());
-            for (PmProject project : activeProjects) {
-                cashJournalTenants.add(project.getTenantId());
+            for (Map.Entry<Long, List<Long>> tenantProjects : projectsByTenant.entrySet()) {
                 try {
-                    ((AlertEvaluationService) AopContext.currentProxy()).evaluateProject(project.getTenantId(), project.getId());
+                    ((AlertEvaluationService) AopContext.currentProxy())
+                            .evaluateProjects(tenantProjects.getKey(), tenantProjects.getValue());
                 } catch (Exception e) {
-                    log.error("Failed to evaluate alerts for project {}", project.getId(), e);
+                    log.error("Failed to evaluate alerts for tenant {}", tenantProjects.getKey(), e);
                 }
             }
             cashJournalTenants.addAll(cashJournalAlertService.pendingTenantIds());
@@ -129,9 +133,7 @@ public class AlertEvaluationService {
         }
         List<PmProject> activeProjects = skipProjects ? List.of() : projectMapper.selectList(wrapper);
         int totalAlerts = cashJournalAlertService.evaluateOverdue(tenantId);
-        for (PmProject project : activeProjects) {
-            totalAlerts += evaluateProject(tenantId, project.getId());
-        }
+        totalAlerts += evaluateProjects(tenantId, activeProjects.stream().map(PmProject::getId).toList());
         int escalated = escalateOverdueAlerts(tenantId);
         log.info("Manual alert escalation done: {} alert(s) escalated for tenantId={}", escalated, tenantId);
         log.info("Manual alert evaluation done: {} alerts generated for tenantId={}", totalAlerts, tenantId);
@@ -144,34 +146,54 @@ public class AlertEvaluationService {
 
     @Transactional(rollbackFor = Exception.class)
     public int evaluateProject(Long tenantId, Long projectId) {
-        Map<String, AlertRuleConfig> ruleConfigs = ruleEvaluator.loadRuleConfigs(tenantId);
+        return evaluateProjects(tenantId, List.of(projectId));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public int evaluateProjects(Long tenantId, Collection<Long> projectIds) {
+        List<List<Long>> projectBatches = projectBatches(projectIds);
         List<AlertLog> alerts = new ArrayList<>();
-
-        alerts.addAll(ruleEvaluator.evaluateDynamicCostExceedsTarget(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateMaterialExceedsBudget(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateSubcontractExceedsContract(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateContractOverdue(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluatePaymentExceedsRatio(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateWarrantyEarlyRelease(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateContractExpiring(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluateVariationUnconfirmed(tenantId, projectId, ruleConfigs));
-        alerts.addAll(ruleEvaluator.evaluatePurchaseDeliveryOverdue(tenantId, projectId, ruleConfigs));
-
+        Set<String> emittedDedupKeys = new HashSet<>();
+        for (List<Long> projectBatch : projectBatches) {
+            ruleEvaluator.evaluateProjects(tenantId, projectBatch).values()
+                    .forEach(candidates -> addNewAlerts(alerts, candidates, emittedDedupKeys));
+        }
         if (!alerts.isEmpty()) {
             alerts.forEach(lifecycleService::initialize);
             com.baomidou.mybatisplus.extension.toolkit.Db.saveBatch(alerts, 50);
             for (AlertLog alert : alerts) {
                 lifecycleService.recordCreated(alert);
                 try {
-                    createAlertNotification(tenantId, projectId, alert);
+                    createAlertNotification(tenantId, alert.getProjectId(), alert);
                 } catch (Exception e) {
                     log.warn("Failed to create notification for alert id={}, ruleType={}: {}",
                             alert.getId(), alert.getRuleType(), e.getMessage());
                 }
             }
-            log.info("Project {}: {} alert(s) generated", projectId, alerts.size());
+            log.info("Tenant {}: {} alert(s) generated for {} project(s)",
+                    tenantId, alerts.size(), projectBatches.stream().mapToInt(List::size).sum());
         }
         return alerts.size();
+    }
+
+    static List<List<Long>> projectBatches(Collection<Long> projectIds) {
+        List<Long> normalized = projectIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        List<List<Long>> batches = new ArrayList<>();
+        for (int start = 0; start < normalized.size(); start += MAX_EVALUATION_BATCH_SIZE) {
+            batches.add(normalized.subList(start, Math.min(start + MAX_EVALUATION_BATCH_SIZE, normalized.size())));
+        }
+        return batches;
+    }
+
+    static void addNewAlerts(List<AlertLog> alerts, Collection<AlertLog> candidates,
+                             Set<String> emittedDedupKeys) {
+        candidates.stream()
+                .filter(alert -> !StringUtils.hasText(alert.getDedupKey())
+                        || emittedDedupKeys.add(alert.getDedupKey()))
+                .forEach(alerts::add);
     }
 
     @Transactional(rollbackFor = Exception.class)

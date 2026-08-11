@@ -3,7 +3,10 @@ package com.cgcpms.auth.service;
 import com.cgcpms.auth.dto.LoginRequest;
 import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -132,7 +140,7 @@ class AuthServiceTest {
 
         LoginResponse response = authService.login(request);
         Claims current = jwtUtils.parseToken(response.getToken());
-        assertTrue(authService.isCurrentAuthorization(current));
+        assertTrue(authService.isCurrentAuthentication(current));
 
         String staleToken = jwtUtils.generateToken(
                 1L,
@@ -142,7 +150,7 @@ class AuthServiceTest {
                 List.of(),
                 current.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class));
 
-        assertFalse(authService.isCurrentAuthorization(jwtUtils.parseToken(staleToken)));
+        assertFalse(authService.isCurrentAuthentication(jwtUtils.parseToken(staleToken)));
     }
 
     @Test
@@ -161,11 +169,11 @@ class AuthServiceTest {
         assertEquals(List.of("TENANT_ADMIN"), response.getUserInfo().getRoles());
         assertEquals(List.of("tenant:dashboard:view"), response.getUserInfo().getPermissions());
         assertTrue(authService.isCurrentCredential(claims));
-        assertTrue(authService.isCurrentAuthorization(claims));
+        assertTrue(authService.isCurrentAuthentication(claims));
     }
 
     @Test
-    @DisplayName("凭据租户错配、禁用用户、密码变化及禁用角色均立即失效")
+    @DisplayName("租户、状态、凭据版本、角色及权限变化均立即失效")
     void credentialAndAuthorizationChangesFailClosed() {
         LoginRequest request = new LoginRequest();
         request.setTenantId(TENANT_1001);
@@ -177,21 +185,67 @@ class AuthServiceTest {
                 TENANT_USER_ID, "admin", 0L, List.of("TENANT_ADMIN"),
                 List.of("tenant:dashboard:view"),
                 claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class));
-        assertFalse(authService.isCurrentCredential(jwtUtils.parseToken(mismatched)));
+        assertFalse(authService.isCurrentAuthentication(jwtUtils.parseToken(mismatched)));
+
+        jdbcTemplate.update("UPDATE sys_menu SET perms = 'tenant:dashboard:changed' WHERE tenant_id = ? AND id = ?",
+                TENANT_1001, TENANT_MENU_ID);
+        assertFalse(authService.isCurrentAuthentication(claims));
+        jdbcTemplate.update("UPDATE sys_menu SET perms = 'tenant:dashboard:view' WHERE tenant_id = ? AND id = ?",
+                TENANT_1001, TENANT_MENU_ID);
 
         jdbcTemplate.update("UPDATE sys_role SET status = 'DISABLE' WHERE tenant_id = ? AND id = ?",
                 TENANT_1001, TENANT_ROLE_ID);
-        assertFalse(authService.isCurrentAuthorization(claims));
+        assertFalse(authService.isCurrentAuthentication(claims));
+        jdbcTemplate.update("UPDATE sys_role SET status = 'ENABLE' WHERE tenant_id = ? AND id = ?",
+                TENANT_1001, TENANT_ROLE_ID);
 
         jdbcTemplate.update("UPDATE sys_user SET status = 'DISABLE' WHERE tenant_id = ? AND id = ?",
                 TENANT_1001, TENANT_USER_ID);
-        assertFalse(authService.isCurrentCredential(claims));
+        assertFalse(authService.isCurrentAuthentication(claims));
         jdbcTemplate.update("UPDATE sys_user SET status = 'ENABLE' WHERE tenant_id = ? AND id = ?",
                 TENANT_1001, TENANT_USER_ID);
 
         jdbcTemplate.update("UPDATE sys_user SET password = ? WHERE tenant_id = ? AND id = ?",
                 passwordEncoder.encode("changed-pass"), TENANT_1001, TENANT_USER_ID);
-        assertFalse(authService.isCurrentCredential(claims));
+        assertFalse(authService.isCurrentAuthentication(claims));
+    }
+
+    @Test
+    @DisplayName("单次认证快照只查询一次用户、角色和权限")
+    void currentAuthenticationLoadsEachSnapshotOnce() {
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        JwtUtils mockedJwtUtils = mock(JwtUtils.class);
+        SysUser user = enabledUser(7L, 1001L, "encoded-password");
+        Claims claims = authenticationClaims();
+        when(userMapper.selectCredentialByTenantAndId(1001L, 7L)).thenReturn(user);
+        when(userMapper.selectEnabledRoleCodesByTenantAndUserId(1001L, 7L))
+                .thenReturn(List.of("TENANT_ADMIN"));
+        when(userMapper.selectEnabledPermissionCodesByTenantAndUserId(1001L, 7L))
+                .thenReturn(List.of("tenant:dashboard:view"));
+        when(mockedJwtUtils.credentialVersion("encoded-password")).thenReturn("current-version");
+        AuthService service = new AuthService(userMapper, mock(PasswordEncoder.class), mockedJwtUtils);
+
+        assertTrue(service.isCurrentAuthentication(claims));
+
+        verify(userMapper).selectCredentialByTenantAndId(1001L, 7L);
+        verify(userMapper).selectEnabledRoleCodesByTenantAndUserId(1001L, 7L);
+        verify(userMapper).selectEnabledPermissionCodesByTenantAndUserId(1001L, 7L);
+        verifyNoMoreInteractions(userMapper);
+    }
+
+    @Test
+    @DisplayName("认证快照查询运行时异常时失败关闭")
+    void currentAuthenticationRuntimeFailureFailsClosed() {
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        JwtUtils mockedJwtUtils = mock(JwtUtils.class);
+        when(userMapper.selectCredentialByTenantAndId(1001L, 7L))
+                .thenReturn(enabledUser(7L, 1001L, "encoded-password"));
+        when(userMapper.selectEnabledRoleCodesByTenantAndUserId(1001L, 7L))
+                .thenThrow(new IllegalStateException("database unavailable"));
+        AuthService service = new AuthService(userMapper, mock(PasswordEncoder.class), mockedJwtUtils);
+
+        assertFalse(service.isCurrentAuthentication(authenticationClaims()));
+        verify(userMapper, never()).selectEnabledPermissionCodesByTenantAndUserId(1001L, 7L);
     }
 
     @Test
@@ -260,6 +314,25 @@ class AuthServiceTest {
                 .findFirst()
                 .orElseThrow();
         return new Cookie(name, header.substring(prefix.length(), header.indexOf(';')));
+    }
+
+    private SysUser enabledUser(Long userId, Long tenantId, String password) {
+        SysUser user = new SysUser();
+        user.setId(userId);
+        user.setTenantId(tenantId);
+        user.setPassword(password);
+        user.setStatus("ENABLE");
+        return user;
+    }
+
+    private Claims authenticationClaims() {
+        return Jwts.claims()
+                .add(JwtUtils.CLAIM_USER_ID, 7L)
+                .add(JwtUtils.CLAIM_TENANT_ID, 1001L)
+                .add(JwtUtils.CLAIM_CREDENTIAL_VERSION, "current-version")
+                .add(JwtUtils.CLAIM_ROLES, List.of("TENANT_ADMIN"))
+                .add(JwtUtils.CLAIM_PERMISSIONS, List.of("tenant:dashboard:view"))
+                .build();
     }
 
     private MockHttpServletRequestBuilder getWithApiContext(String pathWithinContext) {

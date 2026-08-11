@@ -30,7 +30,7 @@ import {
   showToast,
   useToastMessage,
 } from '@/components'
-import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/shared/display'
 import {
   createContractComposite,
   deleteContract,

@@ -17,8 +17,9 @@ import {
   voidBidDocument,
 } from '@/services/commercial'
 import { getSiteFileUrl, uploadSiteFile } from '@/services/delivery'
-import { dashboardStatusLabel } from '@/pages/dashboard/model'
+import { dashboardStatusLabel } from '@/shared/display'
 import { isApiClientError } from '@/services/request'
+import { localDateTimeInputValue } from '@/services/workspace-context'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 
@@ -225,8 +226,7 @@ function chooseFile(event: Event) {
   file.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
 function currentLocalDateTime(): string {
-  const now = new Date()
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+  return localDateTimeInputValue()
 }
 async function uploadDocument() {
   if (!activeGroup.value || !file.value || busy.value) return

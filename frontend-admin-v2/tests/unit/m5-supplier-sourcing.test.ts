@@ -18,8 +18,10 @@ import {
   loadSourcingSuppliers,
   loadSourcingTrace,
   loadSupplierPerformance,
+  loadSupplierPerformanceCandidates,
   loadSupplierQuotes,
   loadSupplierReturns,
+  loadSupplierSourcingWorkspace,
   publishSourcingEvent,
   reviewSupplierBlacklist,
   startSourcingEvaluation,
@@ -71,9 +73,13 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     const performanceCard =
       source.match(/<V2Card title="履约评价、退货与黑名单"[\s\S]*?<\/V2Card>/)?.[0] ?? ''
     expect(performanceCard).toMatch(/<template #title-extra\b/)
-    expect(performanceCard).toContain('评价 {{ performance.length }}')
-    expect(performanceCard).toContain('退货 {{ returns.length }}')
-    for (const loader of ['loadPurchaseRequests', 'loadPurchaseOrders', 'loadContractPage'])
+    expect(performanceCard).toContain('评价 {{ performanceTotal }}')
+    expect(performanceCard).toContain('退货 {{ returnTotal }}')
+    for (const loader of [
+      'loadPurchaseRequests',
+      'loadSupplierPerformanceCandidates',
+      'loadContractPage',
+    ])
       expect(source).toContain(loader)
     for (const model of [
       'form.purchaseRequestId',
@@ -98,7 +104,7 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     expect(source).toContain("contractStatus: 'PERFORMING'")
     expect(source).toContain('partyBId: selected.value?.awardedPartnerId')
     expect(source).not.toContain("item.orderStatus === 'COMPLETED'")
-    expect(source).toContain('evaluation.purchaseOrderId === item.id')
+    expect(source).toContain('loadSupplierPerformanceCandidates')
     expect(source).not.toContain("show('return')")
     expect(source).not.toContain('createSupplierReturn')
     expect(source).not.toContain('confirmSupplierReturn')
@@ -147,9 +153,20 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     await awardSourcingEvent('E/1', 'Q1', '综合第一')
     await linkSourcingContract('E/1', 'C1')
     await loadSupplierPerformance('P1', signal)
+    await loadSupplierPerformanceCandidates({ pageNo: 1, pageSize: 100, projectId: 'P1' }, signal)
     await createSupplierPerformance('O1', '88.5', '良好')
     await confirmSupplierPerformance('PE/1')
     await loadSupplierReturns('P1', signal)
+    await loadSupplierSourcingWorkspace(
+      {
+        eventPageNo: 1,
+        performancePageNo: 2,
+        returnPageNo: 3,
+        pageSize: 10,
+        projectId: 'P1',
+      },
+      signal,
+    )
     await createSupplierBlacklist('PE1', '建议列入')
     await submitSupplierBlacklist('B/1')
     await reviewSupplierBlacklist('B/1', 'APPROVE', '同意')
@@ -163,7 +180,13 @@ describe('M5 supplier sourcing closed-loop contract', () => {
       '/api/supplier-sourcing/events/E%2F1/suppliers/P%261/decline',
     )
     expect(calls.map(([url]) => String(url))).toContain('/api/supplier-sourcing/events/E%2F1/trace')
-    expect(calls.filter(([, init]) => init?.signal === signal)).toHaveLength(7)
+    expect(calls.map(([url]) => String(url))).toContain(
+      '/api/supplier-sourcing/workspace?eventPageNo=1&performancePageNo=2&returnPageNo=3&pageSize=10&projectId=P1',
+    )
+    expect(calls.map(([url]) => String(url))).toContain(
+      '/api/supplier-sourcing/performance-candidates?pageNo=1&pageSize=100&projectId=P1',
+    )
+    expect(calls.filter(([, init]) => init?.signal === signal)).toHaveLength(9)
     const quoteCall = calls.find(
       ([url, init]) => String(url) === '/api/supplier-sourcing/quotes' && init?.method === 'POST',
     )
