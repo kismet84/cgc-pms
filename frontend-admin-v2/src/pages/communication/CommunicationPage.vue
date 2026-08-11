@@ -1033,7 +1033,7 @@ function scanStatusLabel(value: string): string {
   gap: var(--v2-space-2);
   padding-block-end: var(--v2-space-3);
   background: var(--v2-color-canvas);
-  color: var(--v2-color-text-muted);
+  color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
 }
 .communication-page__messages article {

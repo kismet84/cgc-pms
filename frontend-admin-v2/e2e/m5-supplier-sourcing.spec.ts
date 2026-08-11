@@ -159,9 +159,29 @@ async function install(page: Page, permissions = allPermissions) {
         path,
         body: request.postData() ? request.postDataJSON() : null,
       })
-    if (request.method() === 'GET' && path.endsWith('/events')) return fulfill(route, [event])
-    if (request.method() === 'GET' && path.endsWith('/performance')) return fulfill(route, [])
-    if (request.method() === 'GET' && path.endsWith('/returns')) return fulfill(route, [])
+    if (request.method() === 'GET' && path.endsWith('/workspace')) {
+      const pageSize = Number(url.searchParams.get('pageSize') ?? 10)
+      return fulfill(route, {
+        events: {
+          records: [event],
+          total: 1,
+          pageNo: Number(url.searchParams.get('eventPageNo') ?? 1),
+          pageSize,
+        },
+        performance: {
+          records: [],
+          total: 0,
+          pageNo: Number(url.searchParams.get('performancePageNo') ?? 1),
+          pageSize,
+        },
+        returns: {
+          records: [],
+          total: 0,
+          pageNo: Number(url.searchParams.get('returnPageNo') ?? 1),
+          pageSize,
+        },
+      })
+    }
     if (request.method() === 'GET' && path.endsWith('/trace'))
       return fulfill(route, {
         event,
