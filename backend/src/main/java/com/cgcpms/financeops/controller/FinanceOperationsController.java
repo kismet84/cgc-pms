@@ -61,7 +61,7 @@ public class FinanceOperationsController {
     public ApiResponse<Void> invoiceException(@PathVariable Long id,@Valid@RequestBody InvoiceExceptionRequest r){operations.markInvoiceException(id,r);return ApiResponse.success();}
     @GetMapping("/invoices/{id}/write-off") @PreAuthorize("hasAuthority('invoice:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> writeOff(@PathVariable Long id){return ApiResponse.success(operations.invoiceWriteOffProgress(id));}
-    @GetMapping(value="/audit/export",produces="text/csv") @PreAuthorize("hasAuthority('finance:audit:export') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @GetMapping(value="/audit/export",produces="text/csv") @PreAuthorize("(hasAuthority('finance:audit:export') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ResponseEntity<byte[]> export(@RequestParam Long projectId,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate from,@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate to){return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=finance-audit.csv").contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).body(operations.exportAudit(projectId,from,to));}
 
     @PostMapping("/snapshots/{projectId}/rebuild") @PreAuthorize("hasAuthority('finance:analytics:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")

@@ -16,6 +16,7 @@ import {
   loadPurchaseOrderPricingSuggestion,
   loadPurchaseOrders,
   loadPurchaseRequest,
+  loadPurchaseRequestFormOptions,
   loadPurchaseRequestItems,
   loadPurchaseRequests,
   loadMaterials,
@@ -98,6 +99,9 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('await selectRecord(refreshed)')
     expect(source).toContain('loadOrderItemsForReceipt')
     expect(source).toContain('loadMaterials')
+    expect(source).toContain('loadPurchaseRequestFormOptions')
+    expect(source).toContain("hasPermission('purchase:request:self')")
+    expect(source).toContain('v-if="!purchaseRequestSelfOnly"')
     expect(source).toContain('loadPartners')
     expect(source).toContain('loadContractPage')
     expect(source).toContain('loadContractItems')
@@ -166,6 +170,23 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
     expect(source).not.toMatch(
       /frontend-admin\/src|Legacy|totalAmount\s*[+]=|receivedQuantity\s*[+]=|label="[^"]*ID/,
+    )
+  })
+
+  it('loads project-scoped purchase form options without amount fields', async () => {
+    const signal = new AbortController().signal
+    fetchMock.mockResolvedValueOnce(
+      response({
+        materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
+      }),
+    )
+
+    await expect(loadPurchaseRequestFormOptions('P/1', signal)).resolves.toEqual({
+      materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/purchase-requests/form-options?projectId=P%2F1',
+      expect.objectContaining({ method: 'GET', headers: expect.any(Headers), signal }),
     )
   })
 

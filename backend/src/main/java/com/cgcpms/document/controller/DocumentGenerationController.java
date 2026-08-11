@@ -35,7 +35,7 @@ public class DocumentGenerationController {
 
     @PostMapping
     @AuditedOperation(type = "GENERATE", businessType = "DOCUMENT", businessIdExpression = "#request.businessId")
-    @PreAuthorize("hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     @RateLimit(maxRequests = 10, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<DocumentGeneration> generate(@Valid @RequestBody DocumentGenerationRequest request) {
         return ApiResponse.success(service.generate(request.businessType(), request.businessId(),
@@ -44,7 +44,7 @@ public class DocumentGenerationController {
 
     @PostMapping(value = "/preview", produces = MediaType.APPLICATION_PDF_VALUE)
     @AuditedOperation(type = "PREVIEW", businessType = "DOCUMENT", businessIdExpression = "#request.businessId")
-    @PreAuthorize("hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     @RateLimit(maxRequests = 10, windowSeconds = 60, key = RateLimitKey.USER)
     public ResponseEntity<byte[]> preview(@Valid @RequestBody DocumentPreviewRequest request) {
         byte[] content = service.preview(request.businessType(), request.businessId()).content();
@@ -74,14 +74,14 @@ public class DocumentGenerationController {
 
     @GetMapping("/{id}/download")
     @AuditedOperation(type = "DOWNLOAD", businessType = "DOCUMENT", businessIdExpression = "#id")
-    @PreAuthorize("hasAuthority('document:download') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('document:download') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ApiResponse<String> download(@PathVariable Long id) {
         return ApiResponse.success(service.downloadUrl(id));
     }
 
     @GetMapping("/{id}/audit-download")
     @AuditedOperation(type = "AUDIT_DOWNLOAD", businessType = "DOCUMENT", businessIdExpression = "#id")
-    @PreAuthorize("hasRole('SUPER_ADMIN') and hasAuthority('document:audit:download')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') and hasAuthority('document:audit:download') and hasAuthority('business:amount:view')")
     public ApiResponse<String> auditDownload(@PathVariable Long id,
                                              @RequestParam String reason) {
         return ApiResponse.success(service.auditDownloadUrl(id, reason));

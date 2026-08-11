@@ -19,6 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -133,7 +134,7 @@ class MdMaterialDeleteMySqlConcurrencyTest {
     }
 
     private String holdReference(CountDownLatch holding, CountDownLatch release) {
-        TestUserContext.setAdmin(TENANT, USER);
+        authenticateSuperAdmin();
         try {
             return transactions.execute(status -> {
                 createReferenceItem();
@@ -147,7 +148,7 @@ class MdMaterialDeleteMySqlConcurrencyTest {
     }
 
     private String holdDelete(CountDownLatch holding, CountDownLatch release) {
-        TestUserContext.setAdmin(TENANT, USER);
+        authenticateSuperAdmin();
         try {
             return transactions.execute(status -> {
                 materialService.delete(MATERIAL);
@@ -161,7 +162,7 @@ class MdMaterialDeleteMySqlConcurrencyTest {
     }
 
     private String deleteMaterial(CountDownLatch attempting) {
-        TestUserContext.setAdmin(TENANT, USER);
+        authenticateSuperAdmin();
         try {
             attempting.countDown();
             materialService.delete(MATERIAL);
@@ -174,7 +175,7 @@ class MdMaterialDeleteMySqlConcurrencyTest {
     }
 
     private String createReference(CountDownLatch attempting) {
-        TestUserContext.setAdmin(TENANT, USER);
+        authenticateSuperAdmin();
         try {
             attempting.countDown();
             createReferenceItem();
@@ -194,6 +195,10 @@ class MdMaterialDeleteMySqlConcurrencyTest {
         item.setQuantity(BigDecimal.ONE);
         item.setUnitPrice(BigDecimal.ONE);
         contractItemService.create(item);
+    }
+
+    private void authenticateSuperAdmin() {
+        TestUserContext.setUser(TENANT, USER, "m89-super-admin", List.of("SUPER_ADMIN"));
     }
 
     private void assertDatabaseState(int deleted, long references) {

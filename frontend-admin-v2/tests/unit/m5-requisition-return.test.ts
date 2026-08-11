@@ -9,6 +9,7 @@ import {
   loadMaterialReturn,
   loadMaterialReturnItems,
   loadRequisition,
+  loadRequisitionFormOptions,
   loadRequisitionItems,
   loadRequisitions,
   loadRequisitionTrace,
@@ -55,9 +56,8 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain("selected.value?.stockOutFlag !== '1'")
     expect(source).toContain('crypto.randomUUID()')
     expect(source).not.toContain('await deleteRequisition(createdId)')
-    expect(source).toMatch(
-      /const canAdd = computed\(\s*\(\) => hasPermission\('requisition:add'\) && hasPermission\('requisition:edit'\)/,
-    )
+    expect(source).toContain("hasPermission('requisition:self')")
+    expect(source).toContain('canUseRequisitionSelf.value ||')
     expect(source).toContain('发起领料申请')
     expect(source).toContain('requisition-page__workspace')
     expect(source).not.toContain('data-master-detail="true"')
@@ -72,11 +72,7 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain('dateFrom: reportPeriod.value?.startDate')
     expect(source).toContain('dateTo: reportPeriod.value?.endDate')
     expect(source).toContain('editorItems')
-    expect(source).toContain('loadAllContracts')
-    expect(source).not.toContain('loadContractPage')
-    expect(source).not.toContain("contractType: 'PURCHASE'")
-    expect(source).toContain("contractStatus: 'PERFORMING'")
-    expect(source).not.toContain('function changeContract')
+    expect(source).toContain('loadRequisitionFormOptions')
     expect(source).toContain('loadStocks({')
     expect(source).toContain('stockedMaterialIds')
     expect(source).toContain("hasPermission('inventory:stock:list')")
@@ -89,9 +85,11 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain("hasPermission('procurement:trace:query')")
     expect(source).toContain("{{ item.warehouseCode || '仓库编码缺失' }}")
     expect(source).toContain("{{ item.warehouseName || '仓库名称缺失' }}")
-    expect(source).toContain('loadWarehouses')
-    expect(source).toContain('loadMaterials')
-    expect(source).toContain('loadPartners')
+    expect(source).not.toContain('loadWarehouses')
+    expect(source).not.toContain('loadMaterials')
+    expect(source).not.toContain('loadPartners')
+    expect(source).not.toContain('loadContractPage')
+    expect(source).toContain('!requisitionSelfOnly.value && item.unitPrice.trim()')
     expect(source).toContain(':options="warehouseOptions"')
     expect(source).toContain(':options="materialOptions"')
     expect(source).not.toContain('class="requisition-page__filters"')
@@ -99,6 +97,23 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).not.toMatch(/label="[^"]*ID/)
     expect(source).not.toMatch(
       /availableQty\s*[+]=|totalAmount\s*[+]=|stock\/in|stock\/out|frontend-admin\/src/,
+    )
+  })
+
+  it('loads requisition form options from the project-scoped no-amount endpoint', async () => {
+    const signal = new AbortController().signal
+    const options = {
+      warehouses: [{ id: 'W1', warehouseCode: 'WH-1', warehouseName: '项目仓', projectId: 'P1' }],
+      materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
+      partners: [{ id: 'S1', partnerCode: 'SUP-1', partnerName: '供应商' }],
+      contracts: [{ id: 'C1', contractCode: 'CT-1', contractName: '采购合同', projectId: 'P1' }],
+    }
+    fetchMock.mockResolvedValueOnce(response(options))
+
+    await expect(loadRequisitionFormOptions('P/1', signal)).resolves.toEqual(options)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/requisitions/form-options?projectId=P%2F1',
+      expect.objectContaining({ method: 'GET', headers: expect.any(Headers), signal }),
     )
   })
 

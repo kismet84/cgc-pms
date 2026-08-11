@@ -164,6 +164,16 @@ class PaymentApplicationClosedLoopIntegrationTest {
             instance.setStartedAt(LocalDateTime.now());
             wfInstanceMapper.insert(instance);
             jdbcTemplate.update("""
+                    INSERT INTO wf_node_instance
+                        (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,
+                         node_type,approver_config,allow_transfer,allow_add_sign,timeout_hours,node_status,round_no,
+                         created_by,created_at,updated_at,deleted_flag)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                    """,
+                    instance.getId() + 2, TENANT_ID, instance.getId(), null, "LEGACY_APPROVAL",
+                    "历史付款审批", 1, "OR_SIGN", "APPROVAL", "{\"type\":\"USER\",\"userId\":1}",
+                    0, 0, null, "COMPLETED", 1, 1L);
+            jdbcTemplate.update("""
                     INSERT INTO wf_record
                         (id,tenant_id,instance_id,round_no,business_type,business_id,
                          action_type,action_name,operator_id,operator_name,record_status)

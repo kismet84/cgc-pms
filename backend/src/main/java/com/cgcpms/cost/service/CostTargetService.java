@@ -447,6 +447,14 @@ public class CostTargetService {
         if (!Set.of("DRAFT", "REJECTED").contains(target.getApprovalStatus())) {
             throw new BusinessException("COST_TARGET_ALREADY_SUBMITTED", "仅草稿或驳回状态可以提交审批");
         }
+        List<Long> activeTransfers = jdbc.queryForList("""
+                SELECT id FROM bid_cost_target_transfer_request
+                WHERE tenant_id=? AND target_id=? AND deleted_flag=0 AND status='SUBMITTED'
+                ORDER BY id FOR UPDATE
+                """, Long.class, tenantId, targetId);
+        if (!activeTransfers.isEmpty()) {
+            throw new BusinessException("COST_TARGET_BID_TRANSFER_ACTIVE", "当前目标成本存在审批中的投标成本移交");
+        }
         requireWritableProject(target.getProjectId(), "提交目标成本审批");
         validateForSubmit(target);
         Long userId = UserContext.getCurrentUserId();

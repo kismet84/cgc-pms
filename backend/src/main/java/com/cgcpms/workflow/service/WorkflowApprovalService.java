@@ -2,6 +2,8 @@ package com.cgcpms.workflow.service;
 
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowSecurityPolicy;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,8 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class WorkflowApprovalService {
+
+    private static final ObjectMapper POLICY_MAPPER = new ObjectMapper();
 
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
@@ -37,24 +41,28 @@ public class WorkflowApprovalService {
 
     private void approve(Long taskId, Long userId, String username,
                          String comment, String idempotencyKey, boolean purchaseRequestDedicated) {
-        WfTask routeTask = wfTaskMapper.selectById(taskId);
+        ApprovalRoute route = lockApprovalRoute(taskId, userId);
+        WfTask routeTask = route.task();
         if (routeTask != null && com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST
                 .equals(routeTask.getBusinessType()) && !purchaseRequestDedicated) {
             throw new BusinessException("PURCHASE_REQUEST_DEDICATED_APPROVAL_REQUIRED",
                     "采购申请同意必须通过采购申请专用审批入口");
         }
-        WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
+        WfTask task = validateAndCasUpdateTask(route.task(), userId, idempotencyKey,
                 WorkflowConstants.ACTION_APPROVE, WorkflowConstants.TASK_APPROVED, comment);
-
-        // Ping instance to acquire row lock and verify still RUNNING
-        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
-                WorkflowConstants.INSTANCE_RUNNING);
-        if (instanceOk != 1) {
-            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法审批");
+        WfInstance instance = route.instance();
+        WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
+                POLICY_MAPPER, instance.getSecurityPolicyJson());
+        if (policy.preventInitiatorApproval() && instance.getInitiatorId().equals(userId)) {
+            throw new BusinessException("WORKFLOW_INITIATOR_APPROVAL_FORBIDDEN", "发起人不得审批本流程");
+        }
+        if (core.approvedCount(instance.getTenantId(), instance.getId(), userId, task.getRoundNo())
+                > policy.maxApprovalsPerUser()) {
+            throw new BusinessException("WORKFLOW_APPROVAL_LIMIT_EXCEEDED", "同一用户审批次数超过流程安全策略");
         }
 
         // Write record
-        WfNodeInstance nodeInstance = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
+        WfNodeInstance nodeInstance = route.node();
         core.writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
                 task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 nodeInstance != null ? nodeInstance.getNodeCode() : null,
@@ -63,18 +71,17 @@ public class WorkflowApprovalService {
                 userId, username, comment);
 
         // Notify submitter
-        WfInstance instanceForNotify = wfInstanceMapper.selectById(task.getInstanceId());
-        if (instanceForNotify != null) {
-            workflowNotificationAlertService.createWorkflowNotification(instanceForNotify,
-                    instanceForNotify.getInitiatorId(),
+        if (instance != null) {
+            workflowNotificationAlertService.createWorkflowNotification(instance,
+                    instance.getInitiatorId(),
                     username + "同意了你的申请",
-                    username + "同意了你的申请：" + instanceForNotify.getTitle(),
+                    username + "同意了你的申请：" + instance.getTitle(),
                     "APPROVAL_COMPLETED");
         }
 
         // Check if node is complete
         String approveMode = nodeInstance != null ? nodeInstance.getApproveMode() : WorkflowConstants.MODE_SEQUENTIAL;
-        if (core.isNodeComplete(task.getNodeInstanceId(), approveMode)) {
+        if (core.isNodeComplete(task.getTenantId(), task.getNodeInstanceId(), approveMode)) {
             // For OR_SIGN: cancel remaining pending tasks before proceeding
             if (WorkflowConstants.MODE_OR_SIGN.equals(approveMode)) {
                 core.cancelOrSignPendingTasks(task.getNodeInstanceId(), taskId);
@@ -84,14 +91,10 @@ public class WorkflowApprovalService {
             core.completeNode(task.getNodeInstanceId());
 
             // Find next waiting node
-            WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
             WfNodeInstance nextNode = core.findNextWaitingNode(instance.getId(), instance.getCurrentRound());
 
             if (nextNode != null) {
-                // Activate next node
-                WfTemplateNode nextTplNode = core.wfTemplateNodeMapper.selectById(nextNode.getTemplateNodeId());
-                core.activateNode(nextNode, nextTplNode, userId, username,
-                        instance.getTenantId());
+                core.activateNode(nextNode, userId, username, instance.getTenantId());
             } else {
                 // All nodes complete → instance approved
                 instance.setInstanceStatus(WorkflowConstants.INSTANCE_APPROVED);
@@ -112,21 +115,15 @@ public class WorkflowApprovalService {
     @Transactional(rollbackFor = Exception.class)
     public void reject(Long taskId, Long userId, String username,
                        String comment, String idempotencyKey) {
-        WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
+        ApprovalRoute route = lockApprovalRoute(taskId, userId);
+        WfTask task = validateAndCasUpdateTask(route.task(), userId, idempotencyKey,
                 WorkflowConstants.ACTION_REJECT, WorkflowConstants.TASK_REJECTED, comment);
-
-        // Ping instance to acquire row lock and verify still RUNNING
-        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
-                WorkflowConstants.INSTANCE_RUNNING);
-        if (instanceOk != 1) {
-            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法驳回");
-        }
 
         // Cancel other pending tasks in the same node
         core.cancelPendingTasksInNode(task.getNodeInstanceId(), taskId);
 
         // Mark node rejected
-        WfNodeInstance nodeInstance = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
+        WfNodeInstance nodeInstance = route.node();
         if (nodeInstance != null) {
             nodeInstance.setNodeStatus(WorkflowConstants.NODE_REJECTED);
             nodeInstance.setEndedAt(LocalDateTime.now());
@@ -134,7 +131,7 @@ public class WorkflowApprovalService {
         }
 
         // Mark instance rejected
-        WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+        WfInstance instance = route.instance();
         instance.setInstanceStatus(WorkflowConstants.INSTANCE_REJECTED);
         instance.setEndedAt(LocalDateTime.now());
         wfInstanceMapper.updateById(instance);
@@ -158,22 +155,39 @@ public class WorkflowApprovalService {
 
     // ──────────────────────── Extracted helpers ────────────────────────
 
+    private ApprovalRoute lockApprovalRoute(Long taskId, Long userId) {
+        WfTask task = wfTaskMapper.selectByIdIgnoringTenant(taskId);
+        if (task == null) throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        core.requireCurrentTenant(task.getTenantId());
+        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus()))
+            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
+        if (!task.getApproverId().equals(userId))
+            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
+        if (wfInstanceMapper.pingInstanceRunning(task.getInstanceId(), WorkflowConstants.INSTANCE_RUNNING) != 1)
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法处理任务");
+        WfInstance instance = wfInstanceMapper.selectByIdForUpdate(task.getInstanceId(), task.getTenantId());
+        WfNodeInstance node = wfNodeInstanceMapper.selectByIdForUpdate(task.getNodeInstanceId(), task.getTenantId());
+        WfTask lockedTask = wfTaskMapper.selectByIdForUpdate(taskId, task.getTenantId());
+        if (instance == null || node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus()))
+            throw new BusinessException("NODE_NOT_ACTIVE", "只能处理当前活动审批节点");
+        if (lockedTask == null) throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        if (!WorkflowConstants.TASK_PENDING.equals(lockedTask.getTaskStatus()))
+            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
+        if (!lockedTask.getApproverId().equals(userId))
+            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
+        core.requireEligibleApprover(node, instance, userId);
+        return new ApprovalRoute(lockedTask, instance, node);
+    }
+
+    private record ApprovalRoute(WfTask task, WfInstance instance, WfNodeInstance node) {}
+
     /**
      * Validates task: existence, PENDING status, ownership, idempotency.
      * Performs CAS update to atomically claim the task.
      * Returns the freshly-loaded task for downstream use.
      */
-    private WfTask validateAndCasUpdateTask(Long taskId, Long userId, String idempotencyKey,
-                                             String actionType, String targetStatus, String comment) {
-        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
-        if (tenantProbe == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        core.requireCurrentTenant(tenantProbe.getTenantId());
-        WfTask task = wfTaskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
+    private WfTask validateAndCasUpdateTask(WfTask task, Long userId, String idempotencyKey,
+                                              String actionType, String targetStatus, String comment) {
         if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
             throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
         }
@@ -184,7 +198,7 @@ public class WorkflowApprovalService {
 
         // CAS update: atomically check PENDING + version, bump version
         int updated = wfTaskMapper.updateTaskStatusWithCas(
-                taskId,
+                task.getId(),
                 WorkflowConstants.TASK_PENDING,
                 task.getTaskVersion(),
                 targetStatus,

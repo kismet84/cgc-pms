@@ -127,8 +127,12 @@ const projectOptions = computed(() => {
     options.unshift({ value: form.projectId, label: `本地草稿项目（${form.projectId}）` })
   return options
 })
-const canEdit = computed(() => hasPermission('site:daily:edit'))
-const canReportProgress = computed(() => hasPermission('schedule:progress'))
+const canEdit = computed(
+  () => hasPermission('site:daily:edit') || session.hasPermission('site:daily:self'),
+)
+const canReportProgress = computed(
+  () => hasPermission('schedule:progress') || session.hasPermission('schedule:daily-progress:self'),
+)
 const canViewQuality = computed(() => hasPermission('quality:safety:query'))
 const selectedProjectId = computed(() => workspace.selectedProjectId || '')
 const selectedReportPeriod = computed(() =>

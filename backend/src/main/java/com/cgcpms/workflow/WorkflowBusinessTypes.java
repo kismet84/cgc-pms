@@ -47,4 +47,12 @@ public final class WorkflowBusinessTypes {
     public static final String TECHNICAL_SCHEME = "TECHNICAL_SCHEME";
     /** 项目竣工与收尾闭环：竣工验收审批 */
     public static final String PROJECT_FINAL_ACCEPTANCE = "PROJECT_FINAL_ACCEPTANCE";
+    /** 投标成本移交审批命令 */
+    public static final String BID_COST_TARGET_TRANSFER = "BID_COST_TARGET_TRANSFER";
+    /** 财务成本分摊审批命令 */
+    public static final String FINANCE_COST_ALLOCATION = "FINANCE_COST_ALLOCATION";
+    /** 质量安全整改审批 */
+    public static final String QS_RECTIFICATION = "QS_RECTIFICATION";
+    /** 质量安全金额后果审批 */
+    public static final String QS_CONSEQUENCE = "QS_CONSEQUENCE";
 }

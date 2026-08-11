@@ -116,7 +116,7 @@ class CostTargetControllerTest {
         String token = jwtUtils.generateToken(
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
-                List.of());
+                List.of("business:amount:view"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -458,7 +458,7 @@ class CostTargetControllerTest {
         mockMvc.perform(postWithApiContext("/workflow/submit")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COST_TARGET_DEDICATED_SUBMIT_REQUIRED"));
+                .andExpect(jsonPath("$.code").value("WORKFLOW_DEDICATED_SUBMIT_REQUIRED"));
 
         Assertions.assertEquals(version, Integer.parseInt(currentVersion(testTargetId)));
         Assertions.assertEquals(statusBefore, jdbcTemplate.queryForObject(

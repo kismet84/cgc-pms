@@ -6,7 +6,7 @@ export type SchedulePlanStatus =
 
 export type ScheduleDeviationStatus =
   "ON_TRACK" | "LAGGING" | "OVERDUE" | "COMPLETED";
-export type PeriodType = "MONTHLY" | "WEEKLY";
+export type PeriodType = "YEARLY" | "QUARTERLY" | "MONTHLY" | "WEEKLY";
 export type SiteDailyLogStatus = "DRAFT" | "SUBMITTED";
 
 export interface ScheduleRecord {

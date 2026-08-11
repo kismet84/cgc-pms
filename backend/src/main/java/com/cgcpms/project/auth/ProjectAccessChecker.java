@@ -9,6 +9,7 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.mapper.SysRoleMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -111,10 +112,13 @@ public class ProjectAccessChecker {
 
     private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope,
                                  Set<Long> memberProjectIds) {
-        if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) return true;
-        if (userId != null && userId.equals(project.getProjectManagerId())) return true;
-        if (memberProjectIds.contains(project.getId())) return true;
+        if (roles.contains(SystemRoleContract.HIDDEN_SUPER_ADMIN)) return true;
         if ("ALL".equals(dataScope)) return true;
+        // Active project membership is an explicit grant and forms a union with
+        // system-role scope. This also keeps member access when no system role
+        // grants a broader scope.
+        if (memberProjectIds.contains(project.getId())) return true;
+        if ("PROJECT_MEMBER".equals(dataScope)) return false;
         return "SELF".equals(dataScope) && userId != null && userId.equals(project.getCreatedBy());
     }
 
@@ -135,7 +139,7 @@ public class ProjectAccessChecker {
         List<String> roleCodes = UserContext.getCurrentRoles();
         if (roleCodes.isEmpty()) return "SELF";
         if (roleCodes.stream().anyMatch(
-                code -> "ADMIN".equalsIgnoreCase(code) || "SUPER_ADMIN".equalsIgnoreCase(code))) {
+                code -> SystemRoleContract.HIDDEN_SUPER_ADMIN.equalsIgnoreCase(code))) {
             return "ALL";
         }
 
@@ -148,10 +152,12 @@ public class ProjectAccessChecker {
                         .in(SysRole::getRoleCode, roleCodes));
         if (roles.isEmpty()) return "SELF";
 
-        if (roles.stream().anyMatch(r -> "SELF".equals(r.getDataScope()))) return "SELF";
+        if (roles.stream().anyMatch(r -> "ALL".equals(r.getDataScope()))) return "ALL";
+        if (roles.stream().anyMatch(r -> "PROJECT_MEMBER".equals(r.getDataScope()))) return "PROJECT_MEMBER";
         if (roles.stream().anyMatch(r -> "DEPT".equals(r.getDataScope()))) return "DEPT";
+        if (roles.stream().anyMatch(r -> "DEPT_AND_CHILD".equals(r.getDataScope()))) return "DEPT_AND_CHILD";
         if (roles.stream().anyMatch(r -> "CUSTOM".equals(r.getDataScope()))) return "CUSTOM";
-        if (roles.stream().allMatch(r -> "ALL".equals(r.getDataScope()))) return "ALL";
+        if (roles.stream().anyMatch(r -> "SELF".equals(r.getDataScope()))) return "SELF";
         return "NONE";
     }
 }

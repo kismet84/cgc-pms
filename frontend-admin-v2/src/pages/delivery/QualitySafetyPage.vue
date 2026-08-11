@@ -46,8 +46,8 @@ import {
   loadQualityIssues,
   loadQualityPlans,
   loadQualityTrace,
-  postQualityConsequence,
   reinspectQualityRectification,
+  submitQualityConsequence,
   submitQualityInspection,
   submitQualityRectification,
 } from '@/services/quality'
@@ -225,6 +225,9 @@ const canInspect = computed(
 const canRectify = computed(() => Boolean(projectId.value) && can('quality:safety:rectify'))
 const canReinspect = computed(() => Boolean(projectId.value) && can('quality:safety:reinspect'))
 const canConsequence = computed(() => Boolean(projectId.value) && can('quality:safety:consequence'))
+
+const workflowSubmittable = (status: string): boolean =>
+  ['DRAFT', 'REJECTED', 'WITHDRAWN'].includes(status)
 const offlineDraftEnabled = computed(
   () => featureFlags.offlineDraft.enabled && featureFlags.fieldQualitySafety.enabled,
 )
@@ -760,7 +763,7 @@ const saveRectification = () =>
       await uploadRequired('QS_RECTIFICATION', created.id, 'RECTIFICATION_EVIDENCE')
       await submitQualityRectification(created.id)
     },
-    '整改已提交复检',
+    '整改已提交审批',
     activeIssue.value ?? undefined,
   )
 const saveReinspection = () =>
@@ -778,20 +781,20 @@ const saveConsequence = () =>
   runWrite(
     async () => {
       const created = await createQualityConsequence(consequenceForm)
-      await postQualityConsequence(created.id)
+      await submitQualityConsequence(created.id)
     },
-    '后果已确认',
+    '后果已提交审批',
     activeIssue.value ?? undefined,
   )
-const postExistingConsequence = () => {
+const submitExistingConsequence = () => {
   const consequence = trace.value?.consequence
   const issue = activeIssue.value
   if (!consequence || !issue) return
   return runWrite(
     async () => {
-      await postQualityConsequence(consequence.id)
+      await submitQualityConsequence(consequence.id)
     },
-    '后果已确认',
+    '后果已提交审批',
     issue,
   )
 }
@@ -813,7 +816,7 @@ const submitDraftRectification = (item: QualityRectificationRecord) => {
     async () => {
       await submitQualityRectification(item.id)
     },
-    '整改已提交复检',
+    '整改已提交审批',
     issue,
   )
 }
@@ -1296,7 +1299,7 @@ onBeforeUnmount(() => {
         <template v-if="trace">
           <template v-for="item in trace.rectifications" :key="item.id">
             <V2Button
-              v-if="canRectify && item.status === 'DRAFT'"
+              v-if="canRectify && workflowSubmittable(item.status)"
               type="button"
               variant="secondary"
               @click="
@@ -1312,7 +1315,7 @@ onBeforeUnmount(() => {
               上传整改证据
             </V2Button>
             <V2Button
-              v-if="canRectify && item.status === 'DRAFT'"
+              v-if="canRectify && workflowSubmittable(item.status)"
               type="button"
               :loading="saving"
               @click="submitDraftRectification(item)"
@@ -1321,12 +1324,14 @@ onBeforeUnmount(() => {
             </V2Button>
           </template>
           <V2Button
-            v-if="canConsequence && trace.consequence?.status === 'DRAFT'"
+            v-if="
+              canConsequence && trace.consequence && workflowSubmittable(trace.consequence.status)
+            "
             type="button"
             :loading="saving"
-            @click="postExistingConsequence"
+            @click="submitExistingConsequence"
           >
-            确认既有后果
+            提交既有后果审批
           </V2Button>
         </template>
       </template>
@@ -1583,7 +1588,7 @@ onBeforeUnmount(() => {
     >
     <V2Dialog
       :open="dialog === 'consequence'"
-      title="登记合作方后果"
+      title="登记合作方后果并提交审批"
       :close-on-backdrop="false"
       panel-class="v2-dialog-standard"
       @update:open="
@@ -1642,7 +1647,7 @@ onBeforeUnmount(() => {
       <template #footer>
         <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
         <V2Button type="submit" form="quality-consequence-form" :loading="saving"
-          >确认登记</V2Button
+          >提交审批</V2Button
         >
       </template></V2Dialog
     >

@@ -47,6 +47,7 @@ import {
   loadPurchaseOrderPricingSuggestion,
   loadPurchaseOrders,
   loadPurchaseRequest,
+  loadPurchaseRequestFormOptions,
   loadPurchaseRequestItems,
   loadPurchaseRequests,
   loadMaterials,
@@ -189,14 +190,25 @@ const permissions = computed(
       },
     })[mode.value],
 )
+const canUsePurchaseRequestSelf = computed(
+  () => mode.value === 'request' && session.hasPermission('purchase:request:self'),
+)
+const purchaseRequestSelfOnly = computed(
+  () => canUsePurchaseRequestSelf.value && !session.hasAdminOrPermission('purchase:request:edit'),
+)
 const canAdd = computed(
   () =>
-    session.hasAdminOrPermission(permissions.value.add) &&
-    session.hasAdminOrPermission(permissions.value.edit) &&
-    session.hasAdminOrPermission(permissions.value.delete),
+    canUsePurchaseRequestSelf.value ||
+    (session.hasAdminOrPermission(permissions.value.add) &&
+      session.hasAdminOrPermission(permissions.value.edit) &&
+      session.hasAdminOrPermission(permissions.value.delete)),
 )
-const canSubmit = computed(() => session.hasAdminOrPermission(permissions.value.submit))
-const canSaveItems = computed(() => session.hasAdminOrPermission(permissions.value.edit))
+const canSubmit = computed(
+  () => canUsePurchaseRequestSelf.value || session.hasAdminOrPermission(permissions.value.submit),
+)
+const canSaveItems = computed(
+  () => canUsePurchaseRequestSelf.value || session.hasAdminOrPermission(permissions.value.edit),
+)
 const canSubmitSelected = computed(
   () => canSubmit.value && selected.value?.approvalStatus === 'DRAFT',
 )
@@ -1182,8 +1194,9 @@ async function openCreate(nextOrderMode?: OrderCreateMode): Promise<void> {
   try {
     const candidateProjectId = form.projectId || undefined
     if (mode.value === 'request') {
-      const materialPage = await loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' })
-      materials.value = materialPage.records
+      materials.value = candidateProjectId
+        ? (await loadPurchaseRequestFormOptions(candidateProjectId)).materials
+        : []
     } else if (mode.value === 'order') {
       const [partnerPage, materialPage, contractPage, requestPage] = await Promise.all([
         loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' }),
@@ -1282,7 +1295,9 @@ async function changeEditorProject(value: string): Promise<void> {
   if (!value || busy.value) return
   busy.value = true
   try {
-    if (mode.value === 'receipt') {
+    if (mode.value === 'request') {
+      materials.value = (await loadPurchaseRequestFormOptions(value)).materials
+    } else if (mode.value === 'receipt') {
       const [orderPage, warehousePage] = await Promise.all([
         loadPurchaseOrders({
           pageNum: 1,
@@ -2111,6 +2126,7 @@ onBeforeUnmount(() => {
               <h3 id="purchase-request-lines-title">采购申请明细</h3>
               <div class="purchase-execution-page__draft-actions">
                 <MaterialSearchPicker
+                  v-if="!purchaseRequestSelfOnly"
                   :disabled="busy || requestItemDrafts.length >= 200"
                   @select="addRequestMaterial"
                 />

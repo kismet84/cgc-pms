@@ -23,6 +23,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -73,6 +76,7 @@ class PurchaseRequestServiceTest {
                 .add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
+        authenticate("business:amount:view");
         seedProject(PROJECT_ID);
         seedProject(200L);
         seedProcurementSupportData();
@@ -81,6 +85,7 @@ class PurchaseRequestServiceTest {
     @AfterEach
     void clearContext() {
         UserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     private void seedWorkflowApprover() {
@@ -98,6 +103,29 @@ class PurchaseRequestServiceTest {
             jdbcTemplate.update(
                     "UPDATE sys_user SET tenant_id = ?, status = ?, deleted_flag = 0 WHERE id = ?",
                     TENANT_ID, "ENABLE", USER_ADMIN);
+        }
+        jdbcTemplate.update("""
+                UPDATE wf_template_node SET deleted_flag = 1
+                WHERE tenant_id = ? AND template_id = 50010 AND id IN (50011, 50012, 50013)
+                """, TENANT_ID);
+        long[] approvers = {
+                890_000_000_000_000_011L,
+                890_000_000_000_000_012L,
+                890_000_000_000_000_013L
+        };
+        for (int i = 0; i < approvers.length; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user
+                        (id, tenant_id, username, password, status, is_admin, created_by, deleted_flag)
+                    SELECT ?, ?, ?, '{noop}test-only', 'ENABLE', 0, ?, 0
+                    WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
+                    """, approvers[i], TENANT_ID, "purchase-approver-" + (i + 1),
+                    USER_ADMIN, approvers[i]);
+            jdbcTemplate.update("""
+                    UPDATE wf_template_node
+                    SET approver_config = JSON_OBJECT('type', 'USER', 'userId', ?)
+                    WHERE tenant_id = ? AND template_id = 50010 AND id = ?
+                    """, approvers[i], TENANT_ID, 51001L + i);
         }
     }
 
@@ -210,6 +238,29 @@ class PurchaseRequestServiceTest {
         assertThrows(BusinessException.class,
                 () -> requestService.create(request, List.of(completeRequestItem(), invalid)));
 
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=? AND remark=? AND deleted_flag=0",
+                Integer.class, TENANT_ID, request.getRemark()));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("无金额权限提交采购申请单价时精确拒绝且不落库")
+    void employeeCannotForgePurchaseRequestAmounts() {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "employee")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("EMPLOYEE"))
+                .build());
+        authenticate("ROLE_EMPLOYEE", "purchase:request:self");
+        MatPurchaseRequest request = completeRequestHeader();
+        request.setRemark("forged-amount-" + System.nanoTime());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> requestService.create(request, List.of(completeRequestItem())));
+
+        assertEquals("AMOUNT_FIELD_FORBIDDEN", exception.getCode());
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=? AND remark=? AND deleted_flag=0",
                 Integer.class, TENANT_ID, request.getRemark()));
@@ -800,5 +851,11 @@ class PurchaseRequestServiceTest {
         assertEquals(String.valueOf(USER_ADMIN), vo.getCreatedBy());
         assertNotNull(vo.getCreatedTime(), "createdTime 应由 MetaObjectHandler 填充");
         assertNotNull(vo.getUpdatedTime(), "updatedTime 应由 MetaObjectHandler 填充");
+    }
+
+    private void authenticate(String... authorities) {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "user", "n/a", java.util.Arrays.stream(authorities)
+                .map(SimpleGrantedAuthority::new).toList()));
     }
 }

@@ -16,6 +16,9 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -29,11 +32,14 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "jwt.secret=project-schedule-closed-loop-test-secret-key-at-least-sixty-four-characters")
 @ActiveProfiles("local")
 class ProjectScheduleClosedLoopIntegrationTest {
     private static final long PROJECT = 99185001L;
     private static final long DAILY_LOG = 99185002L;
+    private static final long APPROVER_1 = 99185011L;
+    private static final long APPROVER_2 = 99185012L;
+    private static final long APPROVER_3 = 99185013L;
 
     @Autowired ProjectScheduleService service;
     @Autowired SiteDailyLogService dailyLogService;
@@ -48,6 +54,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
                 .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
+        seedWorkflowApprovers();
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'SCHEDULE-IT-P','计划履约测试项目','PREPARING',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
     }
 
@@ -55,13 +62,14 @@ class ProjectScheduleClosedLoopIntegrationTest {
     void teardown() {
         cleanup();
         UserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void fullChainFromBaselineToDailyDeviationCorrectiveAndRevision() {
         long baseline = createAndActivateBaseline();
         long task = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, baseline);
-        long month = createAndApprovePeriod(baseline, null, "MONTHLY", "M-2099-07",
+        long month = createAndApproveMonth(baseline, "M-2099-07",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), task, new BigDecimal("100"));
         createAndApprovePeriod(baseline, month, "WEEKLY", "W-2099-07-03",
                 LocalDate.of(2099, 7, 14), LocalDate.of(2099, 7, 20), task, new BigDecimal("70"));
@@ -109,7 +117,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
     }
 
     @Test
-    void rejectsInvalidWeightsWeeklyWithoutApprovedMonthAndProgressRollback() {
+    void rejectsInvalidWeightsBrokenPeriodParentsAndProgressRollback() {
         long schedule = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-INVALID", "错误权重基线",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
         service.replaceTasks(schedule, new WbsTaskBatch(0, List.of(task("T1", new BigDecimal("90")))));
@@ -123,9 +131,17 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
         BusinessException monthError = assertThrows(BusinessException.class, () -> service.createPeriodPlan(new PeriodPlanRequest(
                 schedule, "WEEKLY", null, "W-NO-MONTH", "无月计划周计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
-        assertEquals("PROJECT_WEEKLY_MONTH_REQUIRED", monthError.getCode());
+        assertEquals("PROJECT_PERIOD_PARENT_REQUIRED", monthError.getCode());
 
-        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-ROLLBACK", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        long quarter = createAndApproveQuarter(schedule, "ROLLBACK", LocalDate.of(2099, 7, 1),
+                LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        long year = jdbc.queryForObject("SELECT parent_period_plan_id FROM project_period_plan WHERE id=?", Long.class, quarter);
+        BusinessException directParent = assertThrows(BusinessException.class, () -> service.createPeriodPlan(
+                new PeriodPlanRequest(schedule, "MONTHLY", year, "M-WRONG-PARENT", "错误直属父级月计划",
+                        LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+        assertEquals("PROJECT_PERIOD_PARENT_NOT_APPROVED", directParent.getCode());
+        long month = createAndApprovePeriod(schedule, quarter, "MONTHLY", "M-ROLLBACK",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
         createAndApprovePeriod(schedule, month, "WEEKLY", "W-ROLLBACK", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("50"));
         jdbc.update("UPDATE project_wbs_task SET actual_progress=30 WHERE id=?", taskId);
         jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-05','测试回退','DRAFT',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
@@ -162,7 +178,9 @@ class ProjectScheduleClosedLoopIntegrationTest {
         service.submitSchedule(schedule);
         approveAll("PROJECT_SCHEDULE", schedule);
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
-        Map<String, Object> period = service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", null,
+        long quarter = createAndApproveQuarter(schedule, "STALE", LocalDate.of(2099, 7, 1),
+                LocalDate.of(2099, 7, 31), taskId, new BigDecimal("50"));
+        Map<String, Object> period = service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", quarter,
                 "M-STALE", "并发保护月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null));
         long periodId = id(period);
         service.replacePeriodItems(periodId, new PeriodItemBatch(0,
@@ -191,24 +209,22 @@ class ProjectScheduleClosedLoopIntegrationTest {
     }
 
     @Test
-    void overlappingWeeklyApprovalFailsClosed() {
+    void overlappingApprovalFailsClosedForEveryPeriodLevel() {
         long schedule = createAndActivateBaseline();
         long taskId = jdbc.queryForObject(
                 "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
-        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-OVERLAP",
+        long year = createAndApprovePeriod(schedule, null, "YEARLY", "Y-OVERLAP",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
-        createAndApprovePeriod(schedule, month, "WEEKLY", "W-OVERLAP-1",
+        assertOverlapRejected(schedule, null, "YEARLY", "Y-OVERLAP-2", "PROJECT_PERIOD_PLAN_OVERLAP");
+        long quarter = createAndApprovePeriod(schedule, year, "QUARTERLY", "Q-OVERLAP",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        assertOverlapRejected(schedule, year, "QUARTERLY", "Q-OVERLAP-2", "PROJECT_PERIOD_PLAN_OVERLAP");
+        long month = createAndApprovePeriod(schedule, quarter, "MONTHLY", "M-OVERLAP",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        assertOverlapRejected(schedule, quarter, "MONTHLY", "M-OVERLAP-2", "PROJECT_PERIOD_PLAN_OVERLAP");
+        createAndApprovePeriod(schedule, month, "WEEKLY", "W-OVERLAP",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("50"));
-        long overlapping = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
-                null, "W-OVERLAP-2", LocalDate.of(2099, 7, 7), LocalDate.of(2099, 7, 14), null)));
-        jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id=?", overlapping);
-
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> service.onPeriodApproved(overlapping));
-
-        assertEquals("PROJECT_WEEKLY_PLAN_OVERLAP", exception.getCode());
-        assertEquals("PENDING", jdbc.queryForObject(
-                "SELECT status FROM project_period_plan WHERE id=?", String.class, overlapping));
+        assertOverlapRejected(schedule, month, "WEEKLY", "W-OVERLAP-2", "PROJECT_WEEKLY_PLAN_OVERLAP");
     }
 
     @Test
@@ -216,7 +232,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long schedule = createAndActivateBaseline();
         long taskId = jdbc.queryForObject(
                 "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
-        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-CONCURRENT-OVERLAP",
+        long month = createAndApproveMonth(schedule, "M-CONCURRENT-OVERLAP",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
         long first = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
                 null, "W-CONCURRENT-1", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
@@ -248,7 +264,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long schedule = createAndActivateBaseline();
         long taskId = jdbc.queryForObject(
                 "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
-        long month = createAndApprovePeriod(schedule, null, "MONTHLY", "M-DATE-CHANGE",
+        long month = createAndApproveMonth(schedule, "M-DATE-CHANGE",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
         createAndApprovePeriod(schedule, month, "WEEKLY", "W-DATE-CHANGE-1",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("40"));
@@ -295,10 +311,38 @@ class ProjectScheduleClosedLoopIntegrationTest {
     }
 
     @Test
+    void dailyProgressSelfPermissionIsOwnerOnlyForReadAndWrite() {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject(
+                "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long month = createAndApproveMonth(schedule, "M-SELF",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        createAndApprovePeriod(schedule, month, "WEEKLY", "W-SELF",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("50"));
+        jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-05','本人填报','DRAFT',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
+
+        selfContext(1L, "schedule:daily-progress:self");
+        assertTrue(service.dailyProgress(DAILY_LOG).isEmpty());
+        service.replaceDailyProgress(DAILY_LOG, new DailyProgressBatch(List.of(
+                new DailyProgressRequest(taskId, new BigDecimal("10"), new BigDecimal("10"), "本人进度"))));
+
+        selfContext(2L, "schedule:daily-progress:self");
+        assertEquals("SITE_DAILY_LOG_NOT_FOUND",
+                assertThrows(BusinessException.class, () -> service.dailyProgress(DAILY_LOG)).getCode());
+        assertEquals("SITE_DAILY_LOG_NOT_FOUND", assertThrows(BusinessException.class,
+                () -> service.replaceDailyProgress(DAILY_LOG, new DailyProgressBatch(List.of(
+                        new DailyProgressRequest(taskId, new BigDecimal("20"), new BigDecimal("20"), "越权进度"))))).getCode());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM site_daily_progress WHERE daily_log_id=? AND current_progress=10", Integer.class, DAILY_LOG));
+    }
+
+    @Test
     void concurrentPeriodSubmitCreatesOneWorkflowInstance() throws Exception {
         long schedule = createAndActivateBaseline();
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
-        long periodId = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", null,
+        long quarter = createAndApproveQuarter(schedule, "CONCURRENT", LocalDate.of(2099, 7, 1),
+                LocalDate.of(2099, 7, 31), taskId, new BigDecimal("50"));
+        long periodId = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", quarter,
                 "M-CONCURRENT", "并发提交月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
         service.replacePeriodItems(periodId, new PeriodItemBatch(0,
                 List.of(new PeriodItemRequest(taskId, new BigDecimal("50"), null))));
@@ -427,6 +471,35 @@ class ProjectScheduleClosedLoopIntegrationTest {
                 new BigDecimal("100"), "%", null);
     }
 
+    private long createAndApproveQuarter(long schedule, String code, LocalDate start, LocalDate end,
+                                         long task, BigDecimal target) {
+        long year = createAndApprovePeriod(schedule, null, "YEARLY", "Y-" + code, start, end, task, target);
+        return createAndApprovePeriod(schedule, year, "QUARTERLY", "Q-" + code, start, end, task, target);
+    }
+
+    private long createAndApproveMonth(long schedule, String code, LocalDate start, LocalDate end,
+                                       long task, BigDecimal target) {
+        long quarter = createAndApproveQuarter(schedule, code, start, end, task, target);
+        return createAndApprovePeriod(schedule, quarter, "MONTHLY", code, start, end, task, target);
+    }
+
+    private void assertOverlapRejected(long schedule, Long parent, String type, String code, String expectedCode) {
+        long overlapping = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code,
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+        jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id=?", overlapping);
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.onPeriodApproved(overlapping));
+        assertEquals(expectedCode, exception.getCode());
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM project_period_plan WHERE id=?", String.class, overlapping));
+    }
+
+    private void selfContext(long userId, String authority) {
+        UserContext.set(Jwts.claims().subject("user-" + userId).add("userId", userId).add("username", "user-" + userId)
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "user-" + userId, "n/a", List.of(new SimpleGrantedAuthority(authority))));
+    }
+
     private long createAndApprovePeriod(long schedule, Long parent, String type, String code,
                                         LocalDate start, LocalDate end, long task, BigDecimal target) {
         long id = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code, start, end, null)));
@@ -446,9 +519,24 @@ class ProjectScheduleClosedLoopIntegrationTest {
             List<WfTask> pending = taskMapper.selectList(new LambdaQueryWrapper<WfTask>()
                     .eq(WfTask::getInstanceId, instance.getId()).eq(WfTask::getTaskStatus, "PENDING"));
             if (pending.isEmpty()) break;
-            for (WfTask task : pending) workflowEngine.approve(task.getId(), 1L, "admin", "同意", "schedule-it-" + UUID.randomUUID());
+            for (WfTask task : pending) workflowEngine.approve(task.getId(), task.getApproverId(),
+                    "schedule-approver-" + task.getApproverId(), "同意", "schedule-it-" + UUID.randomUUID());
         }
         assertEquals("APPROVED", instanceMapper.selectById(instance.getId()).getInstanceStatus());
+    }
+
+    private void seedWorkflowApprovers() {
+        for (long id : List.of(APPROVER_1, APPROVER_2, APPROVER_3)) {
+            jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) "
+                            + "VALUES(?,0,?,'test','计划审批人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                    id, "schedule-approver-" + id);
+        }
+        jdbc.update("UPDATE wf_template_node SET approver_config=JSON '{\"type\":\"USER\",\"userId\":"
+                + APPROVER_1 + "}' WHERE id IN (53301,53401,53501)");
+        jdbc.update("UPDATE wf_template_node SET approver_config=JSON '{\"type\":\"USER\",\"userId\":"
+                + APPROVER_2 + "}' WHERE id IN (53302,53402,53502)");
+        jdbc.update("UPDATE wf_template_node SET approver_config=JSON '{\"type\":\"USER\",\"userId\":"
+                + APPROVER_3 + "}' WHERE id IN (53303,53503)");
     }
 
     private long id(Map<?,?> row) { return ((Number) row.get("id")).longValue(); }
@@ -472,5 +560,8 @@ class ProjectScheduleClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM wf_cc WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('PROJECT_SCHEDULE','PROJECT_PERIOD_PLAN','PROJECT_CORRECTIVE_ACTION'))", PROJECT);
         jdbc.update("DELETE FROM wf_instance WHERE project_id=? AND business_type IN('PROJECT_SCHEDULE','PROJECT_PERIOD_PLAN','PROJECT_CORRECTIVE_ACTION')", PROJECT);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
+        jdbc.update("UPDATE wf_template_node SET approver_config=JSON '{\"type\":\"USER\",\"userId\":1}' WHERE id IN (53301,53302,53303,53401,53402,53501,53502,53503)");
+        jdbc.update("DELETE FROM sys_notification WHERE user_id IN (?,?,?)", APPROVER_1, APPROVER_2, APPROVER_3);
+        jdbc.update("DELETE FROM sys_user WHERE id IN (?,?,?)", APPROVER_1, APPROVER_2, APPROVER_3);
     }
 }

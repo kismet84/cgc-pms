@@ -28,6 +28,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.cgcpms.projectfile.ProjectFileService;
 
 import java.util.List;
@@ -74,11 +77,14 @@ class DocumentGenerationEndToEndTest {
     @BeforeEach
     void setUp() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "n/a", List.of(new SimpleGrantedAuthority("business:amount:view"))));
         TEST_APPLY_AMOUNT.set("123456.78");
     }
 
     @AfterEach
     void tearDown() {
+        SecurityContextHolder.clearContext();
         TestUserContext.clear();
     }
 

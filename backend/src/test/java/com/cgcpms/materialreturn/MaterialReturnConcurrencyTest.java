@@ -25,6 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -153,6 +156,7 @@ class MaterialReturnConcurrencyTest {
         setAdminContext();
         cleanFixtures();
         UserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -200,6 +204,7 @@ class MaterialReturnConcurrencyTest {
             return exception.getCode();
         } finally {
             UserContext.clear();
+            SecurityContextHolder.clearContext();
         }
     }
 
@@ -210,6 +215,8 @@ class MaterialReturnConcurrencyTest {
                 .add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "n/a", List.of(new SimpleGrantedAuthority("business:amount:view"))));
     }
 
     private void cleanFixtures() {

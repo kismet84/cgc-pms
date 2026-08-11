@@ -20,17 +20,19 @@ import {
 import {
   activateMappingVersion,
   createAssignmentRule,
-  createBidTransfer,
+  createBidTransferRequest,
   createCostSubject,
-  createFinanceAllocation,
+  createFinanceAllocationRequest,
   createMappingVersion,
   deleteCostSubject,
   loadAssignmentRules,
   loadBidTransfers,
+  loadBidTransferRequests,
   loadCostSubject,
   loadCostSubjectReconciliation,
   loadCostSubjectTree,
   loadFinanceAllocations,
+  loadFinanceAllocationRequests,
   loadMappingVersions,
   loadProjectScopes,
   loadSubjectImpact,
@@ -38,11 +40,15 @@ import {
   reverseFinanceAllocation,
   saveProjectScope,
   toggleCostSubjectStatus,
+  submitBidTransferRequest,
+  submitFinanceAllocationRequest,
   updateCostSubject,
   type AssignmentRuleRecord,
   type CostSubjectAuditRow,
   type CostSubjectCommand,
   type CostSubjectRecord,
+  type BidTransferRequestRecord,
+  type FinanceAllocationRequestRecord,
   type MappingVersionRecord,
   type ProjectScopeRecord,
   type SubjectImpactRecord,
@@ -81,8 +87,10 @@ const canMappingEdit = computed(() => can('cost:subject:mapping:edit'))
 const canMappingActivate = computed(() => can('cost:subject:mapping:activate'))
 const canRuleEdit = computed(() => can('cost:subject:rule:edit'))
 const canScopeEdit = computed(() => can('cost:subject:scope:edit'))
-const canBidTransfer = computed(() => can('cost:subject:bid-transfer'))
-const canFinanceAllocate = computed(() => can('cost:subject:finance-allocate'))
+const canBidTransferCreate = computed(() => can('cost:subject:bid-transfer'))
+const canBidTransferSubmit = computed(() => can('cost:subject:transfer:submit'))
+const canFinanceAllocationCreate = computed(() => can('cost:subject:finance-allocate'))
+const canFinanceAllocationSubmit = computed(() => can('cost:subject:allocation:submit'))
 
 const subjects = ref<CostSubjectRecord[]>([])
 const selectedFirstLevelId = ref('')
@@ -165,6 +173,8 @@ const impact = ref<SubjectImpactRecord | null>(null)
 const reconciliation = ref<CostSubjectAuditRow | null>(null)
 const transfers = ref<CostSubjectAuditRow[]>([])
 const allocations = ref<CostSubjectAuditRow[]>([])
+const transferRequests = ref<BidTransferRequestRecord[]>([])
+const allocationRequests = ref<FinanceAllocationRequestRecord[]>([])
 const transferPageNo = ref(1)
 const allocationPageNo = ref(1)
 const transferDialog = ref(false)
@@ -176,7 +186,6 @@ const transferForm = reactive({
   projectId: '',
   targetId: '',
   mappingVersionId: '',
-  approvalInstanceId: '',
   idempotencyKey: '',
   remark: '',
 })
@@ -186,7 +195,6 @@ const allocationForm = reactive({
   allocationBasis: 'BENEFIT_AMOUNT',
   accountingPeriod: '',
   costSubjectId: '',
-  approvalInstanceId: '',
   idempotencyKey: '',
   remark: '',
   lines: [{ projectId: '', basisValue: '1' }],
@@ -563,10 +571,13 @@ async function submitScope(): Promise<void> {
 async function loadTrace(signal?: AbortSignal): Promise<void> {
   transferPageNo.value = 1
   allocationPageNo.value = 1
-  ;[transfers.value, allocations.value] = await Promise.all([
-    loadBidTransfers(signal),
-    loadFinanceAllocations(signal),
-  ])
+  ;[transferRequests.value, allocationRequests.value, transfers.value, allocations.value] =
+    await Promise.all([
+      loadBidTransferRequests(signal),
+      loadFinanceAllocationRequests(signal),
+      loadBidTransfers(signal),
+      loadFinanceAllocations(signal),
+    ])
 }
 
 async function queryImpact(): Promise<void> {
@@ -601,18 +612,17 @@ async function submitTransfer(): Promise<void> {
     !transferForm.projectId.trim() ||
     !transferForm.targetId.trim() ||
     !transferForm.mappingVersionId.trim() ||
-    !transferForm.approvalInstanceId.trim() ||
     !transferForm.idempotencyKey.trim()
   ) {
-    showToast('warning', '信息不完整', '转入对象、映射版本、审批实例和幂等键不能为空。')
+    showToast('warning', '信息不完整', '转入对象、映射版本和幂等键不能为空。')
     return
   }
   saving.value = true
   try {
-    await createBidTransfer({ ...transferForm })
+    await createBidTransferRequest({ ...transferForm })
     transferDialog.value = false
     await loadTrace()
-    showToast('success', '投标成本已转入', '目标成本转入事实已刷新。')
+    showToast('success', '转入草稿已保存', '请在申请清单提交审批。')
   } catch (value) {
     showToast('error', '转入失败', messageOf(value))
   } finally {
@@ -633,24 +643,22 @@ async function submitAllocation(): Promise<void> {
     !allocationForm.sourceId.trim() ||
     !allocationForm.accountingPeriod.trim() ||
     !allocationForm.costSubjectId.trim() ||
-    !allocationForm.approvalInstanceId.trim() ||
     !allocationForm.idempotencyKey.trim() ||
     allocationForm.lines.some(
       (line) => !line.projectId.trim() || !line.basisValue.trim() || Number(line.basisValue) <= 0,
     )
   ) {
-    showToast('warning', '信息不完整', '来源、期间、科目、审批、幂等键和项目依据必须有效。')
+    showToast('warning', '信息不完整', '来源、期间、科目、幂等键和项目依据必须有效。')
     return
   }
   saving.value = true
   try {
-    await createFinanceAllocation({
+    await createFinanceAllocationRequest({
       sourceType: allocationForm.sourceType,
       sourceId: allocationForm.sourceId.trim(),
       allocationBasis: allocationForm.allocationBasis,
       accountingPeriod: allocationForm.accountingPeriod.trim(),
       costSubjectId: allocationForm.costSubjectId.trim(),
-      approvalInstanceId: allocationForm.approvalInstanceId.trim(),
       idempotencyKey: allocationForm.idempotencyKey.trim(),
       remark: allocationForm.remark.trim(),
       lines: allocationForm.lines.map((line) => ({
@@ -660,9 +668,37 @@ async function submitAllocation(): Promise<void> {
     })
     allocationDialog.value = false
     await loadTrace()
-    showToast('success', '财务费用已分摊', '分摊记录已刷新。')
+    showToast('success', '分摊草稿已保存', '请在申请清单提交审批。')
   } catch (value) {
     showToast('error', '分摊失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitTransferWorkflow(record: BidTransferRequestRecord): Promise<void> {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await submitBidTransferRequest(record.id)
+    await loadTrace()
+    showToast('success', '转入申请已提交', '审批状态已刷新。')
+  } catch (value) {
+    showToast('error', '转入申请提交失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitAllocationWorkflow(record: FinanceAllocationRequestRecord): Promise<void> {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await submitFinanceAllocationRequest(record.id)
+    await loadTrace()
+    showToast('success', '分摊申请已提交', '审批状态已刷新。')
+  } catch (value) {
+    showToast('error', '分摊申请提交失败', messageOf(value))
   } finally {
     saving.value = false
   }
@@ -725,9 +761,53 @@ function statusLabel(status: string): string {
       DRAFT: '草稿',
       ENABLE: '启用',
       POSTED: '已入账',
+      REJECTED: '已驳回',
       REVERSED: '已冲销',
+      SUBMITTED: '审批中',
+      WITHDRAWN: '已撤回',
     }[status] ?? status
   )
+}
+
+function codeNameLabel(
+  code: string | null | undefined,
+  name: string | null | undefined,
+  fallback: string,
+): string {
+  return [code?.trim(), name?.trim()].filter(Boolean).join(' · ') || fallback
+}
+
+function ruleProjectLabel(record: AssignmentRuleRecord): string {
+  if (!record.projectId) return '全局'
+  return codeNameLabel(record.projectCode, record.projectName, '项目已归档')
+}
+
+function requestProjectLabel(
+  record: Pick<BidTransferRequestRecord, 'projectCode' | 'projectName'>,
+): string {
+  return codeNameLabel(record.projectCode, record.projectName, '项目已归档')
+}
+
+function bidCostLabel(record: BidTransferRequestRecord): string {
+  return record.bidCode?.trim() || '投标成本已归档'
+}
+
+function targetVersionLabel(record: BidTransferRequestRecord): string {
+  return codeNameLabel(record.targetVersionNo, record.targetVersionName, '目标成本版本已归档')
+}
+
+function allocationSourceLabel(record: FinanceAllocationRequestRecord): string {
+  const type =
+    sourceTypeOptions.find((item) => item.value === record.sourceType)?.label ?? '财务业务来源'
+  return record.sourceCode?.trim() ? `${type} · ${record.sourceCode.trim()}` : type
+}
+
+function allocationBasisLabel(value: string): string {
+  return allocationBasisOptions.find((item) => item.value === value)?.label ?? '其他依据'
+}
+
+function allocationSubjectLabel(record: FinanceAllocationRequestRecord): string {
+  return codeNameLabel(record.costSubjectCode, record.costSubjectName, '成本科目已归档')
 }
 
 async function loadActive(): Promise<void> {
@@ -1092,7 +1172,7 @@ onBeforeUnmount(() => controller?.abort())
                 <th scope="row">{{ record.ruleCode }}</th>
                 <td>{{ record.sourceType }}</td>
                 <td>{{ record.businessCategory }}</td>
-                <td>{{ record.projectId || '全局' }}</td>
+                <td>{{ ruleProjectLabel(record) }}</td>
                 <td>{{ record.subjectCode }}</td>
                 <td>{{ record.subjectName }}</td>
                 <td>{{ record.versionCode }}</td>
@@ -1183,11 +1263,15 @@ onBeforeUnmount(() => controller?.abort())
         </div>
         <template #actions>
           <V2Cluster>
-            <V2Button v-if="canBidTransfer" size="small" @click="transferDialog = true">
-              投标成本转入
+            <V2Button v-if="canBidTransferCreate" size="small" @click="transferDialog = true">
+              新建转入申请
             </V2Button>
-            <V2Button v-if="canFinanceAllocate" size="small" @click="allocationDialog = true">
-              财务费用分摊
+            <V2Button
+              v-if="canFinanceAllocationCreate"
+              size="small"
+              @click="allocationDialog = true"
+            >
+              新建分摊申请
             </V2Button>
           </V2Cluster>
         </template>
@@ -1213,6 +1297,114 @@ onBeforeUnmount(() => controller?.abort())
           <V2PageState v-else kind="empty" title="尚未查询" description="输入项目标识。" />
         </V2Card>
       </div>
+
+      <V2Card title="投标成本转入申请">
+        <V2PageState
+          v-if="!transferRequests.length"
+          kind="empty"
+          title="暂无转入申请"
+          description="先保存草稿，再从申请清单提交审批。"
+        />
+        <div v-else class="cost-subject-page__table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>申请编号</th>
+                <th>投标成本</th>
+                <th>项目</th>
+                <th>目标版本</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>审批实例</th>
+                <th>终态记录</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="record in transferRequests" :key="record.id">
+                <th scope="row">{{ record.requestCode || record.id }}</th>
+                <td>{{ bidCostLabel(record) }}</td>
+                <td>{{ requestProjectLabel(record) }}</td>
+                <td>{{ targetVersionLabel(record) }}</td>
+                <td>{{ formatAmount(record.totalAmount) }}</td>
+                <td>{{ statusLabel(record.status) }}</td>
+                <td>{{ record.approvalInstanceId || '—' }}</td>
+                <td>{{ record.finalTransferId || '—' }}</td>
+                <td>
+                  <V2Button
+                    v-if="
+                      canBidTransferSubmit &&
+                      ['DRAFT', 'REJECTED', 'WITHDRAWN'].includes(record.status)
+                    "
+                    size="small"
+                    :loading="saving"
+                    @click="submitTransferWorkflow(record)"
+                  >
+                    提交审批
+                  </V2Button>
+                  <span v-else>—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </V2Card>
+
+      <V2Card title="项目财务费用分摊申请">
+        <V2PageState
+          v-if="!allocationRequests.length"
+          kind="empty"
+          title="暂无分摊申请"
+          description="先保存草稿，再从申请清单提交审批。"
+        />
+        <div v-else class="cost-subject-page__table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>申请编号</th>
+                <th>项目</th>
+                <th>来源</th>
+                <th>依据</th>
+                <th>期间</th>
+                <th>金额</th>
+                <th>科目</th>
+                <th>状态</th>
+                <th>审批实例</th>
+                <th>终态批次</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="record in allocationRequests" :key="record.id">
+                <th scope="row">{{ record.requestCode || record.id }}</th>
+                <td>{{ requestProjectLabel(record) }}</td>
+                <td>{{ allocationSourceLabel(record) }}</td>
+                <td>{{ allocationBasisLabel(record.allocationBasis) }}</td>
+                <td>{{ record.accountingPeriod }}</td>
+                <td>{{ formatAmount(record.sourceAmount) }}</td>
+                <td>{{ allocationSubjectLabel(record) }}</td>
+                <td>{{ statusLabel(record.status) }}</td>
+                <td>{{ record.approvalInstanceId || '—' }}</td>
+                <td>{{ record.finalBatchId || '—' }}</td>
+                <td>
+                  <V2Button
+                    v-if="
+                      canFinanceAllocationSubmit &&
+                      ['DRAFT', 'REJECTED', 'WITHDRAWN'].includes(record.status)
+                    "
+                    size="small"
+                    :loading="saving"
+                    @click="submitAllocationWorkflow(record)"
+                  >
+                    提交审批
+                  </V2Button>
+                  <span v-else>—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </V2Card>
 
       <V2Card title="投标成本转入记录">
         <V2PageState
@@ -1244,7 +1436,9 @@ onBeforeUnmount(() => controller?.abort())
                 <td>{{ rowText(record, 'approvalInstanceId') }}</td>
                 <td>
                   <V2Button
-                    v-if="canBidTransfer && record.status === 'POSTED' && !record.reversalOfId"
+                    v-if="
+                      canBidTransferCreate && record.status === 'POSTED' && !record.reversalOfId
+                    "
                     size="small"
                     variant="danger"
                     @click="openReverse('transfer', record)"
@@ -1300,7 +1494,11 @@ onBeforeUnmount(() => controller?.abort())
                 <td>{{ rowText(record, 'status') }}</td>
                 <td>
                   <V2Button
-                    v-if="canFinanceAllocate && record.status === 'POSTED' && !record.reversalOfId"
+                    v-if="
+                      canFinanceAllocationCreate &&
+                      record.status === 'POSTED' &&
+                      !record.reversalOfId
+                    "
                     size="small"
                     variant="danger"
                     @click="openReverse('allocation', record)"
@@ -1467,8 +1665,8 @@ onBeforeUnmount(() => controller?.abort())
 
     <V2Dialog
       :open="transferDialog"
-      title="投标成本转入目标成本"
-      description="仅中标项目、可编辑目标版本、ACTIVE 映射和已通过审批可执行。"
+      title="新建投标成本转入申请"
+      description="保存草稿后从申请清单提交审批；审批通过后系统生成转入记录。"
       :close-disabled="saving"
       :close-on-backdrop="false"
       @close="transferDialog = false"
@@ -1478,7 +1676,6 @@ onBeforeUnmount(() => controller?.abort())
         <V2Input v-model="transferForm.projectId" label="中标项目标识" required />
         <V2Input v-model="transferForm.targetId" label="目标成本版本标识" required />
         <V2Input v-model="transferForm.mappingVersionId" label="启用映射版本标识" required />
-        <V2Input v-model="transferForm.approvalInstanceId" label="审批实例标识" required />
         <V2Input v-model="transferForm.idempotencyKey" label="幂等键" required />
         <V2Input v-model="transferForm.remark" label="备注" />
       </form>
@@ -1486,14 +1683,14 @@ onBeforeUnmount(() => controller?.abort())
         <V2Button variant="secondary" :disabled="saving" @click="transferDialog = false"
           >取消</V2Button
         >
-        <V2Button type="submit" form="transfer-form" :loading="saving">确认转入</V2Button>
+        <V2Button type="submit" form="transfer-form" :loading="saving">保存草稿</V2Button>
       </template>
     </V2Dialog>
 
     <V2Dialog
       :open="allocationDialog"
-      title="项目财务费用分摊"
-      description="仅支持已过账借方凭证明细或已审批费用申请；默认不自动分摊。"
+      title="新建项目财务费用分摊申请"
+      description="保存草稿后从申请清单提交审批；审批通过后系统生成分摊记录。"
       :close-disabled="saving"
       :close-on-backdrop="false"
       @close="allocationDialog = false"
@@ -1517,7 +1714,6 @@ onBeforeUnmount(() => controller?.abort())
           required
         />
         <V2Input v-model="allocationForm.costSubjectId" label="财务费用末级科目标识" required />
-        <V2Input v-model="allocationForm.approvalInstanceId" label="审批实例标识" required />
         <V2Input v-model="allocationForm.idempotencyKey" label="幂等键" required />
         <V2Input v-model="allocationForm.remark" label="备注" />
         <fieldset class="cost-subject-page__lines">
@@ -1544,7 +1740,7 @@ onBeforeUnmount(() => controller?.abort())
         <V2Button variant="secondary" :disabled="saving" @click="allocationDialog = false"
           >取消</V2Button
         >
-        <V2Button type="submit" form="allocation-form" :loading="saving">确认分摊</V2Button>
+        <V2Button type="submit" form="allocation-form" :loading="saving">保存草稿</V2Button>
       </template>
     </V2Dialog>
 

@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.material.entity.MdMaterialCategory;
+import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialCategoryMapper;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MdMaterialCategoryService {
     private final MdMaterialCategoryMapper mapper;
+    private final MdMaterialMapper materialMapper;
 
     public List<MdMaterialCategory> list() {
         return mapper.selectList(new LambdaQueryWrapper<MdMaterialCategory>()
@@ -45,6 +48,35 @@ public class MdMaterialCategoryService {
         validateParent(input, tenantId);
         try { mapper.updateById(input); }
         catch (DuplicateKeyException e) { throw new BusinessException("MATERIAL_CATEGORY_CODE_EXISTS", "材料分类编码已存在"); }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long id, String status) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        MdMaterialCategory category = parent(id, tenantId);
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!List.of("ENABLE", "DISABLE").contains(normalized)) {
+            throw new BusinessException("MATERIAL_CATEGORY_STATUS_INVALID", "材料分类状态仅支持 ENABLE 或 DISABLE");
+        }
+        category.setStatus(normalized);
+        mapper.updateById(category);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        parent(id, tenantId);
+        if (mapper.selectCount(new LambdaQueryWrapper<MdMaterialCategory>()
+                .eq(MdMaterialCategory::getTenantId, tenantId)
+                .eq(MdMaterialCategory::getParentId, id)) > 0) {
+            throw new BusinessException("MATERIAL_CATEGORY_HAS_CHILDREN", "材料分类存在子分类，不能删除");
+        }
+        if (materialMapper.selectCount(new LambdaQueryWrapper<MdMaterial>()
+                .eq(MdMaterial::getTenantId, tenantId)
+                .eq(MdMaterial::getCategoryId, id)) > 0) {
+            throw new BusinessException("MATERIAL_CATEGORY_IN_USE", "材料分类已被材料引用，不能删除");
+        }
+        mapper.deleteById(id);
     }
 
     private void validateParent(MdMaterialCategory category, Long tenantId) {

@@ -2,6 +2,7 @@ package com.cgcpms.bootstrap.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.bootstrap.config.PlatformBootstrapProperties;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +43,11 @@ public class PlatformBootstrapService {
                 (rs, rowNum) -> new RoleRow(rs.getLong("id"), rs.getString("status")),
                 tenantId, administrator.getRoleCode()), "BOOTSTRAP_ROLE_MISSING");
         require(ENABLED.equals(role.status()), "BOOTSTRAP_ROLE_DISABLED");
+        RoleRow financeRole = one(jdbcTemplate.query(
+                "SELECT id, status FROM sys_role WHERE tenant_id=? AND role_code=? AND deleted_flag=0",
+                (rs, rowNum) -> new RoleRow(rs.getLong("id"), rs.getString("status")),
+                tenantId, SystemRoleContract.COMPANY_FINANCE), "BOOTSTRAP_FINANCE_ROLE_MISSING");
+        require(ENABLED.equals(financeRole.status()), "BOOTSTRAP_FINANCE_ROLE_DISABLED");
 
         long companyId = getOrCreateCompany(tenantId);
         getOrCreateDepartment(tenantId, companyId);
@@ -63,6 +69,8 @@ public class PlatformBootstrapService {
                     administrator.getRealName().trim(), blankToNull(administrator.getEmail()), companyId);
             jdbcTemplate.update("INSERT INTO sys_user_role (id, tenant_id, user_id, role_id) VALUES (?, ?, ?, ?)",
                     IdWorker.getId(), tenantId, userId, role.id());
+            jdbcTemplate.update("INSERT INTO sys_user_role (id, tenant_id, user_id, role_id) VALUES (?, ?, ?, ?)",
+                    IdWorker.getId(), tenantId, userId, financeRole.id());
             result = Result.CREATED;
         } else {
             UserRow user = one(users, "BOOTSTRAP_USER_DUPLICATE");
@@ -71,6 +79,11 @@ public class PlatformBootstrapService {
                     "SELECT COUNT(*) FROM sys_user_role WHERE tenant_id=? AND user_id=? AND role_id=?",
                     Integer.class, tenantId, user.id(), role.id());
             require(binding != null && binding == 1, "BOOTSTRAP_EXISTING_USER_NOT_SUPER_ADMIN");
+            Integer financeBinding = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_user_role WHERE tenant_id=? AND user_id=? AND role_id=?",
+                    Integer.class, tenantId, user.id(), financeRole.id());
+            require(financeBinding != null && financeBinding == 1,
+                    "BOOTSTRAP_EXISTING_USER_NOT_COMPANY_FINANCE");
             if (user.isAdmin() != 1) {
                 jdbcTemplate.update("UPDATE sys_user SET is_admin=1 WHERE tenant_id=? AND id=?", tenantId, user.id());
             }

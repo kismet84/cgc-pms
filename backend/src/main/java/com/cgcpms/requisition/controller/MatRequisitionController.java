@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/requisitions")
@@ -28,7 +29,7 @@ public class MatRequisitionController {
     private final Validator validator;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:query','requisition:self')")
     public ApiResponse<PageResult<MatRequisitionVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -45,19 +46,19 @@ public class MatRequisitionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:query','requisition:self')")
     public ApiResponse<MatRequisitionVO> getById(@PathVariable Long id) {
         return ApiResponse.success(requisitionService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:add','requisition:self')")
     public ApiResponse<String> create(@Valid @RequestBody MatRequisition requisition) {
         return ApiResponse.success(String.valueOf(requisitionService.create(requisition)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:edit','requisition:self')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatRequisition requisition) {
         requisition.setId(id);
         requisitionService.update(requisition);
@@ -65,14 +66,14 @@ public class MatRequisitionController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:delete','requisition:self')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         requisitionService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('requisition:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('requisition:submit','requisition:self') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         requisitionService.submitForApproval(id);
         return ApiResponse.success();
@@ -87,13 +88,13 @@ public class MatRequisitionController {
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:query','requisition:self')")
     public ApiResponse<List<MatRequisitionItemVO>> getItems(@PathVariable Long id) {
         return ApiResponse.success(requisitionService.getItems(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('requisition:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:edit','requisition:self')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @Size(max = 200, message = "批量明细不能超过200条")
                                              @RequestBody List<MatRequisitionItem> items) {
@@ -106,5 +107,11 @@ public class MatRequisitionController {
         }
         requisitionService.saveItemsBatch(id, items);
         return ApiResponse.success();
+    }
+
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:add','requisition:self')")
+    public ApiResponse<Map<String, Object>> formOptions(@RequestParam Long projectId) {
+        return ApiResponse.success(requisitionService.formOptions(projectId));
     }
 }

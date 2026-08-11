@@ -3,6 +3,8 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowSecurityPolicy;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class WorkflowSubmitService {
+
+    private static final ObjectMapper POLICY_MAPPER = new ObjectMapper();
 
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
@@ -128,6 +132,54 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT);
     }
 
+    public WfInstance submitBidCostTargetTransfer(Long userId, String username, Long tenantId,
+                                                   String businessType, Long businessId, String title,
+                                                   java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                   String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitProtected(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER);
+    }
+
+    public WfInstance submitFinanceCostAllocation(Long userId, String username, Long tenantId,
+                                                   String businessType, Long businessId, String title,
+                                                   java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                   String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitProtected(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.FINANCE_COST_ALLOCATION);
+    }
+
+    public WfInstance submitQualityRectification(Long userId, String username, Long tenantId,
+                                                  String businessType, Long businessId, String title,
+                                                  java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                  String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitProtected(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.QS_RECTIFICATION);
+    }
+
+    public WfInstance submitQualityConsequence(Long userId, String username, Long tenantId,
+                                                String businessType, Long businessId, String title,
+                                                java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitProtected(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.QS_CONSEQUENCE);
+    }
+
+    private WfInstance submitProtected(Long userId, String username, Long tenantId,
+                                       String businessType, Long businessId, String title,
+                                       java.math.BigDecimal amount, Long projectId, Long contractId,
+                                       String businessSummary, String variables, List<Long> ccUserIds,
+                                       String dedicatedBusinessType) {
+        if (!dedicatedBusinessType.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "专用提交业务类型不匹配");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds, dedicatedBusinessType);
+    }
+
     private WfInstance submitProcurement(Long userId, String username, Long tenantId,
                                           String businessType, Long businessId, String title,
                                           java.math.BigDecimal amount, Long projectId, Long contractId,
@@ -154,6 +206,10 @@ public class WorkflowSubmitService {
         WfTemplate template = core.findTemplate(businessType, tenantId, amount, businessId,
                 businessAccess.getContractId());
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
+        WorkflowSecurityPolicy policy = template.getConditionRule() == null || template.getConditionRule().isBlank()
+                ? WorkflowSecurityPolicy.legacy()
+                : WorkflowSecurityPolicy.parse(POLICY_MAPPER, template.getConditionRule());
+        core.validateApproverPlan(templateNodes, tenantId, businessAccess.getProjectId(), userId, policy);
 
         // Create instance
         WfInstance instance = new WfInstance();
@@ -172,6 +228,7 @@ public class WorkflowSubmitService {
         instance.setInitiatorId(userId);
         instance.setBusinessSummary(businessSummary);
         instance.setVariables(variables);
+        instance.setSecurityPolicyJson(policy.toCanonicalJson(POLICY_MAPPER));
         instance.setStartedAt(LocalDateTime.now());
 
         // Check for active duplicate business key — V75 added deleted_flag to
@@ -192,7 +249,7 @@ public class WorkflowSubmitService {
         // Activate first node and create tasks
         if (!nodeInstances.isEmpty()) {
             WfNodeInstance firstNode = nodeInstances.get(0);
-            core.activateNode(firstNode, templateNodes.get(0), userId, username, tenantId);
+            core.activateNode(firstNode, userId, username, tenantId);
         }
 
         // Write submit record
@@ -255,6 +312,26 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT);
     }
 
+    public WfInstance resubmitBidCostTargetTransfer(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER);
+    }
+
+    public WfInstance resubmitFinanceCostAllocation(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.FINANCE_COST_ALLOCATION);
+    }
+
+    public WfInstance resubmitQualityRectification(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.QS_RECTIFICATION);
+    }
+
+    public WfInstance resubmitQualityConsequence(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.QS_CONSEQUENCE);
+    }
+
     private WfInstance resubmit(Long instanceId, Long userId, String username,
                                 String dedicatedBusinessType) {
 
@@ -263,7 +340,7 @@ public class WorkflowSubmitService {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
         core.requireCurrentTenant(tenantProbe.getTenantId());
-        WfInstance instance = wfInstanceMapper.selectById(instanceId);
+        WfInstance instance = wfInstanceMapper.selectByIdForUpdate(instanceId, tenantProbe.getTenantId());
         if (instance == null) {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
@@ -291,13 +368,23 @@ public class WorkflowSubmitService {
         // Cancel any stale pending tasks from previous rounds
         core.cancelAllPendingTasks(instanceId);
 
-        // Create fresh node instances for the new round
-        List<WfTemplateNode> templateNodes = core.findTemplateNodes(instance.getTemplateId());
-        List<WfNodeInstance> newNodes = createNodeInstances(templateNodes, instanceId, instance.getTenantId(), newRound);
+        // Clone the submitted snapshot; template edits affect new instances only.
+        List<WfNodeInstance> previousNodes = wfNodeInstanceMapper.selectList(
+                new LambdaQueryWrapper<WfNodeInstance>()
+                        .eq(WfNodeInstance::getInstanceId, instanceId)
+                        .eq(WfNodeInstance::getRoundNo, newRound - 1)
+                        .orderByAsc(WfNodeInstance::getNodeOrder));
+        if (previousNodes.isEmpty()) {
+            throw new BusinessException("WORKFLOW_SNAPSHOT_MISSING", "审批实例缺少节点快照，无法重提");
+        }
+        WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
+                POLICY_MAPPER, instance.getSecurityPolicyJson());
+        core.validateApproverSnapshots(previousNodes, instance.getTenantId(), instance.getProjectId(), userId, policy);
+        List<WfNodeInstance> newNodes = cloneNodeInstances(previousNodes, instanceId, instance.getTenantId(), newRound);
 
         // Activate the first node of the new round
         WfNodeInstance firstNode = newNodes.get(0);
-        core.activateNode(firstNode, templateNodes.get(0), userId, username, instance.getTenantId());
+        core.activateNode(firstNode, userId, username, instance.getTenantId());
 
         core.writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
                 instanceId, null, null, newRound,
@@ -313,6 +400,13 @@ public class WorkflowSubmitService {
     }
 
     private void rejectGenericProtectedRoute(String businessType, String dedicatedBusinessType) {
+        if ((com.cgcpms.workflow.WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER.equals(businessType)
+                || com.cgcpms.workflow.WorkflowBusinessTypes.FINANCE_COST_ALLOCATION.equals(businessType)
+                || com.cgcpms.workflow.WorkflowBusinessTypes.QS_RECTIFICATION.equals(businessType)
+                || com.cgcpms.workflow.WorkflowBusinessTypes.QS_CONSEQUENCE.equals(businessType))
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("DEDICATED_WORKFLOW_REQUIRED", "该业务必须通过专用业务入口重提");
+        }
         if ((com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST.equals(businessType)
                 || com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_ORDER.equals(businessType)
                 || com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT.equals(businessType))
@@ -355,6 +449,11 @@ public class WorkflowSubmitService {
             ni.setNodeName(tn.getNodeName());
             ni.setNodeOrder(tn.getNodeOrder());
             ni.setApproveMode(tn.getApproveMode());
+            ni.setNodeType(tn.getNodeType());
+            ni.setApproverConfig(tn.getApproverConfig());
+            ni.setAllowTransfer(tn.getAllowTransfer());
+            ni.setAllowAddSign(tn.getAllowAddSign());
+            ni.setTimeoutHours(tn.getTimeoutHours());
             ni.setNodeStatus(WorkflowConstants.NODE_WAITING);
             ni.setRoundNo(roundNo);
             ni.setPassRuleJson(tn.getPassRuleJson());
@@ -363,6 +462,33 @@ public class WorkflowSubmitService {
             nodeInstances.add(ni);
         }
         return nodeInstances;
+    }
+
+    private List<WfNodeInstance> cloneNodeInstances(List<WfNodeInstance> nodes, Long instanceId,
+                                                     Long tenantId, int roundNo) {
+        List<WfNodeInstance> clones = new ArrayList<>();
+        for (WfNodeInstance source : nodes) {
+            WfNodeInstance node = new WfNodeInstance();
+            node.setTenantId(tenantId);
+            node.setInstanceId(instanceId);
+            node.setTemplateNodeId(source.getTemplateNodeId());
+            node.setNodeCode(source.getNodeCode());
+            node.setNodeName(source.getNodeName());
+            node.setNodeOrder(source.getNodeOrder());
+            node.setApproveMode(source.getApproveMode());
+            node.setNodeType(source.getNodeType());
+            node.setApproverConfig(source.getApproverConfig());
+            node.setAllowTransfer(source.getAllowTransfer());
+            node.setAllowAddSign(source.getAllowAddSign());
+            node.setTimeoutHours(source.getTimeoutHours());
+            node.setNodeStatus(WorkflowConstants.NODE_WAITING);
+            node.setRoundNo(roundNo);
+            node.setPassRuleJson(source.getPassRuleJson());
+            node.setRejectRuleJson(source.getRejectRuleJson());
+            wfNodeInstanceMapper.insert(node);
+            clones.add(node);
+        }
+        return clones;
     }
 
     private void notifyApprovers(WfInstance instance, String title, String content, String eventType) {

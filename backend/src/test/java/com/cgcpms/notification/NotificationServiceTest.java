@@ -8,20 +8,25 @@ import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.notification.vo.NotificationVO;
+import com.cgcpms.system.mapper.SysUserMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("local")
@@ -43,6 +48,9 @@ class NotificationServiceTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @MockitoBean
+    private SysUserMapper sysUserMapper;
+
     private Long createdNotificationId;
 
     @BeforeEach
@@ -54,6 +62,8 @@ class NotificationServiceTest {
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
                 .build());
+        when(sysUserMapper.selectEnabledPermissionCodesByTenantAndUserId(anyLong(), anyLong()))
+                .thenReturn(List.of("business:amount:view"));
     }
 
     @AfterEach
@@ -125,6 +135,28 @@ class NotificationServiceTest {
 
         System.out.println("✅ TC2 通过: USER_1 total=" + page1.getTotal()
                 + ", USER_2 total=" + page3.getTotal());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("ALERT 金额通知按接收人实时权限过滤，普通通知保持可见")
+    void amountSensitiveAlertsFollowCurrentRecipientPermissionForPageAndCount() {
+        notificationService.create(TENANT_0, USER_1, "金额预警", "余额 100.00", "ALERT", 201L);
+        notificationService.create(TENANT_0, USER_1, "普通待办", "请处理", "SYSTEM", 202L);
+
+        assertEquals(2, notificationService.getPage(USER_1, TENANT_0, false, 1, 20).getTotal());
+        assertEquals(2, notificationService.getUnreadCount(USER_1, TENANT_0));
+
+        when(sysUserMapper.selectEnabledPermissionCodesByTenantAndUserId(TENANT_0, USER_1))
+                .thenReturn(List.of());
+        PageResult<NotificationVO> filtered = notificationService.getPage(USER_1, TENANT_0, false, 1, 20);
+        assertEquals(1, filtered.getTotal());
+        assertEquals("SYSTEM", filtered.getRecords().getFirst().getBizType());
+        assertEquals(1, notificationService.getUnreadCount(USER_1, TENANT_0));
+
+        when(sysUserMapper.selectEnabledPermissionCodesByTenantAndUserId(TENANT_0, USER_1))
+                .thenReturn(List.of("business:amount:view"));
+        assertEquals(2, notificationService.getPage(USER_1, TENANT_0, false, 1, 20).getTotal());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -495,7 +527,7 @@ class NotificationServiceTest {
     @DisplayName("通知SSE心跳清理已断开的客户端")
     void heartbeatRemovesDisconnectedClient() {
         AtomicInteger sends = new AtomicInteger();
-        NotificationService capturing = new NotificationService(notificationMapper) {
+        NotificationService capturing = new NotificationService(notificationMapper, sysUserMapper) {
             @Override
             protected SseEmitter newEmitter() {
                 return new SseEmitter() {
@@ -516,7 +548,7 @@ class NotificationServiceTest {
     @DisplayName("通知SSE仅在事务提交后发送，回滚不发送")
     void notificationFanOutRunsOnlyAfterCommit() {
         AtomicInteger sends = new AtomicInteger();
-        NotificationService capturing = new NotificationService(notificationMapper) {
+        NotificationService capturing = new NotificationService(notificationMapper, sysUserMapper) {
             @Override
             protected SseEmitter newEmitter() {
                 return new SseEmitter() {
@@ -540,5 +572,33 @@ class NotificationServiceTest {
         transaction.executeWithoutResult(status ->
                 capturing.create(TENANT_0, USER_1, "提交通知", "提交后推送", "SYSTEM", null));
         assertEquals(2, sends.get(), "提交后发送一次notification事件");
+    }
+
+    @Test
+    @DisplayName("SSE 在权限降级后立即停止 ALERT，普通通知继续推送")
+    void ssePushChecksCurrentRecipientAmountPermissionEveryTime() {
+        AtomicInteger sends = new AtomicInteger();
+        NotificationService capturing = new NotificationService(notificationMapper, sysUserMapper) {
+            @Override
+            protected SseEmitter newEmitter() {
+                return new SseEmitter() {
+                    @Override
+                    public void send(SseEmitter.SseEventBuilder builder) {
+                        sends.incrementAndGet();
+                    }
+                };
+            }
+        };
+        capturing.subscribe(USER_1, TENANT_0, "amount-tab");
+        capturing.create(TENANT_0, USER_1, "金额预警", "余额 100.00", "ALERT", 301L);
+        assertEquals(2, sends.get(), "有权限时 connected 和 ALERT 各发送一次");
+
+        when(sysUserMapper.selectEnabledPermissionCodesByTenantAndUserId(TENANT_0, USER_1))
+                .thenReturn(List.of());
+        capturing.create(TENANT_0, USER_1, "降级后金额预警", "余额 200.00", "ALERT", 302L);
+        assertEquals(2, sends.get(), "权限降级后不得发送 ALERT");
+
+        capturing.create(TENANT_0, USER_1, "普通待办", "请处理", "SYSTEM", 303L);
+        assertEquals(3, sends.get(), "普通通知不受金额权限影响");
     }
 }

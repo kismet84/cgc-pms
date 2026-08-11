@@ -1,7 +1,7 @@
 {
-  "current_commit": "ce669b33d135e643cb48dc78b68ac9dbdcf6aedd",
+  "current_commit": "2bce3a694622f515d50ea72d2613b2e20e827861",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-11T05:03:16.651Z",
+  "generation_time": "2026-08-11T12:57:17.562Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,16 +52,14 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3871,
-  "repository_file_count": 3874,
-  "included_file_count": 2610,
-  "excluded_file_count": 1264,
+  "tracked_file_count": 3896,
+  "repository_file_count": 3895,
+  "included_file_count": 2632,
+  "excluded_file_count": 1263,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "backend",
-      "frontend_v2",
-      "shared_packages"
+      "backend"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -81,8 +79,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1808,
-      "fingerprint": "50c6ec0b1fcb2e41fa1e76ef6d27b95c3b5c86660d8990782d517bd26c78d2ab"
+      "file_count": 1830,
+      "fingerprint": "1ba4098cd68d2be2539094105c8504dc847e18e855c27befe25c9e918903a7a0"
     },
     {
       "id": "delivery_tooling",
@@ -110,7 +108,7 @@
         "docs/**"
       ],
       "file_count": 131,
-      "fingerprint": "52ab85a58ca183667350fca79baa21fa657ab04ac3da594b6e9a8ab27c20c9ba"
+      "fingerprint": "eebb70b704d94dd1967eedc4c60e6ad39db59b00de3fbca9cacd3107ebee5a95"
     },
     {
       "id": "frontend_v2",
@@ -118,7 +116,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 268,
-      "fingerprint": "48077d9e07c416f54a415c5500eb5895694aaadc679635ea83d17579a0508f14"
+      "fingerprint": "63e32498f552bb64cab34804ed2fafbe2de8515fee2cbfc43b4904790a35a17b"
     },
     {
       "id": "mobile",
@@ -142,7 +140,7 @@
         "packages/**"
       ],
       "file_count": 19,
-      "fingerprint": "d307174fe7bed60d96cfda313d7819f0b5c8eff089757a0a056f78261dd0b515"
+      "fingerprint": "dfb1dff54edd673dc19e5dbe885e19d06162346aceb5fd46cf8dcd5cef96786f"
     }
   ]
 }

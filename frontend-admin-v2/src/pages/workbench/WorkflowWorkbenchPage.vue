@@ -13,6 +13,17 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatAmount } from '@/pages/dashboard/model'
 import {
+  loadBudget,
+  loadCostControl,
+  loadCostTarget,
+  loadMeasurement,
+  submitBudget,
+  submitCostCorrective,
+  submitCostTarget,
+  submitMeasurement,
+} from '@/services/commercial'
+import { submitBidTransferRequest, submitFinanceAllocationRequest } from '@/services/cost-subject'
+import {
   V2Alert,
   V2Badge,
   V2Button,
@@ -26,8 +37,12 @@ import {
 import {
   approvePurchaseRequest,
   loadPurchaseRequestApprovalItems,
+  submitPurchaseOrder,
+  submitPurchaseRequest,
+  submitReceipt,
   type PurchaseRequestApprovalCommand,
 } from '@/services/supply-chain'
+import { submitQualityConsequence, submitQualityRectification } from '@/services/quality'
 import {
   addSignWorkflowTask,
   approveWorkflowTask,
@@ -55,6 +70,20 @@ import {
 } from './model'
 
 type WorkflowRecordSet = WorkflowTask[] | WorkflowRecord[] | WorkflowCc[] | WorkflowMine[]
+
+const DEDICATED_RESUBMIT_PERMISSIONS: Record<string, string> = {
+  BID_COST_TARGET_TRANSFER: 'cost:subject:transfer:submit',
+  FINANCE_COST_ALLOCATION: 'cost:subject:allocation:submit',
+  QS_RECTIFICATION: 'quality:rectification:submit',
+  QS_CONSEQUENCE: 'quality:consequence:submit',
+  PURCHASE_REQUEST: 'purchase:request:submit',
+  PURCHASE_ORDER: 'purchase:order:submit',
+  MATERIAL_RECEIPT: 'receipt:submit',
+  COST_TARGET: 'cost:target:submit',
+  COST_CORRECTIVE_ACTION: 'cost:corrective:submit',
+  PROJECT_BUDGET: 'budget:submit',
+  PRODUCTION_MEASUREMENT: 'measurement:submit',
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -120,16 +149,72 @@ const workflowInstanceStatusOptions = computed(() =>
     label: item.dictLabel,
   })),
 )
-const availableActions = computed(() =>
-  (detail.value?.availableActions ?? []).filter((candidate) =>
-    canPerformWorkflowAction(candidate, detail.value?.availableActions ?? [], session.permissions),
-  ),
-)
+const availableActions = computed(() => {
+  const instance = detail.value
+  return (instance?.availableActions ?? []).filter((candidate) => {
+    if (
+      !canPerformWorkflowAction(candidate, instance?.availableActions ?? [], session.permissions)
+    ) {
+      return false
+    }
+    const permission =
+      candidate === 'resubmit' ? DEDICATED_RESUBMIT_PERMISSIONS[instance?.businessType ?? ''] : null
+    return (
+      !permission || session.permissions.includes('*') || session.permissions.includes(permission)
+    )
+  })
+})
 const pendingTask = computed(() =>
   detail.value?.nodes
     ?.flatMap((node) => node.tasks ?? [])
     .find((task) => task.taskStatus === 'PENDING' && task.approverId === session.userInfo?.userId),
 )
+
+function requiredVersion(value: unknown, label: string): string | number {
+  if (typeof value === 'number' || (typeof value === 'string' && value.trim())) return value
+  throw new TypeError(`${label}版本未加载完成`)
+}
+
+async function resubmitBusiness(instance: WorkflowInstance): Promise<unknown> {
+  const id = instance.businessId
+  switch (instance.businessType) {
+    case 'BID_COST_TARGET_TRANSFER':
+      return submitBidTransferRequest(id)
+    case 'FINANCE_COST_ALLOCATION':
+      return submitFinanceAllocationRequest(id)
+    case 'QS_RECTIFICATION':
+      return submitQualityRectification(id)
+    case 'QS_CONSEQUENCE':
+      return submitQualityConsequence(id)
+    case 'PURCHASE_REQUEST':
+      return submitPurchaseRequest(id)
+    case 'PURCHASE_ORDER':
+      return submitPurchaseOrder(id)
+    case 'MATERIAL_RECEIPT':
+      return submitReceipt(id)
+    case 'COST_TARGET': {
+      const record = await loadCostTarget(id)
+      return submitCostTarget(id, requiredVersion(record.version, '目标成本'))
+    }
+    case 'PROJECT_BUDGET': {
+      const record = await loadBudget(id)
+      return submitBudget(id, requiredVersion(record.version, '项目预算'))
+    }
+    case 'PRODUCTION_MEASUREMENT': {
+      const record = await loadMeasurement(id)
+      return submitMeasurement(id, requiredVersion(record.version, '产值计量'))
+    }
+    case 'COST_CORRECTIVE_ACTION': {
+      if (!instance.projectId) throw new TypeError('成本纠偏项目未加载完成')
+      const overview = await loadCostControl(instance.projectId)
+      const record = overview.correctiveActions.find((item) => String(item.id ?? '') === id)
+      if (!record) throw new TypeError('成本纠偏记录未加载完成')
+      return submitCostCorrective(id, requiredVersion(record.version, '成本纠偏'))
+    }
+    default:
+      return resubmitWorkflowInstance(instance.id)
+  }
+}
 
 function statusTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
   if (status === 'APPROVED' || status === 'COMPLETED' || status === 'APPROVE') return 'success'
@@ -401,7 +486,7 @@ async function submitAction() {
     } else if (action.value === 'withdraw') {
       await withdrawWorkflowInstance(detail.value.id)
     } else if (action.value === 'resubmit') {
-      await resubmitWorkflowInstance(detail.value.id)
+      await resubmitBusiness(detail.value)
     } else if (action.value === 'transfer') {
       await transferWorkflowTask(
         taskId!,

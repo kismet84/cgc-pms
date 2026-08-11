@@ -1,6 +1,5 @@
 package com.cgcpms.workflow.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.workflow.WorkflowConstants;
@@ -30,40 +29,22 @@ public class WorkflowTaskService {
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
-    private final WfTemplateNodeMapper wfTemplateNodeMapper;
     private final WfTaskMapper wfTaskMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public void transfer(Long taskId, Long targetUserId, Long userId,
                          String username, String comment) {
-
-        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
-        if (tenantProbe == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        core.requireCurrentTenant(tenantProbe.getTenantId());
-        WfTask task = wfTaskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
-            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
-        }
-        if (!task.getApproverId().equals(userId)) {
-            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
-        }
-
-        WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
-        if (instance == null) {
-            throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
-        }
-        requireTemplateNodeActionAllowed(task.getNodeInstanceId(), true);
+        TaskActionRoute route = lockTaskActionRoute(taskId, userId, true);
+        WfTask task = route.task();
+        WfInstance instance = route.instance();
+        WfNodeInstance node = route.node();
 
         // Validate target user belongs to the same tenant as the instance
         SysUser targetUser = core.sysUserMapper.selectById(targetUserId);
         if (targetUser == null || !Objects.equals(targetUser.getTenantId(), instance.getTenantId())) {
             throw new BusinessException("WORKFLOW_TARGET_USER_INVALID", "目标用户不属于当前租户");
         }
+        core.requireEligibleApprover(node, instance, targetUserId);
 
         // CAS update: atomically mark original task as TRANSFERRED
         int updated = wfTaskMapper.updateTaskStatusWithCas(
@@ -79,15 +60,7 @@ public class WorkflowTaskService {
             throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），无法转办");
         }
 
-        // Ping instance to acquire row lock and verify still RUNNING
-        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
-                WorkflowConstants.INSTANCE_RUNNING);
-        if (instanceOk != 1) {
-            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法转办");
-        }
-
         // Only create new task after CAS confirms original update succeeded
-        instance = wfInstanceMapper.selectById(task.getInstanceId());
         WfTask newTask = new WfTask();
         newTask.setTenantId(instance.getTenantId());
         newTask.setInstanceId(task.getInstanceId());
@@ -128,35 +101,10 @@ public class WorkflowTaskService {
     @Transactional(rollbackFor = Exception.class)
     public void addSign(Long taskId, List<Long> additionalUserIds, Long userId,
                         String username, String comment) {
-
-        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
-        if (tenantProbe == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        core.requireCurrentTenant(tenantProbe.getTenantId());
-        WfTask task = wfTaskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
-            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
-        }
-        if (!task.getApproverId().equals(userId)) {
-            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人，无法加签");
-        }
-
-        WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
-        if (instance == null) {
-            throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
-        }
-        if (!WorkflowConstants.INSTANCE_RUNNING.equals(instance.getInstanceStatus())) {
-            throw new BusinessException("INSTANCE_NOT_RUNNING", "只能对运行中的审批加签");
-        }
-        WfNodeInstance node = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
-        if (node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
-            throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
-        }
-        requireTemplateNodeActionAllowed(node.getId(), false);
+        TaskActionRoute route = lockTaskActionRoute(taskId, userId, false);
+        WfTask task = route.task();
+        WfInstance instance = route.instance();
+        WfNodeInstance node = route.node();
         // Batch-fetch user names for all signees and validate tenant membership
         Map<Long, SysUser> signUserMap = Collections.emptyMap();
         if (!additionalUserIds.isEmpty()) {
@@ -170,15 +118,14 @@ public class WorkflowTaskService {
                 if (signUser == null || !Objects.equals(signUser.getTenantId(), instance.getTenantId())) {
                     throw new BusinessException("WORKFLOW_TARGET_USER_INVALID", "加签用户不属于当前租户");
                 }
+                core.requireEligibleApprover(node, instance, additionalUserId);
             }
         }
+        boolean taskAdded = false;
         for (Long auid : additionalUserIds) {
             // Check not already exists
-            long exists = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
-                    .eq(WfTask::getNodeInstanceId, task.getNodeInstanceId())
-                    .eq(WfTask::getApproverId, auid)
-                    .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
-            if (exists > 0) continue;
+            if (!wfTaskMapper.selectPendingApproverIdsForUpdate(
+                    task.getTenantId(), task.getNodeInstanceId(), auid).isEmpty()) continue;
 
             WfTask addTask = new WfTask();
             addTask.setTenantId(instance.getTenantId());
@@ -195,6 +142,7 @@ public class WorkflowTaskService {
             addTask.setRoundNo(task.getRoundNo());
             addTask.setReceivedAt(LocalDateTime.now());
             wfTaskMapper.insert(addTask);
+            taskAdded = true;
 
             // Notify signee — re-query instance to ensure fresh tenantId
             try {
@@ -210,28 +158,47 @@ public class WorkflowTaskService {
             }
         }
 
-        core.writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
-                task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
-                null, null, WorkflowConstants.ACTION_ADD_SIGN, "加签",
-                userId, username, comment);
+        if (taskAdded) {
+            core.writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
+                    task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
+                    null, null, WorkflowConstants.ACTION_ADD_SIGN, "加签",
+                    userId, username, comment);
+        }
     }
 
-    private void requireTemplateNodeActionAllowed(Long nodeInstanceId, boolean transfer) {
-        WfNodeInstance node = wfNodeInstanceMapper.selectById(nodeInstanceId);
-        if (node == null || node.getTemplateNodeId() == null) {
-            throw new BusinessException("WORKFLOW_TEMPLATE_NODE_NOT_FOUND", "审批模板节点不存在");
+    private TaskActionRoute lockTaskActionRoute(Long taskId, Long userId, boolean transfer) {
+        WfTask probe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
+        if (probe == null) throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        core.requireCurrentTenant(probe.getTenantId());
+
+        WfInstance instance = wfInstanceMapper.selectByIdForUpdate(probe.getInstanceId(), probe.getTenantId());
+        if (instance == null) throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
+        if (!WorkflowConstants.INSTANCE_RUNNING.equals(instance.getInstanceStatus())) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法处理任务");
         }
-        WfTemplateNode templateNode = wfTemplateNodeMapper.selectById(node.getTemplateNodeId());
-        if (templateNode == null) {
-            throw new BusinessException("WORKFLOW_TEMPLATE_NODE_NOT_FOUND", "审批模板节点不存在");
+        WfNodeInstance node = wfNodeInstanceMapper.selectByIdForUpdate(probe.getNodeInstanceId(), probe.getTenantId());
+        if (node == null) throw new BusinessException("WORKFLOW_NODE_NOT_FOUND", "审批实例节点不存在");
+        if (!WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
+            throw new BusinessException("NODE_NOT_ACTIVE", "只能操作当前活动审批节点");
         }
         boolean allowed = transfer
-                ? Integer.valueOf(1).equals(templateNode.getAllowTransfer())
-                : Integer.valueOf(1).equals(templateNode.getAllowAddSign());
+                ? Integer.valueOf(1).equals(node.getAllowTransfer())
+                : Integer.valueOf(1).equals(node.getAllowAddSign());
         if (!allowed) {
             throw new BusinessException(
                     transfer ? "WORKFLOW_TRANSFER_NOT_ALLOWED" : "WORKFLOW_ADD_SIGN_NOT_ALLOWED",
                     transfer ? "当前审批节点不允许转办" : "当前审批节点不允许加签");
         }
+        WfTask task = wfTaskMapper.selectByIdForUpdate(taskId, probe.getTenantId());
+        if (task == null) throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
+            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
+        }
+        if (!task.getApproverId().equals(userId)) {
+            throw new BusinessException("NOT_TASK_OWNER", transfer ? "非当前任务审批人" : "非当前任务审批人，无法加签");
+        }
+        return new TaskActionRoute(task, instance, node);
     }
+
+    private record TaskActionRoute(WfTask task, WfInstance instance, WfNodeInstance node) {}
 }

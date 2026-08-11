@@ -73,7 +73,7 @@ class InvoiceControllerTest {
         String token = jwtUtils.generateToken(
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
-                List.of());
+                List.of("business:amount:view"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 

@@ -10,6 +10,7 @@ import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import com.cgcpms.system.service.SysUserService;
 import com.cgcpms.system.vo.SysUserVO;
 import io.jsonwebtoken.Jwts;
@@ -28,10 +29,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.lazy-initialization=true"})
+@SpringBootTest(properties = {
+        "spring.main.lazy-initialization=true",
+        "jwt.secret=sys-user-service-test-secret-key-at-least-sixty-four-characters-long"
+})
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SysUserServiceTest {
@@ -65,11 +70,24 @@ class SysUserServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
-                .add("roleCodes", List.of("SUPER_ADMIN"))
+                .add("roleCodes", List.of(
+                        SystemRoleContract.COMPANY_FINANCE,
+                        SystemRoleContract.HIDDEN_SUPER_ADMIN))
                 .build());
+        SystemRoleFixtures.ensure(roleMapper);
         // 确保 admin 用户存在（测试间可能存在软删除交叉污染）
         jdbcTemplate.update(
                 "UPDATE sys_user SET deleted_flag = 0 WHERE id = 1 AND deleted_flag = 1");
+        if (userMapper.selectById(USER_ADMIN) == null) {
+            SysUser admin = new SysUser();
+            admin.setId(USER_ADMIN);
+            admin.setTenantId(TENANT_0);
+            admin.setUsername("system-role-contract-admin");
+            admin.setPassword("{noop}test-only");
+            admin.setStatus("ENABLE");
+            admin.setIsAdmin(1);
+            userMapper.insert(admin);
+        }
     }
 
     @AfterEach
@@ -314,7 +332,7 @@ class SysUserServiceTest {
         // 手动添加一条用户角色关联
         SysUserRole ur = new SysUserRole();
         ur.setUserId(userId);
-        ur.setRoleId(3L); // COMMON_USER
+        ur.setRoleId(roleByCode(SystemRoleContract.EMPLOYEE).getId());
         userRoleMapper.insert(ur);
 
         // 确认关联存在
@@ -377,7 +395,7 @@ class SysUserServiceTest {
         user.setUsername("last_enabled_admin");
         user.setPassword("pass");
         Long userId = userService.create(user);
-        userService.assignRoles(userId, List.of(1L));
+        userService.assignRoles(userId, List.of(roleByCode(SystemRoleContract.COMPANY_FINANCE).getId()));
         jdbcTemplate.update("UPDATE sys_user SET status = 'DISABLE' WHERE id = ?", USER_ADMIN);
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -568,14 +586,15 @@ class SysUserServiceTest {
         user.setPassword("pass");
         Long userId = userService.create(user);
 
-        // roleId=2 是 PROJECT_MANAGER, roleId=3 是 COMMON_USER（均属于 tenant 0）
-        userService.assignRoles(userId, List.of(2L, 3L));
+        SysRole projectManager = roleByCode(SystemRoleContract.PROJECT_MANAGER);
+        SysRole employee = roleByCode(SystemRoleContract.EMPLOYEE);
+        userService.assignRoles(userId, List.of(projectManager.getId(), employee.getId()));
 
         SysUserVO vo = userService.getById(userId);
         assertNotNull(vo.getRoleNames());
         assertEquals(2, vo.getRoleNames().size(), "应有两个角色名");
         assertTrue(vo.getRoleNames().contains("项目经理"), "应包含 项目经理");
-        assertTrue(vo.getRoleNames().contains("普通用户"), "应包含 普通用户");
+        assertTrue(vo.getRoleNames().contains("员工"), "应包含 员工");
 
         System.out.println("✅ testAssignRoles_Success 通过: roles=" + vo.getRoleNames());
     }
@@ -591,7 +610,9 @@ class SysUserServiceTest {
         Long userId = userService.create(user);
 
         // 先分配角色
-        userService.assignRoles(userId, List.of(2L, 3L));
+        userService.assignRoles(userId, List.of(
+                roleByCode(SystemRoleContract.PROJECT_MANAGER).getId(),
+                roleByCode(SystemRoleContract.EMPLOYEE).getId()));
         SysUserVO vo1 = userService.getById(userId);
         assertEquals(2, vo1.getRoleNames().size());
 
@@ -643,6 +664,68 @@ class SysUserServiceTest {
         System.out.println("✅ testAssignRoles_CrossTenantIsolation 通过");
     }
 
+    @Test
+    @Order(24)
+    @Transactional
+    @DisplayName("分配角色 — 隐藏超级管理员不可直接选择")
+    void testAssignRoles_HiddenSuperAdminRejected() {
+        SysUser user = new SysUser();
+        user.setUsername("hidden_admin_role");
+        user.setPassword("pass");
+        Long userId = userService.create(user);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> userService.assignRoles(userId,
+                        List.of(roleByCode(SystemRoleContract.HIDDEN_SUPER_ADMIN).getId())));
+
+        assertEquals("ROLE_NOT_FOUND", error.getCode());
+        assertTrue(userRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getTenantId, TENANT_0)
+                .eq(SysUserRole::getUserId, userId)).isEmpty());
+    }
+
+    @Test
+    @Order(24)
+    @Transactional
+    @DisplayName("分配角色 — 公司财务可给自己分配且自动维护隐藏超管配对")
+    void testAssignRoles_FinanceSelfAssignmentMaintainsPair() {
+        SysRole finance = roleByCode(SystemRoleContract.COMPANY_FINANCE);
+        SysRole hidden = roleByCode(SystemRoleContract.HIDDEN_SUPER_ADMIN);
+
+        userService.assignRoles(USER_ADMIN, List.of(finance.getId()));
+
+        Set<Long> persistedRoleIds = userRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, TENANT_0)
+                        .eq(SysUserRole::getUserId, USER_ADMIN))
+                .stream().map(SysUserRole::getRoleId).collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(finance.getId(), hidden.getId()), persistedRoleIds);
+        assertEquals(List.of(finance.getId()), userService.getById(USER_ADMIN).getRoleIds(),
+                "对外只返回可见财务角色");
+    }
+
+    @Test
+    @Order(24)
+    @Transactional
+    @DisplayName("分配角色 — 非财务用户仍禁止给自己分配角色")
+    void testAssignRoles_NonFinanceSelfAssignmentRejected() {
+        SysUser user = new SysUser();
+        user.setUsername("self_role_employee");
+        user.setPassword("pass");
+        Long userId = userService.create(user);
+        SysRole employee = roleByCode(SystemRoleContract.EMPLOYEE);
+        UserContext.set(Jwts.claims()
+                .add("userId", userId)
+                .add("username", user.getUsername())
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of(SystemRoleContract.EMPLOYEE))
+                .build());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> userService.assignRoles(userId, List.of(employee.getId())));
+
+        assertEquals("SELF_ROLE_ASSIGN_FORBIDDEN", error.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Page VO structure tests
     // ═══════════════════════════════════════════════════════════
@@ -652,10 +735,7 @@ class SysUserServiceTest {
     @Transactional
     @DisplayName("分页查询 — 返回的VO包含roleNames")
     void testGetPage_IncludesRoleNames() {
-        SysRole role = roleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
-                .eq(SysRole::getTenantId, TENANT_0)
-                .eq(SysRole::getRoleCode, "SUPER_ADMIN"));
-        assertNotNull(role, "测试租户应存在超级管理员角色");
+        SysRole role = roleByCode(SystemRoleContract.COMPANY_FINANCE);
         String username = "role_names_" + System.nanoTime();
         SysUser user = new SysUser();
         user.setUsername(username);
@@ -672,8 +752,10 @@ class SysUserServiceTest {
                 .orElse(null);
         assertNotNull(adminVO, "应能在分页结果中找到新建用户");
         assertNotNull(adminVO.getRoleNames());
-        assertTrue(adminVO.getRoleNames().contains("超级管理员"),
-                "用户应包含超级管理员角色");
+        assertEquals(List.of("公司财务"), adminVO.getRoleNames(),
+                "隐藏超级管理员不得进入用户角色展示");
+        assertEquals(List.of(role.getId()), adminVO.getRoleIds(),
+                "隐藏超级管理员不得进入用户角色勾选值");
 
         System.out.println("✅ testGetPage_IncludesRoleNames 通过: admin roles=" + adminVO.getRoleNames());
     }
@@ -684,7 +766,8 @@ class SysUserServiceTest {
     @DisplayName("分页查询 — 按当前租户角色筛选并返回角色内总数")
     void testGetPage_FilterByRole() {
         List<SysRole> roles = roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                .eq(SysRole::getTenantId, TENANT_0));
+                .eq(SysRole::getTenantId, TENANT_0)
+                .in(SysRole::getRoleCode, SystemRoleContract.VISIBLE_ROLE_CODES));
         assertTrue(roles.size() >= 2, "角色筛选测试至少需要两个角色");
         SysRole targetRole = roles.get(0);
         SysRole otherRole = roles.get(1);
@@ -723,16 +806,26 @@ class SysUserServiceTest {
         assertEquals(0L, userService.getPage(
                 1, 10, prefix + "_other", null, null, targetRole.getId()).getTotal(),
                 "其他角色用户不得进入结果");
-        assertEquals(0L, userService.getPage(
-                1, 10, prefix, null, null, Long.MAX_VALUE).getTotal());
+        BusinessException missingRole = assertThrows(BusinessException.class, () -> userService.getPage(
+                1, 10, prefix, null, null, Long.MAX_VALUE));
+        assertEquals("ROLE_NOT_FOUND", missingRole.getCode());
 
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 999L)
                 .build());
-        assertEquals(0L, userService.getPage(
-                1, 10, prefix, null, null, targetRole.getId()).getTotal(),
+        BusinessException crossTenantRole = assertThrows(BusinessException.class, () -> userService.getPage(
+                1, 10, prefix, null, null, targetRole.getId()));
+        assertEquals("ROLE_NOT_FOUND", crossTenantRole.getCode(),
                 "其他租户不得读取当前租户角色用户");
+    }
+
+    private SysRole roleByCode(String roleCode) {
+        SysRole role = roleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getTenantId, TENANT_0)
+                .eq(SysRole::getRoleCode, roleCode));
+        assertNotNull(role, "缺少角色测试数据: " + roleCode);
+        return role;
     }
 }

@@ -42,6 +42,7 @@ const LABELS: Record<string, string> = {
   PENDING_VERIFICATION: '待验证',
   POSTED: '已登记',
   QUALITY: '质量',
+  QUARTERLY: '每季',
   READY_TO_CLOSE: '待关闭',
   RECEIVED: '已接收',
   RECORDED: '已记录',
@@ -67,6 +68,8 @@ const LABELS: Record<string, string> = {
   WARRANTY_ACTIVE: '质保期',
   WARRANTY_RELEASED: '质保已释放',
   WEEKLY: '每周',
+  WITHDRAWN: '已撤回',
+  YEARLY: '每年',
 }
 
 export function deliveryLabel(value?: string | null): string {

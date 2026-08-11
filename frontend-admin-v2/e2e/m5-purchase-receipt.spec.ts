@@ -264,6 +264,18 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
           ? '/purchase-orders'
           : '/receipts'
 
+    if (method === 'GET' && path === '/purchase-requests/form-options')
+      return fulfill(route, {
+        materials: [
+          {
+            id: 'M1',
+            materialCode: 'MAT-001',
+            materialName: '钢筋',
+            specification: 'HRB400',
+            unit: '吨',
+          },
+        ],
+      })
     if (method === 'GET' && path === base)
       return fulfill(route, {
         records: collection,

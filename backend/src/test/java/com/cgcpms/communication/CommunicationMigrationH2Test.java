@@ -23,7 +23,45 @@ class CommunicationMigrationH2Test {
         execute(beforeBackfill, """
                 INSERT INTO sys_role(id,tenant_id,role_code,role_name,role_type,status,data_scope,deleted_flag)
                 VALUES(990100,1001,'PROJECT_MANAGER','租户项目经理','CUSTOM','ENABLE','SELF',0),
-                      (990101,1001,'COMMON_USER','租户普通用户','CUSTOM','ENABLE','SELF',0)
+                      (990101,1001,'COMMON_USER','租户普通用户','CUSTOM','ENABLE','SELF',0),
+                      (990102,1001,'PM','历史项目经理','CUSTOM','ENABLE','SELF',0),
+                      (990103,1001,'CSTM','历史成本经理','CUSTOM','ENABLE','SELF',0),
+                      (990104,1001,'CM','历史商务经理','CUSTOM','ENABLE','SELF',0)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,deleted_flag)
+                VALUES(990300,1001,'legacy-role-user','x','历史角色用户','ENABLE',0,0)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO sys_user_role(id,tenant_id,user_id,role_id)
+                VALUES(990301,1001,990300,990102),(990302,1001,990300,990103),(990303,1001,990300,990104)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO wf_template
+                    (id,tenant_id,template_code,template_name,business_type,enabled,created_by,deleted_flag)
+                VALUES(990400,0,'M89-LEGACY-PROJECT-ROLE-ENABLED','启用历史项目角色','TECH_ITEM',1,1,0),
+                      (990401,0,'M89-LEGACY-PROJECT-ROLE-DISABLED','停用历史项目角色','TECH_ITEM',0,1,0)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO wf_template_node
+                    (id,tenant_id,template_id,node_code,node_name,node_order,node_type,approve_mode,
+                     approver_config,allow_transfer,allow_add_sign,timeout_hours,created_by,deleted_flag)
+                VALUES(990410,0,990400,'LEGACY_PM','历史项目经理',1,'APPROVAL','OR_SIGN',
+                       '{"type":"PROJECT_ROLE","roleCode":"PM"}' FORMAT JSON,1,1,24,1,0),
+                      (990411,0,990401,'LEGACY_CSTM','历史成本经理',1,'APPROVAL','OR_SIGN',
+                       '{"type":"PROJECT_ROLE","roleCode":"CSTM"}' FORMAT JSON,1,1,24,1,0)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO wf_instance
+                    (id,tenant_id,template_id,business_type,business_id,project_id,title,instance_status,
+                     current_round,resubmit_count,business_revision,initiator_id,created_by,deleted_flag)
+                VALUES(990420,0,990400,'TECH_ITEM',990420,10001,'历史项目角色运行实例','RUNNING',1,0,1,1,1,0)
+                """);
+        execute(beforeBackfill, """
+                INSERT INTO wf_node_instance
+                    (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,
+                     node_status,round_no,created_by,deleted_flag)
+                VALUES(990421,0,990420,990410,'LEGACY_PM','历史项目经理',1,'OR_SIGN','ACTIVE',1,1,0)
                 """);
         execute(beforeBackfill, """
                 INSERT INTO sys_menu
@@ -38,7 +76,7 @@ class CommunicationMigrationH2Test {
                 .load();
         flyway.migrate();
 
-        assertEquals("292", flyway.info().current().getVersion().getVersion());
+        assertEquals("293", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO communication_conversation(
                     id,tenant_id,type,direct_pair_key,status,created_at,updated_at)
@@ -87,6 +125,27 @@ class CommunicationMigrationH2Test {
                 WHERE role_menu.tenant_id=1001 AND role_menu.role_id=990101
                   AND menu.perms IN ('communication:view','communication:send')
                 """));
+        assertEquals(1, scalar(flyway, """
+                SELECT COUNT(*) FROM wf_template_node
+                WHERE id=990410 AND CAST(approver_config AS VARCHAR) LIKE '%PROJECT_ROLE%'
+                  AND CAST(approver_config AS VARCHAR) LIKE '%PROJECT_MANAGER%'
+                """));
+        assertEquals(1, scalar(flyway, """
+                SELECT COUNT(*) FROM wf_template_node
+                WHERE id=990411 AND CAST(approver_config AS VARCHAR) LIKE '%PROJECT_ROLE%'
+                  AND CAST(approver_config AS VARCHAR) LIKE '%CSTM%'
+                """));
+        assertEquals(1, scalar(flyway, """
+                SELECT COUNT(*) FROM wf_node_instance
+                WHERE id=990421 AND CAST(approver_config AS VARCHAR) LIKE '%PROJECT_ROLE%'
+                  AND CAST(approver_config AS VARCHAR) LIKE '%PM%'
+                """));
+        assertEquals(2, scalar(flyway, """
+                SELECT COUNT(DISTINCT role.role_code) FROM sys_user_role user_role
+                JOIN sys_role role ON role.id=user_role.role_id AND role.tenant_id=user_role.tenant_id
+                WHERE user_role.tenant_id=1001 AND user_role.user_id=990300
+                  AND role.role_code IN ('PROJECT_MANAGER','PROJECT_ACCOUNTANT')
+                """));
         assertEquals(0, scalar(flyway, """
                 SELECT COUNT(*) FROM sys_role_menu role_menu
                 JOIN sys_menu menu ON menu.id=role_menu.menu_id AND menu.tenant_id=role_menu.tenant_id
@@ -98,10 +157,17 @@ class CommunicationMigrationH2Test {
                 WHERE tenant_id=1001 AND parent_id=990200
                   AND perms='material:dict:delete' AND deleted_flag=0
                 """));
-        assertEquals(0, scalar(flyway, """
+        assertEquals(2, scalar(flyway, """
                 SELECT COUNT(*) FROM sys_role_menu role_menu
                 JOIN sys_menu menu ON menu.id=role_menu.menu_id AND menu.tenant_id=role_menu.tenant_id
                 WHERE role_menu.tenant_id=1001 AND menu.perms='material:dict:delete'
+                """));
+        assertEquals(2, scalar(flyway, """
+                SELECT COUNT(*) FROM sys_role_menu role_menu
+                JOIN sys_menu menu ON menu.id=role_menu.menu_id AND menu.tenant_id=role_menu.tenant_id
+                JOIN sys_role role ON role.id=role_menu.role_id AND role.tenant_id=role_menu.tenant_id
+                WHERE role_menu.tenant_id=1001 AND menu.perms='material:dict:delete'
+                  AND role.role_code IN ('COMPANY_FINANCE','PROCUREMENT_LEAD')
                 """));
     }
 

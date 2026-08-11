@@ -72,6 +72,8 @@ class WorkflowTaskServiceTest {
         cleanupTestData();
         seedAdminUser();
         seedOtherUser();
+        bindCompanyOwner(USER_ADMIN, 880000000000010L);
+        bindCompanyOwner(USER_OTHER, 880000000000011L);
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
     }
 
@@ -183,9 +185,9 @@ class WorkflowTaskServiceTest {
     @DisplayName("transfer: 模板节点禁止转办时拒绝")
     void transferDisallowedByTemplateNode() {
         seedTransferFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING);
-        WfTemplateNode node = wfTemplateNodeMapper.selectById(TEMPLATE_NODE_ID);
+        WfNodeInstance node = wfNodeInstanceMapper.selectById(NODE_INSTANCE_ID);
         node.setAllowTransfer(0);
-        wfTemplateNodeMapper.updateById(node);
+        wfNodeInstanceMapper.updateById(node);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> workflowTaskService.transfer(TASK_ID, USER_OTHER, USER_ADMIN, "admin", "备注"));
@@ -217,8 +219,8 @@ class WorkflowTaskServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("transfer: CAS版本冲突抛出TASK_VERSION_CONFLICT")
-    void transferCasVersionConflict() {
+    @DisplayName("transfer: 锁定当前读使用最新任务版本完成CAS")
+    void transferUsesLatestVersionFromLockedCurrentRead() {
         seedTransferFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING);
 
         // Verify the task exists with expected version
@@ -235,10 +237,9 @@ class WorkflowTaskServiceTest {
                 "SELECT task_version FROM wf_task WHERE id = ?", Integer.class, TASK_ID);
         assertEquals(99, dbVersion);
 
-        // Transfer should fail because expectedVersion=0 but DB has 99
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> workflowTaskService.transfer(TASK_ID, USER_OTHER, USER_ADMIN, "admin", "备注"));
-        assertEquals("TASK_VERSION_CONFLICT", ex.getCode());
+        assertDoesNotThrow(() ->
+                workflowTaskService.transfer(TASK_ID, USER_OTHER, USER_ADMIN, "admin", "备注"));
+        assertEquals(WorkflowConstants.TASK_TRANSFERRED, wfTaskMapper.selectById(TASK_ID).getTaskStatus());
     }
 
     @Test
@@ -303,6 +304,7 @@ class WorkflowTaskServiceTest {
         thirdUser.setStatus("ENABLE");
         thirdUser.setIsAdmin(0);
         sysUserMapper.insert(thirdUser);
+        bindCompanyOwner(88888003L, 880000000000012L);
 
         try {
             workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER, 88888003L),
@@ -317,6 +319,7 @@ class WorkflowTaskServiceTest {
         } finally {
             jdbcTemplate.update("DELETE FROM wf_task WHERE approver_id = ? AND instance_id = ?",
                     88888003L, INSTANCE_ID);
+            jdbcTemplate.update("DELETE FROM sys_user_role WHERE id = 880000000000012");
             sysUserMapper.deleteById(88888003L);
         }
     }
@@ -443,7 +446,7 @@ class WorkflowTaskServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER),
                         USER_ADMIN, "admin", "备注"));
-        assertEquals("INSTANCE_NOT_RUNNING", ex.getCode());
+        assertEquals("INSTANCE_STATUS_CONFLICT", ex.getCode());
     }
 
     @Test
@@ -492,9 +495,9 @@ class WorkflowTaskServiceTest {
     void addSignDisallowedByTemplateNode() {
         seedAddSignFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING,
                 WorkflowConstants.NODE_ACTIVE);
-        WfTemplateNode node = wfTemplateNodeMapper.selectById(TEMPLATE_NODE_ID);
+        WfNodeInstance node = wfNodeInstanceMapper.selectById(NODE_INSTANCE_ID);
         node.setAllowAddSign(0);
-        wfTemplateNodeMapper.updateById(node);
+        wfNodeInstanceMapper.updateById(node);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER),
@@ -585,6 +588,10 @@ class WorkflowTaskServiceTest {
         node.setNodeName("转办节点");
         node.setNodeOrder(1);
         node.setApproveMode(WorkflowConstants.MODE_SEQUENTIAL);
+        node.setNodeType("APPROVAL");
+        node.setApproverConfig("{\"type\":\"ROLE\",\"roleCode\":\"COMPANY_OWNER\"}");
+        node.setAllowTransfer(1);
+        node.setAllowAddSign(1);
         node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
         node.setRoundNo(1);
         wfNodeInstanceMapper.insert(node);
@@ -618,6 +625,10 @@ class WorkflowTaskServiceTest {
         node.setNodeName("加签节点");
         node.setNodeOrder(1);
         node.setApproveMode(WorkflowConstants.MODE_SEQUENTIAL);
+        node.setNodeType("APPROVAL");
+        node.setApproverConfig("{\"type\":\"ROLE\",\"roleCode\":\"COMPANY_OWNER\"}");
+        node.setAllowTransfer(1);
+        node.setAllowAddSign(1);
         node.setNodeStatus(nodeStatus);
         node.setRoundNo(1);
         wfNodeInstanceMapper.insert(node);
@@ -653,6 +664,16 @@ class WorkflowTaskServiceTest {
         wfTemplateNodeMapper.insert(node);
     }
 
+    private void bindCompanyOwner(long userId, long bindingId) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id,user_id,role_id)
+                SELECT ?, ?, r.id
+                FROM sys_role r
+                WHERE r.tenant_id=? AND r.role_code='COMPANY_OWNER' AND r.status='ENABLE' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.user_id=? AND ur.role_id=r.id)
+                """, bindingId, userId, TENANT_0, userId);
+    }
+
     private void cleanupTestData() {
         // Clean up in reverse FK order
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id = ?", 88000001L);
@@ -663,6 +684,7 @@ class WorkflowTaskServiceTest {
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id = ?", INSTANCE_ID);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE id = ?", TEMPLATE_NODE_ID);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE id = ?", INSTANCE_ID);
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE id IN (880000000000010,880000000000011,880000000000012)");
         jdbcTemplate.update("DELETE FROM sys_user WHERE id = ?", USER_OTHER);
     }
 }

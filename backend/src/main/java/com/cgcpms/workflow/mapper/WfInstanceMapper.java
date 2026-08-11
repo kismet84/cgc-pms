@@ -21,6 +21,12 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
             "FROM wf_instance WHERE id = #{id} AND deleted_flag = 0")
     WfInstance selectByIdIgnoringTenant(@Param("id") Long id);
 
+    @Select("SELECT id,tenant_id,template_id,business_type,business_id,project_id,contract_id,title,amount," +
+            "instance_status,current_round,resubmit_count,business_revision,initiator_id,business_summary,variables," +
+            "security_policy_json,started_at,ended_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark " +
+            "FROM wf_instance WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    WfInstance selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     /**
      * Query all rows (including logically-deleted) for the given business key.
      * Uses raw SQL to bypass MyBatis-Plus {@code @TableLogic} filtering.
@@ -72,10 +78,11 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
             "WHERE id = #{instanceId} AND instance_status = #{expectedStatus} " +
             "AND tenant_id = #{tenantId} AND deleted_flag = 0 " +
             "AND NOT EXISTS (SELECT 1 FROM wf_task WHERE instance_id = #{instanceId} " +
-            "AND task_status IN ('APPROVED', 'REJECTED') AND deleted_flag = 0)")
+            "AND round_no = #{currentRound} AND task_status IN ('APPROVED', 'REJECTED') AND deleted_flag = 0)")
     int updateInstanceStatusWithCasNoApprovedTasks(@Param("instanceId") Long instanceId,
                                                     @Param("expectedStatus") String expectedStatus,
                                                     @Param("newStatus") String newStatus,
                                                     @Param("endedAt") java.time.LocalDateTime endedAt,
+                                                    @Param("currentRound") Integer currentRound,
                                                     @Param("tenantId") Long tenantId);
 }

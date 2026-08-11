@@ -201,6 +201,32 @@ public class WorkflowBusinessAccessValidator {
             case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> {
                 return validateJdbc("closeout_final_acceptance", "status", businessId, tenantId, requestProjectId, requestContractId, "CLOSEOUT_FINAL_ACCEPTANCE_NOT_FOUND");
             }
+            case WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER -> {
+                return validateJdbc("bid_cost_target_transfer_request", "status", businessId, tenantId,
+                        requestProjectId, requestContractId, "BID_COST_TRANSFER_REQUEST_NOT_FOUND",
+                        "DRAFT", "REJECTED", "WITHDRAWN");
+            }
+            case WorkflowBusinessTypes.FINANCE_COST_ALLOCATION -> {
+                ValidationResult result = validateJdbc("finance_cost_allocation_request", "status", businessId, tenantId,
+                        requestProjectId, requestContractId, "FINANCE_ALLOCATION_REQUEST_NOT_FOUND",
+                        "DRAFT", "REJECTED", "WITHDRAWN");
+                jdbcTemplate.queryForList("""
+                        SELECT DISTINCT project_id FROM finance_cost_allocation_request_line
+                        WHERE tenant_id=? AND request_id=?
+                        """, Long.class, tenantId, businessId)
+                        .forEach(projectId -> projectAccessChecker.checkAccess(projectId, "提交财务成本分摊审批"));
+                return result;
+            }
+            case WorkflowBusinessTypes.QS_RECTIFICATION -> {
+                return validateJdbc("qs_rectification", "status", businessId, tenantId,
+                        requestProjectId, requestContractId, "QS_RECTIFICATION_NOT_FOUND",
+                        "DRAFT", "REJECTED", "WITHDRAWN");
+            }
+            case WorkflowBusinessTypes.QS_CONSEQUENCE -> {
+                return validateJdbc("qs_consequence", "status", businessId, tenantId,
+                        requestProjectId, requestContractId, "QS_CONSEQUENCE_NOT_FOUND",
+                        "DRAFT", "REJECTED", "WITHDRAWN");
+            }
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         }
     }
@@ -293,6 +319,10 @@ public class WorkflowBusinessAccessValidator {
             case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
             case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
             case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> "closeout:acceptance:submit";
+            case WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER -> "cost:subject:transfer:submit";
+            case WorkflowBusinessTypes.FINANCE_COST_ALLOCATION -> "cost:subject:allocation:submit";
+            case WorkflowBusinessTypes.QS_RECTIFICATION -> "quality:rectification:submit";
+            case WorkflowBusinessTypes.QS_CONSEQUENCE -> "quality:consequence:submit";
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         };
     }
@@ -319,7 +349,9 @@ public class WorkflowBusinessAccessValidator {
 
     private boolean hasNoContractColumn(String table) {
         return Set.of("project_budget", "project_schedule_plan", "project_commencement", "project_period_plan", "project_corrective_action",
-                "cost_corrective_action", "technical_scheme", "closeout_final_acceptance").contains(table);
+                "cost_corrective_action", "technical_scheme", "closeout_final_acceptance",
+                "bid_cost_target_transfer_request", "finance_cost_allocation_request",
+                "qs_rectification").contains(table);
     }
 
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,

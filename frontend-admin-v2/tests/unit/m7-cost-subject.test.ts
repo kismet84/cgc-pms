@@ -1,6 +1,8 @@
 import type { UserInfo } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { V2Input, V2StatusToggle } from '@/components'
 import CostSubjectPage from '@/pages/master-data/CostSubjectPage.vue'
@@ -13,23 +15,27 @@ vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('@/services/cost-subject', () => ({
   activateMappingVersion: vi.fn(),
   createAssignmentRule: vi.fn(),
-  createBidTransfer: vi.fn(),
+  createBidTransferRequest: vi.fn(),
   createCostSubject: vi.fn(),
-  createFinanceAllocation: vi.fn(),
+  createFinanceAllocationRequest: vi.fn(),
   createMappingVersion: vi.fn(),
   deleteCostSubject: vi.fn(),
   loadAssignmentRules: vi.fn(),
   loadBidTransfers: vi.fn(),
+  loadBidTransferRequests: vi.fn(),
   loadCostSubject: vi.fn(),
   loadCostSubjectReconciliation: vi.fn(),
   loadCostSubjectTree: vi.fn(),
   loadFinanceAllocations: vi.fn(),
+  loadFinanceAllocationRequests: vi.fn(),
   loadMappingVersions: vi.fn(),
   loadProjectScopes: vi.fn(),
   loadSubjectImpact: vi.fn(),
   reverseBidTransfer: vi.fn(),
   reverseFinanceAllocation: vi.fn(),
   saveProjectScope: vi.fn(),
+  submitBidTransferRequest: vi.fn(),
+  submitFinanceAllocationRequest: vi.fn(),
   toggleCostSubjectStatus: vi.fn(),
   updateCostSubject: vi.fn(),
 }))
@@ -135,6 +141,9 @@ beforeEach(() => {
       versionCode: 'MAP-2026',
       sourceType: 'CONTRACT',
       businessCategory: '*',
+      projectId: 'P-1',
+      projectCode: 'XM-001',
+      projectName: '服务端项目',
       costSubjectId: '1',
       subjectCode: 'COST',
       subjectName: '服务端成本域',
@@ -154,7 +163,44 @@ beforeEach(() => {
       approvalInstanceId: 'A-1',
     },
   ])
+  vi.mocked(costSubject.loadBidTransferRequests).mockResolvedValue([
+    {
+      id: '41',
+      requestCode: 'BTR-001',
+      bidCostId: 'BID-1',
+      bidCode: 'TB-001',
+      projectId: 'P-1',
+      projectCode: 'XM-001',
+      projectName: '服务端项目',
+      targetId: 'TARGET-1',
+      targetVersionNo: 'V1',
+      targetVersionName: '首版目标成本',
+      mappingVersionId: 'MAP-1',
+      totalAmount: '81.2300',
+      status: 'DRAFT',
+    },
+  ])
   vi.mocked(costSubject.loadFinanceAllocations).mockResolvedValue([])
+  vi.mocked(costSubject.loadFinanceAllocationRequests).mockResolvedValue([
+    {
+      id: '51',
+      requestCode: 'FAR-001',
+      projectId: 'P-1',
+      projectCode: 'XM-001',
+      projectName: '服务端项目',
+      sourceType: 'ACCOUNTING_ENTRY_LINE',
+      sourceId: 'V-1',
+      sourceCode: 'PZ-001',
+      sourceAmount: '10.5',
+      allocationBasis: 'BENEFIT_AMOUNT',
+      accountingPeriod: '2026-08',
+      costSubjectId: '111',
+      costSubjectCode: '5401.04.19',
+      costSubjectName: '财务费用',
+      status: 'SUBMITTED',
+      approvalInstanceId: 'WF-51',
+    },
+  ])
   vi.mocked(costSubject.loadCostSubject).mockResolvedValue({
     id: '9',
     parentId: '0',
@@ -389,12 +435,65 @@ describe('M7 cost-subject center', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('¥125.23')
+    expect(wrapper.text()).toContain('¥81.23')
+    expect(wrapper.text()).toContain('BTR-001')
+    expect(wrapper.text()).toContain('FAR-001')
     expect(wrapper.text()).toContain('服务端投标项目')
+    expect(wrapper.text()).toContain('TB-001')
+    expect(wrapper.text()).toContain('XM-001 · 服务端项目')
+    expect(wrapper.text()).toContain('V1 · 首版目标成本')
+    expect(wrapper.text()).toContain('已过账借方凭证明细 · PZ-001')
+    expect(wrapper.text()).toContain('5401.04.19 · 财务费用')
     expect(wrapper.findAll('button').map((button) => button.text())).not.toEqual(
-      expect.arrayContaining(['投标成本转入', '财务费用分摊', '冲销']),
+      expect.arrayContaining(['新建转入申请', '新建分摊申请', '提交审批', '冲销']),
     )
+    expect(costSubject.loadBidTransferRequests).toHaveBeenCalledOnce()
+    expect(costSubject.loadFinanceAllocationRequests).toHaveBeenCalledOnce()
     expect(costSubject.loadBidTransfers).toHaveBeenCalledOnce()
     expect(costSubject.loadFinanceAllocations).toHaveBeenCalledOnce()
     expect(costSubject.loadCostSubjectTree).not.toHaveBeenCalled()
+  })
+
+  it('creates workflow drafts without approval ids and submits eligible requests separately', async () => {
+    route.path = '/cost/subject/trace'
+    useSessionStore().replaceUserInfo(
+      user([
+        'cost:subject:audit:query',
+        'cost:subject:bid-transfer',
+        'cost:subject:transfer:submit',
+        'cost:subject:finance-allocate',
+        'cost:subject:allocation:submit',
+      ]),
+    )
+    const wrapper = mount(CostSubjectPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('新建转入申请')
+    expect(wrapper.text()).toContain('新建分摊申请')
+    useSessionStore().replaceUserInfo(
+      user([
+        'cost:subject:audit:query',
+        'cost:subject:transfer:submit',
+        'cost:subject:allocation:submit',
+      ]),
+    )
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('新建转入申请')
+    expect(wrapper.text()).not.toContain('新建分摊申请')
+    const submitButtons = wrapper.findAll('button').filter((button) => button.text() === '提交审批')
+    expect(submitButtons).toHaveLength(1)
+    await submitButtons[0]!.trigger('click')
+    await flushPromises()
+    expect(costSubject.submitBidTransferRequest).toHaveBeenCalledWith('41')
+
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/master-data/CostSubjectPage.vue'),
+      'utf8',
+    )
+    const transferForm = source.match(/<form id="transfer-form"[\s\S]*?<\/form>/)?.[0] ?? ''
+    const allocationForm = source.match(/<form id="allocation-form"[\s\S]*?<\/form>/)?.[0] ?? ''
+    expect(transferForm).not.toContain('approvalInstanceId')
+    expect(allocationForm).not.toContain('approvalInstanceId')
+    expect(source).toContain('reverseForm.approvalInstanceId')
   })
 })

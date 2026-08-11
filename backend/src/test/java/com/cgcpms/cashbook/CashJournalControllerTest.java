@@ -107,7 +107,8 @@ class CashJournalControllerTest {
     }
 
     private Cookie adminCookie() {
-        String token = jwtUtils.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of());
+        String token = jwtUtils.generateToken(1L, "admin", 0L, List.of("ADMIN"),
+                List.of("business:amount:view"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 

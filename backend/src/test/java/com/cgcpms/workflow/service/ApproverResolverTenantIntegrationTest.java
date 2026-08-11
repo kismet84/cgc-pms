@@ -30,6 +30,7 @@ class ApproverResolverTenantIntegrationTest {
     @AfterEach
     void tearDown() {
         jdbcTemplate.update("DELETE FROM pm_project_member WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM sys_user WHERE id IN (?, ?)", TENANT_7_USER, TENANT_8_USER);
         TestUserContext.clear();
     }
 
@@ -37,6 +38,13 @@ class ApproverResolverTenantIntegrationTest {
     @DisplayName("PROJECT_ROLE只解析当前租户项目成员")
     void projectRoleResolverOnlyReturnsCurrentTenantMembers() {
         TestUserContext.setAdmin(7L, TENANT_7_USER);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user
+                    (id,tenant_id,username,password,real_name,status,is_admin,created_by,created_at,updated_at,deleted_flag)
+                VALUES
+                    (?,7,'tenant7-approver','x','租户7审批人','ENABLE',0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0),
+                    (?,8,'tenant8-approver','x','租户8审批人','ENABLE',0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, TENANT_7_USER, TENANT_7_USER, TENANT_8_USER, TENANT_8_USER);
         jdbcTemplate.update("""
                 INSERT INTO pm_project_member
                     (id, tenant_id, project_id, user_id, role_code, status, deleted_flag)

@@ -30,6 +30,7 @@ public class QualityRectification extends BaseEntity {
     @JsonIgnore private String requestHash;
     private LocalDateTime actualCompletedAt;
     private String status;
+    @JsonSerialize(using = ToStringSerializer.class) private Long approvalInstanceId;
     @JsonSerialize(using = ToStringSerializer.class) private Long submittedBy;
     private LocalDateTime submittedAt;
     private String reinspectionComment;

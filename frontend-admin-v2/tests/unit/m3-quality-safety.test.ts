@@ -7,6 +7,8 @@ import {
   loadQualityPlans,
   loadQualityTrace,
   reinspectQualityRectification,
+  submitQualityConsequence,
+  submitQualityRectification,
 } from '@/services/quality'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -14,6 +16,7 @@ const pageSource = readFileSync(
   resolve(process.cwd(), 'src/pages/delivery/QualitySafetyPage.vue'),
   'utf8',
 )
+const serviceSource = readFileSync(resolve(process.cwd(), 'src/services/quality.ts'), 'utf8')
 
 function response(data: unknown): Response {
   return new Response(JSON.stringify({ code: '0', message: 'success', data }), {
@@ -67,6 +70,33 @@ describe('M3 quality safety closed loop', () => {
           status: 'DRAFT',
         }),
       )
+      .mockResolvedValueOnce(
+        response({
+          id: '77',
+          issueId: '44',
+          projectId: '3',
+          partnerId: '5',
+          contractId: '6',
+          fineAmount: 12.5,
+          reworkCostAmount: 4.25,
+          evaluationScore: 80,
+          status: 'SUBMITTED',
+          approvalInstanceId: 'WF-77',
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({
+          id: 9,
+          issueId: 44,
+          projectId: 3,
+          roundNo: 1,
+          actionDescription: '完成整改',
+          responsibleUserId: 5,
+          plannedCompleteDate: '2026-08-12',
+          status: 'SUBMITTED',
+          approvalInstanceId: 9009,
+        }),
+      )
       .mockResolvedValueOnce(response({ id: '9', status: 'PASSED' }))
 
     const consequence = await createQualityConsequence({
@@ -80,12 +110,23 @@ describe('M3 quality safety closed loop', () => {
       evaluationScore: '80.00',
       evaluationComment: '整改完成',
     })
+    const submittedConsequence = await submitQualityConsequence('77')
+    const submittedRectification = await submitQualityRectification('9')
     await reinspectQualityRectification('9', { result: 'PASS', comment: '现场复核通过' })
 
     expect(consequence.fineAmount).toBe('12.5')
     expect(consequence.evaluationScore).toBe('80')
+    expect(submittedConsequence).toMatchObject({ status: 'SUBMITTED', approvalInstanceId: 'WF-77' })
+    expect(submittedRectification).toMatchObject({
+      id: '9',
+      issueId: '44',
+      status: 'SUBMITTED',
+      approvalInstanceId: '9009',
+    })
     expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
       ['/api/quality-safety/consequences', 'POST'],
+      ['/api/quality-safety/consequences/77/submit', 'POST'],
+      ['/api/quality-safety/rectifications/9/submit', 'POST'],
       ['/api/quality-safety/rectifications/9/reinspect', 'POST'],
     ])
   })
@@ -158,6 +199,12 @@ describe('M3 quality safety closed loop', () => {
     )
     expect(pageSource).toContain("canConsequence && issue.responsibleKind === 'PARTNER'")
     expect(pageSource).toContain("loadPartners({ pageNo: 1, pageSize: 200, status: 'ENABLE' })")
+    expect(pageSource).toContain('整改已提交审批')
+    expect(pageSource).toContain('后果已提交审批')
+    expect(pageSource).toContain('提交既有后果审批')
+    expect(pageSource).toContain("['DRAFT', 'REJECTED', 'WITHDRAWN'].includes(status)")
+    expect(serviceSource).not.toContain('postQualityConsequence')
+    expect(serviceSource).not.toContain('postConsequence')
   })
 
   it('splits the ledger into five permission-aware tabs without resetting page state', () => {

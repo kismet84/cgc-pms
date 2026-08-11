@@ -188,6 +188,11 @@ class SubMeasureServiceTest {
                 VALUES (?, ?, (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'SUPER_ADMIN' AND deleted_flag = 0 LIMIT 1))
                 """,
                 990002L, 990001L, TENANT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id, user_id, role_id)
+                VALUES (?, ?, (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'COMPANY_FINANCE' AND deleted_flag = 0 LIMIT 1))
+                """,
+                990003L, 990001L, TENANT_ID);
         Long id = createReadyMeasure();
 
         service.submitForApproval(id);
@@ -359,6 +364,16 @@ class SubMeasureServiceTest {
         withdrawn.setStartedAt(LocalDateTime.now().minusDays(1));
         withdrawn.setEndedAt(LocalDateTime.now());
         wfInstanceMapper.insert(withdrawn);
+        jdbcTemplate.update("""
+                INSERT INTO wf_node_instance
+                    (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,
+                     node_type,approver_config,allow_transfer,allow_add_sign,timeout_hours,node_status,round_no,
+                     created_by,created_at,updated_at,deleted_flag)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """,
+                withdrawn.getId() + 900000000L, TENANT_ID, withdrawn.getId(), null, "LEGACY_SUB_MEASURE",
+                "历史分包计量审批", 1, "OR_SIGN", "APPROVAL", "{\"type\":\"USER\",\"userId\":1}",
+                0, 0, null, "CANCELLED", 1, USER_ADMIN);
 
         service.submitForApproval(id);
 

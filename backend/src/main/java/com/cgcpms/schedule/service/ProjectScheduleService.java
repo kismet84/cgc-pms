@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -200,11 +201,11 @@ public class ProjectScheduleService {
     public Map<String, Object> createPeriodPlan(PeriodPlanRequest request) {
         Map<String, Object> schedule = requireSchedule(request.schedulePlanId(), false);
         Long projectId = longValue(schedule.get("project_id"));
-        projectAccessChecker.checkAccess(projectId, "创建月周计划");
-        if (!ACTIVE.equals(string(schedule.get("status")))) throw error("PROJECT_PERIOD_ACTIVE_SCHEDULE_REQUIRED", "只能基于已生效项目计划创建月周计划");
-        requireDates(request.startDate(), request.endDate(), "PROJECT_PERIOD_DATE_INVALID", "月周计划起止日期不合法");
+        projectAccessChecker.checkAccess(projectId, "创建周期计划");
+        if (!ACTIVE.equals(string(schedule.get("status")))) throw error("PROJECT_PERIOD_ACTIVE_SCHEDULE_REQUIRED", "只能基于已生效项目计划创建周期计划");
+        requireDates(request.startDate(), request.endDate(), "PROJECT_PERIOD_DATE_INVALID", "周期计划起止日期不合法");
         if (request.startDate().isBefore(localDate(schedule.get("planned_start_date"))) || request.endDate().isAfter(localDate(schedule.get("planned_end_date"))))
-            throw error("PROJECT_PERIOD_OUTSIDE_SCHEDULE", "月周计划日期必须位于项目计划周期内");
+            throw error("PROJECT_PERIOD_OUTSIDE_SCHEDULE", "周期计划日期必须位于项目计划周期内");
         validatePeriodParent(request, schedule);
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             Long id = IdWorker.getId();
@@ -221,7 +222,7 @@ public class ProjectScheduleService {
                 // 编号并发冲突时继续尝试下一序号。
             }
         }
-        throw error("PROJECT_PERIOD_DUPLICATE", "月周计划编号生成冲突，请重试");
+        throw error("PROJECT_PERIOD_DUPLICATE", "周期计划编号生成冲突，请重试");
     }
 
     public List<Map<String, Object>> periodPlans(Long scheduleId) {
@@ -292,16 +293,16 @@ public class ProjectScheduleService {
             throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
         }
         requireSchedule(longValue(period.get("schedule_plan_id")), true);
-        if ("WEEKLY".equals(string(period.get("period_type")))) {
-            Integer overlaps = jdbc.queryForObject("""
-                    SELECT COUNT(*) FROM project_period_plan
-                    WHERE tenant_id=? AND schedule_plan_id=? AND period_type='WEEKLY' AND status='APPROVED'
-                      AND deleted_flag=0 AND id<>? AND start_date<=? AND end_date>=?
-                    """, Integer.class, tenant(), period.get("schedule_plan_id"), id,
-                    period.get("end_date"), period.get("start_date"));
-            if (overlaps != null && overlaps > 0) {
-                throw error("PROJECT_WEEKLY_PLAN_OVERLAP", "同一计划内已存在日期重叠的已审批周计划");
-            }
+        Integer overlaps = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_period_plan
+                WHERE tenant_id=? AND schedule_plan_id=? AND period_type=? AND status='APPROVED'
+                  AND deleted_flag=0 AND id<>? AND start_date<=? AND end_date>=?
+                """, Integer.class, tenant(), period.get("schedule_plan_id"), period.get("period_type"), id,
+                period.get("end_date"), period.get("start_date"));
+        if (overlaps != null && overlaps > 0) {
+            boolean weekly = "WEEKLY".equals(string(period.get("period_type")));
+            throw error(weekly ? "PROJECT_WEEKLY_PLAN_OVERLAP" : "PROJECT_PERIOD_PLAN_OVERLAP",
+                    weekly ? "同一计划内已存在日期重叠的已审批周计划" : "同一计划内已存在日期重叠的同级已审批周期计划");
         }
         if (jdbc.update("UPDATE project_period_plan SET status='APPROVED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1)
             throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
@@ -314,19 +315,34 @@ public class ProjectScheduleService {
 
     public List<Map<String, Object>> dailyProgress(Long dailyLogId) {
         Map<String, Object> log = requireDailyLog(dailyLogId);
+        requireDailyLogOwner(log, "schedule:query");
         projectAccessChecker.checkAccess(longValue(log.get("project_id")), "查看日报实际进度");
-        return jdbc.queryForList("""
-                SELECT d.id,d.daily_log_id dailyLogId,d.schedule_plan_id schedulePlanId,d.weekly_plan_id weeklyPlanId,
-                 d.wbs_task_id wbsTaskId,t.task_code taskCode,t.task_name taskName,d.previous_progress previousProgress,
-                 d.current_progress currentProgress,d.completed_quantity completedQuantity,d.work_description workDescription
+        return jdbc.query("""
+                SELECT d.id,d.daily_log_id,d.schedule_plan_id,d.weekly_plan_id,d.wbs_task_id,
+                 t.task_code,t.task_name,d.previous_progress,d.current_progress,d.completed_quantity,d.work_description
                 FROM site_daily_progress d JOIN project_wbs_task t ON t.id=d.wbs_task_id
                 WHERE d.tenant_id=? AND d.daily_log_id=? ORDER BY t.sort_order,t.id
-                """, tenant(), dailyLogId);
+                """, (rs, rowNum) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", rs.getObject("id"));
+            row.put("dailyLogId", rs.getObject("daily_log_id"));
+            row.put("schedulePlanId", rs.getObject("schedule_plan_id"));
+            row.put("weeklyPlanId", rs.getObject("weekly_plan_id"));
+            row.put("wbsTaskId", rs.getObject("wbs_task_id"));
+            row.put("taskCode", rs.getObject("task_code"));
+            row.put("taskName", rs.getObject("task_name"));
+            row.put("previousProgress", rs.getObject("previous_progress"));
+            row.put("currentProgress", rs.getObject("current_progress"));
+            row.put("completedQuantity", rs.getObject("completed_quantity"));
+            row.put("workDescription", rs.getObject("work_description"));
+            return row;
+        }, tenant(), dailyLogId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public List<Map<String, Object>> replaceDailyProgress(Long dailyLogId, DailyProgressBatch batch) {
         Map<String, Object> log = requireDailyLog(dailyLogId);
+        requireDailyLogOwner(log, "schedule:progress");
         Long projectId = longValue(log.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "填报日报实际进度");
         projectExecutionGuard.requireActiveSchedule(projectId, "填报日报实际进度");
@@ -656,18 +672,41 @@ public class ProjectScheduleService {
     }
 
     private void validatePeriodParent(PeriodPlanRequest request, Map<String, Object> schedule) {
-        if ("MONTHLY".equals(request.periodType())) {
-            if (request.parentPeriodPlanId() != null) throw error("PROJECT_MONTHLY_PARENT_FORBIDDEN", "月计划不能设置上级周期计划");
+        if ("YEARLY".equals(request.periodType())) {
+            if (request.parentPeriodPlanId() != null) throw error("PROJECT_YEARLY_PARENT_FORBIDDEN", "年计划不能设置上级周期计划");
             return;
         }
-        if (request.parentPeriodPlanId() == null) throw error("PROJECT_WEEKLY_MONTH_REQUIRED", "周计划必须关联已审批月计划");
+        String expectedParent = switch (request.periodType()) {
+            case "QUARTERLY" -> "YEARLY";
+            case "MONTHLY" -> "QUARTERLY";
+            case "WEEKLY" -> "MONTHLY";
+            default -> throw error("PROJECT_PERIOD_TYPE_INVALID", "周期计划类型不合法");
+        };
+        if (request.parentPeriodPlanId() == null) throw error("PROJECT_PERIOD_PARENT_REQUIRED", "周期计划必须关联已审批上级计划");
         Map<String, Object> parent = requirePeriod(request.parentPeriodPlanId());
-        if (!"MONTHLY".equals(string(parent.get("period_type"))) || !"APPROVED".equals(string(parent.get("status"))))
-            throw error("PROJECT_WEEKLY_MONTH_NOT_APPROVED", "周计划必须关联已审批月计划");
+        if (!expectedParent.equals(string(parent.get("period_type"))) || !"APPROVED".equals(string(parent.get("status"))))
+            throw error("PROJECT_PERIOD_PARENT_NOT_APPROVED", "周期计划必须关联已审批的直接上级计划");
         if (!Objects.equals(longValue(parent.get("schedule_plan_id")), longValue(schedule.get("id"))))
-            throw error("PROJECT_WEEKLY_MONTH_MISMATCH", "周计划和月计划必须属于同一项目计划");
+            throw error("PROJECT_PERIOD_PARENT_MISMATCH", "上下级周期计划必须属于同一项目计划");
         if (request.startDate().isBefore(localDate(parent.get("start_date"))) || request.endDate().isAfter(localDate(parent.get("end_date"))))
-            throw error("PROJECT_WEEKLY_OUTSIDE_MONTH", "周计划日期必须位于所属月计划周期内");
+            throw error("PROJECT_PERIOD_OUTSIDE_PARENT", "周期计划日期必须位于上级计划周期内");
+    }
+
+    private void requireDailyLogOwner(Map<String, Object> log, String fullAuthority) {
+        if (selfOnly(fullAuthority) && !Objects.equals(longValueNullable(log.get("created_by")), user())) {
+            throw error("SITE_DAILY_LOG_NOT_FOUND", "现场日报不存在");
+        }
+    }
+
+    private boolean selfOnly(String fullAuthority) {
+        return !UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN")
+                && hasAuthority("schedule:daily-progress:self") && !hasAuthority(fullAuthority);
+    }
+
+    private boolean hasAuthority(String authority) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream().anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     private WfInstance workflowInstance(Map<String, Object> row, String businessType, Long businessId, String title, String summary, Long projectId) {
