@@ -4,7 +4,7 @@
 
 ## 当前入口
 
-- [项目地图（含已合并的第86条主线）](project-map.md)
+- [项目地图（含第91条本地收口与已合并的第86条主线）](project-map.md)
 - [V1.6 竞品情报与产品演进建议](competitor-analysis.md)
 - [V1.6 迭代决策](evolution-decision.md)
 
