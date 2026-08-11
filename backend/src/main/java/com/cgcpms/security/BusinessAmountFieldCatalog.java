@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 /** Versioned response-type and normalized-path amount contract. */
 public final class BusinessAmountFieldCatalog {
 
-    public static final String VERSION = "2026-08-11.v3";
+    public static final String VERSION = "2026-08-11.v4";
 
     private static final Pattern DECIMAL_TEXT = Pattern.compile(
             "[-+]?(?:(?:\\d+\\.\\d+)|(?:\\d+\\.)|(?:\\.\\d+)|(?:\\d+[eE][-+]?\\d+))");
@@ -174,17 +174,10 @@ public final class BusinessAmountFieldCatalog {
             contract("com.cgcpms.workflow.vo.WfTemplateVO",
                     amounts("$.amountMin", "$.amountMax"), safe()),
             contract("java.util.Map",
-                    amounts("$.contractIncome", "$.current_reported_amount", "$.submitted_amount",
-                            "$.confirmed_amount", "$.cumulative_reported_amount", "$.dynamicCost",
-                            "$.forecastAtCompletionCost", "$.forecastProfit",
-                            "$.projects[*].targetCost", "$.projects[*].contractLockedCost",
-                            "$.projects[*].actualCost", "$.projects[*].paidAmount",
-                            "$.projects[*].estimatedRemainingCost", "$.projects[*].dynamicCost",
-                            "$.projects[*].contractIncome", "$.projects[*].confirmedRevenue",
-                            "$.projects[*].expectedProfit", "$.projects[*].costDeviation",
-                            "$.projects[*].responsibilityCost", "$.projects[*].forecastAtCompletionCost",
-                            "$.projects[*].forecastProfit", "$.project.contract_amount", "$.project.target_cost"),
-                    safe("$.profitMargin", "$.projects[*].profitMargin")),
+                    concat(amounts("$.current_reported_amount", "$.submitted_amount",
+                                    "$.confirmed_amount", "$.cumulative_reported_amount"),
+                            costControlMapAmounts()),
+                    costControlMapSafeDecimals()),
             contract("com.cgcpms.site.vo.SiteDailyLogVO", amounts(),
                     safe("$.deliveries[*].actualQuantity", "$.deliveries[*].qualifiedQuantity",
                             "$.requisitions[*].quantity", "$.plannedTasks[*].progressPercent")),
@@ -401,6 +394,67 @@ public final class BusinessAmountFieldCatalog {
 
     private static String[] safe(String... paths) {
         return paths;
+    }
+
+    private static String[] concat(String[]... groups) {
+        int size = 0;
+        for (String[] group : groups) size += group.length;
+        String[] result = new String[size];
+        int offset = 0;
+        for (String[] group : groups) {
+            System.arraycopy(group, 0, result, offset, group.length);
+            offset += group.length;
+        }
+        return result;
+    }
+
+    private static String[] prefixedFields(String[] prefixes, String... fields) {
+        String[] result = new String[prefixes.length * fields.length];
+        int index = 0;
+        for (String prefix : prefixes) {
+            for (String field : fields) result[index++] = prefix + "." + field;
+        }
+        return result;
+    }
+
+    private static String[] costControlMapAmounts() {
+        String[] prefixes = {
+                "$", "$.project", "$.activeTarget", "$.target", "$.main", "$.latestForecast",
+                "$.forecast", "$.projects[*]", "$.targetItems[*]", "$.forecastInputItems[*]",
+                "$.forecastItems[*]", "$.correctiveActions[*]", "$.forecastHistory[*]",
+                "$.costSources[*]", "$.summary[*]", "$.items[*]"
+        };
+        return prefixedFields(prefixes,
+                "amount", "contract_amount", "target_cost", "source_contract_amount",
+                "total_target_amount", "total_bid_cost_amount", "total_responsibility_amount",
+                "target_amount", "bid_cost_amount", "target_cost_amount", "responsibility_amount",
+                "committed_amount", "committed_cost_amount", "actual_amount", "actual_cost_amount",
+                "recommended_remaining_amount", "estimated_remaining_amount",
+                "forecast_at_completion_amount", "contract_income_amount", "forecast_profit_amount",
+                "cost_variance_amount", "expected_saving_amount", "actual_saving_amount", "paid_amount",
+                "estimated_remaining_cost", "dynamic_cost", "contract_income", "confirmed_revenue",
+                "expected_profit", "cost_deviation", "responsibility_cost",
+                "forecast_at_completion_cost", "forecast_profit", "contract_locked_cost",
+                "source_amount", "allocated_amount", "unit_price", "gross_amount", "deducted_amount",
+                "tax_amount", "retention_amount", "targetCost", "targetAmount", "bidCostAmount",
+                "responsibilityAmount", "committedAmount", "actualAmount", "recommendedRemainingAmount",
+                "estimatedRemainingAmount", "forecastAtCompletionAmount", "contractIncomeAmount",
+                "forecastProfitAmount", "costVarianceAmount", "expectedSavingAmount",
+                "actualSavingAmount", "unitPrice", "contractIncome", "dynamicCost",
+                "forecastAtCompletionCost", "forecastProfit", "contractLockedCost", "actualCost",
+                "paidAmount", "estimatedRemainingCost", "confirmedRevenue", "expectedProfit",
+                "costDeviation", "responsibilityCost");
+    }
+
+    private static String[] costControlMapSafeDecimals() {
+        return prefixedFields(new String[]{
+                        "$", "$.project", "$.activeTarget", "$.target", "$.main", "$.latestForecast",
+                        "$.forecast", "$.projects[*]", "$.targetItems[*]", "$.forecastInputItems[*]",
+                        "$.forecastItems[*]", "$.correctiveActions[*]", "$.forecastHistory[*]",
+                        "$.costSources[*]", "$.summary[*]", "$.items[*]"
+                },
+                "profit_margin", "profitMargin", "target_cost_rate", "targetCostRate",
+                "default_target_ratio", "defaultTargetRatio");
     }
 
     private static String[] paymentTraceAmounts() {

@@ -121,7 +121,13 @@ const scheduleId = computed(() =>
 )
 const isDetailRoute = computed(() => Boolean(scheduleId.value))
 const projectOptions = computed(() =>
-  workspace.projects.map((item) => ({ value: item.value, label: item.label })),
+  workspace.projects
+    .filter(
+      (item) =>
+        ['PREPARING', 'ACTIVE'].includes(item.status ?? '') ||
+        item.value === detail.value?.projectId,
+    )
+    .map((item) => ({ value: item.value, label: item.label })),
 )
 const currentUserOptions = computed(() => {
   const value = String(session.userInfo?.userId ?? '')
@@ -257,8 +263,13 @@ function backToList(): void {
 }
 
 function openCreate(): void {
+  const initialProjectId = workspace.projects.some(
+    (item) => item.value === projectId.value && ['PREPARING', 'ACTIVE'].includes(item.status ?? ''),
+  )
+    ? projectId.value
+    : ''
   Object.assign(scheduleForm, {
-    projectId: projectId.value,
+    projectId: initialProjectId,
     planCode: '',
     planName: '项目基线计划',
     plannedStartDate: new Date().toISOString().slice(0, 10),

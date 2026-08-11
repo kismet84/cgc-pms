@@ -9,6 +9,15 @@ export interface CommunicationUserSummary {
   avatar?: string | null;
 }
 
+export interface CommunicationMemberSummary {
+  userId: string;
+  username?: string | null;
+  realName?: string | null;
+  avatar?: string | null;
+  role: CommunicationRole;
+  userStatus?: string | null;
+}
+
 export interface AttachmentRecord {
   id: string;
   originalName: string;

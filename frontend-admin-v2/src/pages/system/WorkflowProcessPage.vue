@@ -114,16 +114,43 @@ const projectRoleOptions = [
 ]
 const approverOptions = computed(() => {
   if (nodeForm.approverType === 'USER') {
-    return users.value.map((item) => ({
-      value: item.id,
-      label: `${item.realName || item.username}（${item.username}）`,
-    }))
+    return users.value
+      .filter(
+        (item) =>
+          item.status === 'ENABLE' ||
+          (Boolean(editingNode.value) && item.id === nodeForm.approverValue),
+      )
+      .map((item) => ({
+        value: item.id,
+        label: `${item.realName || item.username}（${item.username}）`,
+        disabled: item.status !== 'ENABLE',
+      }))
   }
   if (nodeForm.approverType === 'ROLE') {
-    return roles.value.map((item) => ({ value: item.id, label: item.roleName }))
+    return roles.value
+      .filter(
+        (item) =>
+          item.status === 'ENABLE' ||
+          (Boolean(editingNode.value) && item.id === nodeForm.approverValue),
+      )
+      .map((item) => ({
+        value: item.id,
+        label: item.roleName,
+        disabled: item.status !== 'ENABLE',
+      }))
   }
   if (nodeForm.approverType === 'POSITION') {
-    return positions.value.map((item) => ({ value: item.id, label: item.positionName }))
+    return positions.value
+      .filter(
+        (item) =>
+          item.status === 'ENABLE' ||
+          (Boolean(editingNode.value) && item.id === nodeForm.approverValue),
+      )
+      .map((item) => ({
+        value: item.id,
+        label: item.positionName,
+        disabled: item.status !== 'ENABLE',
+      }))
   }
   return projectRoleOptions
 })
@@ -453,8 +480,8 @@ async function loadApproverOptions(): Promise<void> {
       loadPositions({ pageNo: 1, pageSize: 1000 }),
     ])
     users.value = userPage.records
-    roles.value = roleRows.filter((item) => item.status === 'ENABLE')
-    positions.value = positionPage.records.filter((item) => item.status === 'ENABLE')
+    roles.value = roleRows
+    positions.value = positionPage.records
     approverOptionsLoaded.value = true
     normalizeRoleSelection()
   } catch (value) {

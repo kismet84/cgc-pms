@@ -64,6 +64,12 @@ public class CtContractController {
                 contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId, startDate, endDate));
     }
 
+    @GetMapping("/project-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('contract:query','contract:add','contract:edit')")
+    public ApiResponse<List<CtContractService.ContractProjectOption>> projectOptions() {
+        return ApiResponse.success(ctContractService.getProjectOptions());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query')")
     public ApiResponse<CtContractVO> getById(@PathVariable Long id) {

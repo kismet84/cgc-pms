@@ -126,6 +126,12 @@ const partnerOptions = computed(() =>
     label: `${item.partnerCode} · ${item.partnerName}`,
   })),
 )
+const invitePartnerOptions = computed(() => {
+  const invitedPartnerIds = new Set(
+    (trace.value?.invitedSuppliers ?? []).map((item) => item.partnerId),
+  )
+  return partnerOptions.value.filter((item) => !invitedPartnerIds.has(item.value))
+})
 const purchaseRequestOptions = computed(() =>
   purchaseRequests.value.map((item) => ({
     value: item.id,
@@ -133,16 +139,32 @@ const purchaseRequestOptions = computed(() =>
   })),
 )
 const contractOptions = computed(() =>
-  contracts.value.map((item) => ({
-    value: item.id,
-    label: `${item.contractCode} · ${item.contractName}`,
-  })),
+  contracts.value
+    .filter(
+      (item) =>
+        item.contractType === 'PURCHASE' &&
+        item.approvalStatus === 'APPROVED' &&
+        item.contractStatus === 'PERFORMING' &&
+        item.partyBId === selected.value?.awardedPartnerId,
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.contractCode} · ${item.contractName}`,
+    })),
 )
 const purchaseOrderOptions = computed(() =>
-  purchaseOrders.value.map((item) => ({
-    value: item.id,
-    label: `${item.orderCode || '采购订单编号缺失'} · ${item.partnerName || '供应商信息缺失'}`,
-  })),
+  purchaseOrders.value
+    .filter(
+      (item) =>
+        item.approvalStatus === 'APPROVED' &&
+        Boolean(item.contractId) &&
+        Boolean(item.partnerId) &&
+        !performance.value.some((evaluation) => evaluation.purchaseOrderId === item.id),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.orderCode || '采购订单编号缺失'} · ${item.partnerName || '供应商信息缺失'}`,
+    })),
 )
 const dialogTitle = computed(
   () =>
@@ -223,7 +245,15 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
       purchaseRequests.value = page.records
     } else if (next === 'contract') {
       const page = await loadContractPage(
-        { pageNo: 1, pageSize: 200, projectId: selected.value?.projectId || undefined },
+        {
+          pageNo: 1,
+          pageSize: 200,
+          projectId: selected.value?.projectId || undefined,
+          contractType: 'PURCHASE',
+          approvalStatus: 'APPROVED',
+          contractStatus: 'PERFORMING',
+          partyBId: selected.value?.awardedPartnerId || undefined,
+        },
         controller.signal,
       )
       contracts.value = page.records
@@ -982,7 +1012,7 @@ onBeforeUnmount(() => {
           v-if="action === 'invite'"
           v-model="form.partnerId"
           label="供应商"
-          :options="partnerOptions"
+          :options="invitePartnerOptions"
           placeholder="选择供应商"
           required
         />

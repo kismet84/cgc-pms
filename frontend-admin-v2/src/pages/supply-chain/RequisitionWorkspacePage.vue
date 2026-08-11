@@ -5,6 +5,7 @@ import type {
   RequisitionItemRecord,
   RequisitionRecord,
   RequisitionTraceRecord,
+  StockRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
@@ -30,6 +31,7 @@ import {
   loadRequisitionItems,
   loadRequisitions,
   loadRequisitionTrace,
+  loadStocks,
   reverseMaterialReturn,
   saveRequisitionItems,
   stockOutRequisition,
@@ -64,6 +66,8 @@ const warehouses = ref<RequisitionFormOptions['warehouses']>([])
 const materials = ref<RequisitionFormOptions['materials']>([])
 const partners = ref<RequisitionFormOptions['partners']>([])
 const contracts = ref<RequisitionFormOptions['contracts']>([])
+const stocks = ref<StockRecord[]>([])
+const stockFilterReady = ref(false)
 const editorItems = ref<EditorItem[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -102,6 +106,9 @@ const canSubmit = computed(() => canUseRequisitionSelf.value || hasPermission('r
 const canStockOut = computed(() => hasPermission('requisition:stock-out'))
 const canReturn = computed(() => hasPermission('requisition:return'))
 const canTrace = computed(() => hasPermission('procurement:trace:query'))
+const canReadStockCandidates = computed(
+  () => hasPermission('inventory:stock:list') || hasPermission('inventory:transaction:list'),
+)
 const canEditSelected = computed(
   () =>
     canEdit.value &&
@@ -148,31 +155,79 @@ const transactionOptions = computed(() =>
       label: `${transactionTypeLabel(item.txnType)} · ${item.quantity} · ${item.createdTime || '-'}`,
     })),
 )
-const warehouseOptions = computed(() =>
-  warehouses.value.map((item) => ({
+const warehouseOptions = computed(() => {
+  const options = warehouses.value.map((item) => ({
     value: item.id,
     label: [item.warehouseCode, item.warehouseName].filter(Boolean).join(' · '),
-  })),
+  }))
+  if (form.warehouseId && !options.some((item) => item.value === form.warehouseId)) {
+    options.push({
+      value: form.warehouseId,
+      label:
+        selected.value && selected.value.warehouseId === form.warehouseId
+          ? warehouseLabel(selected.value)
+          : '历史仓库',
+    })
+  }
+  return options
+})
+const stockedMaterialIds = computed(
+  () =>
+    new Set(
+      stocks.value
+        .filter(
+          (item) =>
+            /^\d+(?:\.\d+)?$/.test(item.availableQty) && !/^0+(?:\.0+)?$/.test(item.availableQty),
+        )
+        .map((item) => item.materialId),
+    ),
 )
-const materialOptions = computed(() =>
-  materials.value.map((item) => ({
-    value: item.id,
-    label: [item.materialCode, item.materialName].filter(Boolean).join(' · '),
-  })),
-)
-const partnerOptions = computed(() => [
-  { value: '', label: '不指定供应商' },
-  ...partners.value.map((item) => ({
-    value: item.id,
-    label: [item.partnerCode, item.partnerName].filter(Boolean).join(' · '),
-  })),
-])
-const contractOptions = computed(() =>
-  contracts.value.map((item) => ({
+const materialOptions = computed(() => {
+  const ids = new Set([
+    ...(canReadStockCandidates.value && form.warehouseId && stockFilterReady.value
+      ? stockedMaterialIds.value
+      : materials.value.map((item) => item.id)),
+    ...editorItems.value.map((item) => item.materialId).filter(Boolean),
+  ])
+  return [...ids].map((value) => {
+    const material = materials.value.find((item) => item.id === value)
+    const stock = stocks.value.find((item) => item.materialId === value)
+    const historical = editorItems.value.find((item) => item.materialId === value)
+    return {
+      value,
+      label: [
+        material?.materialCode || stock?.materialCode,
+        material?.materialName || stock?.materialName || historical?.materialName || '历史物料',
+        material?.specification,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    }
+  })
+})
+const partnerOptions = computed(() => {
+  const options = [
+    { value: '', label: '不指定供应商' },
+    ...partners.value.map((item) => ({
+      value: item.id,
+      label: [item.partnerCode, item.partnerName].filter(Boolean).join(' · '),
+    })),
+  ]
+  if (form.partnerId && !options.some((item) => item.value === form.partnerId)) {
+    options.push({ value: form.partnerId, label: selected.value?.partnerName || '历史供应商' })
+  }
+  return options
+})
+const contractOptions = computed(() => {
+  const options = contracts.value.map((item) => ({
     value: item.id,
     label: [item.contractCode, item.contractName].filter(Boolean).join(' · '),
-  })),
-)
+  }))
+  if (form.contractId && !options.some((item) => item.value === form.contractId)) {
+    options.push({ value: form.contractId, label: selected.value?.contractName || '历史合同' })
+  }
+  return options
+})
 
 function hasPermission(code: string): boolean {
   return (
@@ -288,7 +343,7 @@ async function loadPage(): Promise<void> {
     )
     if (generation !== listGeneration) return
     records.value = page.records
-    total.value = Number(page.total ?? 0)
+    total.value = page.total ?? 0
     if (editorOpen.value) return
     if (selected.value) {
       const refreshed = page.records.find((item) => item.id === selected.value?.id)
@@ -396,6 +451,7 @@ async function loadEditorCandidates(candidateProjectId: string): Promise<void> {
     materials.value = options.materials
     partners.value = options.partners
     contracts.value = options.contracts
+    await loadWarehouseStocks(candidateProjectId, form.warehouseId)
   } catch (error) {
     errorMessage.value = errorText(error, '领料候选读取失败')
     showToast('error', '领料候选读取失败', errorMessage.value)
@@ -404,9 +460,26 @@ async function loadEditorCandidates(candidateProjectId: string): Promise<void> {
   }
 }
 
+async function loadWarehouseStocks(candidateProjectId: string, warehouseId: string): Promise<void> {
+  stocks.value = []
+  stockFilterReady.value = false
+  if (!canReadStockCandidates.value || !candidateProjectId || !warehouseId) return
+  const page = await loadStocks({
+    pageNo: 1,
+    pageSize: 200,
+    projectId: candidateProjectId,
+    warehouseId,
+  })
+  stocks.value = page.records
+  stockFilterReady.value = (page.total ?? 0) <= page.records.length
+}
+
 function changeMaterial(row: EditorItem, value: string): void {
   row.materialId = value
-  row.materialName = materials.value.find((item) => item.id === value)?.materialName || ''
+  row.materialName =
+    materials.value.find((item) => item.id === value)?.materialName ||
+    stocks.value.find((item) => item.materialId === value)?.materialName ||
+    ''
 }
 
 function addEditorItem(): void {
@@ -426,7 +499,28 @@ async function changeEditorProject(value: string): Promise<void> {
   form.projectId = value
   form.contractId = ''
   form.warehouseId = ''
+  form.partnerId = ''
+  stocks.value = []
+  stockFilterReady.value = false
   await loadEditorCandidates(value)
+}
+
+async function changeWarehouse(value: string): Promise<void> {
+  form.warehouseId = value
+  try {
+    await loadWarehouseStocks(form.projectId, value)
+    if (stockFilterReady.value) {
+      editorItems.value.forEach((item) => {
+        if (!item.materialId || stockedMaterialIds.value.has(item.materialId)) return
+        item.materialId = ''
+        item.materialName = ''
+      })
+    }
+  } catch (error) {
+    stocks.value = []
+    stockFilterReady.value = false
+    showToast('error', '库存候选读取失败', errorText(error, '无法读取所选仓库库存'))
+  }
 }
 
 async function openCreate(): Promise<void> {
@@ -821,6 +915,7 @@ onBeforeUnmount(() => {
             :options="warehouseOptions"
             :disabled="busy"
             required
+            @update:model-value="changeWarehouse"
           />
           <V2Input
             v-model="form.requisitionDate"

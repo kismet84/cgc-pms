@@ -217,6 +217,28 @@ class CommunicationServiceTest {
     }
 
     @Test
+    void groupManagersCanListActiveMembersWithRolesAndUserStatus() {
+        TestUserContext.setAdmin(0, USER_ONE);
+        var conversation = transactions.execute(status ->
+                service.createConversation("GROUP", "项目群", List.of(USER_TWO, OUTSIDER)));
+        long conversationId = Long.parseLong(conversation.id());
+        transactions.executeWithoutResult(status -> service.updateRole(conversationId, USER_TWO, "ADMIN"));
+        jdbc.update("UPDATE sys_user SET status='DISABLE' WHERE id=?", OUTSIDER);
+
+        var members = service.members(conversationId);
+
+        assertEquals(List.of(USER_ONE, USER_TWO, OUTSIDER), members.stream()
+                .map(member -> Long.parseLong(member.userId())).toList());
+        assertEquals(List.of("OWNER", "ADMIN", "MEMBER"), members.stream()
+                .map(CommunicationService.MemberSummary::role).toList());
+        assertEquals("DISABLE", members.get(2).userStatus());
+
+        TestUserContext.setUser(0, OUTSIDER, "comm-out", List.of());
+        BusinessException denied = assertThrows(BusinessException.class, () -> service.members(conversationId));
+        assertEquals("COMMUNICATION_GROUP_MANAGE_DENIED", denied.getCode());
+    }
+
+    @Test
     void closedGroupIsReadOnly() {
         TestUserContext.setAdmin(0, USER_ONE);
         var conversation = transactions.execute(status ->

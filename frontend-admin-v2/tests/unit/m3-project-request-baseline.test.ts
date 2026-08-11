@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createPinia, setActivePinia } from 'pinia'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import ProjectPage from '@/pages/projects/ProjectPage.vue'
 import {
   loadProject,
   loadProjectMembers,
   loadProjectOverview,
   loadProjectPage,
 } from '@/services/projects'
+import { useSessionStore } from '@/stores/session'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -201,6 +206,98 @@ describe('M3 project request baseline', () => {
       '/api/projects/P%2F1/overview',
       '/api/projects/P%2F1/members?pageNo=1&roleCode=PM',
     ])
+  })
+
+  it('excludes every existing non-deleted member from add-member candidates', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url.includes('/system/dict/data/by-code/')) return apiResponse([])
+      if (url === '/api/projects/P1')
+        return apiResponse({
+          id: 'P1',
+          tenantId: 'T1',
+          orgId: 'O1',
+          projectCode: 'P-1',
+          projectName: '项目一',
+          projectType: 'BUILD',
+          projectAddress: '',
+          ownerUnit: '',
+          supervisorUnit: '',
+          designUnit: '',
+          contractAmount: '0',
+          targetCost: '0',
+          plannedStartDate: '2026-08-01',
+          plannedEndDate: '2026-12-31',
+          projectManagerId: 'U1',
+          approvalStatus: 'APPROVED',
+          status: 'ACTIVE',
+          createdBy: '1',
+          createdAt: '2026-08-11T00:00:00',
+          updatedAt: '2026-08-11T00:00:00',
+        })
+      if (url === '/api/projects/P1/members?pageNo=1&pageSize=200')
+        return apiResponse({
+          records: [
+            {
+              id: 'M1',
+              tenantId: 'T1',
+              projectId: 'P1',
+              userId: 'U1',
+              roleCode: 'PM',
+              status: 'INACTIVE',
+              createdBy: '1',
+              createdAt: '2026-08-11T00:00:00',
+              updatedAt: '2026-08-11T00:00:00',
+            },
+          ],
+          total: 1,
+          pageNo: 1,
+          pageSize: 200,
+        })
+      if (url === '/api/system/users?pageNo=1&pageSize=200')
+        return apiResponse({
+          records: [
+            { id: 'U1', username: 'existing', realName: '现有离岗成员', status: 'ENABLE' },
+            { id: 'U2', username: 'candidate', realName: '可选用户', status: 'ENABLE' },
+          ],
+          total: 2,
+          pageNo: 1,
+          pageSize: 200,
+        })
+      throw new Error(`unexpected request: ${url}`)
+    })
+    setActivePinia(createPinia())
+    useSessionStore().replaceUserInfo({
+      tenantId: 'T1',
+      userId: 'ADMIN',
+      username: 'admin',
+      roles: ['ADMIN'],
+      permissions: ['project:member:list', 'project:member:add', 'system:user:query'],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/project/:projectId/members', component: ProjectPage }],
+    })
+    await router.push('/project/P1/members')
+    await router.isReady()
+    const wrapper = mount(ProjectPage, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    })
+    await flushPromises()
+    const addMember = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (item) => item.textContent?.trim() === '添加成员',
+    )
+    if (!addMember) throw new Error('missing add-member button')
+    addMember.click()
+    await flushPromises()
+
+    expect(
+      [...document.querySelectorAll<HTMLSelectElement>('select[aria-label="用户"] option')].map(
+        (option) => option.value,
+      ),
+    ).toEqual(['', 'U2'])
+    wrapper.unmount()
   })
 
   it('rejects an empty project id before sending a request', () => {

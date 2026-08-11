@@ -116,7 +116,13 @@ const form = reactive<SiteDailyLogCommand>({
 })
 
 const projectOptions = computed(() => {
-  const options = workspace.projects.map((item) => ({ value: item.value, label: item.label }))
+  const options = workspace.projects
+    .filter(
+      (item) =>
+        item.status === 'ACTIVE' ||
+        (dialogMode.value !== 'create' && item.value === form.projectId),
+    )
+    .map((item) => ({ value: item.value, label: item.label }))
   if (form.projectId && !options.some((item) => item.value === form.projectId))
     options.unshift({ value: form.projectId, label: `本地草稿项目（${form.projectId}）` })
   return options
@@ -242,8 +248,13 @@ function openCreate(): void {
   qualityFacts.value = []
   files.value = []
   progressRows.value = []
+  const initialProjectId = workspace.projects.some(
+    (item) => item.value === selectedProjectId.value && item.status === 'ACTIVE',
+  )
+    ? selectedProjectId.value
+    : ''
   Object.assign(form, {
-    projectId: selectedProjectId.value,
+    projectId: initialProjectId,
     reportDate: new Date().toISOString().slice(0, 10),
     constructionContent: '',
     issuesDelays: '',

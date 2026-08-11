@@ -15,6 +15,7 @@ vi.mock('@/services/communication', () => ({
   deleteMessageDraft: vi.fn(),
   getCommunicationAttachmentUrl: vi.fn(),
   leaveConversation: vi.fn(),
+  loadConversationMembers: vi.fn(),
   loadCommunicationUsers: vi.fn(),
   loadConversations: vi.fn(),
   loadMessages: vi.fn(),
@@ -62,6 +63,7 @@ beforeEach(() => {
     permissions: ['communication:view', 'communication:send'],
   })
   vi.mocked(communication.loadConversations).mockResolvedValue([conversation])
+  vi.mocked(communication.loadConversationMembers).mockResolvedValue([])
   vi.mocked(communication.loadCommunicationUsers).mockResolvedValue([])
   vi.mocked(communication.loadMessages).mockResolvedValue([message])
   vi.mocked(communication.markConversationRead).mockResolvedValue()
@@ -274,5 +276,158 @@ describe('CommunicationPage', () => {
     expect(vi.mocked(communication.createMessageDraft).mock.calls[1]?.[2]).not.toBe(firstClientId)
     expect(communication.uploadCommunicationAttachment).toHaveBeenNthCalledWith(3, fileC, 'draft-b')
     expect(communication.sendMessage).toHaveBeenCalledWith('draft-b')
+  })
+
+  it('filters group member candidates by action and requester role', async () => {
+    const group = {
+      ...conversation,
+      type: 'GROUP' as const,
+      name: '项目群',
+      ownerUserId: '1',
+      role: 'OWNER' as const,
+    }
+    vi.mocked(communication.loadConversations).mockResolvedValue([group])
+    vi.mocked(communication.loadCommunicationUsers).mockResolvedValue([
+      { id: '2', username: 'admin', realName: '管理员' },
+      { id: '3', username: 'member', realName: '成员' },
+      { id: '5', username: 'outsider', realName: '待加入' },
+    ])
+    vi.mocked(communication.loadConversationMembers).mockResolvedValue([
+      { userId: '1', username: 'owner', role: 'OWNER', userStatus: 'ENABLE' },
+      { userId: '2', username: 'admin', role: 'ADMIN', userStatus: 'ENABLE' },
+      { userId: '3', username: 'member', role: 'MEMBER', userStatus: 'ENABLE' },
+      { userId: '4', username: 'disabled', role: 'MEMBER', userStatus: 'DISABLE' },
+    ])
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+    const targetValues = () =>
+      wrapper
+        .get('#communication-member-target')
+        .findAll('option')
+        .map((option) => option.attributes('value'))
+
+    expect(targetValues()).toEqual(['', '5'])
+    await wrapper.get('#communication-member-action').setValue('REMOVE')
+    expect(targetValues()).toEqual(['', '2', '3', '4'])
+    await wrapper.get('#communication-member-action').setValue('SET_ADMIN')
+    expect(targetValues()).toEqual(['', '3', '4'])
+    await wrapper.get('#communication-member-action').setValue('SET_MEMBER')
+    expect(targetValues()).toEqual(['', '2'])
+    await wrapper.get('#communication-member-action').setValue('TRANSFER_OWNER')
+    expect(targetValues()).toEqual(['', '2', '3'])
+  })
+
+  it('lets an administrator remove members but not owners or other administrators', async () => {
+    const group = {
+      ...conversation,
+      type: 'GROUP' as const,
+      name: '项目群',
+      ownerUserId: '9',
+      role: 'ADMIN' as const,
+    }
+    vi.mocked(communication.loadConversations).mockResolvedValue([group])
+    vi.mocked(communication.loadConversationMembers).mockResolvedValue([
+      { userId: '9', username: 'owner', role: 'OWNER', userStatus: 'ENABLE' },
+      { userId: '2', username: 'admin', role: 'ADMIN', userStatus: 'ENABLE' },
+      { userId: '3', username: 'member', role: 'MEMBER', userStatus: 'ENABLE' },
+    ])
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('#communication-member-action')
+        .findAll('option')
+        .map((option) => option.attributes('value')),
+    ).toEqual(['ADD', 'REMOVE'])
+    await wrapper.get('#communication-member-action').setValue('REMOVE')
+    expect(
+      wrapper
+        .get('#communication-member-target')
+        .findAll('option')
+        .map((option) => option.attributes('value')),
+    ).toEqual(['', '3'])
+  })
+
+  it('ignores stale group members when a later conversation wins', async () => {
+    const groupA = {
+      ...conversation,
+      type: 'GROUP' as const,
+      name: 'A群',
+      ownerUserId: '1',
+      role: 'OWNER' as const,
+    }
+    const groupB = { ...groupA, id: 'group-b', name: 'B群' }
+    const membersA = [
+      { userId: '2', username: 'user-a', role: 'MEMBER' as const, userStatus: 'ENABLE' },
+    ]
+    const membersB = [
+      { userId: '3', username: 'user-b', role: 'MEMBER' as const, userStatus: 'ENABLE' },
+    ]
+    let delayA = false
+    let resolveA!: (members: typeof membersA) => void
+    vi.mocked(communication.loadConversations).mockResolvedValue([groupA, groupB])
+    vi.mocked(communication.loadCommunicationUsers).mockResolvedValue([
+      { id: '2', username: 'user-a' },
+      { id: '3', username: 'user-b' },
+    ])
+    vi.mocked(communication.loadConversationMembers).mockImplementation((id) => {
+      if (id === groupA.id && delayA) {
+        return new Promise((resolve) => {
+          resolveA = resolve
+        })
+      }
+      return Promise.resolve(id === groupA.id ? membersA : membersB)
+    })
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+    delayA = true
+
+    const buttonA = wrapper.findAll('button').find((button) => button.text().includes('A群'))
+    const buttonB = wrapper.findAll('button').find((button) => button.text().includes('B群'))
+    await buttonA!.trigger('click')
+    await buttonB!.trigger('click')
+    await flushPromises()
+    resolveA(membersA)
+    await flushPromises()
+
+    const values = wrapper
+      .get('#communication-member-target')
+      .findAll('option')
+      .map((option) => option.attributes('value'))
+    expect(values).toEqual(['', '2'])
+  })
+
+  it('does not reload members with old owner privileges after transfer', async () => {
+    let role: 'OWNER' | 'MEMBER' = 'OWNER'
+    const group = () => ({
+      ...conversation,
+      type: 'GROUP' as const,
+      name: '项目群',
+      ownerUserId: role === 'OWNER' ? '1' : '2',
+      role,
+    })
+    vi.mocked(communication.loadConversations).mockImplementation(() => Promise.resolve([group()]))
+    vi.mocked(communication.loadConversationMembers).mockResolvedValue([
+      { userId: '1', username: 'owner', role: 'OWNER', userStatus: 'ENABLE' },
+      { userId: '2', username: 'next-owner', role: 'MEMBER', userStatus: 'ENABLE' },
+    ])
+    vi.mocked(communication.transferConversationOwner).mockImplementation(() => {
+      role = 'MEMBER'
+      return Promise.resolve()
+    })
+    const wrapper = mount(CommunicationPage)
+    await flushPromises()
+
+    await wrapper.get('#communication-member-action').setValue('TRANSFER_OWNER')
+    await wrapper.get('#communication-member-target').setValue('2')
+    await wrapper
+      .get('.communication-page__group .communication-page__actions button')
+      .trigger('click')
+    await flushPromises()
+
+    expect(communication.transferConversationOwner).toHaveBeenCalledWith(conversation.id, '2')
+    expect(communication.loadConversationMembers).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.communication-page__group').exists()).toBe(false)
   })
 })

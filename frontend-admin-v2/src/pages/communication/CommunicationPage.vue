@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type {
   CommunicationEvent,
+  CommunicationMemberSummary,
   CommunicationUserSummary,
   ConversationSummary,
   MessageRecord,
 } from '@cgc-pms/frontend-contracts'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { V2Card, V2ConfirmDialog } from '@/components'
 import {
   addConversationMembers,
@@ -15,6 +16,7 @@ import {
   deleteMessageDraft,
   getCommunicationAttachmentUrl,
   leaveConversation,
+  loadConversationMembers,
   loadCommunicationUsers,
   loadConversations,
   loadMessages,
@@ -31,10 +33,13 @@ import { useSessionStore } from '@/stores/session'
 const session = useSessionStore()
 const conversations = ref<ConversationSummary[]>([])
 const users = ref<CommunicationUserSummary[]>([])
+const members = ref<CommunicationMemberSummary[]>([])
 const messages = ref<MessageRecord[]>([])
 const selectedConversationId = ref('')
 const selectedUserIds = ref<string[]>([])
 const memberTargetId = ref('')
+type MemberAction = 'ADD' | 'REMOVE' | 'SET_ADMIN' | 'SET_MEMBER' | 'TRANSFER_OWNER'
+const memberAction = ref<MemberAction>('ADD')
 const userKeyword = ref('')
 const groupName = ref('')
 const body = ref('')
@@ -61,12 +66,56 @@ const canSend = computed(
     !sending.value,
 )
 const canCreateGroup = computed(() => session.hasAdminOrPermission('communication:group:manage'))
-const canManageGroup = computed(
-  () =>
-    selectedConversation.value?.type === 'GROUP' &&
-    selectedConversation.value.status === 'ACTIVE' &&
-    ['OWNER', 'ADMIN'].includes(selectedConversation.value.role),
-)
+function isManageableGroup(conversation?: ConversationSummary): boolean {
+  return Boolean(
+    conversation?.type === 'GROUP' &&
+    conversation.status === 'ACTIVE' &&
+    ['OWNER', 'ADMIN'].includes(conversation.role),
+  )
+}
+const canManageGroup = computed(() => isManageableGroup(selectedConversation.value))
+const memberActionOptions = computed(() => {
+  const base = [
+    { value: 'ADD' as const, label: '加入' },
+    { value: 'REMOVE' as const, label: '移除' },
+  ]
+  if (selectedConversation.value?.role !== 'OWNER') return base
+  return [
+    ...base,
+    { value: 'SET_ADMIN' as const, label: '设管理员' },
+    { value: 'SET_MEMBER' as const, label: '设成员' },
+    { value: 'TRANSFER_OWNER' as const, label: '转让群主' },
+  ]
+})
+const memberCandidates = computed(() => {
+  if (memberAction.value === 'ADD') {
+    const activeIds = new Set(members.value.map((member) => member.userId))
+    return users.value
+      .filter((user) => !activeIds.has(user.id))
+      .map((user) => ({ id: user.id, label: user.realName || user.username }))
+  }
+  const requesterRole = selectedConversation.value?.role
+  return members.value
+    .filter((member) => {
+      if (memberAction.value === 'REMOVE') {
+        return requesterRole === 'OWNER'
+          ? ['ADMIN', 'MEMBER'].includes(member.role)
+          : member.role === 'MEMBER'
+      }
+      if (requesterRole !== 'OWNER') return false
+      if (memberAction.value === 'SET_ADMIN') return member.role === 'MEMBER'
+      if (memberAction.value === 'SET_MEMBER') return member.role === 'ADMIN'
+      return member.role !== 'OWNER' && member.userStatus === 'ENABLE'
+    })
+    .map((member) => ({
+      id: member.userId,
+      label: member.realName || member.username || member.userId,
+    }))
+})
+
+watch(memberAction, () => {
+  memberTargetId.value = ''
+})
 
 onMounted(() => {
   void initialize()
@@ -112,6 +161,9 @@ async function refreshConversations(): Promise<void> {
   ) {
     selectedConversationId.value = ''
     messages.value = []
+    members.value = []
+  } else if (!isManageableGroup(selectedConversation.value)) {
+    members.value = []
   }
 }
 
@@ -127,12 +179,20 @@ async function searchUsers(): Promise<void> {
 async function selectConversation(id: string): Promise<void> {
   const token = ++conversationGeneration
   selectedConversationId.value = id
+  members.value = []
+  memberTargetId.value = ''
+  memberAction.value = 'ADD'
   messagesLoading.value = true
   error.value = ''
   try {
-    const loaded = await loadAllMessages(id)
+    const conversation = conversations.value.find((item) => item.id === id)
+    const [loaded, loadedMembers] = await Promise.all([
+      loadAllMessages(id),
+      isManageableGroup(conversation) ? loadConversationMembers(id) : Promise.resolve([]),
+    ])
     if (token !== conversationGeneration || selectedConversationId.value !== id) return
     messages.value = loaded
+    members.value = loadedMembers
     await markCurrentRead()
     if (token !== conversationGeneration || selectedConversationId.value !== id) return
     await refreshConversations()
@@ -339,22 +399,38 @@ async function downloadAttachment(fileId: string): Promise<void> {
   }
 }
 
-async function manageGroup(action: 'add' | 'remove' | 'admin' | 'member' | 'owner') {
+async function manageGroup() {
   const conversation = selectedConversation.value
   if (!conversation || !memberTargetId.value) return
+  const action = memberAction.value
+  const token = conversationGeneration
   error.value = ''
   try {
-    if (action === 'add') await addConversationMembers(conversation.id, [memberTargetId.value])
-    if (action === 'remove') await removeConversationMember(conversation.id, memberTargetId.value)
-    if (action === 'admin' || action === 'member')
+    if (action === 'ADD') await addConversationMembers(conversation.id, [memberTargetId.value])
+    if (action === 'REMOVE') await removeConversationMember(conversation.id, memberTargetId.value)
+    if (action === 'SET_ADMIN' || action === 'SET_MEMBER')
       await updateConversationRole(
         conversation.id,
         memberTargetId.value,
-        action === 'admin' ? 'ADMIN' : 'MEMBER',
+        action === 'SET_ADMIN' ? 'ADMIN' : 'MEMBER',
       )
-    if (action === 'owner') await transferConversationOwner(conversation.id, memberTargetId.value)
+    if (action === 'TRANSFER_OWNER') {
+      await transferConversationOwner(conversation.id, memberTargetId.value)
+      members.value = []
+      memberTargetId.value = ''
+      await refreshConversations()
+      if (token === conversationGeneration && selectedConversationId.value === conversation.id) {
+        status.value = '群成员操作已完成。'
+      }
+      return
+    }
     status.value = '群成员操作已完成。'
     await refreshConversations()
+    if (token !== conversationGeneration || selectedConversationId.value !== conversation.id) return
+    const loadedMembers = await loadConversationMembers(conversation.id)
+    if (token !== conversationGeneration || selectedConversationId.value !== conversation.id) return
+    members.value = loadedMembers
+    memberTargetId.value = ''
   } catch {
     error.value = '群成员操作失败，请确认目标用户及当前角色。'
   }
@@ -543,43 +619,30 @@ function scanStatusLabel(value: string): string {
             aria-labelledby="group-management-title"
           >
             <h3 id="group-management-title">群管理</h3>
+            <label for="communication-member-action">操作</label>
+            <select id="communication-member-action" v-model="memberAction">
+              <option
+                v-for="action in memberActionOptions"
+                :key="action.value"
+                :value="action.value"
+              >
+                {{ action.label }}
+              </option>
+            </select>
             <label for="communication-member-target">目标用户</label>
             <select id="communication-member-target" v-model="memberTargetId">
               <option value="">请选择</option>
-              <option v-for="user in users" :key="user.id" :value="user.id">
-                {{ user.realName || user.username }}
+              <option
+                v-for="candidate in memberCandidates"
+                :key="candidate.id"
+                :value="candidate.id"
+              >
+                {{ candidate.label }}
               </option>
             </select>
             <div class="communication-page__actions">
-              <button type="button" :disabled="!memberTargetId" @click="manageGroup('add')">
-                加入
-              </button>
-              <button type="button" :disabled="!memberTargetId" @click="manageGroup('remove')">
-                移除
-              </button>
-              <button
-                v-if="selectedConversation.role === 'OWNER'"
-                type="button"
-                :disabled="!memberTargetId"
-                @click="manageGroup('admin')"
-              >
-                设管理员
-              </button>
-              <button
-                v-if="selectedConversation.role === 'OWNER'"
-                type="button"
-                :disabled="!memberTargetId"
-                @click="manageGroup('member')"
-              >
-                设成员
-              </button>
-              <button
-                v-if="selectedConversation.role === 'OWNER'"
-                type="button"
-                :disabled="!memberTargetId"
-                @click="manageGroup('owner')"
-              >
-                转让群主
+              <button type="button" :disabled="!memberTargetId" @click="manageGroup">
+                执行{{ memberActionOptions.find((action) => action.value === memberAction)?.label }}
               </button>
             </div>
             <div class="communication-page__inline">

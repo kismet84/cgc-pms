@@ -38,6 +38,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CostControlService {
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
+    private static final String ACTIVE_PROJECT_MEMBER_SCOPE = """
+            FROM sys_user u
+            JOIN pm_project_member m ON m.tenant_id=u.tenant_id AND m.user_id=u.id
+            WHERE u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+              AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+            """;
 
     private static final Set<String> MONEY_KEYS = Set.of(
             "amount", "contract_amount", "target_cost", "total_target_amount", "total_bid_cost_amount", "total_responsibility_amount",
@@ -130,6 +136,15 @@ public class CostControlService {
         result.put("costSources", costSourceBreakdown(projectId, LocalDate.now()));
         result.put("summary", latestSummary(projectId));
         return moneyPayload(result);
+    }
+
+    public List<CorrectiveOwnerOption> correctiveOwnerOptions(Long projectId) {
+        requireProject(projectId, false);
+        return jdbc.query("SELECT DISTINCT u.id,u.username,u.real_name " + ACTIVE_PROJECT_MEMBER_SCOPE
+                        + " ORDER BY u.real_name,u.username,u.id",
+                (result, row) -> new CorrectiveOwnerOption(
+                        result.getString("id"), result.getString("username"), result.getString("real_name")),
+                tenant(), projectId);
     }
 
     public Map<String, Object> trace(Long forecastId) {
@@ -293,7 +308,9 @@ public class CostControlService {
         requireProject(idValue(action.get("project_id")), true);
         if (!Set.of("DRAFT", "REJECTED").contains(string(action.get("status")))) throw error("COST_CORRECTIVE_IMMUTABLE", "仅草稿或驳回纠偏措施可编辑");
         if (!Objects.equals(idValue(action.get("forecast_id")), request.forecastId())) throw error("COST_CORRECTIVE_FORECAST_IMMUTABLE", "纠偏措施所属预测不可修改");
-        requireActiveProjectMember(idValue(action.get("project_id")), request.responsibleUserId());
+        if (!Objects.equals(idValue(action.get("responsible_user_id")), request.responsibleUserId())) {
+            requireActiveProjectMember(idValue(action.get("project_id")), request.responsibleUserId());
+        }
         BigDecimal allocated = jdbc.queryForObject("SELECT COALESCE(SUM(expected_saving_amount),0) FROM cost_corrective_action WHERE tenant_id=? AND forecast_id=? AND id<>? AND deleted_flag=0 AND status<>'CANCELLED'", BigDecimal.class, tenant(), request.forecastId(), id);
         BigDecimal variance = money(forecast.get("cost_variance_amount"));
         if (money(allocated).add(money(request.expectedSavingAmount())).compareTo(variance) > 0) throw error("COST_CORRECTIVE_SAVING_EXCEEDS_VARIANCE", "纠偏预计节约金额合计不能超过预测成本偏差");
@@ -542,12 +559,8 @@ public class CostControlService {
     }
 
     private void requireActiveProjectMember(Long projectId, Long userId) {
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM sys_user u
-                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
-                  AND EXISTS (SELECT 1 FROM pm_project_member m WHERE m.tenant_id=u.tenant_id
-                    AND m.user_id=u.id AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0)
-                """, Integer.class, userId, tenant(), projectId);
+        Integer count = jdbc.queryForObject("SELECT COUNT(DISTINCT u.id) " + ACTIVE_PROJECT_MEMBER_SCOPE
+                + " AND u.id=?", Integer.class, tenant(), projectId, userId);
         if (count == null || count != 1) throw error("COST_RESPONSIBLE_PROJECT_MEMBER_INVALID", "责任人不存在、跨租户、已停用或不是目标项目有效成员");
     }
 
@@ -582,6 +595,8 @@ public class CostControlService {
                 .map(BigDecimal::new)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+    public record CorrectiveOwnerOption(String userId, String username, String realName) {}
 
     @SuppressWarnings("unchecked")
     private static <T> T moneyPayload(T value) {

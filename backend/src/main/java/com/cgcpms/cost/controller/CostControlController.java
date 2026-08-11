@@ -6,6 +6,7 @@ import com.cgcpms.cost.dto.CostControlModels.CorrectiveActionRequest;
 import com.cgcpms.cost.dto.CostControlModels.CorrectiveCloseRequest;
 import com.cgcpms.cost.dto.CostControlModels.ForecastRequest;
 import com.cgcpms.cost.service.CostControlService;
+import com.cgcpms.cost.service.CostControlService.CorrectiveOwnerOption;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -36,6 +38,12 @@ public class CostControlController {
     @PreAuthorize("hasAuthority('cost:control:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> overview(@PathVariable Long projectId) {
         return ApiResponse.success(service.overview(projectId));
+    }
+
+    @GetMapping("/projects/{projectId}/corrective-owner-options")
+    @PreAuthorize("hasAuthority('cost:corrective:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<CorrectiveOwnerOption>> correctiveOwnerOptions(@PathVariable Long projectId) {
+        return ApiResponse.success(service.correctiveOwnerOptions(projectId));
     }
 
     @GetMapping("/forecasts/{id}/trace")

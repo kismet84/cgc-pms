@@ -67,6 +67,7 @@ export interface SupplyFormMaterialOption {
   id: string
   materialCode: string
   materialName: string
+  specification?: string | null
   unit?: string | null
 }
 

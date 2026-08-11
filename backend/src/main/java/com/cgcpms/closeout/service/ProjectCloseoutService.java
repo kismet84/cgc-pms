@@ -65,15 +65,16 @@ public class ProjectCloseoutService {
                 SELECT s.id,s.contract_id contractId,s.settlement_code settlementCode,s.settlement_date settlementDate,
                  s.gross_amount grossAmount,s.retention_amount retentionAmount,s.net_receivable_amount netReceivableAmount,
                  s.status,s.settlement_type settlementType
-                FROM owner_settlement s JOIN project_closeout c ON c.final_owner_settlement_id=s.id
-                WHERE c.tenant_id=? AND c.project_id=? AND c.deleted_flag=0
+                FROM owner_settlement s
+                WHERE s.tenant_id=? AND s.project_id=? AND s.deleted_flag=0
+                ORDER BY s.settlement_date DESC,s.id DESC
                 """, tenant(), projectId));
         result.put("receivables", jdbc.queryForList("""
                 SELECT r.id,r.settlement_id settlementId,r.contract_id contractId,r.receivable_type receivableType,
                  r.receivable_code receivableCode,r.original_amount originalAmount,r.collected_amount collectedAmount,
                  r.outstanding_amount outstandingAmount,r.due_date dueDate,r.status
-                FROM account_receivable r JOIN project_closeout c ON c.final_owner_settlement_id=r.settlement_id
-                WHERE c.tenant_id=? AND c.project_id=? AND r.deleted_flag=0 ORDER BY r.receivable_type,r.id
+                FROM account_receivable r
+                WHERE r.tenant_id=? AND r.project_id=? AND r.deleted_flag=0 ORDER BY r.settlement_id,r.receivable_type,r.id
                 """, tenant(), projectId));
         result.put("warranties", jdbc.queryForList("""
                 SELECT id,closeout_id closeoutId,contract_id contractId,receivable_id receivableId,warranty_code warrantyCode,
@@ -112,7 +113,7 @@ public class ProjectCloseoutService {
                 ORDER BY w.sort_order,w.id
                 """, tenant(), projectId));
         result.put("qualityInspections", jdbc.queryForList("""
-                SELECT id,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
+                SELECT id,wbs_task_id wbsTaskId,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
                 FROM qs_inspection_record WHERE tenant_id=? AND project_id=? AND deleted_flag=0
                 ORDER BY inspection_date DESC,id DESC
                 """, tenant(), projectId));

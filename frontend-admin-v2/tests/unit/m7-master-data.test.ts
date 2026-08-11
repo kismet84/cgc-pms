@@ -442,6 +442,142 @@ describe('M7 master-data pages', () => {
     ).toBe(true)
   })
 
+  it('limits new organization links and preserves valid historical edit values', async () => {
+    vi.mocked(masterData.loadCompanies).mockResolvedValue({
+      records: [
+        { id: '1', companyCode: 'C1', companyName: '启用公司', status: 'ENABLE' },
+        { id: '10', companyCode: 'C-HIST', companyName: '历史公司', status: 'DISABLE' },
+      ],
+      total: 2,
+      pageNo: 1,
+      pageSize: 200,
+    })
+    vi.mocked(masterData.loadDepartmentTree).mockResolvedValue([
+      {
+        id: '2',
+        companyId: '1',
+        parentId: '0',
+        deptCode: 'PARENT',
+        deptName: '历史上级',
+        orderNum: 0,
+        status: 'DISABLE',
+        children: [
+          {
+            id: '3',
+            companyId: '1',
+            parentId: '2',
+            deptCode: 'CHILD',
+            deptName: '当前部门',
+            orderNum: 0,
+            status: 'ENABLE',
+            children: [
+              {
+                id: '4',
+                companyId: '1',
+                parentId: '3',
+                deptCode: 'GRANDCHILD',
+                deptName: '下级部门',
+                orderNum: 0,
+                status: 'ENABLE',
+                children: [],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: '5',
+        companyId: '1',
+        parentId: '0',
+        deptCode: 'SIBLING',
+        deptName: '可选上级',
+        orderNum: 1,
+        status: 'ENABLE',
+        children: [],
+      },
+      {
+        id: '6',
+        companyId: '10',
+        parentId: '0',
+        deptCode: 'D-HIST',
+        deptName: '历史部门',
+        orderNum: 0,
+        status: 'DISABLE',
+        children: [],
+      },
+    ])
+    vi.mocked(masterData.loadPositions).mockImplementation(async (query) => ({
+      records:
+        query.departmentId === '6'
+          ? [
+              {
+                id: '7',
+                companyId: '10',
+                departmentId: '6',
+                positionCode: 'P-HIST',
+                positionName: '历史岗位',
+                status: 'ENABLE',
+              },
+            ]
+          : [],
+      total: query.departmentId === '6' ? 1 : 0,
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+    }))
+    useSessionStore().replaceUserInfo(user([], ['ADMIN']))
+    const wrapper = mount(OrganizationPage, { attachTo: document.body })
+    await flushPromises()
+    const optionValues = (label: string) =>
+      [
+        ...document.querySelectorAll<HTMLOptionElement>(
+          `[role="dialog"] select[aria-label="${label}"] option`,
+        ),
+      ].map((option) => option.value)
+    const clickDialogButton = (label: string) => {
+      const target = [
+        ...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+      ].find((button) => button.textContent?.trim() === label)
+      if (!target) throw new Error(`missing dialog button: ${label}`)
+      target.click()
+    }
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增部门')!
+      .trigger('click')
+    expect(optionValues('所属公司')).toEqual(['', '1'])
+    expect(optionValues('上级部门')).toEqual(['', '0', '3', '4', '5'])
+    clickDialogButton('取消')
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新增岗位')!
+      .trigger('click')
+    expect(optionValues('所属公司')).toEqual(['', '1'])
+    expect(optionValues('所属部门')).toEqual(['', '3', '4', '5'])
+    clickDialogButton('取消')
+    await flushPromises()
+
+    await wrapper
+      .get('.v2-action-menu__content[aria-label="CHILD更多操作"] button')
+      .trigger('click')
+    expect(optionValues('上级部门')).toEqual(['', '0', '2', '5'])
+    clickDialogButton('取消')
+    await flushPromises()
+
+    await wrapper
+      .findAll('.org-page__select')
+      .find((button) => button.text().includes('历史公司'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('.v2-action-menu__content[aria-label="P-HIST更多操作"] button')
+      .trigger('click')
+    expect(optionValues('所属公司')).toEqual(['', '1', '10'])
+    expect(optionValues('所属部门')).toEqual(['', '6'])
+  })
+
   it('confirms and rereads company, department and position status updates', async () => {
     useSessionStore().replaceUserInfo(user(['org:list', 'org:edit']))
     const wrapper = mount(OrganizationPage, { attachTo: document.body })

@@ -36,12 +36,12 @@ import {
   loadBudgetAvailability,
   loadBudgetPage,
   loadProjectContextOptions,
+  loadCostTargetProjectManagerOptions,
   saveCostBudgetDraft,
   submitCostTarget,
 } from '@/services/commercial'
 import type { CostSubjectOption } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
-import { loadProjectUsers } from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
 type PendingAction = 'delete' | 'submit' | null
@@ -77,7 +77,7 @@ const records = ref<CostTargetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
-const responsibleUsers = ref<Array<{ value: string; label: string }>>([])
+const responsibleUsers = ref<Array<{ value: string; label: string; disabled?: boolean }>>([])
 const detail = ref<CostTargetRecord | null>(null)
 const items = ref<CostTargetItemRecord[]>([])
 const executionBudget = ref<ProjectBudgetRecord | null>(null)
@@ -127,14 +127,27 @@ const fixedTargetVersion = computed(
 const targetDifference = computed(() => amountDifference('targetAmount'))
 const responsibilityDifference = computed(() => amountDifference('responsibilityAmount'))
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 10))))
-const projectOptions = computed(() =>
-  projects.value.map((project) => ({ value: project.id, label: project.projectName })),
-)
+const projectOptions = computed(() => {
+  const eligibleStatuses = new Set(['PREPARING', 'ACTIVE'])
+  return projects.value
+    .filter(
+      (project) =>
+        mode.value === 'list' ||
+        eligibleStatuses.has(project.status) ||
+        project.id === form.projectId,
+    )
+    .map((project) => ({ value: project.id, label: project.projectName }))
+})
 const costSubjectOptions = computed(() => {
-  const options = costSubjects.value.map((subject) => ({
-    value: subject.id,
-    label: `${subject.subjectCode} · ${subject.subjectName}`,
-  }))
+  const parentIds = new Set(
+    costSubjects.value.map((subject) => subject.parentId).filter((id): id is string => Boolean(id)),
+  )
+  const options = costSubjects.value
+    .filter((subject) => subject.status === 'ENABLE' && !parentIds.has(subject.id))
+    .map((subject) => ({
+      value: subject.id,
+      label: `${subject.subjectCode} · ${subject.subjectName}`,
+    }))
   for (const [index, item] of items.value.entries()) {
     if (item.costSubjectId && !options.some((option) => option.value === item.costSubjectId)) {
       options.push({
@@ -248,15 +261,7 @@ async function loadProjects(): Promise<void> {
       responsibleUsers.value = []
       return
     }
-    const users = await loadProjectUsers(controller.signal)
-    if (projectController !== controller) return
-    responsibleUsers.value = users.records
-      .filter((user) => user.status === 'ENABLE')
-      .map((user) => ({ value: user.id, label: user.realName || user.username }))
     if (form.projectId && mode.value === 'create') await selectProject(form.projectId)
-    else if (form.projectId && !form.projectManagerId)
-      form.projectManagerId =
-        projects.value.find((project) => project.id === form.projectId)?.projectManagerId ?? ''
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '可见项目加载失败')
   }
@@ -329,6 +334,8 @@ async function loadDetail(id: string, preserveNotice = false): Promise<void> {
       version: target.version ?? null,
       remark: target.remark ?? null,
     })
+    if (mode.value === 'edit') await loadManagerOptions(target.projectId, controller.signal)
+    else responsibleUsers.value = []
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
       detail.value = null
@@ -384,6 +391,13 @@ function command(): CostBudgetDraftSaveCommand {
   ) {
     throw new TypeError('项目、项目经理、版本号和版本名称不能为空')
   }
+  if (
+    !responsibleUsers.value.some(
+      (option) => option.value === form.projectManagerId && !option.disabled,
+    )
+  ) {
+    throw new TypeError('请选择有效的项目经理')
+  }
   return {
     projectId: form.projectId.trim(),
     projectManagerId: form.projectManagerId.trim(),
@@ -408,6 +422,7 @@ async function selectProject(projectId: string): Promise<void> {
   form.totalBidCostAmount = ''
   form.totalResponsibilityAmount = ''
   items.value = []
+  responsibleUsers.value = []
   if (!projectId || mode.value !== 'create') return
   allocationController?.abort()
   const controller = new AbortController()
@@ -415,8 +430,16 @@ async function selectProject(projectId: string): Promise<void> {
   actionBusy.value = true
   resetNotices()
   try {
-    const allocation = await loadCostTargetDefaultAllocation(projectId, controller.signal)
+    const [allocation, managerOptions] = await Promise.all([
+      loadCostTargetDefaultAllocation(projectId, controller.signal),
+      loadCostTargetProjectManagerOptions(projectId, controller.signal),
+    ])
     if (allocationController !== controller || form.projectId !== projectId) return
+    responsibleUsers.value = managerOptions.map((option) => ({
+      value: option.id,
+      label: `${option.realName || option.username}${option.eligible ? '' : '（历史项目经理）'}`,
+      disabled: !option.eligible,
+    }))
     applyDefaultAllocation(allocation)
   } catch (error) {
     if (!controller.signal.aborted)
@@ -424,6 +447,16 @@ async function selectProject(projectId: string): Promise<void> {
   } finally {
     if (allocationController === controller) actionBusy.value = false
   }
+}
+
+async function loadManagerOptions(projectId: string, signal?: AbortSignal): Promise<void> {
+  const options = await loadCostTargetProjectManagerOptions(projectId, signal)
+  if (signal?.aborted || form.projectId !== projectId) return
+  responsibleUsers.value = options.map((option) => ({
+    value: option.id,
+    label: `${option.realName || option.username}${option.eligible ? '' : '（历史项目经理）'}`,
+    disabled: !option.eligible,
+  }))
 }
 
 function applyDefaultAllocation(allocation: CostTargetDefaultAllocation): void {

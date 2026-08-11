@@ -12,9 +12,8 @@ import { dismissToast, toastItems } from '@/components/toast'
 import {
   createVariation,
   deleteVariation,
-  loadContractPage,
+  loadAllContracts,
   loadCostSubjectOptions,
-  loadPartners,
   loadProjectContextOptions,
   loadVariation,
   loadVariationPage,
@@ -31,9 +30,8 @@ import { useSessionStore } from '@/stores/session'
 vi.mock('@/services/commercial', () => ({
   createVariation: vi.fn(),
   deleteVariation: vi.fn(),
-  loadContractPage: vi.fn(),
+  loadAllContracts: vi.fn(),
   loadCostSubjectOptions: vi.fn(),
-  loadPartners: vi.fn(),
   loadProjectContextOptions: vi.fn(),
   loadVariation: vi.fn(),
   loadVariationPage: vi.fn(),
@@ -141,54 +139,98 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue([
       { id: 'P1', projectCode: 'PRJ-001', projectName: '项目一', status: 'ACTIVE' },
+      { id: 'P2', projectCode: 'PRJ-002', projectName: '已关闭项目', status: 'CLOSED' },
     ])
-  vi.mocked(loadContractPage)
+  vi.mocked(loadAllContracts)
     .mockReset()
-    .mockResolvedValue({
-      records: [
-        {
-          id: 'C1',
-          tenantId: '1',
-          orgId: '1',
-          projectId: 'P1',
-          contractCode: 'CT-001',
-          contractName: '合同一',
-          contractType: 'MAIN',
-          partyAId: 'A',
-          partyAName: '甲方',
-          partyBId: 'B',
-          partyBName: '乙方',
-          contractAmount: '1.00',
-          currentAmount: '1.00',
-          taxRate: '0',
-          taxAmount: '0',
-          amountWithoutTax: '1.00',
-          signedDate: '2026-01-01',
-          startDate: '2026-01-01',
-          endDate: '2026-12-31',
-          paymentMethod: '',
-          settlementMethod: '',
-          paidAmount: '0',
-          settlementAmount: '0',
-          contractStatus: 'PERFORMING',
-          approvalStatus: 'APPROVED',
-          projectName: '项目一',
-          version: '1',
-        },
-      ],
-      total: 1,
-      pageNo: 1,
-      pageSize: 200,
-    })
-  vi.mocked(loadPartners)
-    .mockReset()
-    .mockResolvedValue({
-      records: [{ id: 'A1', partnerCode: 'PTN-001', partnerName: '往来单位一', status: 'ENABLE' }],
-    })
+    .mockResolvedValue([
+      {
+        id: 'C1',
+        tenantId: '1',
+        orgId: '1',
+        projectId: 'P1',
+        contractCode: 'CT-001',
+        contractName: '合同一',
+        contractType: 'MAIN',
+        partyAId: 'A',
+        partyAName: '甲方',
+        partyBId: 'B',
+        partyBName: '乙方',
+        contractAmount: '1.00',
+        currentAmount: '1.00',
+        taxRate: '0',
+        taxAmount: '0',
+        amountWithoutTax: '1.00',
+        signedDate: '2026-01-01',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        paymentMethod: '',
+        settlementMethod: '',
+        paidAmount: '0',
+        settlementAmount: '0',
+        contractStatus: 'PERFORMING',
+        approvalStatus: 'APPROVED',
+        projectName: '项目一',
+        version: '1',
+      },
+      {
+        id: 'C2',
+        tenantId: '1',
+        orgId: '1',
+        projectId: 'P1',
+        contractCode: 'CT-002',
+        contractName: '成本合同草稿',
+        contractType: 'SUB',
+        partyAId: 'A',
+        partyAName: '甲方',
+        partyBId: 'B',
+        partyBName: '乙方',
+        contractAmount: '1.00',
+        currentAmount: '1.00',
+        taxRate: '0',
+        taxAmount: '0',
+        amountWithoutTax: '1.00',
+        signedDate: '2026-01-01',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        paymentMethod: '',
+        settlementMethod: '',
+        paidAmount: '0',
+        settlementAmount: '0',
+        contractStatus: 'DRAFT',
+        approvalStatus: 'DRAFT',
+        projectName: '项目一',
+        version: '1',
+      },
+    ])
   vi.mocked(loadCostSubjectOptions)
     .mockReset()
     .mockResolvedValue([
-      { id: 'CS1', subjectCode: '5401', subjectName: '合同履约成本', status: 'ENABLE' },
+      {
+        id: 'CS-PARENT',
+        subjectCode: '5400',
+        subjectName: '成本父科目',
+        status: 'ENABLE',
+      },
+      {
+        id: 'CS-LEAF',
+        parentId: 'CS-PARENT',
+        subjectCode: '5401',
+        subjectName: '启用叶子科目',
+        status: 'ENABLE',
+      },
+      {
+        id: 'CS-DISABLED',
+        subjectCode: '5499',
+        subjectName: '停用叶子科目',
+        status: 'DISABLE',
+      },
+      {
+        id: 'CS1',
+        subjectCode: '5402',
+        subjectName: '历史成本科目',
+        status: 'DISABLE',
+      },
     ])
   vi.mocked(loadSchedules)
     .mockReset()
@@ -254,6 +296,41 @@ beforeEach(() => {
 })
 
 describe('M4 variation page', () => {
+  it('keeps cost-contract drafts while limiting income to performing main contracts', async () => {
+    const { wrapper } = await mountPage('/variation/order?mode=create&projectId=P1', [
+      'variation:order:add',
+    ])
+
+    const dialog = wrapper.get('[role="dialog"]')
+    expect(loadAllContracts).toHaveBeenCalledWith({ projectId: 'P1' }, expect.any(AbortSignal))
+    expect(dialog.get('select[aria-label="项目"]').text()).not.toContain('已关闭项目')
+    expect(dialog.get('select[aria-label="合同"]').text()).toContain('成本合同草稿')
+    await dialog.get('select[aria-label="合同"]').setValue('C1')
+    expect(dialog.get('select[aria-label="往来单位"]').text()).toContain('乙方')
+    expect(dialog.get('select[aria-label="往来单位"]').text()).not.toContain('甲方')
+
+    await dialog.get('select[aria-label="方向"]').setValue('INCOME')
+    await flushPromises()
+    expect(dialog.get('select[aria-label="合同"]').text()).not.toContain('成本合同草稿')
+    expect(dialog.get('select[aria-label="往来单位"]').text()).toContain('甲方')
+    expect(dialog.get('select[aria-label="往来单位"]').text()).not.toContain('乙方')
+  })
+
+  it('shows only enabled leaf cost subjects and preserves the current historical subject disabled', async () => {
+    const { wrapper } = await mountPage('/variation/order?mode=detail&id=9', [
+      'variation:order:query',
+      'variation:order:item:edit',
+    ])
+
+    const subject = wrapper.get('select[aria-label="成本科目"]')
+    expect(subject.text()).toContain('启用叶子科目')
+    expect(subject.text()).not.toContain('成本父科目')
+    expect(subject.text()).not.toContain('停用叶子科目')
+    const historical = subject.get('option[value="CS1"]')
+    expect(historical.text()).toContain('历史成本科目（历史值）')
+    expect(historical.attributes('disabled')).toBeDefined()
+  })
+
   it('renders the server ledger and exact permission actions', async () => {
     const { wrapper } = await mountPage('/variation/order?period=2026-07', [
       'variation:order:query',
@@ -356,6 +433,37 @@ describe('M4 variation page', () => {
     await flushPromises()
 
     expect(updateVariation).toHaveBeenCalledWith('9', expect.objectContaining({ version: '3' }))
+  })
+
+  it('keeps a locked historical cost contract when income is not eligible', async () => {
+    vi.mocked(loadVariation).mockResolvedValue({
+      ...baseRecord,
+      contractId: 'C2',
+      contractName: '成本合同草稿',
+      direction: 'COST',
+    })
+    const { wrapper } = await mountPage('/variation/order?mode=edit&id=9&projectId=P1', [
+      'variation:order:query',
+      'variation:order:edit',
+    ])
+
+    const contract = wrapper.get('select[aria-label="合同"]')
+    expect(contract.element.value).toBe('C2')
+    expect(contract.attributes('disabled')).toBeDefined()
+    expect(
+      wrapper
+        .get('#variation-editor-form')
+        .get('select[aria-label="方向"]')
+        .get('option[value="INCOME"]')
+        .attributes('disabled'),
+    ).toBeDefined()
+
+    await wrapper.get('#variation-editor-form').trigger('submit')
+    await flushPromises()
+    expect(updateVariation).toHaveBeenCalledWith(
+      '9',
+      expect.objectContaining({ contractId: 'C2', direction: 'COST', version: '3' }),
+    )
   })
 
   it('keeps item editing behind its dedicated permission', async () => {

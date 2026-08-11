@@ -148,6 +148,7 @@ public class BidCostService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(BidCost bid) {
         Long tenantId = tenant();
+        requireEligibleOwner(bid.getOwnerId());
         bid.setTenantId(tenantId);
         bid.setProjectId(null);
         bid.setBidStatus("PREPARING");
@@ -171,6 +172,9 @@ public class BidCostService {
     public void update(BidCost command) {
         BidCost existing = requireExisting(command.getId());
         ensureBoundProjectVisible(existing, "编辑投标记录");
+        if (!Objects.equals(existing.getOwnerId(), command.getOwnerId())) {
+            requireEligibleOwner(command.getOwnerId());
+        }
         String current = normalizeStatus(existing.getBidStatus());
         if (!Set.of("PREPARING", "SUBMITTED", "EVALUATING").contains(current)) {
             throw new BusinessException("BID_STATUS_NOT_EDITABLE", "投标结果登记后不可编辑");
@@ -196,6 +200,15 @@ public class BidCostService {
                 .set(BidCost::getFinalBidPrice, command.getFinalBidPrice())
                 .set(BidCost::getRemark, command.getRemark());
         requireStateCas(mapper.update(null, update));
+    }
+
+    private void requireEligibleOwner(Long ownerId) {
+        if (ownerId == null) return;
+        boolean eligible = mapper.selectOwnerOptions(tenant()).stream()
+                .anyMatch(option -> Objects.equals(option.ownerId(), ownerId));
+        if (!eligible) {
+            throw new BusinessException("BID_OWNER_INVALID", "投标负责人不存在、已停用或无投标维护权限");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

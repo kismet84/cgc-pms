@@ -79,8 +79,8 @@ const state = {
       partnerName: '供应商甲',
       orderCode: 'PO-001',
       totalAmount: '32.50',
-      approvalStatus: 'DRAFT',
-      orderStatus: 'DRAFT',
+      approvalStatus: 'APPROVED',
+      orderStatus: 'PERFORMING',
     },
   ],
   orderItems: [
@@ -170,8 +170,21 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
       pageSize: 200,
     }),
   )
-  await page.route('**/api/contracts**', (route) =>
-    fulfill(route, {
+  await page.route('**/api/contracts**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/contracts/C1/items')
+      return fulfill(route, [
+        {
+          id: 'CI1',
+          contractId: 'C1',
+          materialId: 'M1',
+          itemCode: 'MAT-001',
+          itemName: '钢筋',
+          itemSpec: 'HRB400',
+          unit: '吨',
+        },
+      ])
+    return fulfill(route, {
       records: [
         {
           id: 'C1',
@@ -179,13 +192,16 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
           contractName: '钢材采购合同',
           contractType: 'PURCHASE',
           approvalStatus: 'APPROVED',
+          contractStatus: 'PERFORMING',
+          partyBId: 'S1',
+          partyBName: '供应商甲',
         },
       ],
       total: 1,
       pageNo: 1,
       pageSize: 200,
-    }),
-  )
+    })
+  })
   await page.route('**/api/project-budgets**', (route) => {
     const path = new URL(route.request().url()).pathname
     return path === '/api/project-budgets/B1'
@@ -338,7 +354,8 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     state.orderItems.splice(1)
     state.receiptItems.splice(1)
     state.requests[0]!.approvalStatus = 'DRAFT'
-    state.orders[0]!.approvalStatus = 'DRAFT'
+    state.orders[0]!.approvalStatus = 'APPROVED'
+    state.orders[0]!.orderStatus = 'PERFORMING'
     state.receipts[0]!.approvalStatus = 'DRAFT'
   })
 

@@ -123,7 +123,9 @@ const canUpload = computed(() => session.hasPermission('file:upload'))
 const contractOptions = computed(() =>
   contracts.value.map((c) => ({ value: c.id, label: c.contractName })),
 )
-const projectOptions = computed(() => workspace.projects)
+const projectOptions = computed(() =>
+  workspace.projects.filter((project) => project.status === 'ACTIVE'),
+)
 const periodOptions = computed(() =>
   creationPeriods.value
     .filter((p) => text(p, 'status') === 'OPEN')

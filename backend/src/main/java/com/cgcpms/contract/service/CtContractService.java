@@ -92,6 +92,28 @@ public class CtContractService {
     private final FileLifecycleGateway fileLifecycleGateway;
     private final JdbcTemplate jdbcTemplate;
 
+    public List<ContractProjectOption> getProjectOptions() {
+        List<PmProject> projects = projectAccessChecker.accessibleProjects();
+        if (projects.isEmpty()) return List.of();
+        Set<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toSet());
+        Set<Long> activeBudgetProjectIds = projectBudgetMapper.selectList(
+                        new LambdaQueryWrapper<ProjectBudget>()
+                                .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId())
+                                .in(ProjectBudget::getProjectId, projectIds)
+                                .eq(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
+                                .eq(ProjectBudget::getActiveFlag, 1))
+                .stream().map(ProjectBudget::getProjectId).collect(Collectors.toSet());
+        return projects.stream().map(project -> new ContractProjectOption(
+                String.valueOf(project.getId()), project.getProjectCode(), project.getProjectName(),
+                project.getStatus(),
+                "APPROVED".equals(project.getApprovalStatus())
+                        && Set.of(ProjectStatusConstants.PREPARING, ProjectStatusConstants.ACTIVE)
+                        .contains(project.getStatus()),
+                ProjectStatusConstants.ACTIVE.equals(project.getStatus())
+                        && activeBudgetProjectIds.contains(project.getId())))
+                .toList();
+    }
+
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
                                        String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
@@ -669,6 +691,15 @@ public class CtContractService {
             throw new BusinessException("PURCHASE_SUPPLIER_DISABLED", "供应商已停用，禁止提交采购合同审批");
         if (java.util.Objects.equals(supplier.getBlacklistFlag(), 1))
             throw new BusinessException("PURCHASE_SUPPLIER_BLACKLISTED", "黑名单供应商禁止提交采购合同审批");
+    }
+
+    public record ContractProjectOption(
+            String id,
+            String projectCode,
+            String projectName,
+            String status,
+            boolean mainEligible,
+            boolean nonMainEligible) {
     }
 
     private CtContractVO toVO(CtContract c) {

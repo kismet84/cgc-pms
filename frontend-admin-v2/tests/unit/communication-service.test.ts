@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createConversation,
   createMessageDraft,
+  loadConversationMembers,
   loadCommunicationUsers,
   loadMessages,
   markConversationRead,
@@ -24,6 +25,7 @@ describe('communication service', () => {
     vi.mocked(apiRequest).mockResolvedValue([])
 
     await loadCommunicationUsers(' 张 三 ')
+    await loadConversationMembers('9007199254740993')
     await loadMessages('9007199254740993', '9007199254740995', 25)
     await createConversation({ type: 'DIRECT', memberIds: ['9007199254740997'] })
     await createMessageDraft('9007199254740993', 'hello', 'client-1')
@@ -38,15 +40,20 @@ describe('communication service', () => {
     )
     expect(apiRequest).toHaveBeenNthCalledWith(
       2,
+      '/communications/conversations/9007199254740993/members',
+      { signal: undefined },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      3,
       '/communications/conversations/9007199254740993/messages?afterSeq=9007199254740995&pageSize=25',
       { signal: undefined },
     )
-    expect(apiRequest).toHaveBeenNthCalledWith(3, '/communications/conversations', {
+    expect(apiRequest).toHaveBeenNthCalledWith(4, '/communications/conversations', {
       method: 'POST',
       body: { type: 'DIRECT', memberIds: ['9007199254740997'] },
     })
     expect(apiRequest).toHaveBeenNthCalledWith(
-      5,
+      6,
       '/communications/conversations/9007199254740993/read',
       { method: 'PUT', body: { seq: '9007199254740995' } },
     )

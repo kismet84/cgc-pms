@@ -104,6 +104,15 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('v-if="!purchaseRequestSelfOnly"')
     expect(source).toContain('loadPartners')
     expect(source).toContain('loadContractPage')
+    expect(source).toContain('loadContractItems')
+    expect(source).toContain("contractStatus: 'PERFORMING'")
+    expect(source).toContain(
+      'form.partnerId = contracts.value.find((item) => item.id === value)?.partyBId',
+    )
+    expect(source).toContain('contractItems.value.map((item) => item.materialId)')
+    expect(source).toContain("['PERFORMING', 'PARTIAL_RECEIVED'].includes(item.orderStatus || '')")
+    expect(source).toContain('item.id === form.orderId')
+    expect(source).not.toContain('changeOrderEditContract')
     expect(source).toContain('loadBudgetPage')
     expect(source).toContain('budgetLineId: requiredDraft')
     expect(source).not.toContain('estimatedUnitPrice')

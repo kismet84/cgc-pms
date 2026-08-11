@@ -35,6 +35,7 @@ class CostControlControllerTest {
     private static final long TARGET = 99189002L;
     private static final long FORECAST = 99189003L;
     private static final long DRAFT_FORECAST = 99189009L;
+    private static final long CORRECTIVE = 99189010L;
     private static final long OUTSIDER = 99189004L;
     private static final long MEMBER = 99189005L;
     private static final long PROJECT_WITHOUT_FORECAST = 99189007L;
@@ -58,6 +59,7 @@ class CostControlControllerTest {
 
     @AfterEach
     void cleanup() {
+        jdbc.update("DELETE FROM cost_corrective_action WHERE id=?", CORRECTIVE);
         jdbc.update("DELETE FROM cost_forecast WHERE id=?", DRAFT_FORECAST);
         jdbc.update("DELETE FROM cost_forecast WHERE id=?", FORECAST);
         jdbc.update("DELETE FROM cost_target WHERE id=?", TARGET);
@@ -146,6 +148,69 @@ class CostControlControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/cost-controls/forecasts/{id}/trace", FORECAST).contextPath("/api").cookie(query))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/cost-controls/projects/{id}/corrective-owner-options", PROJECT)
+                        .contextPath("/api").cookie(cookie("cost:corrective:maintain")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void correctiveOwnerOptionsRequireMaintainPermissionAndActiveEnabledMembership() throws Exception {
+        Cookie maintainer = memberCookie("cost:corrective:maintain");
+        mockMvc.perform(get("/api/cost-controls/projects/{id}/corrective-owner-options", PROJECT)
+                        .contextPath("/api").cookie(maintainer))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.length()").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data[0].userId").value(String.valueOf(MEMBER)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data[0].username").value("cost.control.member"));
+        mockMvc.perform(get("/api/cost-controls/projects/{id}/corrective-owner-options", PROJECT)
+                        .contextPath("/api").cookie(memberCookie("cost:control:query")))
+                .andExpect(status().isForbidden());
+
+        Cookie admin = adminCookie();
+        jdbc.update("UPDATE sys_user SET status='DISABLE' WHERE id=?", MEMBER);
+        mockMvc.perform(get("/api/cost-controls/projects/{id}/corrective-owner-options", PROJECT)
+                        .contextPath("/api").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data").isEmpty());
+
+        jdbc.update("UPDATE sys_user SET status='ENABLE' WHERE id=?", MEMBER);
+        jdbc.update("UPDATE pm_project_member SET status='INACTIVE' WHERE project_id=? AND user_id=?", PROJECT, MEMBER);
+        mockMvc.perform(get("/api/cost-controls/projects/{id}/corrective-owner-options", PROJECT)
+                        .contextPath("/api").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void historicalResponsibleCanRemainButCannotBeNewOrReplacementResponsible() throws Exception {
+        jdbc.update("UPDATE cost_forecast SET status='ACTION_REQUIRED',cost_variance_amount=100 WHERE id=?", FORECAST);
+        jdbc.update("""
+                INSERT INTO cost_corrective_action(id,tenant_id,project_id,forecast_id,action_code,action_title,root_cause,action_plan,
+                  expected_saving_amount,responsible_user_id,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'CA-HISTORY','历史负责人纠偏','原因','计划',1,?,?,'DRAFT',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, CORRECTIVE, PROJECT, FORECAST, MEMBER, LocalDate.now().plusDays(1));
+        jdbc.update("UPDATE sys_user SET status='DISABLE' WHERE id=?", MEMBER);
+        jdbc.update("UPDATE pm_project_member SET status='INACTIVE' WHERE project_id=? AND user_id=?", PROJECT, MEMBER);
+        Cookie admin = adminCookie();
+
+        mockMvc.perform(put("/api/cost-controls/corrective-actions/{id}", CORRECTIVE).contextPath("/api")
+                        .param("version", "0").contentType(MediaType.APPLICATION_JSON)
+                        .content(correctiveBody(MEMBER)).cookie(admin))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals(MEMBER, jdbc.queryForObject(
+                "SELECT responsible_user_id FROM cost_corrective_action WHERE id=?", Long.class, CORRECTIVE));
+
+        mockMvc.perform(put("/api/cost-controls/corrective-actions/{id}", CORRECTIVE).contextPath("/api")
+                        .param("version", "1").contentType(MediaType.APPLICATION_JSON)
+                        .content(correctiveBody(OUTSIDER)).cookie(admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value("COST_RESPONSIBLE_PROJECT_MEMBER_INVALID"));
+        mockMvc.perform(post("/api/cost-controls/corrective-actions").contextPath("/api")
+                        .contentType(MediaType.APPLICATION_JSON).content(correctiveBody(MEMBER)).cookie(admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                        .value("COST_RESPONSIBLE_PROJECT_MEMBER_INVALID"));
     }
 
     @Test
@@ -175,6 +240,18 @@ class CostControlControllerTest {
     private Cookie memberCookie(String... authorities) {
         String token = jwtUtils.generateToken(MEMBER, "cost.control.member", 0L, List.of(), List.of(authorities));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Cookie adminCookie() {
+        String token = jwtUtils.generateToken(OUTSIDER, "cost.control.outsider", 0L, List.of("ADMIN"), List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private String correctiveBody(long responsibleUserId) {
+        return """
+                {"forecastId":%d,"actionTitle":"历史负责人纠偏","rootCause":"原因","actionPlan":"计划",
+                 "expectedSavingAmount":1,"responsibleUserId":%d,"dueDate":"%s"}
+                """.formatted(FORECAST, responsibleUserId, LocalDate.now().plusDays(1));
     }
 
     private void assertVersionAndPermission(String name, String permission, Class<?>... parameterTypes) throws Exception {

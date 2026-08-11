@@ -3,6 +3,7 @@ package com.cgcpms.bid;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.cgcpms.bid.dto.BidCostOption;
+import com.cgcpms.bid.dto.BidOwnerOption;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -109,6 +111,45 @@ class BidCostServiceTest {
         command.setBidProjectName("待中标工程");
 
         assertDoesNotThrow(() -> service.update(command));
+    }
+
+    @Test
+    void ownerCandidatesRequireAnEnabledRoleWithBidWritePermission() throws NoSuchMethodException {
+        Select select = BidCostMapper.class
+                .getMethod("selectOwnerOptions", Long.class)
+                .getAnnotation(Select.class);
+        String sql = String.join(" ", select.value());
+
+        assertTrue(sql.contains("FROM sys_user_role"));
+        assertTrue(sql.contains("FROM sys_role_menu"));
+        assertTrue(sql.contains("m.perms IN ('bid:add','bid:edit')"));
+        assertTrue(sql.contains("r.status='ENABLE'"));
+        assertTrue(sql.contains("u.status IN ('ACTIVE', 'ENABLE')"));
+        assertTrue(sql.contains("r.role_code IN ('ADMIN','SUPER_ADMIN')"));
+    }
+
+    @Test
+    void changedOwnerMustRemainInAuthoritativeCandidates() {
+        BidCost existing = new BidCost();
+        existing.setId(12L);
+        existing.setTenantId(TestUserContext.TENANT_0);
+        existing.setBidStatus("PREPARING");
+        when(mapper.selectById(12L)).thenReturn(existing);
+        when(mapper.selectOwnerOptions(TestUserContext.TENANT_0))
+                .thenReturn(List.of(new BidOwnerOption(21L, "投标负责人")));
+
+        BidCost accepted = new BidCost();
+        accepted.setId(12L);
+        accepted.setOwnerId(21L);
+        when(mapper.update(any(), any())).thenReturn(1);
+        assertDoesNotThrow(() -> service.update(accepted));
+
+        BidCost rejected = new BidCost();
+        rejected.setId(12L);
+        rejected.setOwnerId(22L);
+        assertEquals("BID_OWNER_INVALID", assertThrows(
+                com.cgcpms.common.exception.BusinessException.class,
+                () -> service.update(rejected)).getCode());
     }
 
     @Test

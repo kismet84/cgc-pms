@@ -89,6 +89,23 @@ public class CommunicationService {
                 rs.getString("role"), rs.getLong("unread_count")), tenantId(), userId());
     }
 
+    public List<MemberSummary> members(long conversationId) {
+        ConversationAccess access = requireConversation(conversationId, false);
+        requireGroup(access);
+        requireActiveConversation(access);
+        requireManager(access);
+        return jdbcTemplate.query("""
+                SELECT m.user_id,u.username,u.real_name,u.avatar,m.role,u.status AS user_status
+                FROM communication_member m
+                LEFT JOIN sys_user u ON u.tenant_id=m.tenant_id AND u.id=m.user_id
+                WHERE m.tenant_id=? AND m.conversation_id=?
+                  AND m.status='ACTIVE' AND m.deleted_flag=0
+                ORDER BY m.user_id
+                """, (rs, ignored) -> new MemberSummary(id(rs.getLong("user_id")), rs.getString("username"),
+                rs.getString("real_name"), rs.getString("avatar"), rs.getString("role"),
+                rs.getString("user_status")), tenantId(), conversationId);
+    }
+
     @Transactional
     public ConversationSummary createConversation(String type, String name, List<Long> memberIds) {
         String normalizedType = type == null ? "" : type.trim().toUpperCase();
@@ -723,6 +740,8 @@ public class CommunicationService {
     private record MemberAccess(String role, long joinSeq, Long leaveSeq, String status) {}
 
     public record CommunicationUserSummary(String id, String username, String realName, String avatar) {}
+    public record MemberSummary(String userId, String username, String realName, String avatar,
+                                String role, String userStatus) {}
     public record ConversationSummary(String id, String type, String name, String ownerUserId,
                                       String lastMessageSeq, LocalDateTime lastMessageAt,
                                       String status, String role, long unreadCount) {}

@@ -192,6 +192,13 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain(':options="partnerOptions"')
     expect(pageSource).toContain(':options="contractOptions"')
     expect(pageSource).toContain(':options="userOptions(issueForm.responsibleUserId)"')
+    expect(pageSource).toContain("['SUPPLIER', 'SUB', 'SUBCONTRACTOR']")
+    expect(pageSource).toContain("item.status === 'ENABLE'")
+    expect(pageSource).toContain(
+      '[item.partyAId, item.partyBId].includes(consequenceForm.partnerId)',
+    )
+    expect(pageSource).toContain("canConsequence && issue.responsibleKind === 'PARTNER'")
+    expect(pageSource).toContain("loadPartners({ pageNo: 1, pageSize: 200, status: 'ENABLE' })")
     expect(pageSource).toContain('整改已提交审批')
     expect(pageSource).toContain('后果已提交审批')
     expect(pageSource).toContain('提交既有后果审批')

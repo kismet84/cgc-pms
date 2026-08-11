@@ -81,7 +81,16 @@ class VariationClaimClosedLoopIntegrationTest {
     @Transactional
     @DisplayName("现场证据→内部审批→业主退回重报→部分核定→合同变更生效→成本不重复→全链追溯")
     void closesVariationClaimLoop() {
-        Long subjectId = jdbc.queryForObject("SELECT id FROM cost_subject WHERE tenant_id=0 AND deleted_flag=0 LIMIT 1", Long.class);
+        Long subjectId = jdbc.queryForObject("""
+                SELECT cs.id
+                FROM cost_subject cs
+                WHERE cs.tenant_id=0 AND cs.status='ENABLE' AND cs.deleted_flag=0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM cost_subject child
+                      WHERE child.tenant_id=cs.tenant_id AND child.parent_id=cs.id AND child.deleted_flag=0)
+                ORDER BY cs.id
+                LIMIT 1
+                """, Long.class);
         VarOrder order = new VarOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(CONTRACT_ID);

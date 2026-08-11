@@ -170,6 +170,29 @@ class BusinessAmountFieldCatalogTest {
     }
 
     @Test
+    void redactsReviewedCostControlJdbcMapShapesAndKeepsRatios() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("expected_saving_amount", "10.00");
+        data.put("profit_margin", "0.25");
+        data.put("activeTarget", Map.of(
+                "source_contract_amount", new BigDecimal("1000.00"),
+                "target_cost_rate", new BigDecimal("0.80")));
+        data.put("forecastItems", List.of(Map.of(
+                "actual_cost_amount", new BigDecimal("150.00"),
+                "cost_variance_amount", new BigDecimal("20.00"))));
+
+        JsonNode result = BusinessAmountFieldCatalog.redact(objectMapper, Map.class, data);
+
+        assertTrue(result.path("expected_saving_amount").isNull());
+        assertEquals("0.25", result.path("profit_margin").asText());
+        assertTrue(result.at("/activeTarget/source_contract_amount").isNull());
+        assertEquals(0, new BigDecimal("0.80")
+                .compareTo(result.at("/activeTarget/target_cost_rate").decimalValue()));
+        assertTrue(result.at("/forecastItems/0/actual_cost_amount").isNull());
+        assertTrue(result.at("/forecastItems/0/cost_variance_amount").isNull());
+    }
+
+    @Test
     void failsClosedForUnknownNumericTextAndUnknownAmountPath() {
         BusinessException numericText = assertThrows(BusinessException.class,
                 () -> BusinessAmountFieldCatalog.redact(objectMapper, CtContractVO.class,

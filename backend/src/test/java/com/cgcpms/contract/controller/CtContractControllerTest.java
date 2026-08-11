@@ -4,6 +4,7 @@ import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -44,6 +45,22 @@ class CtContractControllerTest {
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
 
+    @BeforeAll
+    void ensureAdminUser() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id=?", Integer.class, ADMIN_ID);
+        if (count != null && count == 0) {
+            jdbc.update("""
+                    INSERT INTO sys_user
+                        (id,tenant_id,username,password,real_name,status,is_admin,deleted_flag)
+                    VALUES (?,?,'admin','{noop}test','合同接口测试管理员','ENABLE',1,0)
+                    """, ADMIN_ID, TENANT_ID);
+        } else {
+            jdbc.update("UPDATE sys_user SET tenant_id=?,status='ENABLE',is_admin=1,deleted_flag=0 WHERE id=?",
+                    TENANT_ID, ADMIN_ID);
+        }
+    }
+
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
@@ -63,6 +80,18 @@ class CtContractControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.records").isArray());
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("GET /contracts/project-options → 返回合同类型资格标记")
+    void projectOptionsExposeAuthoritativeEligibility() throws Exception {
+        mockMvc.perform(getWithApi("/contracts/project-options").cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].mainEligible").isBoolean())
+                .andExpect(jsonPath("$.data[0].nonMainEligible").isBoolean());
     }
 
     @Test

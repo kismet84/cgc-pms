@@ -69,6 +69,25 @@ async function installContractMock(page: Page, readIdentity: () => Identity): Pr
       }),
     }),
   )
+  await page.route('**/api/contracts/project-options', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: [
+          {
+            id: 'P1',
+            projectName: '项目一',
+            status: 'ACTIVE',
+            mainEligible: true,
+            nonMainEligible: true,
+          },
+        ],
+      }),
+    }),
+  )
   await page.route(/\/api\/partners(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,

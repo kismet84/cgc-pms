@@ -9,8 +9,8 @@ import {
   deleteContract,
   loadContractComposite,
   loadContractPage,
+  loadContractProjectOptions,
   loadPartners,
-  loadProjectContextOptions,
   submitContract,
   updateContractComposite,
 } from '@/services/commercial'
@@ -40,8 +40,8 @@ vi.mock('@/services/commercial', () => ({
   deleteContract: vi.fn(),
   loadContractComposite: vi.fn(),
   loadContractPage: vi.fn(),
+  loadContractProjectOptions: vi.fn(),
   loadPartners: vi.fn(),
-  loadProjectContextOptions: vi.fn(),
   submitContract: vi.fn(),
   updateContractComposite: vi.fn(),
 }))
@@ -164,13 +164,53 @@ async function mountPage(path: string, permissions: string[]) {
 }
 
 beforeEach(() => {
-  vi.mocked(loadProjectContextOptions)
+  vi.mocked(loadContractProjectOptions)
     .mockReset()
-    .mockResolvedValue([{ id: 'P1', projectName: '项目一', status: 'ACTIVE' }])
+    .mockResolvedValue([
+      {
+        id: 'P1',
+        projectCode: 'P1',
+        projectName: '主合同项目',
+        status: 'ACTIVE',
+        mainEligible: true,
+        nonMainEligible: false,
+      },
+      {
+        id: 'P2',
+        projectCode: 'P2',
+        projectName: '非主合同项目',
+        status: 'ACTIVE',
+        mainEligible: false,
+        nonMainEligible: true,
+      },
+      {
+        id: 'P3',
+        projectCode: 'P3',
+        projectName: '不符合项目',
+        status: 'CLOSED',
+        mainEligible: false,
+        nonMainEligible: false,
+      },
+    ])
   vi.mocked(loadPartners)
     .mockReset()
     .mockResolvedValue({
-      records: [{ id: 'A1', partnerCode: 'A1', partnerName: '甲方一', status: 'ENABLE' }],
+      records: [
+        {
+          id: 'A1',
+          partnerCode: 'A1',
+          partnerName: '甲方一',
+          partnerType: 'CUSTOMER',
+          status: 'ENABLE',
+        },
+        {
+          id: 'B1',
+          partnerCode: 'B1',
+          partnerName: '乙方一',
+          partnerType: 'SUPPLIER',
+          status: 'ENABLE',
+        },
+      ],
     })
   vi.mocked(loadMaterials).mockReset().mockResolvedValue({
     records: [],
@@ -187,6 +227,46 @@ beforeEach(() => {
 })
 
 describe('M4 contracts page', () => {
+  it('filters project candidates by contract type and keeps the current historical project disabled', async () => {
+    const create = await mountPage('/contract/create', ['contract:add'])
+    const createProject = create.wrapper.get('select[aria-label="项目"]')
+    expect(createProject.find('option[value="P1"]').exists()).toBe(true)
+    expect(createProject.find('option[value="P2"]').exists()).toBe(false)
+    expect(createProject.find('option[value="P3"]').exists()).toBe(false)
+
+    await create.wrapper.get('select[aria-label="合同类型"]').setValue('PURCHASE')
+    expect(createProject.find('option[value="P1"]').exists()).toBe(false)
+    expect(createProject.find('option[value="P2"]').exists()).toBe(true)
+    expect(createProject.find('option[value="P3"]').exists()).toBe(false)
+    create.wrapper.unmount()
+
+    vi.mocked(loadContractProjectOptions).mockResolvedValueOnce([
+      {
+        id: 'P1',
+        projectCode: 'P1',
+        projectName: '历史项目',
+        status: 'CLOSED',
+        mainEligible: false,
+        nonMainEligible: false,
+      },
+    ])
+    const edit = await mountPage('/contract/9/edit', ['contract:query', 'contract:edit'])
+    const historical = edit.wrapper.get('select[aria-label="项目"]').get('option[value="P1"]')
+    expect(historical.text()).toContain('历史项目（历史值）')
+    expect(historical.attributes('disabled')).toBeDefined()
+  })
+
+  it('prevents selecting the same party twice and limits purchase vendors to suppliers', async () => {
+    const { wrapper } = await mountPage('/contract/create', ['contract:add'])
+    await wrapper.get('select[aria-label="合同类型"]').setValue('PURCHASE')
+
+    const partyA = wrapper.get('select[aria-label="甲方"]')
+    await partyA.setValue('A1')
+    const partyB = wrapper.get('select[aria-label="乙方"]')
+    expect(partyB.text()).toContain('乙方一')
+    expect(partyB.text()).not.toContain('甲方一')
+  })
+
   it('searches material dictionary and adds the selected material to a purchase contract', async () => {
     const material = {
       id: 'M1',

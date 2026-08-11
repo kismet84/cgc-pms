@@ -6,12 +6,12 @@ import type {
   ContractItemRecord,
   ContractPage,
   ContractPaymentTermRecord,
+  ContractProjectOption,
   ContractQuery,
   ContractSaveCommand,
   ContractType,
   MaterialRecord,
   PartnerRecord,
-  ProjectContextOption,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -37,10 +37,10 @@ import {
   loadContractComposite,
   loadContractBudgetAllocations,
   loadContractPage,
+  loadContractProjectOptions,
   loadBudget,
   loadBudgetPage,
   loadPartners,
-  loadProjectContextOptions,
   submitContract,
   saveContractBudgetAllocations,
   updateContractComposite,
@@ -128,7 +128,7 @@ const allocationDrafts = ref<ContractBudgetAllocationRecord[]>([])
 const activeBudgetLines = ref<BudgetLineRecord[]>([])
 const allocationEditing = ref(false)
 const allocationSaving = ref(false)
-const projects = ref<ProjectContextOption[]>([])
+const projects = ref<ContractProjectOption[]>([])
 const partners = ref<PartnerRecord[]>([])
 const materials = ref<MaterialRecord[]>([])
 const form = ref<ContractSaveCommand>(emptyCommand())
@@ -195,6 +195,37 @@ const materialOptions = computed(() =>
     label: `${item.materialCode} · ${item.materialName}`,
   })),
 )
+const projectOptions = computed(() => {
+  const currentProjectId = form.value.contract.projectId
+  const isEligible = (project: ContractProjectOption) =>
+    form.value.contract.contractType === 'MAIN' ? project.mainEligible : project.nonMainEligible
+  const options = projects.value
+    .filter(
+      (project) =>
+        isEligible(project) || (mode.value === 'edit' && project.id === currentProjectId),
+    )
+    .map((project) => {
+      const eligible = isEligible(project)
+      return {
+        value: project.id,
+        label: `${project.projectName}${eligible ? '' : '（历史值）'}`,
+        disabled: !eligible,
+      }
+    })
+  if (
+    mode.value === 'edit' &&
+    currentProjectId &&
+    !options.some((project) => project.value === currentProjectId) &&
+    detail.value?.contract.projectName
+  ) {
+    options.push({
+      value: currentProjectId,
+      label: `${detail.value.contract.projectName}（历史值）`,
+      disabled: true,
+    })
+  }
+  return options
+})
 const pageCount = computed(() => {
   const pageSize = filter.pageSize ?? 10
   return Math.max(1, Math.ceil(total.value / pageSize))
@@ -219,6 +250,37 @@ const contractAmountLocked = computed(
     mode.value === 'edit' &&
     projects.value.find((project) => project.id === form.value.contract.projectId)?.status ===
       'ACTIVE',
+)
+function partnerCandidates(
+  excludedId: string | null | undefined,
+  currentId: string | null | undefined,
+  currentName: string | null | undefined,
+  eligible: (partner: PartnerRecord) => boolean = () => true,
+) {
+  const options = partners.value
+    .filter((partner) => partner.id !== excludedId && eligible(partner))
+    .map((partner) => ({ value: partner.id, label: partner.partnerName }))
+  if (currentId && !options.some((option) => option.value === currentId)) {
+    options.push({ value: currentId, label: `${currentName || '历史合作方'}（历史值）` })
+  }
+  return options
+}
+
+const partyAOptions = computed(() =>
+  partnerCandidates(
+    form.value.contract.partyBId,
+    form.value.contract.partyAId,
+    currentContract.value?.partyAName,
+  ),
+)
+const partyBOptions = computed(() =>
+  partnerCandidates(
+    form.value.contract.partyAId,
+    form.value.contract.partyBId,
+    currentContract.value?.partyBName,
+    (partner) =>
+      form.value.contract.contractType !== 'PURCHASE' || partner.partnerType === 'SUPPLIER',
+  ),
 )
 
 function emptyCommand(): ContractSaveCommand {
@@ -391,7 +453,7 @@ async function loadReferenceData(): Promise<void> {
   const controller = new AbortController()
   refController = controller
   try {
-    const projectOptions = await loadProjectContextOptions(controller.signal)
+    const projectOptions = await loadContractProjectOptions(controller.signal)
     if (refController !== controller) return
     projects.value = projectOptions
     if (mode.value === 'create' || mode.value === 'edit') {
@@ -579,11 +641,21 @@ function previewTaxBreakdown(
 }
 
 function updateContractType(value: string): void {
+  const contractType = value as ContractType
+  const selectedProject = projects.value.find(
+    (project) => project.id === form.value.contract.projectId,
+  )
+  const selectedProjectEligible = selectedProject
+    ? contractType === 'MAIN'
+      ? selectedProject.mainEligible
+      : selectedProject.nonMainEligible
+    : false
   form.value = {
     ...form.value,
     contract: {
       ...form.value.contract,
-      contractType: value as ContractType,
+      contractType,
+      projectId: selectedProjectEligible ? form.value.contract.projectId : '',
       pricingMode: value === 'PURCHASE' ? form.value.contract.pricingMode || 'FIXED' : null,
     },
   }
@@ -731,6 +803,17 @@ function sanitizeCommand(value: ContractSaveCommand): ContractSaveCommand {
 
 function validateForm(command: ContractSaveCommand): string | null {
   if (!command.contract.projectId) return '项目不能为空'
+  const selectedProject = projects.value.find(
+    (project) => project.id === command.contract.projectId,
+  )
+  if (
+    !selectedProject ||
+    (command.contract.contractType === 'MAIN'
+      ? !selectedProject.mainEligible
+      : !selectedProject.nonMainEligible)
+  ) {
+    return '所选项目不符合当前合同类型的审批、状态或预算要求'
+  }
   if (!command.contract.contractName) return '合同名称不能为空'
   if (!command.contract.partyAId || !command.contract.partyBId) return '甲乙方不能为空'
   if (!command.contract.contractAmount) return '合同金额不能为空'
@@ -1317,7 +1400,7 @@ onBeforeUnmount(() => {
             <V2Select
               :model-value="form.contract.projectId || ''"
               label="项目"
-              :options="projects.map((item) => ({ value: item.id, label: item.projectName }))"
+              :options="projectOptions"
               :disabled="formLocked"
               @update:model-value="updateContractField('projectId', $event)"
             />
@@ -1348,14 +1431,14 @@ onBeforeUnmount(() => {
             <V2Select
               :model-value="form.contract.partyAId || ''"
               label="甲方"
-              :options="partners.map((item) => ({ value: item.id, label: item.partnerName }))"
+              :options="partyAOptions"
               :disabled="formLocked"
               @update:model-value="updateContractField('partyAId', $event)"
             />
             <V2Select
               :model-value="form.contract.partyBId || ''"
               label="乙方"
-              :options="partners.map((item) => ({ value: item.id, label: item.partnerName }))"
+              :options="partyBOptions"
               :disabled="formLocked"
               @update:model-value="updateContractField('partyBId', $event)"
             />

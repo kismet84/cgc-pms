@@ -76,6 +76,15 @@ export interface ContractRecord {
   remark?: string | null;
 }
 
+export interface ContractProjectOption {
+  id: string;
+  projectCode: string;
+  projectName: string;
+  status: string;
+  mainEligible: boolean;
+  nonMainEligible: boolean;
+}
+
 export interface ContractItemRecord {
   id?: string | null;
   tenantId?: string | null;
@@ -490,6 +499,14 @@ export interface CostTargetDefaultAllocation {
   items: CostTargetDefaultAllocationItem[];
 }
 
+export interface CostTargetProjectManagerOption {
+  id: string;
+  username: string;
+  realName?: string | null;
+  status: string;
+  eligible: boolean;
+}
+
 export interface CostTargetSaveCommand {
   id?: string | null;
   projectId: string;
@@ -650,6 +667,12 @@ export interface CostCorrectiveCommand {
   dueDate: string;
   remark?: string | null;
   version?: string | number | null;
+}
+
+export interface CostCorrectiveOwnerOption {
+  userId: string;
+  username: string;
+  realName?: string | null;
 }
 
 export interface CostCorrectiveCloseCommand {
@@ -856,6 +879,7 @@ export const COMMERCIAL_QUERY_PERMISSIONS = {
 
 export const COMMERCIAL_API = {
   contracts: "/contracts",
+  contractProjectOptions: "/contracts/project-options",
   contractKpi: "/contracts/kpi",
   contract: (id: string) => `/contracts/${encodeURIComponent(id)}`,
   contractItems: (id: string) => `/contracts/${encodeURIComponent(id)}/items`,
@@ -892,6 +916,7 @@ export const COMMERCIAL_API = {
     `/bid-cost/${encodeURIComponent(id)}/documents/${encodeURIComponent(versionId)}/void`,
   costTargets: "/cost-targets",
   costTargetDefaultAllocation: "/cost-targets/default-allocation",
+  costTargetProjectManagerOptions: "/cost-targets/project-manager-options",
   costTarget: (id: string) => `/cost-targets/${encodeURIComponent(id)}`,
   costTargetItems: (id: string) =>
     `/cost-targets/${encodeURIComponent(id)}/items`,
@@ -912,6 +937,8 @@ export const COMMERCIAL_API = {
   accessibleCostControl: "/cost-controls/overview",
   costControl: (projectId: string) =>
     `/cost-controls/projects/${encodeURIComponent(projectId)}/overview`,
+  costCorrectiveOwnerOptions: (projectId: string) =>
+    `/cost-controls/projects/${encodeURIComponent(projectId)}/corrective-owner-options`,
   costForecasts: "/cost-controls/forecasts",
   costForecast: (id: string) =>
     `/cost-controls/forecasts/${encodeURIComponent(id)}`,

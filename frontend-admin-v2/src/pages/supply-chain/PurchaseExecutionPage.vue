@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   BudgetLineRecord,
+  ContractItemRecord,
   ContractPage,
   MaterialRecord,
   PartnerRecord,
@@ -63,7 +64,14 @@ import {
   updatePurchaseOrder,
   updateReceipt,
 } from '@/services/supply-chain'
-import { loadBudget, loadBudgetPage, loadContractPage, loadPartners } from '@/services/commercial'
+import {
+  loadBudget,
+  loadBudgetPage,
+  loadContract,
+  loadContractItems,
+  loadContractPage,
+  loadPartners,
+} from '@/services/commercial'
 import { deleteSiteFile, getSiteFileUrl, listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   downloadDocumentGeneration,
@@ -123,6 +131,7 @@ const receiptCandidates = ref<ReceiptItemRecord[]>([])
 const materials = ref<MaterialRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
 const contracts = ref<ContractPage['records']>([])
+const contractItems = ref<ContractItemRecord[]>([])
 const warehouses = ref<WarehouseRecord[]>([])
 const orderCandidates = ref<PurchaseOrderRecord[]>([])
 const requestCandidates = ref<PurchaseRequestRecord[]>([])
@@ -250,32 +259,71 @@ const returnableReceiptItems = computed(() =>
       label: `${item.materialName || '物料名称缺失'} · 已验收 ${item.acceptedQuantity}`,
     })),
 )
-const materialOptions = computed(() =>
-  materials.value.map((item) => ({
-    value: item.id,
-    label: [item.materialCode, item.materialName, item.specification].filter(Boolean).join(' · '),
-  })),
-)
+const materialOptions = computed(() => {
+  if (mode.value !== 'order')
+    return materials.value.map((item) => ({
+      value: item.id,
+      label: [item.materialCode, item.materialName, item.specification].filter(Boolean).join(' · '),
+    }))
+  const options = new Map<string, string>()
+  for (const item of contractItems.value) {
+    if (!item.materialId || options.has(item.materialId)) continue
+    const material = materials.value.find((candidate) => candidate.id === item.materialId)
+    options.set(
+      item.materialId,
+      [
+        material?.materialCode || item.itemCode,
+        material?.materialName || item.itemName,
+        material?.specification || item.itemSpec,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    )
+  }
+  return [...options].map(([value, label]) => ({ value, label }))
+})
 const contractOptions = computed(() =>
   contracts.value.map((item) => ({
     value: item.id,
     label: [item.contractCode, item.contractName].filter(Boolean).join(' · '),
   })),
 )
-const partnerOptions = computed(() => [
-  { value: '', label: '不指定供应商' },
-  ...partners.value.map((item) => ({
+const partnerOptions = computed(() => {
+  const options = partners.value.map((item) => ({
     value: item.id,
     label: [item.partnerCode, item.partnerName].filter(Boolean).join(' · '),
-  })),
-])
-const warehouseOptions = computed(() => [
-  { value: '', label: '不入库' },
-  ...warehouses.value.map((item) => ({
-    value: item.id,
-    label: [item.warehouseCode, item.warehouseName].filter(Boolean).join(' · '),
-  })),
-])
+  }))
+  for (const value of [form.partnerId, orderEditForm.partnerId]) {
+    if (!value || options.some((item) => item.value === value)) continue
+    const contract = contracts.value.find((item) => item.partyBId === value)
+    const selectedOrder = selected.value && 'orderCode' in selected.value ? selected.value : null
+    options.push({
+      value,
+      label: contract?.partyBName || selectedOrder?.partnerName || '历史供应商',
+    })
+  }
+  return options
+})
+const warehouseOptions = computed(() => {
+  const options = [
+    { value: '', label: '不入库' },
+    ...warehouses.value.map((item) => ({
+      value: item.id,
+      label: [item.warehouseCode, item.warehouseName].filter(Boolean).join(' · '),
+    })),
+  ]
+  if (form.warehouseId && !options.some((item) => item.value === form.warehouseId)) {
+    const receipt = selected.value && 'receiptCode' in selected.value ? selected.value : null
+    options.push({
+      value: form.warehouseId,
+      label:
+        receipt?.warehouseId === form.warehouseId
+          ? receipt.warehouseName || '历史仓库'
+          : '历史仓库',
+    })
+  }
+  return options
+})
 const budgetLineOptions = computed(() =>
   budgetLines.value
     .filter((item) => item.id)
@@ -285,10 +333,17 @@ const budgetLineOptions = computed(() =>
     })),
 )
 const orderOptions = computed(() =>
-  orderCandidates.value.map((item) => ({
-    value: item.id,
-    label: [recordCode(item), item.partnerName].filter(Boolean).join(' · '),
-  })),
+  orderCandidates.value
+    .filter(
+      (item) =>
+        (item.approvalStatus === 'APPROVED' &&
+          ['PERFORMING', 'PARTIAL_RECEIVED'].includes(item.orderStatus || '')) ||
+        (Boolean(editingReceiptId.value) && item.id === form.orderId),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: [recordCode(item), item.partnerName].filter(Boolean).join(' · '),
+    })),
 )
 const requestOptions = computed(() =>
   requestCandidates.value.map((item) => ({
@@ -711,7 +766,7 @@ async function openOrderEdit(): Promise<void> {
   orderEditOpen.value = true
   busy.value = true
   try {
-    const [partnerPage, contractPage] = await Promise.all([
+    const [partnerPage, contractPage, currentContract] = await Promise.all([
       loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' }),
       loadContractPage({
         pageNo: 1,
@@ -719,11 +774,16 @@ async function openOrderEdit(): Promise<void> {
         projectId: order.projectId,
         contractType: 'PURCHASE',
         approvalStatus: 'APPROVED',
+        contractStatus: 'PERFORMING',
       }),
+      order.contractId ? loadContract(order.contractId) : Promise.resolve(null),
       loadActiveBudgetLines(order.projectId),
     ])
     partners.value = partnerPage.records
-    contracts.value = contractPage.records
+    contracts.value =
+      currentContract && !contractPage.records.some((item) => item.id === currentContract.id)
+        ? [...contractPage.records, currentContract]
+        : contractPage.records
   } catch (error) {
     errorMessage.value = errorText(error, '供应商读取失败')
     showToast('error', '供应商读取失败', errorMessage.value)
@@ -889,7 +949,8 @@ async function selectOrderMaterial(index: number, value: string): Promise<void> 
   if (!item) return
   item.materialId = value
   const material = materials.value.find((candidate) => candidate.id === value)
-  item.unit = material?.unit || ''
+  const contractItem = contractItems.value.find((candidate) => candidate.materialId === value)
+  item.unit = material?.unit || contractItem?.unit || ''
   item.unitPrice = ''
   item.pricingMode = ''
   item.priceSource = ''
@@ -1119,6 +1180,7 @@ async function openCreate(nextOrderMode?: OrderCreateMode): Promise<void> {
   for (const key of Object.keys(form)) delete form[key]
   form.projectId = projectId.value
   receiptCandidates.value = []
+  contractItems.value = []
   requestCandidates.value = []
   requestItemDrafts.value = [newRequestItemDraft()]
   orderItemDrafts.value = [newOrderItemDraft()]
@@ -1145,6 +1207,7 @@ async function openCreate(nextOrderMode?: OrderCreateMode): Promise<void> {
           projectId: candidateProjectId,
           contractType: 'PURCHASE',
           approvalStatus: 'APPROVED',
+          contractStatus: 'PERFORMING',
         }),
         candidateProjectId && orderCreateMode.value === 'FROM_REQUEST'
           ? loadPurchaseRequests({
@@ -1186,6 +1249,13 @@ async function openReceiptEdit(): Promise<void> {
   const receipt = selected.value as ReceiptRecord
   const item = detailItems.value[0] as ReceiptItemRecord
   await openCreate()
+  if (receipt.orderId && !orderCandidates.value.some((order) => order.id === receipt.orderId)) {
+    try {
+      orderCandidates.value.push(await loadPurchaseOrder(receipt.orderId))
+    } catch (error) {
+      showToast('warning', '历史订单读取失败', errorText(error, '无法回显原验收订单'))
+    }
+  }
   editingReceiptId.value = receipt.id
   Object.assign(form, {
     projectId: receipt.projectId,
@@ -1214,8 +1284,11 @@ async function openReceiptEdit(): Promise<void> {
 async function changeEditorProject(value: string): Promise<void> {
   form.projectId = value
   form.contractId = ''
+  form.partnerId = ''
   form.requestId = ''
+  form.orderId = ''
   form.budgetLineId = ''
+  contractItems.value = []
   budgetLines.value = []
   requestCandidates.value = []
   if (mode.value === 'order') orderItemDrafts.value = [newOrderItemDraft()]
@@ -1230,7 +1303,6 @@ async function changeEditorProject(value: string): Promise<void> {
           pageNum: 1,
           pageSize: 200,
           projectId: value,
-          approvalStatus: 'APPROVED',
         }),
         loadWarehouses({ pageNo: 1, pageSize: 200, projectId: value, status: 'ENABLE' }),
       ])
@@ -1247,6 +1319,7 @@ async function changeEditorProject(value: string): Promise<void> {
           projectId: value,
           contractType: 'PURCHASE',
           approvalStatus: 'APPROVED',
+          contractStatus: 'PERFORMING',
         })
       ).records
       if (orderCreateMode.value === 'FROM_REQUEST') await loadApprovedRequestCandidates(value)
@@ -1262,6 +1335,26 @@ async function changeEditorProject(value: string): Promise<void> {
 
 async function changeOrderContract(value: string): Promise<void> {
   form.contractId = value
+  form.partnerId = contracts.value.find((item) => item.id === value)?.partyBId || ''
+  contractItems.value = []
+  if (value) {
+    try {
+      const items = await loadContractItems(value)
+      if (form.contractId !== value) return
+      contractItems.value = items
+    } catch (error) {
+      if (form.contractId !== value) return
+      showToast('error', '合同材料读取失败', errorText(error, '无法读取采购合同明细'))
+    }
+  }
+  if (orderCreateMode.value === 'EXCEPTION') {
+    const materialIds = new Set(
+      contractItems.value.map((item) => item.materialId).filter((id): id is string => Boolean(id)),
+    )
+    orderItemDrafts.value.forEach((item) => {
+      if (item.materialId && !materialIds.has(item.materialId)) item.materialId = ''
+    })
+  }
   await refreshOrderPrices()
 }
 
@@ -1921,14 +2014,14 @@ onBeforeUnmount(() => {
           v-model="orderEditForm.contractId"
           label="采购合同"
           :options="contractOptions"
-          :disabled="busy"
+          :disabled="true"
           required
         />
         <V2Select
           v-model="orderEditForm.partnerId"
           label="供应商"
           :options="partnerOptions"
-          :disabled="busy"
+          :disabled="true"
           required
         />
         <V2Input
@@ -2160,8 +2253,8 @@ onBeforeUnmount(() => {
             v-model="form.partnerId"
             label="供应商"
             :options="partnerOptions"
-            allow-empty
-            :disabled="busy"
+            :disabled="true"
+            required
           />
           <V2Input v-model="form.orderDate" label="订单日期" placeholder="YYYY-MM-DD" />
           <V2Input v-model="form.deliveryDate" label="交付日期" placeholder="YYYY-MM-DD" />

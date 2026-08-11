@@ -15,12 +15,12 @@ import {
   loadCostTarget,
   loadCostTargetDefaultAllocation,
   loadCostTargetItems,
+  loadCostTargetProjectManagerOptions,
   loadCostTargetPage,
   loadProjectContextOptions,
   saveCostBudgetDraft,
   submitCostTarget,
 } from '@/services/commercial'
-import { loadProjectUsers } from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/commercial', () => ({
@@ -29,12 +29,12 @@ vi.mock('@/services/commercial', () => ({
   loadCostTarget: vi.fn(),
   loadCostTargetDefaultAllocation: vi.fn(),
   loadCostTargetItems: vi.fn(),
+  loadCostTargetProjectManagerOptions: vi.fn(),
   loadCostTargetPage: vi.fn(),
   loadProjectContextOptions: vi.fn(),
   saveCostBudgetDraft: vi.fn(),
   submitCostTarget: vi.fn(),
 }))
-vi.mock('@/services/projects', () => ({ loadProjectUsers: vi.fn() }))
 
 const target: CostTargetRecord = {
   id: '81',
@@ -106,7 +106,7 @@ beforeEach(() => {
   toastItems.slice().forEach((toast) => dismissToast(toast.id))
   vi.mocked(loadCostSubjectOptions)
     .mockReset()
-    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
+    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ENABLE' }])
   vi.mocked(loadCostTargetPage).mockReset().mockResolvedValue(page)
   vi.mocked(loadCostTarget).mockReset().mockResolvedValue(target)
   vi.mocked(loadCostTargetDefaultAllocation)
@@ -146,14 +146,17 @@ beforeEach(() => {
         projectManagerId: 'U1',
       },
     ])
-  vi.mocked(loadProjectUsers)
+  vi.mocked(loadCostTargetProjectManagerOptions)
     .mockReset()
-    .mockResolvedValue({
-      records: [{ id: 'U1', username: 'owner', realName: '负责人', status: 'ENABLE' }],
-      total: 1,
-      pageNo: 1,
-      pageSize: 200,
-    })
+    .mockResolvedValue([
+      {
+        id: 'U1',
+        username: 'owner',
+        realName: '负责人',
+        status: 'ENABLE',
+        eligible: true,
+      },
+    ])
   vi.mocked(saveCostBudgetDraft).mockReset().mockResolvedValue('81')
   vi.mocked(submitCostTarget).mockReset()
   vi.mocked(deleteCostTarget).mockReset()
@@ -210,7 +213,12 @@ describe('M4 cost target page', () => {
     const dialog = wrapper.get('[role="dialog"]')
     expect(dialog.text()).toContain('新建项目成本预算')
     expect(dialog.text()).toContain('版本信息')
-    expect(dialog.get('select[aria-label="项目经理"]')).toBeTruthy()
+    await dialog.get('select[aria-label="项目"]').setValue('P1')
+    await flushPromises()
+    const managerSelect = dialog.get('select[aria-label="项目经理"]')
+    expect(managerSelect.findAll('option').map((option) => option.text())).toContain('负责人')
+    expect(managerSelect.text()).not.toContain('普通用户')
+    expect(loadCostTargetProjectManagerOptions).toHaveBeenCalledWith('P1', expect.any(AbortSignal))
     expect(dialog.text()).toContain('成本预算明细')
     expect(dialog.text()).not.toContain('备注')
     expect(dialog.findAll('.v2-card')).toHaveLength(1)

@@ -147,6 +147,16 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     @Test
+    void overviewExposesUnboundSettlementReceivablesAndInspectionWbsForCandidateFiltering() {
+        Map<String, Object> overview = service.overview(PROJECT);
+        assertEquals(1, ((List<?>) overview.get("settlements")).size());
+        assertEquals(2, ((List<?>) overview.get("receivables")).size());
+        Map<?, ?> inspection = (Map<?, ?>) ((List<?>) overview.get("qualityInspections")).get(0);
+        assertEquals(WBS, ((Number) inspection.get("wbsTaskId")).longValue());
+        assertNull(overview.get("closeout"));
+    }
+
+    @Test
     void closesSectionFinalAcceptanceSettlementCollectionsWarrantyDefectArchiveAndProject() {
         BusinessException directClose = assertThrows(BusinessException.class,
                 () -> projectService.transitionStatus(PROJECT, "CLOSED", "绕过收尾闭环"));

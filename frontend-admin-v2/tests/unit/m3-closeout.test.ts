@@ -47,17 +47,27 @@ describe('M3 closeout closed loop', () => {
         archive_transfers: [],
         wbs_readiness: { total_tasks: 1, incomplete_tasks: 0 },
         wbs_tasks: [],
-        quality_inspections: [],
+        quality_inspections: [
+          {
+            id: 9,
+            wbs_task_id: 8,
+            inspection_code: 'QI-9',
+            inspection_date: '2026-08-01',
+            conclusion: 'PASS',
+            status: 'SUBMITTED',
+          },
+        ],
       }),
     )
     const controller = new AbortController()
 
-    await loadCloseoutOverview('project / 1', controller.signal)
+    const overview = await loadCloseoutOverview('project / 1', controller.signal)
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       '/api/project-closeouts/overview?projectId=project%20%2F%201',
     )
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
+    expect(overview.qualityInspections[0]).toMatchObject({ id: '9', wbsTaskId: '8' })
     expect(() => loadCloseoutTrace('   ')).toThrow('ID不能为空')
   })
 
@@ -133,6 +143,11 @@ describe('M3 closeout closed loop', () => {
     )
     expect(pageSource).not.toContain('revenue:operations:query')
     expect(pageSource).toContain(':options="settlementOptions"')
+    expect(pageSource).toContain("item.status === 'RECEIVABLE_CREATED'")
+    expect(pageSource).toContain("receivable.receivableType === 'PROGRESS'")
+    expect(pageSource).toContain("item.status === 'COMPLETED'")
+    expect(pageSource).toContain("item.status === 'SUBMITTED'")
+    expect(pageSource).toContain('item.wbsTaskId === sectionForm.wbsTaskId')
     expect(pageSource).not.toContain('手工输入 ownerSettlementId')
   })
 

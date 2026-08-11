@@ -14,7 +14,6 @@ import CostLedgerPage from '@/pages/commercial/CostLedgerPage.vue'
 import CostSummaryPage from '@/pages/commercial/CostSummaryPage.vue'
 import { dismissToast, toastItems } from '@/components/toast'
 import * as commercial from '@/services/commercial'
-import * as projects from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/commercial', () => ({
@@ -26,6 +25,7 @@ vi.mock('@/services/commercial', () => ({
   loadAccessibleCostSummary: vi.fn(),
   loadCostSubjectOptions: vi.fn(),
   loadCostControl: vi.fn(),
+  loadCostCorrectiveOwnerOptions: vi.fn(),
   loadCostForecastTrace: vi.fn(),
   loadCostLedger: vi.fn(),
   loadCostLedgerPage: vi.fn(),
@@ -38,7 +38,6 @@ vi.mock('@/services/commercial', () => ({
   updateCostCorrective: vi.fn(),
   updateCostForecast: vi.fn(),
 }))
-vi.mock('@/services/projects', () => ({ loadProjectUsers: vi.fn() }))
 
 const ledger = {
   id: '9007199254740993',
@@ -157,14 +156,9 @@ beforeEach(() => {
   vi.mocked(commercial.loadCostSubjectOptions)
     .mockReset()
     .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
-  vi.mocked(projects.loadProjectUsers)
+  vi.mocked(commercial.loadCostCorrectiveOwnerOptions)
     .mockReset()
-    .mockResolvedValue({
-      records: [{ id: 'U1', username: 'owner', realName: '负责人', status: 'ACTIVE' }],
-      total: 1,
-      pageNo: 1,
-      pageSize: 200,
-    })
+    .mockResolvedValue([{ userId: 'U1', username: 'owner', realName: '负责人' }])
   vi.mocked(commercial.loadProjectContextOptions)
     .mockReset()
     .mockResolvedValue([
@@ -188,7 +182,9 @@ beforeEach(() => {
   vi.mocked(commercial.loadAccessibleCostControl).mockReset().mockResolvedValue(accessibleControl)
   vi.mocked(commercial.loadCostForecastTrace).mockReset().mockResolvedValue(overview)
   vi.mocked(commercial.confirmCostForecast).mockReset().mockResolvedValue({})
+  vi.mocked(commercial.createCostCorrective).mockReset().mockResolvedValue({})
   vi.mocked(commercial.submitCostCorrective).mockReset().mockResolvedValue({})
+  vi.mocked(commercial.updateCostCorrective).mockReset().mockResolvedValue({})
 })
 
 describe('M4 costs pages', () => {
@@ -245,6 +241,108 @@ describe('M4 costs pages', () => {
     ])
     expect(controlView.wrapper.text()).not.toContain('负责人ID')
     expect(controlView.wrapper.text()).not.toContain('成本科目 S1')
+  })
+
+  it('limits corrective owners to active members of the selected project', async () => {
+    vi.mocked(commercial.loadCostCorrectiveOwnerOptions).mockResolvedValueOnce([
+      { userId: 'U1', username: 'member', realName: '项目成员' },
+    ])
+    vi.mocked(commercial.loadCostControl).mockResolvedValueOnce({
+      ...overview,
+      latestForecast: { ...overview.latestForecast, status: 'ACTION_REQUIRED' },
+    })
+
+    const { wrapper } = await mountPage(CostControlPage, '/cost/control?projectId=P1', [
+      'cost:control:query',
+      'cost:corrective:maintain',
+    ])
+    await button(wrapper, '新建纠偏措施')!.trigger('click')
+
+    expect(commercial.loadCostCorrectiveOwnerOptions).toHaveBeenCalledWith(
+      'P1',
+      expect.any(AbortSignal),
+    )
+    expect(
+      wrapper
+        .get('select[aria-label="负责人"]')
+        .findAll('option')
+        .map((option) => option.attributes('value')),
+    ).toEqual(['', 'U1'])
+
+    const owner = wrapper.get('select[aria-label="负责人"]')
+    const outsider = document.createElement('option')
+    outsider.value = 'U2'
+    owner.element.append(outsider)
+    await owner.setValue('U2')
+    await wrapper.get('input[aria-label="措施标题"]').setValue('越权候选')
+    await wrapper.get('input[aria-label="根因"]').setValue('测试')
+    await wrapper.get('input[aria-label="行动计划"]').setValue('测试')
+    await wrapper.get('input[aria-label="预计节约金额"]').setValue('1')
+    await wrapper.get('input[aria-label="截止日期"]').setValue('2026-08-31')
+    await wrapper.get('#cost-corrective-form').trigger('submit')
+    await flushPromises()
+    expect(commercial.createCostCorrective).not.toHaveBeenCalled()
+  })
+
+  it('shows and preserves only the current historical corrective owner during editing', async () => {
+    vi.mocked(commercial.loadCostControl).mockResolvedValueOnce({
+      ...overview,
+      correctiveActions: [
+        {
+          ...overview.correctiveActions[0],
+          action_code: 'CA-1',
+          action_title: '历史负责人纠偏',
+          root_cause: '原因',
+          action_plan: '计划',
+          expected_saving_amount: '1',
+          responsible_user_id: 'U9',
+          responsible_user_name: '离岗负责人',
+          due_date: '2026-08-31',
+        },
+      ],
+    })
+
+    const { wrapper } = await mountPage(CostControlPage, '/cost/control?projectId=P1', [
+      'cost:control:query',
+      'cost:corrective:maintain',
+    ])
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text().trim() === '编辑')!
+      .trigger('click')
+
+    const owner = wrapper.get('select[aria-label="负责人"]')
+    expect(owner.findAll('option').map((option) => option.attributes('value'))).toEqual([
+      '',
+      'U1',
+      'U9',
+    ])
+    expect(owner.find('option[value="U9"]').attributes('disabled')).toBeDefined()
+    expect((owner.element as HTMLSelectElement).value).toBe('U9')
+    expect(owner.text()).toContain('离岗负责人（历史）')
+
+    await wrapper.get('#cost-corrective-form').trigger('submit')
+    await flushPromises()
+    expect(commercial.updateCostCorrective).toHaveBeenCalledWith(
+      'A1',
+      expect.objectContaining({ responsibleUserId: 'U9' }),
+    )
+  })
+
+  it('keeps core cost-control facts when corrective owner options are forbidden', async () => {
+    vi.mocked(commercial.loadCostCorrectiveOwnerOptions).mockRejectedValueOnce(
+      apiError('负责人候选无权访问', 403),
+    )
+
+    const { wrapper } = await mountPage(CostControlPage, '/cost/control?projectId=P1', [
+      'cost:control:query',
+      'cost:corrective:maintain',
+    ])
+
+    expect(commercial.loadCostControl).toHaveBeenCalledWith('P1', expect.any(AbortSignal))
+    expect(commercial.loadCostSubjectOptions).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(wrapper.text()).toContain('FC-1')
+    expect(wrapper.text()).not.toContain('负责人候选无权访问')
   })
 
   it('loads accessible all-project facts when the public shell selects all projects', async () => {

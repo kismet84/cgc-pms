@@ -173,6 +173,22 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain("item.approvalStatus === 'APPROVED'")
     expect(source).toContain('label="已审批收入确认"')
   })
+  it('filters finance editor candidates by active project and authoritative contract relations', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
+      'utf8',
+    )
+    expect(source).toContain("item.status === 'ACTIVE'")
+    expect(source).toContain("item.approvalStatus === 'APPROVED'")
+    expect(source).toContain("item.contractStatus === 'PERFORMING'")
+    expect(source).toContain("performing && item.contractType === 'MAIN'")
+    expect(source).toContain('selectedContract.value?.partyBId')
+    expect(source).toContain('selectedContract.value?.partyAId')
+    expect(source).toContain(':options="payeePartnerOptions"')
+    expect(source).not.toContain(
+      "if (editorKind.value === 'expense') editor.value.payeePartnerId = contract?.partyBId",
+    )
+  })
   it('uploads required expense evidence before submission', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),

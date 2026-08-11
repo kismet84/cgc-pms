@@ -44,9 +44,21 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
     List<BidCost> selectListStats(@Param("tenantId") Long tenantId, @Param("ids") List<Long> ids);
 
     @Select("""
-            SELECT u.id AS owner_id, u.real_name AS owner_name
+            SELECT DISTINCT u.id AS owner_id, u.real_name AS owner_name
             FROM sys_user u
             WHERE u.tenant_id=#{tenantId} AND u.deleted_flag=0 AND u.status IN ('ACTIVE', 'ENABLE')
+              AND EXISTS (
+                SELECT 1 FROM sys_user_role ur
+                JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
+                  AND r.deleted_flag=0 AND r.status='ENABLE'
+                WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+                  AND (r.role_code IN ('ADMIN','SUPER_ADMIN') OR EXISTS (
+                    SELECT 1 FROM sys_role_menu rm
+                    JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                      AND m.deleted_flag=0 AND m.status='ENABLE' AND m.perms IN ('bid:add','bid:edit')
+                    WHERE rm.tenant_id=r.tenant_id AND rm.role_id=r.id
+                  ))
+              )
             ORDER BY u.real_name, u.id
             """)
     List<BidOwnerOption> selectOwnerOptions(@Param("tenantId") Long tenantId);
