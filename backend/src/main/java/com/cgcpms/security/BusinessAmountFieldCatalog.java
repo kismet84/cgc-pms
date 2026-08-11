@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 /** Versioned response-type and normalized-path amount contract. */
 public final class BusinessAmountFieldCatalog {
 
-    public static final String VERSION = "2026-08-11.v4";
+    public static final String VERSION = "2026-08-12.v5";
 
     private static final Pattern DECIMAL_TEXT = Pattern.compile(
             "[-+]?(?:(?:\\d+\\.\\d+)|(?:\\d+\\.)|(?:\\.\\d+)|(?:\\d+[eE][-+]?\\d+))");
@@ -246,6 +246,14 @@ public final class BusinessAmountFieldCatalog {
             contract("com.cgcpms.tech.vo.ChiefEngineerDashboardVO",
                     amounts("$.pendingReviews[*].amount", "$.pendingCoordinations[*].amount",
                             "$.openIssues[*].amount", "$.overdueItems[*].amount"), safe()),
+            contract("com.cgcpms.supplier.dto.SupplierSourcingModels$WorkspacePage",
+                    amounts("$.returns.records[*].returnAmount"),
+                    safe("$.performance.records[*].deliveryScore",
+                            "$.performance.records[*].qualityScore",
+                            "$.performance.records[*].serviceScore",
+                            "$.performance.records[*].commercialScore",
+                            "$.performance.records[*].totalScore",
+                            "$.returns.records[*].returnQuantity")),
             contract("com.cgcpms.payment.vo.PaymentTraceVO", paymentTraceAmounts(), paymentTraceSafe()),
             contract("com.cgcpms.procurement.vo.ProcurementTraceVO",
                     procurementTraceAmounts(), procurementTraceSafe()),

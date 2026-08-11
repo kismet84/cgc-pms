@@ -6,6 +6,7 @@ import {
   loadQualityIssues,
   loadQualityPlans,
   loadQualityTrace,
+  loadQualityWorkspace,
   reinspectQualityRectification,
   submitQualityConsequence,
   submitQualityRectification,
@@ -50,6 +51,34 @@ describe('M3 quality safety closed loop', () => {
     ])
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
     expect(() => loadQualityPlans('   ')).toThrow('ID不能为空')
+  })
+
+  it('encodes the bounded workspace query with active view and optional scope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      response({
+        view: 'inspection',
+        page: { records: [], total: 0, pageNo: 2, pageSize: 10 },
+        counts: { plan: 0, inspection: 0, rectification: 0, reinspection: 0, consequence: 0 },
+        selectedPlanRef: null,
+      }),
+    )
+    const controller = new AbortController()
+
+    await loadQualityWorkspace(
+      {
+        view: 'inspection',
+        pageNo: 2,
+        pageSize: 10,
+        projectId: ' project / 1 ',
+        planId: ' plan / 2 ',
+      },
+      controller.signal,
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/quality-safety/workspace?view=inspection&pageNo=2&pageSize=10&projectId=project+%2F+1&planId=plan+%2F+2',
+      expect.objectContaining({ signal: controller.signal }),
+    )
   })
 
   it('keeps consequence decimals as strings and uses stage-specific write endpoints', async () => {
@@ -179,7 +208,7 @@ describe('M3 quality safety closed loop', () => {
     ])
       expect(pageSource).toContain(stage)
     expect(pageSource).toContain('aria-label="质量安全整改闭环"')
-    expect(pageSource).toContain('v-if="!loading && !scopeProjectIds.length && !errorMessage"')
+    expect(pageSource).toContain('v-if="!loading && !hasProjectScope && !errorMessage"')
     expect(pageSource.indexOf('title="质量安全整改闭环"')).toBeLessThan(
       pageSource.indexOf('title="暂无可访问项目"'),
     )
@@ -226,8 +255,9 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain('v-else-if="activeTab === \'reinspection\'"')
     expect(pageSource).toContain('v-else-if="activeTab === \'consequence\'"')
     expect(pageSource).not.toMatch(/watch\(activeTab[\s\S]{0,200}selectedPlanId\.value\s*=/)
-    expect(pageSource).toContain("() => scopeProjectIds.value.join('|')")
-    expect(pageSource).toContain('plan.id === previousSelectedPlanId')
+    expect(pageSource).toContain('loadQualityWorkspace(')
+    expect(pageSource).not.toContain('scopeProjectIds')
+    expect(pageSource).not.toContain('previousSelectedPlanId')
     expect(pageSource).toContain('@click="selectPlan(plan.id)"')
     expect(pageSource).toContain('query: { ...route.query, planId }')
     expect(pageSource).not.toContain('v-model="inspectionTypeFilter"')

@@ -147,6 +147,30 @@ class BusinessAmountFieldCatalogTest {
     }
 
     @Test
+    void redactsSupplierWorkspaceReturnAmountsAndKeepsReviewedScoresAndQuantities() {
+        Map<String, Object> workspace = Map.of(
+                "events", Map.of("records", List.of()),
+                "performance", Map.of("records", List.of(Map.of(
+                        "deliveryScore", "90.00",
+                        "qualityScore", "91.00",
+                        "serviceScore", "92.00",
+                        "commercialScore", "93.00",
+                        "totalScore", "91.50"))),
+                "returns", Map.of("records", List.of(Map.of(
+                        "returnQuantity", "2.0000",
+                        "returnAmount", "20.00"))));
+
+        JsonNode result = BusinessAmountFieldCatalog.redact(
+                objectMapper,
+                com.cgcpms.supplier.dto.SupplierSourcingModels.WorkspacePage.class,
+                workspace);
+
+        assertEquals("91.50", result.at("/performance/records/0/totalScore").asText());
+        assertEquals("2.0000", result.at("/returns/records/0/returnQuantity").asText());
+        assertTrue(result.at("/returns/records/0/returnAmount").isNull());
+    }
+
+    @Test
     void redactsReviewedJdbcMapShapeThroughEndpointContract() throws NoSuchMethodException {
         Map<String, Object> allocation = Map.of("allocated_amount", new BigDecimal("40.00"));
         Map<String, Object> data = new LinkedHashMap<>();

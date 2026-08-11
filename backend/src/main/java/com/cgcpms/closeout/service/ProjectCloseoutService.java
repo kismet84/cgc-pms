@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.closeout.dto.ProjectCloseoutModels.*;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,6 +120,60 @@ public class ProjectCloseoutService {
                 ORDER BY inspection_date DESC,id DESC
                 """, tenant(), projectId));
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<WorkspaceRow> page(int pageNo, int pageSize, Long projectId) {
+        int safePageNo = Math.max(1, pageNo);
+        int safePageSize = Math.min(100, Math.max(1, pageSize));
+        ProjectAccessChecker.ProjectSqlScope scope = projectAccessChecker.sqlScope();
+        String where = "c.deleted_flag=0 AND " + scope.predicate();
+        List<Object> parameters = new ArrayList<>(scope.parameters());
+        if (projectId != null) {
+            where += " AND p.id=?";
+            parameters.add(projectId);
+        }
+
+        long total = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM project_closeout c
+                JOIN pm_project p ON p.id=c.project_id AND p.tenant_id=c.tenant_id
+                WHERE %s
+                """.formatted(where), Long.class, parameters.toArray());
+        if (total == 0) {
+            return new PageResult<>(safePageNo, safePageSize, 0, List.of());
+        }
+
+        List<Object> pageParameters = new ArrayList<>(parameters);
+        pageParameters.add(safePageSize);
+        pageParameters.add((safePageNo - 1) * safePageSize);
+        List<WorkspaceRow> records = jdbc.query("""
+                SELECT p.id projectId,p.project_name projectName,c.id closeoutId,
+                 c.closeout_code closeoutCode,c.status,
+                 (SELECT COUNT(*) FROM closeout_section_acceptance a
+                   WHERE a.tenant_id=c.tenant_id AND a.closeout_id=c.id AND a.deleted_flag=0) sectionAcceptanceCount,
+                 (SELECT COUNT(*) FROM closeout_final_acceptance f
+                   WHERE f.tenant_id=c.tenant_id AND f.closeout_id=c.id AND f.deleted_flag=0) finalAcceptanceCount,
+                 (SELECT COUNT(*) FROM closeout_warranty w
+                   WHERE w.tenant_id=c.tenant_id AND w.closeout_id=c.id AND w.deleted_flag=0) warrantyCount,
+                 (SELECT COUNT(*) FROM closeout_defect d
+                   WHERE d.tenant_id=c.tenant_id AND d.closeout_id=c.id AND d.deleted_flag=0) defectCount
+                FROM project_closeout c
+                JOIN pm_project p ON p.id=c.project_id AND p.tenant_id=c.tenant_id
+                WHERE %s
+                ORDER BY c.created_at DESC,c.id DESC
+                LIMIT ? OFFSET ?
+                """.formatted(where), (rs, rowNum) -> new WorkspaceRow(
+                rs.getString("projectId"),
+                rs.getString("projectName"),
+                rs.getString("closeoutId"),
+                rs.getString("closeoutCode"),
+                rs.getString("status"),
+                rs.getLong("sectionAcceptanceCount"),
+                rs.getLong("finalAcceptanceCount"),
+                rs.getLong("warrantyCount"),
+                rs.getLong("defectCount")), pageParameters.toArray());
+        return new PageResult<>(safePageNo, safePageSize, total, records);
     }
 
     public Map<String, Object> finalAcceptanceDetail(Long acceptanceId) {

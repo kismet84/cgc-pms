@@ -4,10 +4,14 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.quality.dto.QualitySafetyModels.*;
 import com.cgcpms.quality.entity.*;
+import com.cgcpms.quality.service.QualitySafetyQueryService;
 import com.cgcpms.quality.service.QualitySafetyService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,8 +19,20 @@ import java.util.List;
 @RestController
 @RequestMapping("/quality-safety")
 @RequiredArgsConstructor
+@Validated
 public class QualitySafetyController {
     private final QualitySafetyService service;
+    private final QualitySafetyQueryService queryService;
+
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:safety:query')")
+    public ApiResponse<Workspace> workspace(@RequestParam String view,
+                                            @RequestParam @Min(1) int pageNo,
+                                            @RequestParam @Min(1) @Max(100) int pageSize,
+                                            @RequestParam(required = false) Long projectId,
+                                            @RequestParam(required = false) Long planId) {
+        return ApiResponse.success(queryService.workspace(view, pageNo, pageSize, projectId, planId));
+    }
 
     @GetMapping("/plans")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:safety:query')")

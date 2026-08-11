@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   bindFinalSettlement,
   createArchiveTransfer,
+  loadCloseoutPage,
   loadCloseoutOverview,
   loadCloseoutTrace,
   verifyCloseoutDefect,
@@ -69,6 +70,41 @@ describe('M3 closeout closed loop', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
     expect(overview.qualityInspections[0]).toMatchObject({ id: '9', wbsTaskId: '8' })
     expect(() => loadCloseoutTrace('   ')).toThrow('ID不能为空')
+  })
+
+  it('loads one bounded server page for the all-project workspace', async () => {
+    fetchMock.mockResolvedValueOnce(
+      response({
+        pageNo: 2,
+        pageSize: 10,
+        total: 11,
+        records: [
+          {
+            project_id: 9,
+            project_name: '项目九',
+            closeout_id: 19,
+            closeout_code: 'CO-9',
+            status: 'INITIATED',
+            section_acceptance_count: 2,
+            final_acceptance_count: 1,
+            warranty_count: 0,
+            defect_count: 0,
+          },
+        ],
+      }),
+    )
+    const controller = new AbortController()
+
+    const page = await loadCloseoutPage({ pageNo: 2, pageSize: 10 }, controller.signal)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/project-closeouts/page?pageNo=2&pageSize=10')
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
+    expect(page.records[0]).toMatchObject({
+      projectId: '9',
+      closeoutId: '19',
+      sectionAcceptanceCount: 2,
+    })
   })
 
   it('keeps settlement and allocation money as strings and normalizes snake_case trace keys', async () => {
@@ -184,7 +220,9 @@ describe('M3 closeout closed loop', () => {
     expect(pageSource).toContain('projectController?.abort()')
     expect(pageSource).toContain('traceController?.abort()')
     expect(pageSource).toContain('await loadProject(true)')
-    expect(pageSource).toContain('loaded.filter((item) => hasCloseoutData(item.overview))')
+    expect(pageSource).toContain('const loaded = await loadCloseoutPage(')
+    expect(pageSource).not.toContain('workspace.projects.map')
+    expect(pageSource).toContain(':total="scopedOverviewTotal"')
     expect(pageSource).toContain('aria-label="竣工收尾闭环"')
     expect(pageSource).toContain('<V2Card v-if="!projectId && scopedOverviews.length">')
     expect(pageSource).not.toContain('title="全部项目收尾概览"')

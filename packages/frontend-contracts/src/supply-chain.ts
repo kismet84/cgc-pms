@@ -14,6 +14,8 @@ export const SUPPLY_CHAIN_QUERY_PERMISSIONS = {
 } as const;
 
 export const SUPPLY_CHAIN_API = {
+  supplierSourcingWorkspace: "/supplier-sourcing/workspace",
+  supplierPerformanceCandidates: "/supplier-sourcing/performance-candidates",
   supplierSourcingEvents: "/supplier-sourcing/events",
   supplierSourcingQuotes: "/supplier-sourcing/quotes",
   supplierSourcingEvaluations: "/supplier-sourcing/evaluations",
@@ -146,6 +148,8 @@ export interface SupplierPerformanceRecord {
   id: string;
   projectId: string;
   partnerId: string;
+  partnerCode?: string | null;
+  partnerName?: string | null;
   contractId: string;
   purchaseOrderId: string;
   evaluationCode: string;
@@ -166,6 +170,8 @@ export interface SupplierReturnRecord {
   id: string;
   projectId: string;
   partnerId: string;
+  partnerCode?: string | null;
+  partnerName?: string | null;
   contractId: string;
   purchaseOrderId: string;
   receiptId: string;
@@ -176,6 +182,32 @@ export interface SupplierReturnRecord {
   reason: string;
   status: "CONFIRMED" | "REVERSED";
 }
+
+export interface SupplierSourcingWorkspacePage {
+  events: PageResult<SourcingEventRecord>;
+  performance: PageResult<SupplierPerformanceRecord>;
+  returns: PageResult<SupplierReturnRecord>;
+}
+
+export interface SupplierSourcingWorkspaceQuery {
+  eventPageNo?: number;
+  performancePageNo?: number;
+  returnPageNo?: number;
+  pageSize?: number;
+  projectId?: string;
+}
+
+export interface SupplierPerformanceCandidateRecord {
+  id: string;
+  projectId: string;
+  orderCode: string;
+  partnerId: string;
+  partnerCode: string;
+  partnerName: string;
+}
+
+export type SupplierPerformanceCandidatePage =
+  PageResult<SupplierPerformanceCandidateRecord>;
 
 export interface SupplierBlacklistRecord {
   id: string;
@@ -693,7 +725,8 @@ export interface PurchaseOrderItemRecord {
   quantity: SupplyChainDecimalString;
   unitPrice: SupplyChainDecimalString;
   pricingMode?: "FIXED" | "ACTUAL" | null;
-  priceSource?: 'CONTRACT_ITEM' | 'RECENT_RECEIPT' | 'MANUAL' | 'UNKNOWN' | null;
+  priceSource?:
+    "CONTRACT_ITEM" | "RECENT_RECEIPT" | "MANUAL" | "UNKNOWN" | null;
   priceSourceReceiptItemId?: string | null;
   taxRate?: SupplyChainDecimalString | null;
   amount?: SupplyChainDecimalString | null;

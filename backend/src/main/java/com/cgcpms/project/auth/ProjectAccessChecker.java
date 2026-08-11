@@ -14,7 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -103,6 +106,105 @@ public class ProjectAccessChecker {
         List<PmProject> tenantProjects = projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>().eq(PmProject::getTenantId, tenantId));
         return filterAccessible(tenantProjects);
+    }
+
+    /**
+     * Builds an immutable SQL predicate for queries that join {@code pm_project p}.
+     * Construction is database-free; role and membership validity are checked by
+     * the predicate in the caller's paged query.
+     */
+    public ProjectSqlScope sqlScope() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long userId = UserContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            return new ProjectSqlScope("(p.id IS NULL AND 1 = 0)", List.of());
+        }
+
+        List<String> roleCodes = UserContext.getCurrentRoles().stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(role -> !role.isEmpty())
+                .map(role -> role.toUpperCase(Locale.ROOT))
+                .distinct()
+                .sorted()
+                .toList();
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenantId);
+        parameters.add(tenantId);
+        parameters.add(userId);
+
+        String memberGrant = """
+                EXISTS (
+                    SELECT 1
+                    FROM pm_project_member pm
+                    WHERE pm.tenant_id = ?
+                      AND pm.project_id = p.id
+                      AND pm.user_id = ?
+                      AND pm.status = 'ACTIVE'
+                      AND pm.deleted_flag = 0
+                )
+                """.strip();
+        if (roleCodes.isEmpty()) {
+            parameters.add(userId);
+            return new ProjectSqlScope("""
+                    (
+                        p.tenant_id = ?
+                        AND p.deleted_flag = 0
+                        AND (
+                            %s
+                            OR p.created_by = ?
+                        )
+                    )
+                    """.formatted(memberGrant).strip(), parameters);
+        }
+
+        String rolePlaceholders = String.join(", ", Collections.nCopies(roleCodes.size(), "?"));
+        parameters.add(tenantId);
+        parameters.add(userId);
+        parameters.addAll(roleCodes);
+        parameters.add(userId);
+        return new ProjectSqlScope("""
+                (
+                    p.tenant_id = ?
+                    AND p.deleted_flag = 0
+                    AND (
+                        %s
+                        OR CASE (
+                            SELECT CASE
+                                WHEN COUNT(*) = 0 THEN 'SELF'
+                                WHEN SUM(CASE WHEN UPPER(r.role_code) = 'SUPER_ADMIN' THEN 1 ELSE 0 END) > 0 THEN 'ALL'
+                                WHEN SUM(CASE WHEN r.data_scope = 'ALL' THEN 1 ELSE 0 END) > 0 THEN 'ALL'
+                                WHEN SUM(CASE WHEN r.data_scope = 'PROJECT_MEMBER' THEN 1 ELSE 0 END) > 0 THEN 'PROJECT_MEMBER'
+                                WHEN SUM(CASE WHEN r.data_scope = 'DEPT' THEN 1 ELSE 0 END) > 0 THEN 'DEPT'
+                                WHEN SUM(CASE WHEN r.data_scope = 'DEPT_AND_CHILD' THEN 1 ELSE 0 END) > 0 THEN 'DEPT_AND_CHILD'
+                                WHEN SUM(CASE WHEN r.data_scope = 'CUSTOM' THEN 1 ELSE 0 END) > 0 THEN 'CUSTOM'
+                                WHEN SUM(CASE WHEN r.data_scope = 'SELF' THEN 1 ELSE 0 END) > 0 THEN 'SELF'
+                                ELSE 'NONE'
+                            END
+                            FROM sys_user_role ur
+                            JOIN sys_role r
+                              ON r.tenant_id = ur.tenant_id
+                             AND r.id = ur.role_id
+                            WHERE ur.tenant_id = ?
+                              AND ur.user_id = ?
+                              AND r.status = 'ENABLE'
+                              AND r.deleted_flag = 0
+                              AND UPPER(r.role_code) IN (%s)
+                        )
+                            WHEN 'ALL' THEN 1
+                            WHEN 'SELF' THEN CASE WHEN p.created_by = ? THEN 1 ELSE 0 END
+                            ELSE 0
+                        END = 1
+                    )
+                )
+                """.formatted(memberGrant, rolePlaceholders).strip(), parameters);
+    }
+
+    public record ProjectSqlScope(String predicate, List<Object> parameters) {
+        public ProjectSqlScope {
+            predicate = Objects.requireNonNull(predicate, "predicate");
+            parameters = List.copyOf(Objects.requireNonNull(parameters, "parameters"));
+        }
     }
 
     public void requireAllScope(String action) {

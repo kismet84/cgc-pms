@@ -32,6 +32,18 @@ export interface ProjectCloseoutRecord {
   remark?: string | null;
 }
 
+export interface CloseoutWorkspaceRow {
+  projectId: string;
+  projectName: string;
+  closeoutId: string;
+  closeoutCode: string;
+  status: CloseoutStatus;
+  sectionAcceptanceCount: number;
+  finalAcceptanceCount: number;
+  warrantyCount: number;
+  defectCount: number;
+}
+
 export interface CloseoutSectionAcceptance {
   id: string;
   closeoutId: string;
@@ -305,6 +317,7 @@ export interface CloseProjectCommand {
 
 export const CLOSEOUT_API = {
   overview: "/project-closeouts/overview",
+  page: "/project-closeouts/page",
   initiate: "/project-closeouts",
   sectionAcceptances: (id: string) =>
     `/project-closeouts/${id}/section-acceptances`,

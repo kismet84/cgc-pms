@@ -3,12 +3,12 @@ import type {
   BidEvaluationCommand,
   ContractRecord,
   PartnerRecord,
-  PurchaseOrderRecord,
   PurchaseRequestRecord,
   SourcingEventCommand,
   SourcingEventRecord,
   SourcingTraceRecord,
   SupplierPerformanceRecord,
+  SupplierPerformanceCandidateRecord,
   SupplierQuoteCommand,
   SupplierReturnRecord,
 } from '@cgc-pms/frontend-contracts'
@@ -37,12 +37,10 @@ import {
   declineSourcingSupplier,
   inviteSourcingSuppliers,
   linkSourcingContract,
-  loadPurchaseOrders,
   loadPurchaseRequests,
-  loadSourcingEvents,
   loadSourcingTrace,
-  loadSupplierPerformance,
-  loadSupplierReturns,
+  loadSupplierPerformanceCandidates,
+  loadSupplierSourcingWorkspace,
   publishSourcingEvent,
   reviewSupplierBlacklist,
   startSourcingEvaluation,
@@ -77,13 +75,16 @@ const performance = ref<SupplierPerformanceRecord[]>([])
 const returns = ref<SupplierReturnRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
 const purchaseRequests = ref<PurchaseRequestRecord[]>([])
-const purchaseOrders = ref<PurchaseOrderRecord[]>([])
+const purchaseOrders = ref<SupplierPerformanceCandidateRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const selectedId = ref('')
 const pageNo = ref(1)
 const pageSize = 10
 const performancePageNo = ref(1)
 const returnPageNo = ref(1)
+const eventTotal = ref(0)
+const performanceTotal = ref(0)
+const returnTotal = ref(0)
 const loading = ref(false)
 const detailLoading = ref(false)
 const busy = ref(false)
@@ -109,18 +110,6 @@ const canAward = computed(() => session.hasPermission('supplier:sourcing:award')
 const canPerformance = computed(() => session.hasPermission('supplier:performance:evaluate'))
 const canReview = computed(() => session.hasPermission('supplier:blacklist:review'))
 const selected = computed(() => events.value.find((item) => item.id === selectedId.value) ?? null)
-const pagedEvents = computed(() =>
-  events.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
-)
-const pagedPerformance = computed(() =>
-  performance.value.slice(
-    (performancePageNo.value - 1) * pageSize,
-    performancePageNo.value * pageSize,
-  ),
-)
-const pagedReturns = computed(() =>
-  returns.value.slice((returnPageNo.value - 1) * pageSize, returnPageNo.value * pageSize),
-)
 const partnerOptions = computed(() =>
   partners.value.map((item) => ({
     value: item.id,
@@ -154,18 +143,10 @@ const contractOptions = computed(() =>
     })),
 )
 const purchaseOrderOptions = computed(() =>
-  purchaseOrders.value
-    .filter(
-      (item) =>
-        item.approvalStatus === 'APPROVED' &&
-        Boolean(item.contractId) &&
-        Boolean(item.partnerId) &&
-        !performance.value.some((evaluation) => evaluation.purchaseOrderId === item.id),
-    )
-    .map((item) => ({
-      value: item.id,
-      label: `${item.orderCode || '采购订单编号缺失'} · ${item.partnerName || '供应商信息缺失'}`,
-    })),
+  purchaseOrders.value.map((item) => ({
+    value: item.id,
+    label: `${item.orderCode || '采购订单编号缺失'} · ${item.partnerName || '供应商信息缺失'}`,
+  })),
 )
 const dialogTitle = computed(
   () =>
@@ -186,6 +167,12 @@ const dialogTitle = computed(
 function partnerLabel(id: string): string {
   const partner = partners.value.find((item) => item.id === id)
   return partner ? `${partner.partnerCode} · ${partner.partnerName}` : '供应商信息缺失'
+}
+
+function workspacePartnerLabel(item: SupplierPerformanceRecord | SupplierReturnRecord): string {
+  if (item.partnerCode || item.partnerName)
+    return `${item.partnerCode || '供应商编号缺失'} · ${item.partnerName || '供应商名称缺失'}`
+  return partnerLabel(item.partnerId)
 }
 
 function quoteCode(id: string): string {
@@ -259,8 +246,8 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
       )
       contracts.value = page.records
     } else if (next === 'performance') {
-      const page = await loadPurchaseOrders(
-        { pageNum: 1, pageSize: 200, projectId: projectId.value || undefined },
+      const page = await loadSupplierPerformanceCandidates(
+        { pageNo: 1, pageSize: 200, projectId: projectId.value || undefined },
         controller.signal,
       )
       purchaseOrders.value = page.records
@@ -275,54 +262,47 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
   }
 }
 
-async function loadPage(): Promise<void> {
-  pageNo.value = 1
-  performancePageNo.value = 1
-  returnPageNo.value = 1
+async function loadPage(resetPages = false): Promise<void> {
+  if (resetPages) {
+    pageNo.value = 1
+    performancePageNo.value = 1
+    returnPageNo.value = 1
+  }
   listController?.abort()
   traceController?.abort()
   trace.value = null
   selectedId.value = ''
-  const projectIds = projectId.value
-    ? [projectId.value]
-    : workspace.projects.map((project) => project.value)
-  if (!projectIds.length) {
-    events.value = []
-    performance.value = []
-    returns.value = []
-    return
-  }
   const controller = new AbortController()
   listController = controller
   const generation = ++listGeneration
   loading.value = true
   errorMessage.value = ''
   try {
-    const [partnerPage, results] = await Promise.all([
-      loadPartners(
-        { pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' },
-        controller.signal,
-      ),
-      Promise.all(
-        projectIds.map(async (currentProjectId) =>
-          Promise.all([
-            loadSourcingEvents(currentProjectId, controller.signal),
-            loadSupplierPerformance(currentProjectId, controller.signal),
-            loadSupplierReturns(currentProjectId, controller.signal),
-          ]),
-        ),
-      ),
-    ])
+    const result = await loadSupplierSourcingWorkspace(
+      {
+        eventPageNo: pageNo.value,
+        performancePageNo: performancePageNo.value,
+        returnPageNo: returnPageNo.value,
+        pageSize,
+        projectId: projectId.value || undefined,
+      },
+      controller.signal,
+    )
     if (generation !== listGeneration) return
-    partners.value = partnerPage.records
-    events.value = results.flatMap(([nextEvents]) => nextEvents)
-    performance.value = results.flatMap(([, nextPerformance]) => nextPerformance)
-    returns.value = results.flatMap(([, , nextReturns]) => nextReturns)
+    events.value = result.events.records
+    performance.value = result.performance.records
+    returns.value = result.returns.records
+    eventTotal.value = result.events.total
+    performanceTotal.value = result.performance.total
+    returnTotal.value = result.returns.total
   } catch (error) {
     if (!controller.signal.aborted && generation === listGeneration) {
       events.value = []
       performance.value = []
       returns.value = []
+      eventTotal.value = 0
+      performanceTotal.value = 0
+      returnTotal.value = 0
       errorMessage.value = errorText(error, '供应商招采数据加载失败')
       showToast('error', '供应商招采读取失败', errorMessage.value)
     }
@@ -339,8 +319,19 @@ async function selectEvent(id: string): Promise<void> {
   const generation = ++traceGeneration
   detailLoading.value = true
   try {
-    const value = await loadSourcingTrace(id, controller.signal)
-    if (generation === traceGeneration) trace.value = value
+    const [value, partnerPage] = await Promise.all([
+      loadSourcingTrace(id, controller.signal),
+      partners.value.length
+        ? Promise.resolve(null)
+        : loadPartners(
+            { pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' },
+            controller.signal,
+          ),
+    ])
+    if (generation === traceGeneration) {
+      trace.value = value
+      if (partnerPage) partners.value = partnerPage.records
+    }
   } catch (error) {
     if (!controller.signal.aborted && generation === traceGeneration) {
       trace.value = null
@@ -503,11 +494,7 @@ function closeTrace(): void {
   trace.value = null
 }
 
-watch(
-  () => [projectId.value, ...workspace.projects.map((project) => project.value)],
-  () => void loadPage(),
-  { immediate: true },
-)
+watch(projectId, () => void loadPage(true), { immediate: true })
 onBeforeUnmount(() => {
   listController?.abort()
   traceController?.abort()
@@ -558,7 +545,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in pagedEvents" :key="item.id">
+              <tr v-for="item in events" :key="item.id">
                 <th scope="row">
                   <V2Button
                     size="small"
@@ -581,11 +568,14 @@ onBeforeUnmount(() => {
         </div>
         <template #footer>
           <V2Pagination
-            :total="events.length"
+            :total="eventTotal"
             :page-no="pageNo"
             :page-size="pageSize"
             label="招采事件分页"
-            @update:page-no="pageNo = $event"
+            @update:page-no="
+              pageNo = $event
+              loadPage()
+            "
           />
         </template>
       </V2Card>
@@ -836,8 +826,8 @@ onBeforeUnmount(() => {
       <V2Card title="履约评价、退货与黑名单">
         <template #title-extra>
           <div class="supplier-page__facts" aria-label="供应商履约与退货概览">
-            <V2Badge>评价 {{ performance.length }}</V2Badge>
-            <V2Badge tone="warning">退货 {{ returns.length }}</V2Badge>
+            <V2Badge>评价 {{ performanceTotal }}</V2Badge>
+            <V2Badge tone="warning">退货 {{ returnTotal }}</V2Badge>
           </div>
         </template>
         <div class="supplier-page__grid">
@@ -855,9 +845,9 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in pagedPerformance" :key="item.id">
+                <tr v-for="item in performance" :key="item.id">
                   <th scope="row">{{ item.evaluationCode }}</th>
-                  <td>{{ partnerLabel(item.partnerId) }}</td>
+                  <td>{{ workspacePartnerLabel(item) }}</td>
                   <td>{{ formatDecimal(item.totalScore) }}</td>
                   <td>{{ item.grade }}</td>
                   <td>{{ label(item.status) }}</td>
@@ -884,11 +874,14 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
             <V2Pagination
-              :total="performance.length"
+              :total="performanceTotal"
               :page-no="performancePageNo"
               :page-size="pageSize"
               label="履约评价分页"
-              @update:page-no="performancePageNo = $event"
+              @update:page-no="
+                performancePageNo = $event
+                loadPage()
+              "
             />
           </section>
           <section>
@@ -905,9 +898,9 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in pagedReturns" :key="item.id">
+                <tr v-for="item in returns" :key="item.id">
                   <th scope="row">{{ item.returnCode }}</th>
-                  <td>{{ partnerLabel(item.partnerId) }}</td>
+                  <td>{{ workspacePartnerLabel(item) }}</td>
                   <td>{{ formatDecimal(item.returnQuantity) }}</td>
                   <td>{{ formatAmount(item.returnAmount) }}</td>
                   <td>{{ label(item.status) }}</td>
@@ -916,11 +909,14 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
             <V2Pagination
-              :total="returns.length"
+              :total="returnTotal"
               :page-no="returnPageNo"
               :page-size="pageSize"
               label="供应商退货分页"
-              @update:page-no="returnPageNo = $event"
+              @update:page-no="
+                returnPageNo = $event
+                loadPage()
+              "
             />
           </section>
         </div>
