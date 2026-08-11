@@ -59,18 +59,25 @@ import com.cgcpms.workflow.mapper.WfRecordMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PaymentTraceService {
+    private static final int TRACE_BATCH_SIZE = 100;
     private final CashJournalEntryMapper cashJournalMapper;
     private final PayRecordMapper recordMapper;
     private final PayApplicationMapper applicationMapper;
@@ -224,148 +231,309 @@ public class PaymentTraceService {
     }
 
     public PaymentTraceVO byApplication(Long applicationId) {
-        Long tenantId = UserContext.getCurrentTenantId();
-        PayApplication app = applicationMapper.selectById(applicationId);
-        if (app == null || !Objects.equals(app.getTenantId(), tenantId)) {
+        return traces(List.of(applicationId), "付款申请不存在").getFirst();
+    }
+
+    private List<PaymentTraceVO> assembleBatch(List<Long> applicationIds) {
+        Long tenantId = tenant();
+        List<PayApplication> applications = applicationMapper.selectList(new LambdaQueryWrapper<PayApplication>()
+                .eq(PayApplication::getTenantId, tenantId)
+                .in(PayApplication::getId, applicationIds)
+                .orderByAsc(PayApplication::getId));
+        if (!ids(applications, PayApplication::getId).equals(Set.copyOf(applicationIds))
+                || applications.stream().anyMatch(item -> !Objects.equals(item.getTenantId(), tenantId))) {
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请不存在");
         }
-        projectAccessChecker.checkAccess(app.getProjectId(), "查看付款全链路");
-        PaymentTraceVO trace = new PaymentTraceVO();
-        trace.setPaymentApplication(app);
-        PmProject project = projectMapper.selectById(app.getProjectId());
-        CtContract contract = contractMapper.selectById(app.getContractId());
-        if (project == null || !Objects.equals(project.getTenantId(), tenantId)
-                || contract == null || !Objects.equals(contract.getTenantId(), tenantId)
-                || !Objects.equals(contract.getProjectId(), app.getProjectId())) {
-            throw incomplete("付款申请的项目或合同关系不一致");
+
+        Set<Long> projectIds = idSet(applications, PayApplication::getProjectId);
+        List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getTenantId, tenantId)
+                .in(!projectIds.isEmpty(), PmProject::getId, projectIds)
+                .apply(projectIds.isEmpty(), "1 = 0")
+                .orderByAsc(PmProject::getId));
+        if (!ids(projects, PmProject::getId).equals(projectIds)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
-        trace.setProject(project);
-        trace.setContract(contract);
+        Set<Long> accessibleProjectIds = idSet(projectAccessChecker.filterAccessible(projects), PmProject::getId);
+        if (!accessibleProjectIds.containsAll(projectIds)) {
+            throw new BusinessException("PROJECT_ACCESS_DENIED", "无权查看付款全链路该项目");
+        }
 
-        WfInstance instance = app.getApprovalInstanceId() == null ? null : instanceMapper.selectById(app.getApprovalInstanceId());
-        trace.setApprovalInstance(instance);
-        trace.setApprovalRecords(instance == null ? List.of() : workflowRecordMapper.selectList(
-                new LambdaQueryWrapper<WfRecord>().eq(WfRecord::getTenantId, tenantId)
-                        .eq(WfRecord::getInstanceId, instance.getId()).orderByAsc(WfRecord::getCreatedAt)));
+        Set<Long> contractIds = idSet(applications, PayApplication::getContractId);
+        List<CtContract> contracts = contractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId)
+                .in(!contractIds.isEmpty(), CtContract::getId, contractIds)
+                .apply(contractIds.isEmpty(), "1 = 0")
+                .orderByAsc(CtContract::getId));
 
-        List<PaymentApplicationSource> sources = sourceMapper.selectList(new LambdaQueryWrapper<PaymentApplicationSource>()
-                .eq(PaymentApplicationSource::getTenantId, tenantId)
-                .eq(PaymentApplicationSource::getPayApplicationId, applicationId));
-        trace.setApplicationSources(sources);
-        List<Long> expenseIds = sources.stream().map(PaymentApplicationSource::getExpenseId).filter(Objects::nonNull).distinct().toList();
-        List<Long> settlementIds = sources.stream().map(PaymentApplicationSource::getSettlementId).filter(Objects::nonNull).distinct().toList();
-        List<Long> directMeasureIds = sources.stream().map(PaymentApplicationSource::getSubMeasureId)
-                .filter(Objects::nonNull).distinct().toList();
-        trace.setExpenses(expenseIds.isEmpty() ? List.of() : expenseMapper.selectByIds(expenseIds));
-        trace.setSettlements(settlementIds.isEmpty() ? List.of() : settlementMapper.selectByIds(settlementIds));
-        List<SettlementSubMeasure> settlementMeasureLinks = settlementIds.isEmpty() ? List.of()
-                : settlementSubMeasureMapper.selectList(new LambdaQueryWrapper<SettlementSubMeasure>()
-                    .eq(SettlementSubMeasure::getTenantId, tenantId)
-                    .in(SettlementSubMeasure::getSettlementId, settlementIds));
-        trace.setSettlementSubMeasures(settlementMeasureLinks);
+        Set<Long> instanceIds = idSet(applications, PayApplication::getApprovalInstanceId);
+        List<WfInstance> instances = instanceMapper.selectList(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId)
+                .in(!instanceIds.isEmpty(), WfInstance::getId, instanceIds)
+                .apply(instanceIds.isEmpty(), "1 = 0")
+                .orderByAsc(WfInstance::getId));
+        List<WfRecord> workflowRecords = workflowRecordMapper.selectList(new LambdaQueryWrapper<WfRecord>()
+                .eq(WfRecord::getTenantId, tenantId)
+                .in(!instanceIds.isEmpty(), WfRecord::getInstanceId, instanceIds)
+                .apply(instanceIds.isEmpty(), "1 = 0")
+                .orderByAsc(WfRecord::getCreatedAt, WfRecord::getId));
+
+        List<PaymentApplicationSource> sources = sourceMapper.selectList(
+                new LambdaQueryWrapper<PaymentApplicationSource>()
+                        .eq(PaymentApplicationSource::getTenantId, tenantId)
+                        .in(PaymentApplicationSource::getPayApplicationId, applicationIds)
+                        .orderByAsc(PaymentApplicationSource::getId));
+        Set<Long> expenseIds = idSet(sources, PaymentApplicationSource::getExpenseId);
+        Set<Long> settlementIds = idSet(sources, PaymentApplicationSource::getSettlementId);
+        Set<Long> directMeasureIds = idSet(sources, PaymentApplicationSource::getSubMeasureId);
+        List<ExpenseApplication> expenses = expenseMapper.selectList(new LambdaQueryWrapper<ExpenseApplication>()
+                .eq(ExpenseApplication::getTenantId, tenantId)
+                .in(!expenseIds.isEmpty(), ExpenseApplication::getId, expenseIds)
+                .apply(expenseIds.isEmpty(), "1 = 0")
+                .orderByAsc(ExpenseApplication::getId));
+        List<StlSettlement> settlements = settlementMapper.selectList(new LambdaQueryWrapper<StlSettlement>()
+                .eq(StlSettlement::getTenantId, tenantId)
+                .in(!settlementIds.isEmpty(), StlSettlement::getId, settlementIds)
+                .apply(settlementIds.isEmpty(), "1 = 0")
+                .orderByAsc(StlSettlement::getId));
+        List<SettlementSubMeasure> settlementMeasureLinks = settlementSubMeasureMapper.selectList(
+                new LambdaQueryWrapper<SettlementSubMeasure>()
+                        .eq(SettlementSubMeasure::getTenantId, tenantId)
+                        .in(!settlementIds.isEmpty(), SettlementSubMeasure::getSettlementId, settlementIds)
+                        .apply(settlementIds.isEmpty(), "1 = 0")
+                        .orderByAsc(SettlementSubMeasure::getSettlementId, SettlementSubMeasure::getId));
         Set<Long> measureIds = new HashSet<>(directMeasureIds);
-        settlementMeasureLinks.stream().map(SettlementSubMeasure::getSubMeasureId).forEach(measureIds::add);
-        List<SubMeasure> measures = measureIds.isEmpty() ? List.of() : subMeasureMapper.selectByIds(measureIds).stream()
-                .filter(measure -> Objects.equals(measure.getTenantId(), tenantId)).toList();
-        trace.setSubMeasures(measures);
-        List<Long> taskIds = measures.stream().map(SubMeasure::getSubTaskId).filter(Objects::nonNull).distinct().toList();
-        trace.setSubTasks(taskIds.isEmpty() ? List.of() : subTaskMapper.selectByIds(taskIds).stream()
-                .filter(task -> Objects.equals(task.getTenantId(), tenantId)).toList());
+        measureIds.addAll(idSet(settlementMeasureLinks, SettlementSubMeasure::getSubMeasureId));
+        List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .in(!measureIds.isEmpty(), SubMeasure::getId, measureIds)
+                .apply(measureIds.isEmpty(), "1 = 0")
+                .orderByAsc(SubMeasure::getId));
+        Set<Long> taskIds = idSet(measures, SubMeasure::getSubTaskId);
+        List<SubTask> tasks = subTaskMapper.selectList(new LambdaQueryWrapper<SubTask>()
+                .eq(SubTask::getTenantId, tenantId)
+                .in(!taskIds.isEmpty(), SubTask::getId, taskIds)
+                .apply(taskIds.isEmpty(), "1 = 0")
+                .orderByAsc(SubTask::getId));
 
-        List<PayRecord> records = recordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
-                .eq(PayRecord::getTenantId, tenantId).eq(PayRecord::getPayApplicationId, applicationId)
-                .orderByAsc(PayRecord::getPaidAt));
-        trace.setPaymentRecords(records);
-        List<Long> recordIds = records.stream().map(PayRecord::getId).toList();
-        trace.setPaymentSourceAllocations(recordIds.isEmpty() ? List.of() : sourceAllocationMapper.selectList(
+        List<PayRecord> paymentRecords = recordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId)
+                .in(PayRecord::getPayApplicationId, applicationIds)
+                .orderByAsc(PayRecord::getPaidAt, PayRecord::getId));
+        Set<Long> recordIds = idSet(paymentRecords, PayRecord::getId);
+        List<PaymentRecordSourceAllocation> sourceAllocations = sourceAllocationMapper.selectList(
                 new LambdaQueryWrapper<PaymentRecordSourceAllocation>()
                         .eq(PaymentRecordSourceAllocation::getTenantId, tenantId)
-                        .in(PaymentRecordSourceAllocation::getPayRecordId, recordIds)));
-        trace.setCashJournals(recordIds.isEmpty() ? List.of() : cashJournalMapper.selectList(
-                new LambdaQueryWrapper<CashJournalEntry>().eq(CashJournalEntry::getTenantId, tenantId)
-                        .in(CashJournalEntry::getPayRecordId, recordIds)));
-        List<Long> journalIds = trace.getCashJournals().stream().map(CashJournalEntry::getId).toList();
-        trace.setPaymentDocuments(journalIds.isEmpty() ? List.of() : jdbc.queryForList("""
-                SELECT link.id,target.id AS cash_journal_id,
-                       link.cash_journal_id AS evidence_cash_journal_id,
-                       link.file_id,link.document_type,link.created_at
-                  FROM cash_journal_entry target
-                  JOIN payment_document_link link
-                    ON link.tenant_id=target.tenant_id
-                   AND link.cash_journal_id=COALESCE(target.reverse_of_entry_id,target.id)
-                 WHERE target.tenant_id=? AND target.id IN (%s)
-                 ORDER BY target.id,link.created_at,link.id
-                """.formatted("?,".repeat(journalIds.size()).replaceFirst(",$", "")),
-                args(tenantId, journalIds)));
+                        .in(!recordIds.isEmpty(), PaymentRecordSourceAllocation::getPayRecordId, recordIds)
+                        .apply(recordIds.isEmpty(), "1 = 0")
+                        .orderByAsc(PaymentRecordSourceAllocation::getPayRecordId,
+                                PaymentRecordSourceAllocation::getId));
+        List<CashJournalEntry> cashJournals = cashJournalMapper.selectList(
+                new LambdaQueryWrapper<CashJournalEntry>()
+                        .eq(CashJournalEntry::getTenantId, tenantId)
+                        .in(!recordIds.isEmpty(), CashJournalEntry::getPayRecordId, recordIds)
+                        .apply(recordIds.isEmpty(), "1 = 0")
+                        .orderByAsc(CashJournalEntry::getPayRecordId, CashJournalEntry::getId));
+        Set<Long> journalIds = idSet(cashJournals, CashJournalEntry::getId);
+        List<Map<String, Object>> paymentDocuments = paymentDocuments(tenantId, journalIds);
 
-        List<InvoicePaymentAllocation> invoiceAllocations = recordIds.isEmpty() ? List.of() : invoiceAllocationMapper.selectList(
-                new LambdaQueryWrapper<InvoicePaymentAllocation>().eq(InvoicePaymentAllocation::getTenantId, tenantId)
-                        .in(InvoicePaymentAllocation::getPayRecordId, recordIds));
-        trace.setInvoiceAllocations(invoiceAllocations);
-        List<Long> invoiceIds = invoiceAllocations.stream().map(InvoicePaymentAllocation::getInvoiceId).distinct().toList();
-        trace.setInvoices(invoiceIds.isEmpty() ? List.of() : invoiceMapper.selectByIds(invoiceIds));
+        List<InvoicePaymentAllocation> invoiceAllocations = invoiceAllocationMapper.selectList(
+                new LambdaQueryWrapper<InvoicePaymentAllocation>()
+                        .eq(InvoicePaymentAllocation::getTenantId, tenantId)
+                        .in(!recordIds.isEmpty(), InvoicePaymentAllocation::getPayRecordId, recordIds)
+                        .apply(recordIds.isEmpty(), "1 = 0")
+                        .orderByAsc(InvoicePaymentAllocation::getPayRecordId,
+                                InvoicePaymentAllocation::getId));
+        Set<Long> invoiceIds = idSet(invoiceAllocations, InvoicePaymentAllocation::getInvoiceId);
+        List<PayInvoice> invoices = invoiceMapper.selectList(new LambdaQueryWrapper<PayInvoice>()
+                .eq(PayInvoice::getTenantId, tenantId)
+                .in(!invoiceIds.isEmpty(), PayInvoice::getId, invoiceIds)
+                .apply(invoiceIds.isEmpty(), "1 = 0")
+                .orderByAsc(PayInvoice::getId));
 
-        Set<String> businessKeys = new HashSet<>();
-        businessKeys.add("PAY_REQUEST:" + applicationId);
-        expenseIds.forEach(id -> businessKeys.add("EXPENSE:" + id));
-        List<BudgetLedger> ledgers = budgetLedgerMapper.selectList(new LambdaQueryWrapper<BudgetLedger>()
-                .eq(BudgetLedger::getTenantId, tenantId).eq(BudgetLedger::getProjectId, app.getProjectId())
-                .orderByAsc(BudgetLedger::getCreatedAt)).stream()
-                .filter(l -> businessKeys.contains(l.getBusinessType() + ":" + l.getBusinessId())).toList();
-        trace.setBudgetLedgers(ledgers);
+        List<BudgetLedger> budgetLedgers = budgetLedgerMapper.selectList(new LambdaQueryWrapper<BudgetLedger>()
+                .eq(BudgetLedger::getTenantId, tenantId)
+                .in(!projectIds.isEmpty(), BudgetLedger::getProjectId, projectIds)
+                .apply(projectIds.isEmpty(), "1 = 0")
+                .and(keys -> {
+                    keys.eq(BudgetLedger::getBusinessType, "PAY_REQUEST")
+                            .in(BudgetLedger::getBusinessId, applicationIds);
+                    if (!expenseIds.isEmpty()) {
+                        keys.or().eq(BudgetLedger::getBusinessType, "EXPENSE")
+                                .in(BudgetLedger::getBusinessId, expenseIds);
+                    }
+                })
+                .orderByAsc(BudgetLedger::getCreatedAt, BudgetLedger::getId));
 
-        ProjectBudgetLine budgetLine = app.getBudgetLineId() == null
-                ? null : projectBudgetLineMapper.selectById(app.getBudgetLineId());
-        ProjectBudget budget = budgetLine == null ? null : projectBudgetMapper.selectById(budgetLine.getBudgetId());
-        CostSubject subject = app.getCostSubjectId() == null
-                ? null : costSubjectMapper.selectById(app.getCostSubjectId());
-        ContractBudgetAllocation contractAllocation = app.getContractBudgetAllocationId() == null
-                ? null : contractBudgetAllocationMapper.selectById(app.getContractBudgetAllocationId());
-        trace.setProjectBudgetLine(budgetLine);
-        trace.setProjectBudget(budget);
-        trace.setCostSubject(subject);
-        trace.setContractBudgetAllocation(contractAllocation);
+        Set<Long> budgetLineIds = idSet(applications, PayApplication::getBudgetLineId);
+        List<ProjectBudgetLine> budgetLines = projectBudgetLineMapper.selectList(
+                new LambdaQueryWrapper<ProjectBudgetLine>()
+                        .eq(ProjectBudgetLine::getTenantId, tenantId)
+                        .in(!budgetLineIds.isEmpty(), ProjectBudgetLine::getId, budgetLineIds)
+                        .apply(budgetLineIds.isEmpty(), "1 = 0")
+                        .orderByAsc(ProjectBudgetLine::getId));
+        Set<Long> budgetIds = idSet(budgetLines, ProjectBudgetLine::getBudgetId);
+        List<ProjectBudget> budgets = projectBudgetMapper.selectList(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getTenantId, tenantId)
+                .in(!budgetIds.isEmpty(), ProjectBudget::getId, budgetIds)
+                .apply(budgetIds.isEmpty(), "1 = 0")
+                .orderByAsc(ProjectBudget::getId));
+        Set<Long> costSubjectIds = idSet(applications, PayApplication::getCostSubjectId);
+        List<CostSubject> costSubjects = costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, tenantId)
+                .in(!costSubjectIds.isEmpty(), CostSubject::getId, costSubjectIds)
+                .apply(costSubjectIds.isEmpty(), "1 = 0")
+                .orderByAsc(CostSubject::getId));
+        Set<Long> contractAllocationIds = idSet(applications, PayApplication::getContractBudgetAllocationId);
+        List<ContractBudgetAllocation> contractAllocations = contractBudgetAllocationMapper.selectList(
+                new LambdaQueryWrapper<ContractBudgetAllocation>()
+                        .eq(ContractBudgetAllocation::getTenantId, tenantId)
+                        .in(!contractAllocationIds.isEmpty(), ContractBudgetAllocation::getId,
+                                contractAllocationIds)
+                        .apply(contractAllocationIds.isEmpty(), "1 = 0")
+                        .orderByAsc(ContractBudgetAllocation::getId));
 
-        List<Long> receiptItemIds = sources.stream().map(PaymentApplicationSource::getReceiptItemId)
-                .filter(Objects::nonNull).distinct().toList();
-        List<MatReceiptItem> receiptItems = receiptItemIds.isEmpty() ? List.of()
-                : receiptItemMapper.selectByIds(receiptItemIds).stream()
-                        .filter(item -> Objects.equals(item.getTenantId(), tenantId)).toList();
-        List<Long> receiptIds = receiptItems.stream().map(MatReceiptItem::getReceiptId)
-                .filter(Objects::nonNull).distinct().toList();
-        List<MatReceipt> receipts = receiptIds.isEmpty() ? List.of()
-                : receiptMapper.selectByIds(receiptIds).stream()
-                        .filter(item -> Objects.equals(item.getTenantId(), tenantId)).toList();
-        trace.setMaterialReceiptItems(receiptItems);
-        trace.setMaterialReceipts(receipts);
+        Set<Long> receiptItemIds = idSet(sources, PaymentApplicationSource::getReceiptItemId);
+        List<MatReceiptItem> receiptItems = receiptItemMapper.selectList(new LambdaQueryWrapper<MatReceiptItem>()
+                .eq(MatReceiptItem::getTenantId, tenantId)
+                .in(!receiptItemIds.isEmpty(), MatReceiptItem::getId, receiptItemIds)
+                .apply(receiptItemIds.isEmpty(), "1 = 0")
+                .orderByAsc(MatReceiptItem::getId));
+        Set<Long> receiptIds = idSet(receiptItems, MatReceiptItem::getReceiptId);
+        List<MatReceipt> receipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
+                .eq(MatReceipt::getTenantId, tenantId)
+                .in(!receiptIds.isEmpty(), MatReceipt::getId, receiptIds)
+                .apply(receiptIds.isEmpty(), "1 = 0")
+                .orderByAsc(MatReceipt::getId));
 
-        BigDecimal netReserved = ledgerNet(ledgers, "RESERVE", "RESTORE_RESERVATION")
-                .subtract(ledgerNet(ledgers, "RELEASE", "CONSUME"));
-        BigDecimal netConsumed = ledgerNet(ledgers, "CONSUME")
-                .subtract(ledgerNet(ledgers, "RESTORE_RESERVATION", "REVERSE"));
-        BigDecimal netPaid = sources.stream().map(PaymentApplicationSource::getPaidAmount)
-                .map(this::money).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal netCashOutflow = trace.getCashJournals().stream()
-                .filter(item -> item.getArchivedAt() != null || "ARCHIVED".equals(item.getStatus()))
-                .map(item -> "OUT".equals(item.getDirection()) ? money(item.getAmount())
-                        : money(item.getAmount()).negate())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        trace.setBudgetConservation(Map.of(
-                "netReserved", money(netReserved).toPlainString(),
-                "netConsumed", money(netConsumed).toPlainString(),
-                "netPaid", money(netPaid).toPlainString(),
-                "netCashOutflow", money(netCashOutflow).toPlainString()));
+        List<AccountingEntry> accountingEntries = accountingEntryMapper.selectList(
+                new LambdaQueryWrapper<AccountingEntry>()
+                        .eq(AccountingEntry::getTenantId, tenantId)
+                        .in(!recordIds.isEmpty(), AccountingEntry::getPayRecordId, recordIds)
+                        .apply(recordIds.isEmpty(), "1 = 0")
+                        .orderByAsc(AccountingEntry::getId));
+        Set<Long> entryIds = idSet(accountingEntries, AccountingEntry::getId);
+        List<AccountingEntryLine> accountingLines = accountingLineMapper.selectList(
+                new LambdaQueryWrapper<AccountingEntryLine>()
+                        .eq(AccountingEntryLine::getTenantId, tenantId)
+                        .in(!entryIds.isEmpty(), AccountingEntryLine::getEntryId, entryIds)
+                        .apply(entryIds.isEmpty(), "1 = 0")
+                        .orderByAsc(AccountingEntryLine::getEntryId, AccountingEntryLine::getId));
 
-        List<AccountingEntry> entries = recordIds.isEmpty() ? List.of() : accountingEntryMapper.selectList(
-                new LambdaQueryWrapper<AccountingEntry>().eq(AccountingEntry::getTenantId, tenantId)
-                        .in(AccountingEntry::getPayRecordId, recordIds));
-        trace.setAccountingEntries(entries);
-        List<Long> entryIds = entries.stream().map(AccountingEntry::getId).toList();
-        trace.setAccountingEntryLines(entryIds.isEmpty() ? List.of() : accountingLineMapper.selectList(
-                new LambdaQueryWrapper<AccountingEntryLine>().eq(AccountingEntryLine::getTenantId, tenantId)
-                        .in(AccountingEntryLine::getEntryId, entryIds)));
-        validate(trace, tenantId);
-        return trace;
+        Map<Long, PmProject> projectById = byId(projects, PmProject::getId);
+        Map<Long, CtContract> contractById = byId(contracts, CtContract::getId);
+        Map<Long, WfInstance> instanceById = byId(instances, WfInstance::getId);
+        Map<Long, ProjectBudgetLine> budgetLineById = byId(budgetLines, ProjectBudgetLine::getId);
+        Map<Long, ProjectBudget> budgetById = byId(budgets, ProjectBudget::getId);
+        Map<Long, CostSubject> subjectById = byId(costSubjects, CostSubject::getId);
+        Map<Long, ContractBudgetAllocation> contractAllocationById = byId(contractAllocations,
+                ContractBudgetAllocation::getId);
+
+        List<PaymentTraceVO> result = new ArrayList<>(applications.size());
+        for (PayApplication application : applications) {
+            PaymentTraceVO trace = new PaymentTraceVO();
+            trace.setPaymentApplication(application);
+            trace.setProject(projectById.get(application.getProjectId()));
+            trace.setContract(contractById.get(application.getContractId()));
+            if (trace.getProject() == null || trace.getContract() == null
+                    || !Objects.equals(trace.getProject().getTenantId(), tenantId)
+                    || !Objects.equals(trace.getContract().getTenantId(), tenantId)
+                    || !Objects.equals(trace.getContract().getProjectId(), application.getProjectId())) {
+                throw incomplete("付款申请的项目或合同关系不一致");
+            }
+
+            WfInstance instance = instanceById.get(application.getApprovalInstanceId());
+            trace.setApprovalInstance(instance);
+            trace.setApprovalRecords(instance == null ? List.of() : workflowRecords.stream()
+                    .filter(item -> Objects.equals(item.getInstanceId(), instance.getId())).toList());
+
+            List<PaymentApplicationSource> applicationSources = sources.stream()
+                    .filter(item -> Objects.equals(item.getPayApplicationId(), application.getId())).toList();
+            trace.setApplicationSources(applicationSources);
+            Set<Long> applicationExpenseIds = idSet(applicationSources, PaymentApplicationSource::getExpenseId);
+            Set<Long> applicationSettlementIds = idSet(applicationSources,
+                    PaymentApplicationSource::getSettlementId);
+            trace.setExpenses(filterByIds(expenses, ExpenseApplication::getId, applicationExpenseIds));
+            trace.setSettlements(filterByIds(settlements, StlSettlement::getId, applicationSettlementIds));
+            List<SettlementSubMeasure> applicationSettlementLinks = settlementMeasureLinks.stream()
+                    .filter(item -> applicationSettlementIds.contains(item.getSettlementId())).toList();
+            trace.setSettlementSubMeasures(applicationSettlementLinks);
+            Set<Long> applicationMeasureIds = idSet(applicationSources,
+                    PaymentApplicationSource::getSubMeasureId);
+            applicationMeasureIds.addAll(idSet(applicationSettlementLinks, SettlementSubMeasure::getSubMeasureId));
+            List<SubMeasure> applicationMeasures = filterByIds(measures, SubMeasure::getId, applicationMeasureIds);
+            trace.setSubMeasures(applicationMeasures);
+            trace.setSubTasks(filterByIds(tasks, SubTask::getId, idSet(applicationMeasures, SubMeasure::getSubTaskId)));
+
+            List<PayRecord> applicationRecords = paymentRecords.stream()
+                    .filter(item -> Objects.equals(item.getPayApplicationId(), application.getId())).toList();
+            Set<Long> applicationRecordIds = idSet(applicationRecords, PayRecord::getId);
+            trace.setPaymentRecords(applicationRecords);
+            trace.setPaymentSourceAllocations(sourceAllocations.stream()
+                    .filter(item -> applicationRecordIds.contains(item.getPayRecordId())).toList());
+            List<CashJournalEntry> applicationJournals = cashJournals.stream()
+                    .filter(item -> applicationRecordIds.contains(item.getPayRecordId())).toList();
+            trace.setCashJournals(applicationJournals);
+            Set<Long> applicationJournalIds = idSet(applicationJournals, CashJournalEntry::getId);
+            trace.setPaymentDocuments(paymentDocuments.stream()
+                    .filter(item -> applicationJournalIds.contains(cashJournalId(item))).toList());
+            List<InvoicePaymentAllocation> applicationInvoiceAllocations = invoiceAllocations.stream()
+                    .filter(item -> applicationRecordIds.contains(item.getPayRecordId())).toList();
+            trace.setInvoiceAllocations(applicationInvoiceAllocations);
+            trace.setInvoices(filterByIds(invoices, PayInvoice::getId,
+                    idSet(applicationInvoiceAllocations, InvoicePaymentAllocation::getInvoiceId)));
+
+            Set<String> businessKeys = new HashSet<>();
+            businessKeys.add("PAY_REQUEST:" + application.getId());
+            applicationExpenseIds.forEach(id -> businessKeys.add("EXPENSE:" + id));
+            List<BudgetLedger> applicationLedgers = budgetLedgers.stream()
+                    .filter(item -> Objects.equals(item.getProjectId(), application.getProjectId()))
+                    .filter(item -> businessKeys.contains(item.getBusinessType() + ":" + item.getBusinessId()))
+                    .toList();
+            trace.setBudgetLedgers(applicationLedgers);
+            ProjectBudgetLine budgetLine = budgetLineById.get(application.getBudgetLineId());
+            trace.setProjectBudgetLine(budgetLine);
+            trace.setProjectBudget(budgetLine == null ? null : budgetById.get(budgetLine.getBudgetId()));
+            trace.setCostSubject(subjectById.get(application.getCostSubjectId()));
+            trace.setContractBudgetAllocation(contractAllocationById.get(
+                    application.getContractBudgetAllocationId()));
+
+            Set<Long> applicationReceiptItemIds = idSet(applicationSources,
+                    PaymentApplicationSource::getReceiptItemId);
+            List<MatReceiptItem> applicationReceiptItems = filterByIds(receiptItems, MatReceiptItem::getId,
+                    applicationReceiptItemIds);
+            trace.setMaterialReceiptItems(applicationReceiptItems);
+            trace.setMaterialReceipts(filterByIds(receipts, MatReceipt::getId,
+                    idSet(applicationReceiptItems, MatReceiptItem::getReceiptId)));
+
+            BigDecimal netReserved = ledgerNet(applicationLedgers, "RESERVE", "RESTORE_RESERVATION")
+                    .subtract(ledgerNet(applicationLedgers, "RELEASE", "CONSUME"));
+            BigDecimal netConsumed = ledgerNet(applicationLedgers, "CONSUME")
+                    .subtract(ledgerNet(applicationLedgers, "RESTORE_RESERVATION", "REVERSE"));
+            BigDecimal netPaid = applicationSources.stream().map(PaymentApplicationSource::getPaidAmount)
+                    .map(this::money).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal netCashOutflow = applicationJournals.stream()
+                    .filter(item -> item.getArchivedAt() != null || "ARCHIVED".equals(item.getStatus()))
+                    .map(item -> "OUT".equals(item.getDirection()) ? money(item.getAmount())
+                            : money(item.getAmount()).negate())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            trace.setBudgetConservation(Map.of(
+                    "netReserved", money(netReserved).toPlainString(),
+                    "netConsumed", money(netConsumed).toPlainString(),
+                    "netPaid", money(netPaid).toPlainString(),
+                    "netCashOutflow", money(netCashOutflow).toPlainString()));
+
+            List<AccountingEntry> applicationEntries = accountingEntries.stream()
+                    .filter(item -> applicationRecordIds.contains(item.getPayRecordId())).toList();
+            trace.setAccountingEntries(applicationEntries);
+            Set<Long> applicationEntryIds = idSet(applicationEntries, AccountingEntry::getId);
+            trace.setAccountingEntryLines(accountingLines.stream()
+                    .filter(item -> applicationEntryIds.contains(item.getEntryId()))
+                    .toList());
+            validate(trace, tenantId);
+            result.add(trace);
+        }
+        return result;
     }
 
     private void validate(PaymentTraceVO trace, Long tenantId) {
@@ -748,7 +916,58 @@ public class PaymentTraceService {
     private List<PaymentTraceVO> traces(Collection<Long> applicationIds, String emptyMessage) {
         List<Long> ids = applicationIds.stream().filter(Objects::nonNull).distinct().sorted().toList();
         if (ids.isEmpty()) throw incomplete(emptyMessage);
-        return ids.stream().map(this::byApplication).toList();
+        List<PaymentTraceVO> result = new ArrayList<>(ids.size());
+        for (int start = 0; start < ids.size(); start += TRACE_BATCH_SIZE) {
+            result.addAll(assembleBatch(ids.subList(start, Math.min(start + TRACE_BATCH_SIZE, ids.size()))));
+        }
+        return List.copyOf(result);
+    }
+
+    private List<Map<String, Object>> paymentDocuments(Long tenantId, Set<Long> journalIds) {
+        if (journalIds.isEmpty()) {
+            return jdbc.queryForList("""
+                    SELECT link.id,target.id AS cash_journal_id,
+                           link.cash_journal_id AS evidence_cash_journal_id,
+                           link.file_id,link.document_type,link.created_at
+                      FROM cash_journal_entry target
+                      JOIN payment_document_link link
+                        ON link.tenant_id=target.tenant_id
+                       AND link.cash_journal_id=COALESCE(target.reverse_of_entry_id,target.id)
+                     WHERE target.tenant_id=? AND 1=0
+                     ORDER BY target.id,link.created_at,link.id
+                    """, args(tenantId, List.of()));
+        }
+        List<Long> sortedIds = journalIds.stream().sorted().toList();
+        return jdbc.queryForList("""
+                SELECT link.id,target.id AS cash_journal_id,
+                       link.cash_journal_id AS evidence_cash_journal_id,
+                       link.file_id,link.document_type,link.created_at
+                  FROM cash_journal_entry target
+                  JOIN payment_document_link link
+                    ON link.tenant_id=target.tenant_id
+                   AND link.cash_journal_id=COALESCE(target.reverse_of_entry_id,target.id)
+                 WHERE target.tenant_id=? AND target.id IN (%s)
+                 ORDER BY target.id,link.created_at,link.id
+                """.formatted("?,".repeat(sortedIds.size()).replaceFirst(",$", "")),
+                args(tenantId, sortedIds));
+    }
+
+    private <T> Set<Long> ids(List<T> values, Function<T, Long> idExtractor) {
+        return values.stream().map(idExtractor).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private <T> Set<Long> idSet(List<T> values, Function<T, Long> idExtractor) {
+        return new HashSet<>(ids(values, idExtractor));
+    }
+
+    private <T> Map<Long, T> byId(List<T> values, Function<T, Long> idExtractor) {
+        return values.stream().filter(item -> idExtractor.apply(item) != null)
+                .collect(Collectors.toMap(idExtractor, Function.identity(), (left, right) -> left, LinkedHashMap::new));
+    }
+
+    private <T> List<T> filterByIds(List<T> values, Function<T, Long> idExtractor, Set<Long> selectedIds) {
+        if (selectedIds.isEmpty()) return List.of();
+        return values.stream().filter(item -> selectedIds.contains(idExtractor.apply(item))).toList();
     }
 
     private void requireTenantProject(Long entityTenantId, Long projectId, String code, String message) {

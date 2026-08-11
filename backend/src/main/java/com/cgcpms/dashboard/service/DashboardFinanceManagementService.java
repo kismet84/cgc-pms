@@ -34,7 +34,6 @@ import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
-import com.cgcpms.cashbook.entity.FundAccount;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
@@ -77,6 +76,7 @@ import com.cgcpms.workflow.mapper.WfTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -94,6 +94,7 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Service
+@Transactional(readOnly = true)
 public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
     private final ProjectAccessChecker projectAccessChecker;
@@ -167,73 +168,9 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setProjectId(projectId.toString());
         vo.setProjectName(project.getProjectName());
 
-        // Pay records
-        List<PayRecord> payRecords = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getTenantId, tenantId)
-                        .eq(PayRecord::getProjectId, projectId));
-        payRecords = payRecords.stream()
-                .filter(record -> existedBy(record.getPayDate(), record.getCreatedAt(), selectedMonth))
-                .collect(Collectors.toList());
-
-        // Pending payments
-        vo.setPendingPayments(List.of());
-
-        // Over-ratio payments: SUM of excess where SUCCESS paid > contract_amount
-        BigDecimal overRatioTotal = BigDecimal.ZERO;
-        Set<Long> overRatioContractIds = new HashSet<>();
-        List<PayRecord> successRecords = payRecords.stream()
-                .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
-                .collect(Collectors.toList());
-        if (!successRecords.isEmpty()) {
-            Map<Long, BigDecimal> paidByContract = new HashMap<>();
-            for (PayRecord r : successRecords) {
-                paidByContract.merge(r.getContractId(),
-                        r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO, BigDecimal::add);
-            }
-            List<CtContract> relatedContracts = ctContractMapper.selectList(
-                    new LambdaQueryWrapper<CtContract>()
-                            .eq(CtContract::getTenantId, tenantId)
-                            .eq(CtContract::getProjectId, projectId)
-                            .in(CtContract::getId, paidByContract.keySet()));
-            Map<Long, CtContract> contractMap = relatedContracts.stream()
-                    .collect(Collectors.toMap(CtContract::getId, c -> c));
-            for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
-                CtContract contract = contractMap.get(entry.getKey());
-                if (contract == null) continue;
-                BigDecimal contractAmount = contract.getContractAmount() != null ? contract.getContractAmount() : BigDecimal.ZERO;
-                if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
-                if (entry.getValue().compareTo(contractAmount) > 0) {
-                    overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
-                    overRatioContractIds.add(entry.getKey());
-                }
-            }
-        }
-        vo.setOverRatioAmount(overRatioTotal.toPlainString());
-
-        // Warranty expiring: SUM contractAmount WHERE endDate within 30 days
-        LocalDate windowStart = selectedMonth == null ? LocalDate.now() : selectedMonth.atDay(1);
-        LocalDate threshold = selectedMonth == null ? windowStart.plusDays(30) : selectedMonth.atEndOfMonth();
-        BigDecimal warrantyExpiringTotal = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .eq(CtContract::getProjectId, projectId)
-                        .eq(CtContract::getContractStatus, "PERFORMING")
-                        .ge(CtContract::getEndDate, windowStart)
-                        .le(CtContract::getEndDate, threshold))
-                .stream()
-                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        vo.setWarrantyExpiringAmount(warrantyExpiringTotal.toPlainString());
-
-        // Detail lists
-        vo.setOverRatioPayments(successRecords.stream()
-                .filter(p -> overRatioContractIds.contains(p.getContractId()))
-                .limit(20)
-                .map(p -> toPaymentItem(p, project.getProjectName()))
-                .collect(Collectors.toList()));
-
-        applyClosedLoopMetrics(vo, tenantId, List.of(projectId), selectedMonth, false);
+        ClosedLoopSnapshot snapshot = applyClosedLoopMetrics(
+                vo, tenantId, List.of(project), selectedMonth, false);
+        applyRealtimeFinanceRisks(vo, snapshot, selectedMonth);
 
         return vo;
     }
@@ -268,7 +205,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         }
         List<PmProject> activeProjects = projectAccessChecker.filterAccessible(
                 projectMapper.selectList(projectQuery)).stream()
-                .filter(project -> existedBy(project.getPlannedStartDate(), project.getCreatedAt(), selectedMonth))
+                .filter(project -> existedBy(null, project.getCreatedAt(), selectedMonth))
                 .collect(Collectors.toList());
         if (selectedMonth == null) {
             vo.setActiveProjectCount((long) activeProjects.size());
@@ -384,63 +321,51 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 .map(this::toManagementMetricSource)
                 .collect(Collectors.toList()));
 
-        // Pending tasks count (tenant-wide)
-        List<WfTask> allPending = wfTaskMapper.selectList(
-                new LambdaQueryWrapper<WfTask>()
-                        .eq(WfTask::getTenantId, tenantId)
-                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
-                        .orderByDesc(WfTask::getReceivedAt));
-        Map<Long, WfInstance> pendingInstanceMap = batchLoadInstances(allPending);
-        List<WfTask> visiblePending = allPending.stream()
-                .filter(task -> selectedMonth == null || (task.getReceivedAt() != null
-                        && !task.getReceivedAt().toLocalDate().isBefore(selectedMonth.atDay(1))
-                        && !task.getReceivedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth())))
-                .filter(task -> {
-                    WfInstance instance = pendingInstanceMap.get(task.getInstanceId());
-                    return instance != null
-                            && Objects.equals(tenantId, instance.getTenantId())
-                            && instance.getProjectId() != null
-                            && visibleProjectIds.contains(instance.getProjectId());
-                })
-                .collect(Collectors.toList());
-        vo.setTotalPendingTaskCount(selectedMonth == null ? (long) visiblePending.size() : null);
-
-        // Overdue items: pending tasks older than 7 days
-        LocalDateTime sevenDaysAgo = (selectedMonth == null
-                ? LocalDateTime.now()
-                : selectedMonth.atEndOfMonth().atTime(23, 59, 59)).minusDays(7);
-        List<DashboardTaskItemVO> overdueItems = visiblePending.stream()
-                .filter(t -> t.getReceivedAt() != null && t.getReceivedAt().isBefore(sevenDaysAgo))
-                .limit(20)
-                .map(t -> {
-                    DashboardTaskItemVO item = new DashboardTaskItemVO();
-                    item.setTaskId(String.valueOf(t.getId()));
-                    item.setInstanceId(String.valueOf(t.getInstanceId()));
-                    item.setBusinessType(t.getBusinessType());
-                    item.setTaskStatus(t.getTaskStatus());
-                    if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
-                    return item;
-                }).collect(Collectors.toList());
-        vo.setOverdueItems(selectedMonth == null ? overdueItems : List.of());
-
-        // Risks from alert_log: unread alerts tenant-wide, preserving severity for UI filtering.
-        List<AlertLog> unreadAlerts = alertLogMapper.selectList(
-                new LambdaQueryWrapper<AlertLog>()
-                        .eq(AlertLog::getTenantId, tenantId)
-                        .in(AlertLog::getProjectId, visibleProjectIds)
-                        .eq(AlertLog::getIsRead, 0)
-                        .orderByDesc(AlertLog::getTriggeredAt));
-        if (selectedMonth != null) {
-            unreadAlerts = unreadAlerts.stream()
-                    .filter(alert -> alert.getTriggeredAt() != null
-                            && !alert.getTriggeredAt().toLocalDate().isBefore(selectedMonth.atDay(1))
-                            && !alert.getTriggeredAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
-                    .collect(Collectors.toList());
-        }
         if (selectedMonth == null) {
+            List<WfTask> allPending = wfTaskMapper.selectList(
+                    new LambdaQueryWrapper<WfTask>()
+                            .eq(WfTask::getTenantId, tenantId)
+                            .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                            .orderByDesc(WfTask::getReceivedAt));
+            Map<Long, WfInstance> pendingInstanceMap = batchLoadInstances(allPending);
+            List<WfTask> visiblePending = allPending.stream()
+                    .filter(task -> {
+                        WfInstance instance = pendingInstanceMap.get(task.getInstanceId());
+                        return instance != null
+                                && Objects.equals(tenantId, instance.getTenantId())
+                                && instance.getProjectId() != null
+                                && visibleProjectIds.contains(instance.getProjectId());
+                    })
+                    .toList();
+            vo.setTotalPendingTaskCount((long) visiblePending.size());
+            LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            vo.setOverdueItems(visiblePending.stream()
+                    .filter(task -> task.getReceivedAt() != null
+                            && task.getReceivedAt().isBefore(sevenDaysAgo))
+                    .limit(20)
+                    .map(task -> {
+                        DashboardTaskItemVO item = new DashboardTaskItemVO();
+                        item.setTaskId(String.valueOf(task.getId()));
+                        item.setInstanceId(String.valueOf(task.getInstanceId()));
+                        item.setBusinessType(task.getBusinessType());
+                        item.setTaskStatus(task.getTaskStatus());
+                        if (task.getReceivedAt() != null) {
+                            item.setReceivedAt(DateTimeUtils.DTF.format(task.getReceivedAt()));
+                        }
+                        return item;
+                    })
+                    .toList());
+            List<AlertLog> unreadAlerts = alertLogMapper.selectList(
+                    new LambdaQueryWrapper<AlertLog>()
+                            .eq(AlertLog::getTenantId, tenantId)
+                            .in(AlertLog::getProjectId, visibleProjectIds)
+                            .eq(AlertLog::getIsRead, 0)
+                            .orderByDesc(AlertLog::getTriggeredAt));
             vo.setTotalRiskCount((long) unreadAlerts.size());
-            vo.setMajorRisks(unreadAlerts.stream().limit(10).map(this::toAlertItem).collect(Collectors.toList()));
+            vo.setMajorRisks(unreadAlerts.stream().limit(10).map(this::toAlertItem).toList());
         } else {
+            vo.setTotalPendingTaskCount(null);
+            vo.setOverdueItems(List.of());
             vo.setTotalRiskCount(null);
             vo.setMajorRisks(List.of());
             unavailable.addAll(List.of("totalPendingTaskCount", "overdueItems", "totalRiskCount", "majorRisks"));
@@ -472,93 +397,13 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 projectMapper.selectList(projectQuery)).stream()
                 .filter(project -> existedBy(null, project.getCreatedAt(), selectedMonth))
                 .collect(Collectors.toList());
-        List<Long> projectIds = visibleProjects.stream().map(PmProject::getId).collect(Collectors.toList());
-
         FinanceDashboardVO vo = new FinanceDashboardVO();
         vo.setProjectId(null);
         vo.setProjectName("全部项目");
 
-        if (projectIds.isEmpty()) {
-            vo.setPendingPaymentAmount("0");
-            vo.setPendingPaymentCount(0L);
-            vo.setApprovedUnpaidAmount("0");
-            vo.setOverRatioAmount("0");
-            vo.setWarrantyExpiringAmount("0");
-            vo.setPendingPayments(Collections.emptyList());
-            vo.setOverRatioPayments(Collections.emptyList());
-            applyClosedLoopMetrics(vo, tenantId, List.of(), selectedMonth, true);
-            return vo;
-        }
-
-        // Pay records — tenant-wide
-        List<PayRecord> allPayRecords = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getTenantId, tenantId)
-                        .in(PayRecord::getProjectId, projectIds));
-        allPayRecords = allPayRecords.stream()
-                .filter(record -> existedBy(record.getPayDate(), record.getCreatedAt(), selectedMonth))
-                .collect(Collectors.toList());
-
-        // Pending payments
-        vo.setPendingPayments(List.of());
-
-        // Over-ratio payments
-        BigDecimal overRatioTotal = BigDecimal.ZERO;
-        Set<Long> overRatioContractIds = new HashSet<>();
-        List<PayRecord> successRecords = allPayRecords.stream()
-                .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
-                .collect(Collectors.toList());
-        if (!successRecords.isEmpty()) {
-            Map<Long, BigDecimal> paidByContract = new HashMap<>();
-            for (PayRecord r : successRecords) {
-                paidByContract.merge(r.getContractId(),
-                        r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO, BigDecimal::add);
-            }
-            List<CtContract> relatedContracts = ctContractMapper.selectList(
-                    new LambdaQueryWrapper<CtContract>()
-                            .eq(CtContract::getTenantId, tenantId)
-                            .in(CtContract::getProjectId, projectIds)
-                            .in(CtContract::getId, paidByContract.keySet()));
-            Map<Long, CtContract> contractMap = relatedContracts.stream()
-                    .collect(Collectors.toMap(CtContract::getId, c -> c));
-            for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
-                CtContract contract = contractMap.get(entry.getKey());
-                if (contract == null) continue;
-                BigDecimal contractAmount = contract.getContractAmount() != null ? contract.getContractAmount() : BigDecimal.ZERO;
-                if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
-                if (entry.getValue().compareTo(contractAmount) > 0) {
-                    overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
-                    overRatioContractIds.add(entry.getKey());
-                }
-            }
-        }
-        vo.setOverRatioAmount(overRatioTotal.toPlainString());
-
-        // Warranty expiring
-        LocalDate windowStart = selectedMonth == null ? LocalDate.now() : selectedMonth.atDay(1);
-        LocalDate threshold = selectedMonth == null ? windowStart.plusDays(30) : selectedMonth.atEndOfMonth();
-        BigDecimal warrantyExpiringTotal = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .in(CtContract::getProjectId, projectIds)
-                        .eq(CtContract::getContractStatus, "PERFORMING")
-                        .ge(CtContract::getEndDate, windowStart)
-                        .le(CtContract::getEndDate, threshold))
-                .stream()
-                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        vo.setWarrantyExpiringAmount(warrantyExpiringTotal.toPlainString());
-
-        // Detail lists
-        Map<Long, String> projectNameMap = visibleProjects.stream()
-                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        vo.setOverRatioPayments(successRecords.stream()
-                .filter(p -> overRatioContractIds.contains(p.getContractId()))
-                .limit(20)
-                .map(p -> toPaymentItem(p, projectNameMap.getOrDefault(p.getProjectId(), "")))
-                .collect(Collectors.toList()));
-
-        applyClosedLoopMetrics(vo, tenantId, projectIds, selectedMonth, true);
+        ClosedLoopSnapshot snapshot = applyClosedLoopMetrics(
+                vo, tenantId, visibleProjects, selectedMonth, true);
+        applyRealtimeFinanceRisks(vo, snapshot, selectedMonth);
 
         return vo;
     }
@@ -576,9 +421,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         return item;
     }
 
-    private void applyClosedLoopMetrics(FinanceDashboardVO vo, Long tenantId,
-                                        List<Long> projectIds, YearMonth selectedMonth,
-                                        boolean enterpriseView) {
+    private ClosedLoopSnapshot applyClosedLoopMetrics(FinanceDashboardVO vo, Long tenantId,
+                                                       List<PmProject> projects, YearMonth selectedMonth,
+                                                       boolean enterpriseView) {
+        List<Long> projectIds = projects.stream().map(PmProject::getId).toList();
         List<String> unavailable = new ArrayList<>();
         vo.setUnavailableMetrics(unavailable);
         vo.setPendingPayments(List.of());
@@ -591,29 +437,45 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             unavailable.addAll(List.of("overRatioAmount", "warrantyExpiringAmount", "overRatioPayments"));
         }
         if (projectIds.isEmpty()) {
-            vo.setPendingPaymentAmount("0.00");
-            vo.setPendingPaymentCount(0L);
-            vo.setApprovedUnpaidAmount("0.00");
-            vo.setTotalContractAmount("0.00");
+            if (selectedMonth == null) {
+                vo.setPendingPaymentAmount("0.00");
+                vo.setPendingPaymentCount(0L);
+                vo.setApprovedUnpaidAmount("0.00");
+                vo.setTotalContractAmount("0.00");
+                vo.setBudgetAmount("0.00");
+                vo.setBudgetReservedAmount("0.00");
+                vo.setBudgetConsumedAmount("0.00");
+                vo.setBudgetExecutionRate("0.00");
+            } else {
+                vo.setPendingPaymentAmount(null);
+                vo.setPendingPaymentCount(null);
+                vo.setApprovedUnpaidAmount(null);
+                vo.setTotalContractAmount(null);
+                vo.setBudgetAmount(null);
+                vo.setBudgetReservedAmount(null);
+                vo.setBudgetConsumedAmount(null);
+                vo.setBudgetExecutionRate(null);
+                unavailable.addAll(List.of(
+                        "pendingPaymentAmount", "pendingPaymentCount", "approvedUnpaidAmount",
+                        "totalContractAmount", "budgetAmount", "budgetReservedAmount",
+                        "budgetConsumedAmount", "budgetExecutionRate"));
+            }
             vo.setTotalPaidAmount("0.00");
-            vo.setBudgetAmount("0.00");
-            vo.setBudgetReservedAmount("0.00");
-            vo.setBudgetConsumedAmount("0.00");
-            vo.setBudgetExecutionRate("0.00");
             vo.setCashOutflowAmount("0.00");
             applyCashBalance(vo, tenantId, selectedMonth, enterpriseView, unavailable);
             vo.setProjectProfit("0.00");
-            vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
+            vo.setMetricFormulaVersion(selectedMonth == null
+                    ? "PAYMENT_CLOSED_LOOP_V1" : "PAYMENT_CLOSED_LOOP_HISTORY_V1");
             vo.setTrendPoints(Collections.emptyList());
             vo.setContractFundBreakdowns(Collections.emptyList());
-            return;
+            if (selectedMonth != null) unavailable.add("contractFundBreakdowns");
+            return ClosedLoopSnapshot.empty();
         }
-        List<PayApplication> applications = payApplicationMapper.selectList(
-                new LambdaQueryWrapper<PayApplication>().eq(PayApplication::getTenantId, tenantId)
-                        .in(PayApplication::getProjectId, projectIds));
-        applications = applications.stream()
-                .filter(application -> existedBy(null, application.getCreatedAt(), selectedMonth))
-                .collect(Collectors.toList());
+        List<PayApplication> applications = selectedMonth == null
+                ? payApplicationMapper.selectList(
+                        new LambdaQueryWrapper<PayApplication>().eq(PayApplication::getTenantId, tenantId)
+                                .in(PayApplication::getProjectId, projectIds))
+                : List.of();
         List<PayApplication> approving = applications.stream()
                 .filter(a -> "APPROVING".equals(a.getApprovalStatus())).toList();
         BigDecimal pending = approving.stream().map(PayApplication::getApplyAmount)
@@ -633,17 +495,15 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             unavailable.addAll(List.of("pendingPaymentAmount", "pendingPaymentCount", "approvedUnpaidAmount"));
         }
 
-        LambdaQueryWrapper<CtContract> contractQuery = new LambdaQueryWrapper<CtContract>()
-                .eq(CtContract::getTenantId, tenantId)
-                .in(CtContract::getProjectId, projectIds);
-        if (selectedMonth == null) {
-            contractQuery.eq(CtContract::getApprovalStatus, "APPROVED")
-                    .eq(CtContract::getContractStatus, "PERFORMING");
-        }
-        List<CtContract> contracts = ctContractMapper.selectList(contractQuery);
-        contracts = contracts.stream()
-                .filter(contract -> existedBy(contract.getSignedDate(), contract.getCreatedAt(), selectedMonth))
-                .collect(Collectors.toList());
+        List<CtContract> allContracts = selectedMonth == null
+                ? ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .in(CtContract::getProjectId, projectIds))
+                : List.of();
+        List<CtContract> contracts = allContracts.stream()
+                .filter(contract -> "APPROVED".equals(contract.getApprovalStatus()))
+                .filter(contract -> "PERFORMING".equals(contract.getContractStatus()))
+                .toList();
         BigDecimal contractAmount = contracts.stream().map(CtContract::getCurrentAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<PayRecord> allPayRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
@@ -656,15 +516,11 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         BigDecimal paid = paidRecords.stream().map(PayRecord::getPayAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<ProjectBudget> activeBudgets = projectBudgetMapper.selectList(new LambdaQueryWrapper<ProjectBudget>()
-                .eq(ProjectBudget::getTenantId, tenantId).in(ProjectBudget::getProjectId, projectIds)
-                .eq(ProjectBudget::getStatus, "ACTIVE").eq(ProjectBudget::getActiveFlag, 1));
-        activeBudgets = activeBudgets.stream()
-                .filter(budget -> existedBy(
-                        budget.getEffectiveAt() == null ? null : budget.getEffectiveAt().toLocalDate(),
-                        budget.getCreatedAt(),
-                        selectedMonth))
-                .collect(Collectors.toList());
+        List<ProjectBudget> activeBudgets = selectedMonth == null
+                ? projectBudgetMapper.selectList(new LambdaQueryWrapper<ProjectBudget>()
+                        .eq(ProjectBudget::getTenantId, tenantId).in(ProjectBudget::getProjectId, projectIds)
+                        .eq(ProjectBudget::getStatus, "ACTIVE").eq(ProjectBudget::getActiveFlag, 1))
+                : List.of();
         BigDecimal budgetAmount = activeBudgets.stream().map(ProjectBudget::getTotalAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<Long> budgetIds = activeBudgets.stream().map(ProjectBudget::getId).toList();
@@ -680,8 +536,6 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 : reserved.add(consumed).multiply(new BigDecimal("100"))
                         .divide(budgetAmount, 2, RoundingMode.HALF_UP);
 
-        List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
-                .eq(PmProject::getTenantId, tenantId).in(PmProject::getId, projectIds));
         Map<Long, String> projectNames = projects.stream().collect(Collectors.toMap(
                 PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         List<CashJournalEntry> archivedJournals = cashJournalEntryMapper.selectList(
@@ -755,6 +609,67 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             vo.setContractFundBreakdowns(List.of());
             unavailable.add("contractFundBreakdowns");
         }
+        return new ClosedLoopSnapshot(allContracts, allPayRecords, projectNames);
+    }
+
+    private void applyRealtimeFinanceRisks(FinanceDashboardVO vo, ClosedLoopSnapshot snapshot,
+                                           YearMonth selectedMonth) {
+        if (selectedMonth != null) return;
+
+        OverRatioResult overRatio = calculateOverRatio(snapshot.payRecords(), snapshot.contracts());
+        vo.setOverRatioAmount(overRatio.amount().toPlainString());
+        vo.setOverRatioPayments(snapshot.payRecords().stream()
+                .filter(record -> "SUCCESS".equals(record.getPayStatus()))
+                .filter(record -> overRatio.contractIds().contains(record.getContractId()))
+                .limit(20)
+                .map(record -> toPaymentItem(
+                        record, snapshot.projectNames().getOrDefault(record.getProjectId(), "")))
+                .toList());
+
+        LocalDate windowStart = LocalDate.now();
+        LocalDate threshold = windowStart.plusDays(30);
+        BigDecimal warrantyExpiring = snapshot.contracts().stream()
+                .filter(contract -> "PERFORMING".equals(contract.getContractStatus()))
+                .filter(contract -> contract.getEndDate() != null
+                        && !contract.getEndDate().isBefore(windowStart)
+                        && !contract.getEndDate().isAfter(threshold))
+                .map(CtContract::getContractAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setWarrantyExpiringAmount(warrantyExpiring.toPlainString());
+    }
+
+    private OverRatioResult calculateOverRatio(List<PayRecord> records, List<CtContract> contracts) {
+        Map<Long, BigDecimal> paidByContract = records.stream()
+                .filter(record -> "SUCCESS".equals(record.getPayStatus()))
+                .filter(record -> record.getContractId() != null)
+                .collect(Collectors.toMap(PayRecord::getContractId,
+                        record -> nz(record.getPayAmount()), BigDecimal::add));
+        Map<Long, CtContract> contractsById = contracts.stream()
+                .collect(Collectors.toMap(CtContract::getId, contract -> contract, (left, ignored) -> left));
+        BigDecimal amount = BigDecimal.ZERO;
+        Set<Long> contractIds = new LinkedHashSet<>();
+        for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
+            CtContract contract = contractsById.get(entry.getKey());
+            BigDecimal contractAmount = contract == null ? BigDecimal.ZERO : nz(contract.getContractAmount());
+            if (contractAmount.compareTo(BigDecimal.ZERO) > 0
+                    && entry.getValue().compareTo(contractAmount) > 0) {
+                amount = amount.add(entry.getValue().subtract(contractAmount));
+                contractIds.add(entry.getKey());
+            }
+        }
+        return new OverRatioResult(amount, Set.copyOf(contractIds));
+    }
+
+    private record ClosedLoopSnapshot(List<CtContract> contracts,
+                                      List<PayRecord> payRecords,
+                                      Map<Long, String> projectNames) {
+        private static ClosedLoopSnapshot empty() {
+            return new ClosedLoopSnapshot(List.of(), List.of(), Map.of());
+        }
+    }
+
+    private record OverRatioResult(BigDecimal amount, Set<Long> contractIds) {
     }
 
     private List<FinanceDashboardVO.ContractFundBreakdown> buildContractFundBreakdowns(
@@ -862,10 +777,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     }
 
     private BigDecimal companyCashBalance(Long tenantId) {
-        return fundAccountMapper.selectList(new LambdaQueryWrapper<FundAccount>()
-                        .eq(FundAccount::getTenantId, tenantId).eq(FundAccount::getEnabledFlag, 1)).stream()
-                .map(account -> fundAccountMapper.selectCurrentBalance(account.getId(), tenantId))
-                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return fundAccountMapper.selectBalancesByType(tenantId, null, true).stream()
+                .map(FundAccountMapper.AccountTypeBalance::getBalance)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void applyCashBalance(FinanceDashboardVO vo, Long tenantId, YearMonth selectedMonth,
@@ -889,14 +804,15 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     private boolean paidAsOf(PayRecord record, YearMonth selectedMonth) {
         if (selectedMonth == null) return "SUCCESS".equals(record.getPayStatus());
         if (!Set.of("SUCCESS", "REVERSED").contains(record.getPayStatus())) return false;
-        LocalDateTime cutoff = selectedMonth.atEndOfMonth().atTime(23, 59, 59);
-        return record.getReversedAt() == null || record.getReversedAt().isAfter(cutoff);
+        LocalDateTime nextMonthStart = selectedMonth.plusMonths(1).atDay(1).atStartOfDay();
+        return record.getReversedAt() == null || !record.getReversedAt().isBefore(nextMonthStart);
     }
 
     private boolean archivedAsOf(CashJournalEntry journal, YearMonth selectedMonth) {
         if (journal.getArchivedAt() == null) return false;
         if (selectedMonth == null) return Set.of("ARCHIVED", "REVERSED").contains(journal.getStatus());
-        return !journal.getArchivedAt().isAfter(selectedMonth.atEndOfMonth().atTime(23, 59, 59));
+        LocalDateTime nextMonthStart = selectedMonth.plusMonths(1).atDay(1).atStartOfDay();
+        return journal.getArchivedAt().isBefore(nextMonthStart);
     }
 
     private LocalDate trendDate(CashJournalEntry journal) {

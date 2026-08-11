@@ -59,12 +59,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -132,10 +134,10 @@ class CashJournalPrivacyTest {
         authenticate("bid:cost:query");
         CashJournalQuery query = bidQuery();
         when(bidCostMapper.selectById(BID_COST_ID)).thenReturn(bidCost());
-        when(entryMapper.selectList(any())).thenReturn(List.of(
-                entry(CashbookConstants.Direction.OUT, "100.00"),
-                entry(CashbookConstants.Direction.IN, "30.00")));
-        when(bidDepositMapper.selectList(any())).thenReturn(List.of());
+        when(entryMapper.selectSummaryAggregate(eq(TENANT_ID), any())).thenReturn(
+                new CashJournalEntryMapper.CashJournalAggregate(
+                        new BigDecimal("30.00"), new BigDecimal("100.00"), BigDecimal.ZERO, 0L));
+        when(bidDepositMapper.selectOutstandingTotal(TENANT_ID, BID_COST_ID)).thenReturn(BigDecimal.ZERO);
 
         var summary = service.summary(query);
 
@@ -149,8 +151,7 @@ class CashJournalPrivacyTest {
         assertEquals("70.00", summary.getCashNetOutflow());
         assertEquals("0.00", summary.getActualBidExpense());
         assertEquals("0.00", summary.getOutstandingDeposit());
-        verify(fundAccountMapper, never()).selectList(any());
-        verify(fundAccountMapper, never()).selectCurrentBalance(any(), any());
+        verify(fundAccountMapper, never()).selectBalancesByType(any(), any(), anyBoolean());
         verify(projectAccessChecker, never()).checkAccess(anyLong(), anyString());
     }
 
@@ -166,8 +167,8 @@ class CashJournalPrivacyTest {
         BusinessException error = assertThrows(BusinessException.class, () -> service.summary(bidQuery()));
 
         assertEquals("PROJECT_ACCESS_DENIED", error.getCode());
-        verify(entryMapper, never()).selectList(any());
-        verify(bidDepositMapper, never()).selectList(any());
+        verify(entryMapper, never()).selectSummaryAggregate(any(), any());
+        verify(bidDepositMapper, never()).selectOutstandingTotal(any(), any());
     }
 
     @Test
@@ -176,8 +177,9 @@ class CashJournalPrivacyTest {
         BidCost bid = bidCost();
         bid.setProjectId(9L);
         when(bidCostMapper.selectById(BID_COST_ID)).thenReturn(bid);
-        when(entryMapper.selectList(any())).thenReturn(List.of());
-        when(bidDepositMapper.selectList(any())).thenReturn(List.of());
+        when(entryMapper.selectSummaryAggregate(eq(TENANT_ID), any())).thenReturn(
+                CashJournalEntryMapper.CashJournalAggregate.empty());
+        when(bidDepositMapper.selectOutstandingTotal(TENANT_ID, BID_COST_ID)).thenReturn(BigDecimal.ZERO);
 
         service.summary(bidQuery());
 
@@ -189,18 +191,19 @@ class CashJournalPrivacyTest {
         authenticate("cashbook:journal:query");
         when(projectAccessChecker.accessibleProjectIds()).thenReturn(List.of(9L));
         List<String> wrapperSql = new ArrayList<>();
-        when(entryMapper.selectList(any())).thenAnswer(invocation -> {
-            Wrapper<CashJournalEntry> wrapper = invocation.getArgument(0);
+        when(entryMapper.selectSummaryAggregate(eq(TENANT_ID), any())).thenAnswer(invocation -> {
+            Wrapper<CashJournalEntry> wrapper = invocation.getArgument(1);
             wrapperSql.add(wrapper.getSqlSegment());
-            return List.of();
+            return CashJournalEntryMapper.CashJournalAggregate.empty();
         });
-        when(fundAccountMapper.selectList(any())).thenReturn(List.of());
+        when(fundAccountMapper.selectBalancesByType(TENANT_ID, null, false)).thenReturn(List.of());
 
         service.summary(new CashJournalQuery());
 
-        assertEquals(2, wrapperSql.size());
+        assertEquals(1, wrapperSql.size());
         assertTrue(wrapperSql.stream().allMatch(sql -> sql.contains("bid_cost_id IS NULL")
                 && sql.contains("b.project_id IS NULL OR b.project_id IN (")));
+        verify(projectAccessChecker, times(1)).accessibleProjectIds();
 
         MybatisConfiguration configuration = new MybatisConfiguration();
         String resource = "mapper/cashbook/CashJournalEntryMapper.xml";
@@ -223,6 +226,38 @@ class CashJournalPrivacyTest {
         assertFalse(emptyScopeSql.contains("e.project_id IN"));
         assertFalse(emptyScopeSql.contains("b.project_id IN"));
         assertTrue(emptyScopeSql.contains("e.bid_cost_id IS NULL OR EXISTS"));
+    }
+
+    @Test
+    void summaryUsesOneJournalAndOneAccountAggregate() {
+        authenticate("cashbook:journal:query");
+        when(projectAccessChecker.accessibleProjectIds()).thenReturn(List.of(9L));
+        when(entryMapper.selectSummaryAggregate(eq(TENANT_ID), any())).thenReturn(
+                new CashJournalEntryMapper.CashJournalAggregate(
+                        new BigDecimal("10.00"), new BigDecimal("4.00"),
+                        new BigDecimal("3.00"), 2L));
+        when(fundAccountMapper.selectBalancesByType(TENANT_ID, null, false)).thenReturn(List.of(
+                new FundAccountMapper.AccountTypeBalance(CashbookConstants.AccountType.CASH,
+                        new BigDecimal("101.00")),
+                new FundAccountMapper.AccountTypeBalance(CashbookConstants.AccountType.BANK,
+                        new BigDecimal("202.00"))));
+
+        var summary = service.summary(new CashJournalQuery());
+
+        assertEquals("101.00", summary.getCashBalance());
+        assertEquals("202.00", summary.getBankBalance());
+        assertEquals("10.00", summary.getIncome());
+        assertEquals("4.00", summary.getExpense());
+        assertEquals(2L, summary.getPendingCount());
+        assertEquals("3.00", summary.getActualBidExpense());
+        verify(projectAccessChecker, times(1)).accessibleProjectIds();
+        verify(entryMapper, times(1)).selectSummaryAggregate(eq(TENANT_ID), any());
+        verify(fundAccountMapper, times(1)).selectBalancesByType(TENANT_ID, null, false);
+        verify(entryMapper, never()).selectList(any());
+        verify(fundAccountMapper, never()).selectList(any());
+        verify(fundAccountMapper, never()).selectCurrentBalance(any(), any());
+        verify(costSubjectMapper, never()).selectBatchIds(any());
+        verify(bidDepositMapper, never()).selectList(any());
     }
 
     @Test

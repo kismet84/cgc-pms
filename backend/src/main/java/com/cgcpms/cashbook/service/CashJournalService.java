@@ -54,8 +54,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -440,44 +438,46 @@ public class CashJournalService {
         return page;
     }
 
+    @Transactional(readOnly = true)
     public CashJournalSummaryVO summary(CashJournalQuery query) {
         normalizeQuery(query);
         boolean bidOnly = requireBidQueryScope(query);
-        List<CashJournalEntry> effective = entryMapper.selectList(baseWrapper(query)
-                .in(CashJournalEntry::getStatus, CashbookConstants.Status.ARCHIVED, CashbookConstants.Status.REVERSED));
-        BigDecimal cashOut = effective.stream()
-                .filter(e -> CashbookConstants.Direction.OUT.equals(e.getDirection()))
-                .map(CashJournalEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal cashIn = effective.stream()
-                .filter(e -> CashbookConstants.Direction.IN.equals(e.getDirection()))
-                .map(CashJournalEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Long tenantId = tenantId();
+        List<Long> accessibleProjectIds = query.getProjectId() == null
+                ? projectAccessChecker.accessibleProjectIds()
+                : List.of(query.getProjectId());
+        CashJournalEntryMapper.CashJournalAggregate aggregate = entryMapper.selectSummaryAggregate(
+                tenantId, baseWrapper(query, accessibleProjectIds));
+        if (aggregate == null) aggregate = CashJournalEntryMapper.CashJournalAggregate.empty();
+        BigDecimal cashOut = aggregate.getCashOut() == null ? BigDecimal.ZERO : aggregate.getCashOut();
+        BigDecimal cashIn = aggregate.getCashIn() == null ? BigDecimal.ZERO : aggregate.getCashIn();
+        BigDecimal actualBidExpense = aggregate.getActualBidExpense() == null
+                ? BigDecimal.ZERO : aggregate.getActualBidExpense();
 
         CashJournalSummaryVO summary = new CashJournalSummaryVO();
         if (!bidOnly) {
-            LambdaQueryWrapper<FundAccount> accountQuery = new LambdaQueryWrapper<FundAccount>()
-                    .eq(FundAccount::getTenantId, tenantId());
-            if (query.getAccountId() != null) accountQuery.eq(FundAccount::getId, query.getAccountId());
             BigDecimal cash = BigDecimal.ZERO;
             BigDecimal bank = BigDecimal.ZERO;
-            for (FundAccount account : fundAccountMapper.selectList(accountQuery)) {
-                BigDecimal balance = fundAccountMapper.selectCurrentBalance(account.getId(), tenantId());
-                if (CashbookConstants.AccountType.CASH.equals(account.getAccountType())) cash = cash.add(balance);
-                if (CashbookConstants.AccountType.BANK.equals(account.getAccountType())) bank = bank.add(balance);
+            for (FundAccountMapper.AccountTypeBalance account
+                    : fundAccountMapper.selectBalancesByType(tenantId, query.getAccountId(), false)) {
+                if (CashbookConstants.AccountType.CASH.equals(account.getAccountType())) {
+                    cash = cash.add(account.getBalance());
+                }
+                if (CashbookConstants.AccountType.BANK.equals(account.getAccountType())) {
+                    bank = bank.add(account.getBalance());
+                }
             }
-            List<CashJournalEntry> pending = entryMapper.selectList(baseWrapper(query)
-                    .in(CashJournalEntry::getStatus, CashbookConstants.Status.DRAFT,
-                            CashbookConstants.Status.PENDING_ARCHIVE));
             summary.setCashBalance(money(cash));
             summary.setBankBalance(money(bank));
             summary.setIncome(money(cashIn));
             summary.setExpense(money(cashOut));
-            summary.setPendingCount(pending.size());
+            summary.setPendingCount(aggregate.getPendingCount() == null ? 0L : aggregate.getPendingCount());
         }
         summary.setCumulativeCashOut(money(cashOut));
         summary.setCumulativeCashIn(money(cashIn));
         summary.setCashNetOutflow(money(cashOut.subtract(cashIn)));
-        summary.setActualBidExpense(money(actualBidExpense(effective)));
-        summary.setOutstandingDeposit(money(outstandingDeposit(query.getBidCostId())));
+        summary.setActualBidExpense(money(actualBidExpense));
+        summary.setOutstandingDeposit(money(outstandingDeposit(tenantId, query.getBidCostId())));
         return summary;
     }
 
@@ -674,33 +674,9 @@ public class CashJournalService {
         }
     }
 
-    private BigDecimal actualBidExpense(List<CashJournalEntry> entries) {
-        Set<Long> subjectIds = entries.stream().map(CashJournalEntry::getCostSubjectId)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        if (subjectIds.isEmpty()) return BigDecimal.ZERO;
-        Map<Long, CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds).stream()
-                .filter(s -> Objects.equals(s.getTenantId(), tenantId()))
-                .collect(Collectors.toMap(CostSubject::getId, Function.identity()));
-        return entries.stream()
-                .filter(e -> {
-                    CostSubject subject = subjects.get(e.getCostSubjectId());
-                    return subject != null && "COST".equals(subject.getAccountCategory());
-                })
-                .map(e -> CashbookConstants.Direction.OUT.equals(e.getDirection())
-                        ? e.getAmount() : e.getAmount().negate())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal outstandingDeposit(Long bidCostId) {
+    private BigDecimal outstandingDeposit(Long tenantId, Long bidCostId) {
         if (bidCostId == null) return BigDecimal.ZERO;
-        return bidDepositMapper.selectList(new LambdaQueryWrapper<BidDeposit>()
-                        .eq(BidDeposit::getTenantId, tenantId())
-                        .eq(BidDeposit::getBidCostId, bidCostId)
-                        .ne(BidDeposit::getDepositStatus, "FORFEITED"))
-                .stream()
-                .map(d -> (d.getDepositAmount() == null ? BigDecimal.ZERO : d.getDepositAmount())
-                        .subtract(d.getReturnedAmount() == null ? BigDecimal.ZERO : d.getReturnedAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return bidDepositMapper.selectOutstandingTotal(tenantId, bidCostId);
     }
 
     private boolean requireBidQueryScope(Long bidCostId) {
@@ -775,6 +751,14 @@ public class CashJournalService {
     }
 
     private LambdaQueryWrapper<CashJournalEntry> baseWrapper(CashJournalQuery query) {
+        List<Long> projectIds = query.getProjectId() == null
+                ? projectAccessChecker.accessibleProjectIds()
+                : List.of(query.getProjectId());
+        return baseWrapper(query, projectIds);
+    }
+
+    private LambdaQueryWrapper<CashJournalEntry> baseWrapper(CashJournalQuery query,
+                                                              List<Long> projectIds) {
         LambdaQueryWrapper<CashJournalEntry> wrapper = new LambdaQueryWrapper<CashJournalEntry>()
                 .eq(CashJournalEntry::getTenantId, tenantId());
         if (query.getAccountId() != null) wrapper.eq(CashJournalEntry::getAccountId, query.getAccountId());
@@ -790,7 +774,6 @@ public class CashJournalService {
                                     + "AND b.deleted_flag=0", query.getProjectId())));
         }
         else {
-            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
             String accessibleBid = "SELECT 1 FROM bid_cost b "
                     + "WHERE b.tenant_id=cash_journal_entry.tenant_id "
                     + "AND b.id=cash_journal_entry.bid_cost_id AND b.deleted_flag=0 "

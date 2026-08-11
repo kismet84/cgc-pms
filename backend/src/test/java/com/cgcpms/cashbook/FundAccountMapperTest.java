@@ -108,6 +108,38 @@ class FundAccountMapperTest {
                 fundAccountMapper.selectCurrentBalance(account.getId(), TENANT_ID)));
     }
 
+    @Test
+    void balancesIgnoreUnarchivedReversalAndKeepArchivedReversalNetZero() {
+        FundAccount account = account(93400120L, TENANT_ID, "CASH-REVERSAL", "100.00");
+        fundAccountMapper.insert(account);
+
+        CashJournalEntry unarchived = entry(
+                93400121L, account.getId(), LocalDate.of(2026, 7, 10), "30.00");
+        unarchived.setDirection(CashbookConstants.Direction.OUT);
+        unarchived.setStatus(CashbookConstants.Status.REVERSED);
+        unarchived.setArchivedBy(null);
+        unarchived.setArchivedAt(null);
+        entryMapper.insert(unarchived);
+
+        CashJournalEntry archivedOriginal = entry(
+                93400122L, account.getId(), LocalDate.of(2026, 7, 11), "20.00");
+        archivedOriginal.setDirection(CashbookConstants.Direction.OUT);
+        archivedOriginal.setStatus(CashbookConstants.Status.REVERSED);
+        entryMapper.insert(archivedOriginal);
+        CashJournalEntry reversal = entry(
+                93400123L, account.getId(), LocalDate.of(2026, 7, 11), "20.00");
+        reversal.setDirection(CashbookConstants.Direction.IN);
+        entryMapper.insert(reversal);
+
+        assertEquals(0, new BigDecimal("100.00").compareTo(
+                fundAccountMapper.selectCurrentBalance(account.getId(), TENANT_ID)));
+        List<FundAccountMapper.AccountTypeBalance> balances =
+                fundAccountMapper.selectBalancesByType(TENANT_ID, account.getId(), false);
+        assertEquals(1, balances.size());
+        assertEquals(CashbookConstants.AccountType.CASH, balances.getFirst().getAccountType());
+        assertEquals(0, new BigDecimal("100.00").compareTo(balances.getFirst().getBalance()));
+    }
+
     private int countMenus(List<String> permissions) {
         String placeholders = String.join(",", permissions.stream().map(value -> "?").toList());
         return jdbcTemplate.queryForObject(

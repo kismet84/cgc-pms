@@ -265,6 +265,26 @@ class RevenueCollectionClosedLoopIntegrationTest {
     }
 
     @Test
+    void agingKeepsAllFiveBoundaryBuckets() {
+        int[] overdueDays = {-1, 0, 1, 30, 31, 60, 61, 90, 91};
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < overdueDays.length; i++) {
+            BigDecimal amount = BigDecimal.valueOf(i + 1L);
+            long receivableId = createReceivable("AGING-" + i, amount);
+            jdbc.update("UPDATE account_receivable SET due_date=? WHERE id=?",
+                    today.minusDays(overdueDays[i]), receivableId);
+        }
+
+        Map<String, Object> result = advanced.aging(PROJECT);
+
+        assertEquals(new BigDecimal("3.00"), result.get("current"));
+        assertEquals(new BigDecimal("7.00"), result.get("days1To30"));
+        assertEquals(new BigDecimal("11.00"), result.get("days31To60"));
+        assertEquals(new BigDecimal("15.00"), result.get("days61To90"));
+        assertEquals(new BigDecimal("9.00"), result.get("daysOver90"));
+    }
+
+    @Test
     void concurrentDuplicateBankCallbacksCreateOneDraftAndConfirmationCreatesOneJournalAndEntry() throws Exception {
         long ar = createReceivable("2026-10", new BigDecimal("300"));
         LocalDateTime collectedAt = LocalDateTime.now();

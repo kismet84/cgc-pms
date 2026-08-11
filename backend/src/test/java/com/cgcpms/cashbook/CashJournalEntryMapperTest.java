@@ -10,6 +10,7 @@ import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.cashbook.entity.FundAccount;
 import com.cgcpms.cashbook.dto.CashJournalQuery;
 import com.cgcpms.cashbook.vo.CashJournalEntryVO;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.TestUserContext;
 import org.junit.jupiter.api.AfterEach;
@@ -159,6 +160,64 @@ class CashJournalEntryMapperTest {
         assertEquals("110.00", records.stream().filter(row -> row.getId().equals(String.valueOf(current.getId())))
                 .findFirst().orElseThrow().getRunningBalance());
         assertEquals("100.00", records.stream().filter(row -> row.getId().equals(String.valueOf(legacy.getId())))
+                .findFirst().orElseThrow().getRunningBalance());
+    }
+
+    @Test
+    void aggregatesAndRunningBalanceIgnoreUnarchivedReversal() {
+        FundAccount account = new FundAccount();
+        account.setId(93400230L);
+        account.setTenantId(TENANT_ID);
+        account.setAccountCode("RUNNING-REVERSAL");
+        account.setAccountName("Running Reversal");
+        account.setAccountType(CashbookConstants.AccountType.CASH);
+        account.setOpeningDate(LocalDate.of(2026, 7, 10));
+        account.setOpeningBalance(new BigDecimal("100.00"));
+        account.setEnabledFlag(1);
+        account.setVersion(0);
+        fundAccountMapper.insert(account);
+
+        CashJournalEntry unarchived = entry(
+                93400231L, "CJ-20260710-031", CashbookConstants.SourceType.MANUAL, null);
+        unarchived.setAccountId(account.getId());
+        unarchived.setAmount(new BigDecimal("30.00"));
+        unarchived.setStatus(CashbookConstants.Status.REVERSED);
+        entryMapper.insert(unarchived);
+
+        CashJournalEntry archivedOriginal = entry(
+                93400232L, "CJ-20260710-032", CashbookConstants.SourceType.MANUAL, null);
+        archivedOriginal.setAccountId(account.getId());
+        archivedOriginal.setAmount(new BigDecimal("20.00"));
+        archivedOriginal.setStatus(CashbookConstants.Status.REVERSED);
+        archivedOriginal.setArchivedBy(1L);
+        archivedOriginal.setArchivedAt(LocalDateTime.now());
+        entryMapper.insert(archivedOriginal);
+        CashJournalEntry reversal = entry(
+                93400233L, "CJ-20260710-033", CashbookConstants.SourceType.MANUAL, null);
+        reversal.setAccountId(account.getId());
+        reversal.setDirection(CashbookConstants.Direction.IN);
+        reversal.setAmount(new BigDecimal("20.00"));
+        reversal.setStatus(CashbookConstants.Status.ARCHIVED);
+        reversal.setArchivedBy(1L);
+        reversal.setArchivedAt(LocalDateTime.now());
+        entryMapper.insert(reversal);
+
+        CashJournalEntryMapper.CashJournalAggregate aggregate = entryMapper.selectSummaryAggregate(
+                TENANT_ID, new LambdaQueryWrapper<CashJournalEntry>()
+                        .eq(CashJournalEntry::getAccountId, account.getId()));
+        assertEquals(0, new BigDecimal("20.00").compareTo(aggregate.getCashIn()));
+        assertEquals(0, new BigDecimal("20.00").compareTo(aggregate.getCashOut()));
+
+        CashJournalQuery query = new CashJournalQuery();
+        query.setAccountId(account.getId());
+        var records = entryMapper.selectPageWithBalance(
+                        new Page<CashJournalEntryVO>(1, 20), TENANT_ID, query, List.of())
+                .getRecords();
+        assertEquals("100.00", records.stream()
+                .filter(row -> row.getId().equals(String.valueOf(unarchived.getId())))
+                .findFirst().orElseThrow().getRunningBalance());
+        assertEquals("100.00", records.stream()
+                .filter(row -> row.getId().equals(String.valueOf(reversal.getId())))
                 .findFirst().orElseThrow().getRunningBalance());
     }
 

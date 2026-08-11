@@ -1,7 +1,7 @@
 {
-  "current_commit": "4164af108cb663d054081486248a39f745927315",
+  "current_commit": "ebbedc1c919b2303da1214883a35bdc4758dfa99",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-11T17:44:15.291Z",
+  "generation_time": "2026-08-11T18:36:24.888Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,16 +52,14 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3913,
-  "repository_file_count": 3915,
-  "included_file_count": 2651,
+  "tracked_file_count": 3915,
+  "repository_file_count": 3919,
+  "included_file_count": 2655,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "backend",
-      "documentation",
-      "frontend_v2"
+      "backend"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -81,8 +79,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1839,
-      "fingerprint": "43b813d733236b7ed7f65b8d7f629946e0d90c12d7bbb38cba9366ca997dfd63"
+      "file_count": 1843,
+      "fingerprint": "621313d857d014a1af9bb291d3f645e2f1d23c15ad92230b927c8e8cfc0cbbc9"
     },
     {
       "id": "delivery_tooling",
