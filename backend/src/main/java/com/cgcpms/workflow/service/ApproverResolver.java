@@ -12,6 +12,8 @@ import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
+import com.cgcpms.system.role.SystemRoleContract;
+import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Resolves approver IDs from template node approverConfig JSON.
@@ -57,6 +60,11 @@ public class ApproverResolver {
      * @throws BusinessException NO_APPROVER if no users match
      */
     public List<Long> resolve(String approverConfig, Long tenantId, Long projectId) {
+        return resolve(approverConfig, tenantId, projectId, WorkflowSecurityPolicy.legacy());
+    }
+
+    public List<Long> resolve(String approverConfig, Long tenantId, Long projectId,
+                              WorkflowSecurityPolicy policy) {
         if (approverConfig == null || approverConfig.isBlank() || "{}".equals(approverConfig.trim())) {
             throw new BusinessException("NO_APPROVER", "审批节点未配置审批人");
         }
@@ -76,13 +84,16 @@ public class ApproverResolver {
 
         List<Long> userIds = switch (type.toUpperCase()) {
             case "USER" -> resolveUser(config, tenantId);
-            case "ROLE" -> resolveRole(config, tenantId);
+            case "ROLE" -> resolveRole(config, tenantId, projectId, policy);
             case "POSITION" -> resolvePosition(config, tenantId);
             case "PROJECT_ROLE" -> resolveProjectRole(config, tenantId, projectId);
             default -> throw new BusinessException("UNSUPPORTED_APPROVER_TYPE",
                     "不支持的审批人类型: " + type);
         };
 
+        if (userIds.isEmpty() && policy.allowAdminFallback()) {
+            userIds = resolveFinanceAdministrators(tenantId);
+        }
         if (userIds.isEmpty()) {
             throw new BusinessException("NO_APPROVER",
                     "审批节点未找到可用的审批人 (type=" + type + ")");
@@ -97,21 +108,44 @@ public class ApproverResolver {
             throw new BusinessException("INVALID_APPROVER_CONFIG", "USER类型配置缺少userId");
         }
         Long userId = config.get("userId").asLong();
-        SysUser user = sysUserMapper.selectById(userId);
-        if (user == null || !Objects.equals(user.getTenantId(), tenantId)) {
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getId, userId)
+                .eq(tenantId != null, SysUser::getTenantId, tenantId)
+                .eq(SysUser::getStatus, "ENABLE")
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        if (user == null) {
             throw new BusinessException("WORKFLOW_APPROVER_INVALID", "审批人不属于当前租户");
         }
         return Collections.singletonList(userId);
     }
 
-    private List<Long> resolveRole(JsonNode config, Long tenantId) {
+    private List<Long> resolveRole(JsonNode config, Long tenantId, Long projectId,
+                                   WorkflowSecurityPolicy policy) {
+        SysRole role;
         if (config.has("roleId")) {
-            return resolveRoleById(config.get("roleId").asLong(), tenantId);
+            role = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                    .eq(SysRole::getId, config.get("roleId").asLong())
+                    .eq(tenantId != null, SysRole::getTenantId, tenantId)
+                    .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+            if (role == null) return Collections.emptyList();
+            String canonicalCode = SystemRoleContract.canonicalRoleCode(role.getRoleCode());
+            if (!Objects.equals(canonicalCode, role.getRoleCode())) {
+                role = findEnabledRole(tenantId, canonicalCode);
+            }
+            if (role == null || !"ENABLE".equals(role.getStatus())) return Collections.emptyList();
+        } else if (config.has("roleCode")) {
+            role = findEnabledRole(tenantId, config.get("roleCode").asText());
+            if (role == null) return Collections.emptyList();
+        } else {
+            throw new BusinessException("INVALID_APPROVER_CONFIG", "ROLE类型配置缺少roleId或roleCode");
         }
-        if (config.has("roleCode")) {
-            return resolveTenantUsersByRoleCode(tenantId, config.get("roleCode").asText());
+        if (SystemRoleContract.EMPLOYEE.equals(role.getRoleCode())) return Collections.emptyList();
+        List<Long> users = resolveRoleById(role.getId(), tenantId);
+        if (policy.requireProjectMembership()
+                && SystemRoleContract.PROJECT_SCOPED_ROLE_CODES.contains(role.getRoleCode())) {
+            users = intersectProjectMembers(users, tenantId, projectId);
         }
-        throw new BusinessException("INVALID_APPROVER_CONFIG", "ROLE类型配置缺少roleId或roleCode");
+        return users;
     }
 
     private List<Long> resolvePosition(JsonNode config, Long tenantId) {
@@ -120,9 +154,12 @@ public class ApproverResolver {
         }
         long positionId = config.get("positionId").asLong();
 
-        OrgPosition position = orgPositionMapper.selectById(positionId);
-        if (position == null || !Objects.equals(position.getTenantId(), tenantId)
-                || !"ENABLE".equals(position.getStatus())) {
+        OrgPosition position = orgPositionMapper.selectOne(new LambdaQueryWrapper<OrgPosition>()
+                .eq(OrgPosition::getId, positionId)
+                .eq(tenantId != null, OrgPosition::getTenantId, tenantId)
+                .eq(OrgPosition::getStatus, "ENABLE")
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        if (position == null) {
             return Collections.emptyList();
         }
         return jdbcTemplate.queryForList("""
@@ -132,7 +169,7 @@ public class ApproverResolver {
                   AND u.status='ENABLE' AND u.deleted_flag=0
                   AND (up.effective_from IS NULL OR up.effective_from<=CURRENT_DATE)
                   AND (up.effective_to IS NULL OR up.effective_to>=CURRENT_DATE)
-                ORDER BY up.primary_flag DESC,u.id
+                ORDER BY up.primary_flag DESC,u.id FOR UPDATE
                 """, Long.class, tenantId, positionId);
     }
 
@@ -143,43 +180,71 @@ public class ApproverResolver {
         if (projectId == null) {
             throw new BusinessException("NO_PROJECT", "PROJECT_ROLE类型需要关联项目");
         }
-        String roleCode = config.get("roleCode").asText();
+        String expectedRoleCode = SystemRoleContract.canonicalRoleCode(config.get("roleCode").asText());
+        List<Long> memberIds = pmProjectMemberMapper.selectList(
+                        new LambdaQueryWrapper<PmProjectMember>()
+                                .eq(tenantId != null, PmProjectMember::getTenantId, tenantId)
+                                .eq(PmProjectMember::getProjectId, projectId)
+                                .eq(PmProjectMember::getStatus, "ACTIVE")
+                                .last("FOR UPDATE")) // SQL-SAFETY: fixed-sql-fragment
+                .stream()
+                .filter(member -> Objects.equals(expectedRoleCode,
+                        SystemRoleContract.canonicalRoleCode(member.getRoleCode())))
+                .map(PmProjectMember::getUserId).filter(Objects::nonNull).distinct().toList();
+        if (memberIds.isEmpty()) return memberIds;
+        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, memberIds)
+                        .eq(tenantId != null, SysUser::getTenantId, tenantId)
+                        .eq(SysUser::getStatus, "ENABLE")
+                        .last("FOR UPDATE")) // SQL-SAFETY: fixed-sql-fragment
+                .stream().map(SysUser::getId).distinct().toList();
+    }
 
+    private List<Long> intersectProjectMembers(List<Long> roleUsers, Long tenantId, Long projectId) {
+        if (projectId == null) {
+            throw new BusinessException("NO_PROJECT", "项目级审批角色需要关联项目");
+        }
+        if (roleUsers.isEmpty()) return roleUsers;
         List<PmProjectMember> members = pmProjectMemberMapper.selectList(
                 new LambdaQueryWrapper<PmProjectMember>()
                         .eq(tenantId != null, PmProjectMember::getTenantId, tenantId)
                         .eq(PmProjectMember::getProjectId, projectId)
-                        .eq(PmProjectMember::getRoleCode, roleCode)
-                        .eq(PmProjectMember::getStatus, "ACTIVE"));
-        if (!members.isEmpty()) {
-            return members.stream().map(PmProjectMember::getUserId).distinct().toList();
-        }
-
-        // ponytail: keep the workflow usable in dev/demo data even when project-member seeds are missing.
-        List<Long> tenantRoleUsers = resolveTenantUsersByRoleCode(tenantId, roleCode);
-        if (!tenantRoleUsers.isEmpty()) {
-            return tenantRoleUsers;
-        }
-        return resolveTenantUsersByRoleCode(tenantId, "SUPER_ADMIN");
+                        .eq(PmProjectMember::getStatus, "ACTIVE")
+                        .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        Set<Long> memberIds = members.stream().map(PmProjectMember::getUserId).collect(java.util.stream.Collectors.toSet());
+        return roleUsers.stream().filter(memberIds::contains).distinct().toList();
     }
 
     private List<Long> resolveTenantUsersByRoleCode(Long tenantId, String roleCode) {
-        SysRole role = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
-                .eq(tenantId != null, SysRole::getTenantId, tenantId)
-                .eq(SysRole::getRoleCode, roleCode)
-                .eq(SysRole::getStatus, "ENABLE")
-                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
+        SysRole role = findEnabledRole(tenantId, roleCode);
         if (role == null) {
             return Collections.emptyList();
         }
         return resolveRoleById(role.getId(), tenantId);
     }
 
+    private SysRole findEnabledRole(Long tenantId, String roleCode) {
+        return sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(tenantId != null, SysRole::getTenantId, tenantId)
+                .eq(SysRole::getRoleCode, SystemRoleContract.canonicalRoleCode(roleCode))
+                .eq(SysRole::getStatus, "ENABLE")
+                .last("LIMIT 1 FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+    }
+
+    private List<Long> resolveFinanceAdministrators(Long tenantId) {
+        List<Long> finance = resolveTenantUsersByRoleCode(tenantId, SystemRoleContract.COMPANY_FINANCE);
+        if (finance.isEmpty()) return finance;
+        Set<Long> superAdmins = Set.copyOf(
+                resolveTenantUsersByRoleCode(tenantId, SystemRoleContract.HIDDEN_SUPER_ADMIN));
+        return finance.stream().filter(superAdmins::contains).distinct().toList();
+    }
+
     private List<Long> resolveRoleById(Long roleId, Long tenantId) {
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
                 new LambdaQueryWrapper<SysUserRole>()
                         .eq(tenantId != null, SysUserRole::getTenantId, tenantId)
-                        .eq(SysUserRole::getRoleId, roleId));
+                        .eq(SysUserRole::getRoleId, roleId)
+                        .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         if (userRoles.isEmpty()) {
             return Collections.emptyList();
         }
@@ -191,7 +256,8 @@ public class ApproverResolver {
                 new LambdaQueryWrapper<SysUser>()
                         .in(SysUser::getId, userIds)
                         .eq(tenantId != null, SysUser::getTenantId, tenantId)
-                        .eq(SysUser::getStatus, "ENABLE"));
+                        .eq(SysUser::getStatus, "ENABLE")
+                        .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
 
         return users.stream().map(SysUser::getId).toList();
     }

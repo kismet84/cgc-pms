@@ -37,6 +37,10 @@ class ProjectCashForecastConcurrencyTest {
         cleanup();
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,?,'CF-CONCURRENT','预测并发测试','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)",
                 PROJECT, TENANT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_at,deleted_flag) VALUES(?,?,?,?,?,'ACTIVE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                99194011L, TENANT, PROJECT, 1L, "EMPLOYEE");
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_at,deleted_flag) VALUES(?,?,?,?,?,'ACTIVE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                99194012L, TENANT, PROJECT, 2L, "EMPLOYEE");
     }
 
     @AfterEach
@@ -44,6 +48,7 @@ class ProjectCashForecastConcurrencyTest {
         jdbc.update("DELETE FROM finance_audit_event WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM cash_forecast_line WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM cash_forecast_cycle WHERE tenant_id=?", TENANT);
+        jdbc.update("DELETE FROM pm_project_member WHERE tenant_id=? AND project_id=?", TENANT, PROJECT);
         jdbc.update("DELETE FROM pm_project WHERE tenant_id=? AND id=?", TENANT, PROJECT);
         UserContext.clear();
     }

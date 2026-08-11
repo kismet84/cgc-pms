@@ -11,6 +11,7 @@ import com.cgcpms.system.mapper.SysMenuMapper;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
 import com.cgcpms.system.mapper.SysRoleMenuMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import com.cgcpms.system.vo.SysRoleVO;
 import com.cgcpms.system.vo.RoleUserCountVO;
 import lombok.RequiredArgsConstructor;
@@ -31,11 +32,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysRoleService {
 
-    private static final Set<String> RESERVED_ROLE_CODES = Set.of("ADMIN", "SUPER_ADMIN");
-    private static final Set<String> ALLOWED_STATUSES = Set.of("ENABLE", "DISABLE");
-    private static final Set<String> ALLOWED_DATA_SCOPES =
-            Set.of("ALL", "DEPT", "DEPT_AND_CHILD", "SELF", "CUSTOM");
-
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
     private final SysMenuMapper sysMenuMapper;
@@ -47,130 +43,44 @@ public class SysRoleService {
         Map<Long, Long> userCounts = sysUserRoleMapper.countUsersByRole(tenantId).stream()
                 .collect(Collectors.toMap(RoleUserCountVO::getRoleId, RoleUserCountVO::getUserCount));
         return sysRoleMapper.selectList(
-                        new LambdaQueryWrapper<SysRole>().eq(SysRole::getTenantId, tenantId))
+                        new LambdaQueryWrapper<SysRole>()
+                                .eq(SysRole::getTenantId, tenantId)
+                                .in(SysRole::getRoleCode, SystemRoleContract.VISIBLE_ROLE_CODES))
                 .stream().map(role -> toVO(role, userCounts.getOrDefault(role.getId(), 0L)))
+                .sorted(java.util.Comparator.comparingInt(role ->
+                        SystemRoleContract.VISIBLE_ROLE_CODES.indexOf(role.getRoleCode())))
                 .collect(Collectors.toList());
     }
 
     public SysRoleVO getById(Long id) {
         SysRole role = sysRoleMapper.selectById(id);
-        if (role == null || !role.getTenantId().equals(UserContext.getCurrentTenantId()))
+        if (role == null || !role.getTenantId().equals(UserContext.getCurrentTenantId())
+                || !SystemRoleContract.isVisible(role.getRoleCode()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
         return toVO(role, sysUserRoleMapper.countUsersForRole(role.getTenantId(), role.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysRole role) {
-        Long tenantId = UserContext.getCurrentTenantId();
-        normalizeAndValidateCreate(role);
-        if (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
-                .eq(SysRole::getRoleCode, role.getRoleCode())
-                .eq(SysRole::getTenantId, tenantId)) > 0) {
-            throw new BusinessException("ROLE_CODE_EXISTS", "角色编码已存在");
-        }
-        role.setId(null);
-        role.setTenantId(tenantId);
-        role.setRoleType("CUSTOM");
-        role.setRoleLevel(2);
-        sysRoleMapper.insert(role);
-        log.info("Creating role: {}", role.getRoleCode());
-        return role.getId();
-    }
-
-    private void normalizeAndValidateCreate(SysRole role) {
-        String roleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
-        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
-        if (roleCode.isEmpty() || roleName.isEmpty()) {
-            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码和角色名称不能为空");
-        }
-        if (roleCode.length() > 50 || roleName.length() > 100) {
-            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码或角色名称长度超限");
-        }
-        if (RESERVED_ROLE_CODES.contains(roleCode.toUpperCase())
-                || (role.getRoleType() != null && !"CUSTOM".equalsIgnoreCase(role.getRoleType().trim()))
-                || (role.getRoleLevel() != null && !Integer.valueOf(2).equals(role.getRoleLevel()))) {
-            throw new BusinessException("ROLE_CREATE_PRIVILEGE_ESCALATION", "不允许创建系统或高等级角色");
-        }
-
-        String status = role.getStatus() == null || role.getStatus().isBlank()
-                ? "ENABLE" : role.getStatus().trim().toUpperCase();
-        String dataScope = role.getDataScope() == null || role.getDataScope().isBlank()
-                ? "SELF" : role.getDataScope().trim().toUpperCase();
-        if (!ALLOWED_STATUSES.contains(status) || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
-            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色状态或数据范围不合法");
-        }
-
-        role.setRoleCode(roleCode);
-        role.setRoleName(roleName);
-        role.setStatus(status);
-        role.setDataScope(dataScope);
+        throw new BusinessException("ROLE_CATALOG_FIXED", "系统角色目录固定，不允许新建角色");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void update(SysRole role) {
         SysRole existing = sysRoleMapper.selectById(role.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())
+                || !SystemRoleContract.isVisible(existing.getRoleCode()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
-
-        String existingRoleCode = existing.getRoleCode() == null
-                ? "" : existing.getRoleCode().trim().toUpperCase();
-        if (RESERVED_ROLE_CODES.contains(existingRoleCode)
-                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
-                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
-            throw new BusinessException("ROLE_UPDATE_PROTECTED", "系统或高等级角色不允许修改");
-        }
-
-        String requestRoleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
-        if (!requestRoleCode.equals(existing.getRoleCode())) {
-            throw new BusinessException("ROLE_UPDATE_IMMUTABLE_FIELD", "角色编码不允许修改");
-        }
-
-        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
-        String status = role.getStatus() == null
-                ? existing.getStatus() : role.getStatus().trim().toUpperCase();
-        String dataScope = role.getDataScope() == null
-                ? existing.getDataScope() : role.getDataScope().trim().toUpperCase();
-        if (roleName.isEmpty() || roleName.length() > 100
-                || !ALLOWED_STATUSES.contains(status)
-                || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
-            throw new BusinessException("ROLE_UPDATE_INVALID_FIELD", "角色名称、状态或数据范围不合法");
-        }
-
-        existing.setRoleName(roleName);
-        existing.setStatus(status);
-        existing.setDataScope(dataScope);
-        if (sysRoleMapper.updateById(existing) != 1) {
-            throw new BusinessException("ROLE_UPDATE_FAILED", "角色修改失败，请重试");
-        }
+        throw new BusinessException("ROLE_CATALOG_FIXED", "角色名称、编码、状态和数据范围固定");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysRole existing = sysRoleMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())
+                || !SystemRoleContract.isVisible(existing.getRoleCode()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
-
-        String roleCode = existing.getRoleCode() == null ? "" : existing.getRoleCode().trim().toUpperCase();
-        if (RESERVED_ROLE_CODES.contains(roleCode)
-                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
-                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
-            throw new BusinessException("ROLE_DELETE_PROTECTED", "系统或高等级角色不允许删除");
-        }
-
-        long userBindingCount = sysUserRoleMapper.selectCount(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getTenantId, existing.getTenantId())
-                        .eq(SysUserRole::getRoleId, id));
-        if (userBindingCount > 0) {
-            throw new BusinessException("ROLE_IN_USE", "角色仍绑定用户，无法删除");
-        }
-
-        sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
-                .eq(SysRoleMenu::getTenantId, existing.getTenantId())
-                .eq(SysRoleMenu::getRoleId, id));
-        if (sysRoleMapper.deleteById(id) != 1) {
-            throw new BusinessException("ROLE_DELETE_FAILED", "角色删除失败，请重试");
-        }
+        throw new BusinessException("ROLE_CATALOG_FIXED", "系统角色目录固定，不允许删除角色");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -190,8 +100,13 @@ public class SysRoleService {
     private void doAssignMenus(Long roleId, Long tenantId, Long operatorId,
                                AtomicReference<List<Long>> beforeMenuIdsRef, List<Long> afterMenuIds) {
         SysRole role = sysRoleMapper.selectById(roleId);
-        if (role == null || !role.getTenantId().equals(tenantId))
+        if (role == null || !role.getTenantId().equals(tenantId)
+                || !SystemRoleContract.isVisible(role.getRoleCode()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
+
+        if (!SystemRoleContract.isFinanceAdministrator(UserContext.getCurrentRoles())) {
+            throw new BusinessException("ROLE_MENU_FINANCE_REQUIRED", "仅公司财务可维护角色权限包");
+        }
 
         List<Long> beforeMenuIds = currentMenuIds(roleId);
         beforeMenuIdsRef.set(beforeMenuIds);
@@ -234,16 +149,8 @@ public class SysRoleService {
     }
 
     private void requireEditableRole(SysRole role, Long operatorId) {
-        if ("SUPER_ADMIN".equals(role.getRoleCode()) || Integer.valueOf(0).equals(role.getRoleLevel())) {
+        if (!SystemRoleContract.isVisible(role.getRoleCode())) {
             throw new BusinessException("ROLE_MENU_SUPER_ADMIN_PROTECTED", "超级管理员角色不允许编辑授权");
-        }
-        long selfRoleCount = sysUserRoleMapper.selectCount(
-                new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
-                        .eq(com.cgcpms.system.entity.SysUserRole::getUserId, operatorId)
-                        .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, role.getTenantId())
-                        .eq(com.cgcpms.system.entity.SysUserRole::getRoleId, role.getId()));
-        if (selfRoleCount > 0) {
-            throw new BusinessException("ROLE_MENU_SELF_EDIT_FORBIDDEN", "不允许编辑当前用户持有的角色授权");
         }
     }
 
@@ -260,6 +167,7 @@ public class SysRoleService {
     }
 
     private void rejectHighRiskDiff(List<Long> beforeMenuIds, List<Long> afterMenuIds, Map<Long, SysMenu> afterMenus) {
+        if (SystemRoleContract.isFinanceAdministrator(UserContext.getCurrentRoles())) return;
         Set<Long> changedMenuIds = new HashSet<>(beforeMenuIds);
         for (Long menuId : afterMenuIds) {
             if (!changedMenuIds.add(menuId)) {

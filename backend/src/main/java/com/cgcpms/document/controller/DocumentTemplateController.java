@@ -132,7 +132,7 @@ public class DocumentTemplateController {
     @PostMapping(value = "/versions/{versionId}/preview", produces = MediaType.APPLICATION_PDF_VALUE)
     @AuditedOperation(type = "PREVIEW", businessType = "DOCUMENT_TEMPLATE_VERSION", businessIdExpression = "#versionId")
     @PreAuthorize("(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
-            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))")
+            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ResponseEntity<byte[]> previewVersion(@PathVariable Long versionId, @RequestParam Long businessId) {
         RenderedDocument rendered = generationService.previewTemplateVersion(versionId, businessId);
         return ResponseEntity.ok()
@@ -145,7 +145,7 @@ public class DocumentTemplateController {
     @PostMapping("/versions/{versionId}/preview-html")
     @AuditedOperation(type = "PREVIEW_HTML", businessType = "DOCUMENT_TEMPLATE_VERSION", businessIdExpression = "#versionId")
     @PreAuthorize("(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
-            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))")
+            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ApiResponse<DocumentHtmlPreviewResponse> previewHtml(@PathVariable Long versionId,
                                                                 @RequestParam(required = false) Long businessId) {
         return ApiResponse.success(new DocumentHtmlPreviewResponse(service.renderHtmlPreview(versionId, businessId)));
@@ -154,7 +154,7 @@ public class DocumentTemplateController {
     @PostMapping("/preview-html")
     @AuditedOperation(type = "PREVIEW_HTML", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
     @PreAuthorize("(hasAuthority('document:template:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')) and "
-            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN'))")
+            + "(hasAuthority('document:generate') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ApiResponse<DocumentHtmlPreviewResponse> previewCanvas(@Valid @RequestBody DocumentCanvasPreviewRequest request) {
         return ApiResponse.success(new DocumentHtmlPreviewResponse(service.renderCanvasPreview(
                 request.businessType(), request.designSchema(), request.businessId())));

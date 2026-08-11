@@ -36,6 +36,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -100,12 +103,15 @@ class MatRequisitionWorkflowSubmitTest {
                 .add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "n/a", List.of(new SimpleGrantedAuthority("business:amount:view"))));
         jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'REQ-WBS-SP','领料测试基线','BASELINE',9303,'2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SCHEDULE_ID, PROJECT_ID);
         jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'REQ-WBS','领料测试WBS','2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_ID, PROJECT_ID, SCHEDULE_ID);
     }
 
     @AfterEach
     void clearContext() {
+        SecurityContextHolder.clearContext();
         UserContext.clear();
     }
 

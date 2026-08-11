@@ -19,7 +19,7 @@ public class ReportCatalogController {
     private final ReportCatalogService reportCatalogService;
 
     @GetMapping("/catalog")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('report:catalog:query') or hasRole('SUPER_ADMIN')")
     public ApiResponse<List<ReportCatalogItem>> catalog() {
         return ApiResponse.success(reportCatalogService.listVisibleCatalog());
     }

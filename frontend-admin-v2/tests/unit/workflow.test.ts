@@ -13,6 +13,7 @@ import {
   workflowRows,
   workflowStatusLabel,
 } from '@/pages/workbench/model'
+import { workflowModule } from '@/pages/system/workflow-business-modules'
 import {
   approveWorkflowTask,
   loadWorkflowBusinessTypes,
@@ -128,6 +129,42 @@ describe('workflow contract and service', () => {
     expect(WORKFLOW_BUSINESS_TYPES).toContainEqual(['PAY_REQUEST', '付款申请'])
     expect(workflowStatusLabel('ACTIVE')).toBe('处理中')
     expect(workflowApproveModeLabel('SEQUENTIAL')).toBe('顺序审批')
+  })
+
+  it('labels and routes all 21 default approval-matrix business types', () => {
+    const matrixTypes = [
+      'BID_COST_TARGET_TRANSFER',
+      'CONTRACT_APPROVAL',
+      'EXPENSE',
+      'FINANCE_COST_ALLOCATION',
+      'MATERIAL_RECEIPT',
+      'MATERIAL_REQUISITION',
+      'OWNER_SETTLEMENT',
+      'PAY_REQUEST',
+      'PRODUCTION_MEASUREMENT',
+      'PROJECT_BUDGET',
+      'PROJECT_COMMENCEMENT',
+      'PROJECT_SCHEDULE',
+      'PROJECT_PERIOD_PLAN',
+      'PURCHASE_ORDER',
+      'PURCHASE_REQUEST',
+      'SETTLEMENT',
+      'SUB_MEASURE',
+      'TECHNICAL_SCHEME',
+      'VAR_ORDER',
+      'QS_RECTIFICATION',
+      'QS_CONSEQUENCE',
+    ]
+
+    expect(matrixTypes).toHaveLength(21)
+    for (const businessType of matrixTypes) {
+      expect(workflowBusinessTypeLabel(businessType)).not.toBe('其他业务审批')
+      expect(workflowModule(businessType).key).not.toBe('other')
+    }
+    expect(workflowBusinessTypeLabel('PROJECT_COMMENCEMENT')).toBe('项目开工')
+    expect(workflowBusinessTypeLabel('PROJECT_PERIOD_PLAN')).toBe('项目年季月周计划')
+    expect(workflowBusinessTypeLabel('QS_RECTIFICATION')).toBe('质量安全整改')
+    expect(workflowBusinessTypeLabel('QS_CONSEQUENCE')).toBe('质量安全金额后果')
   })
 
   it('uses existing list and idempotent action endpoints', async () => {

@@ -22,6 +22,9 @@ import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.quality.dto.QualitySafetyModels.*;
 import com.cgcpms.quality.entity.*;
 import com.cgcpms.quality.mapper.*;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -64,6 +67,7 @@ public class QualitySafetyService {
     private final CostSubjectV2Service costSubjectV2Service;
     private final BusinessCodeGenerator businessCodeGenerator;
     private final JdbcTemplate jdbc;
+    private final WorkflowEngine workflowEngine;
 
     public List<QualityInspectionPlan> listPlans(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询质量安全检查计划");
@@ -357,25 +361,22 @@ public class QualitySafetyService {
         QualityRectification rectification = requireRectification(id);
         QualitySafetyIssue issue = requireIssue(rectification.getIssueId());
         projectAccessChecker.checkAccess(issue.getProjectId(), "提交质量安全整改");
-        if (!isAdmin() && !Objects.equals(userId(), rectification.getResponsibleUserId()))
+        if (!Objects.equals(userId(), rectification.getResponsibleUserId()))
             throw new BusinessException("QS_RECTIFICATION_SUBMIT_FORBIDDEN", "只能由整改责任人提交整改结果");
-        if (!"DRAFT".equals(rectification.getStatus()) || !"RECTIFYING".equals(issue.getStatus()))
+        if (!Set.of("DRAFT", "REJECTED", "WITHDRAWN").contains(rectification.getStatus())
+                || !"RECTIFYING".equals(issue.getStatus()))
             throw immutable("整改记录已提交或问题单状态已变化");
         requireFile("QS_RECTIFICATION", id, "RECTIFICATION_EVIDENCE", "提交整改必须上传整改完成证据");
-        LocalDateTime now = LocalDateTime.now();
-        int updated = rectificationMapper.update(null, new LambdaUpdateWrapper<QualityRectification>()
-                .eq(QualityRectification::getId, id).eq(QualityRectification::getTenantId, tenantId())
-                .eq(QualityRectification::getStatus, "DRAFT")
-                .set(QualityRectification::getStatus, "SUBMITTED")
-                .set(QualityRectification::getActualCompletedAt, now)
-                .set(QualityRectification::getSubmittedBy, userId())
-                .set(QualityRectification::getSubmittedAt, now));
-        if (updated != 1) throw concurrent();
-        int issueUpdated = issueMapper.update(null, new LambdaUpdateWrapper<QualitySafetyIssue>()
-                .eq(QualitySafetyIssue::getId, issue.getId()).eq(QualitySafetyIssue::getTenantId, tenantId())
-                .eq(QualitySafetyIssue::getStatus, "RECTIFYING")
-                .set(QualitySafetyIssue::getStatus, "PENDING_REINSPECTION"));
-        if (issueUpdated != 1) throw concurrent();
+        if (rectification.getApprovalInstanceId() != null) {
+            workflowEngine.resubmitQualityRectification(
+                    rectification.getApprovalInstanceId(), userId(), UserContext.getCurrentUsername());
+        } else {
+            workflowEngine.submitQualityRectification(userId(), UserContext.getCurrentUsername(), tenantId(),
+                    WorkflowBusinessTypes.QS_RECTIFICATION, id,
+                    "质量安全整改 " + issue.getIssueCode() + " 第" + rectification.getRoundNo() + "轮",
+                    BigDecimal.ZERO, rectification.getProjectId(), null,
+                    rectification.getActionDescription(), null, null);
+        }
         return requireRectification(id);
     }
 
@@ -392,24 +393,16 @@ public class QualitySafetyService {
         if (!Set.of("PASS", "REJECT").contains(result))
             throw new BusinessException("QS_REINSPECTION_RESULT_INVALID", "复验结果只能为通过或驳回");
         requireFile("QS_RECTIFICATION", id, "REINSPECTION_EVIDENCE", "复验必须上传复验证据");
-        LocalDateTime now = LocalDateTime.now();
-        String rectStatus = "PASS".equals(result) ? "PASSED" : "REJECTED";
         int updated = rectificationMapper.update(null, new LambdaUpdateWrapper<QualityRectification>()
                 .eq(QualityRectification::getId, id).eq(QualityRectification::getTenantId, tenantId())
                 .eq(QualityRectification::getStatus, "SUBMITTED")
-                .set(QualityRectification::getStatus, rectStatus)
-                .set(QualityRectification::getReinspectionComment, command.comment().trim())
+                .eq(QualityRectification::getVersion, rectification.getVersion())
+                .isNull(QualityRectification::getReinspectedAt)
+                .set(QualityRectification::getReinspectionComment, result + "：" + command.comment().trim())
                 .set(QualityRectification::getReinspectedBy, userId())
-                .set(QualityRectification::getReinspectedAt, now));
+                .set(QualityRectification::getReinspectedAt, LocalDateTime.now())
+                .setSql("version = version + 1"));
         if (updated != 1) throw concurrent();
-        LambdaUpdateWrapper<QualitySafetyIssue> issueUpdate = new LambdaUpdateWrapper<QualitySafetyIssue>()
-                .eq(QualitySafetyIssue::getId, issue.getId()).eq(QualitySafetyIssue::getTenantId, tenantId())
-                .eq(QualitySafetyIssue::getStatus, "PENDING_REINSPECTION")
-                .set(QualitySafetyIssue::getStatus, "PASS".equals(result) ? "CLOSED" : "RECTIFYING");
-        if ("PASS".equals(result)) {
-            issueUpdate.set(QualitySafetyIssue::getClosedBy, userId()).set(QualitySafetyIssue::getClosedAt, now);
-        }
-        if (issueMapper.update(null, issueUpdate) != 1) throw concurrent();
         return requireRectification(id);
     }
 
@@ -456,13 +449,142 @@ public class QualitySafetyService {
 
     @Transactional(rollbackFor = Exception.class)
     public QualityConsequence postConsequence(Long id) {
+        requireConsequence(id);
+        throw new BusinessException("WORKFLOW_REQUIRED", "质量安全金额后果必须提交审批，禁止直接确认");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public QualityConsequence submitConsequence(Long id) {
         QualityConsequence consequence = requireConsequence(id);
         QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
-        projectAccessChecker.checkAccess(issue.getProjectId(), "确认质量安全处罚成本与评价");
-        if (!"CLOSED".equals(issue.getStatus()) || !"DRAFT".equals(consequence.getStatus()))
-            throw immutable("只有已关闭问题的草稿处罚成本记录可以确认");
+        projectAccessChecker.checkAccess(issue.getProjectId(), "提交质量安全处罚成本与评价");
+        if (!"CLOSED".equals(issue.getStatus())
+                || !Set.of("DRAFT", "REJECTED", "WITHDRAWN").contains(consequence.getStatus()))
+            throw immutable("只有已关闭问题的可编辑处罚成本记录可以提交");
+        if (consequence.getCostSubjectId() == null) {
+            Long costSubjectId = costSubjectV2Service.resolveRule(
+                    SOURCE_TYPE, issue.getIssueType(), consequence.getProjectId());
+            if (consequenceMapper.update(null, new LambdaUpdateWrapper<QualityConsequence>()
+                    .eq(QualityConsequence::getId, consequence.getId())
+                    .eq(QualityConsequence::getTenantId, tenantId())
+                    .in(QualityConsequence::getStatus, List.of("DRAFT", "REJECTED", "WITHDRAWN"))
+                    .isNull(QualityConsequence::getCostSubjectId)
+                    .set(QualityConsequence::getCostSubjectId, costSubjectId)) != 1) throw concurrent();
+            consequence.setCostSubjectId(costSubjectId);
+        }
+        if (consequence.getApprovalInstanceId() != null) {
+            workflowEngine.resubmitQualityConsequence(
+                    consequence.getApprovalInstanceId(), userId(), UserContext.getCurrentUsername());
+        } else {
+            workflowEngine.submitQualityConsequence(userId(), UserContext.getCurrentUsername(), tenantId(),
+                    WorkflowBusinessTypes.QS_CONSEQUENCE, id,
+                    "质量安全金额后果 " + consequence.getConsequenceCode(),
+                    consequence.getFineAmount().add(consequence.getReworkCostAmount()),
+                    consequence.getProjectId(), consequence.getContractId(),
+                    consequence.getEvaluationComment(), null, null);
+        }
+        return requireConsequence(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onRectificationRunning(WfInstance instance) {
+        QualityRectification rectification = requireRectificationWorkflow(instance);
+        requireWorkflowAmount(instance, BigDecimal.ZERO);
+        QualitySafetyIssue issue = requireIssue(rectification.getIssueId());
+        if ("SUBMITTED".equals(rectification.getStatus())) {
+            if (!Objects.equals(rectification.getApprovalInstanceId(), instance.getId())
+                    || !"PENDING_REINSPECTION".equals(issue.getStatus())) throw workflowBinding();
+            return;
+        }
+        if (!Set.of("DRAFT", "REJECTED", "WITHDRAWN").contains(rectification.getStatus())
+                || !"RECTIFYING".equals(issue.getStatus())) throw immutable("整改记录或问题单状态不能进入审批");
+        if (!Objects.equals(instance.getInitiatorId(), rectification.getResponsibleUserId()))
+            throw new BusinessException("QS_RECTIFICATION_SUBMIT_FORBIDDEN", "只能由整改责任人提交整改结果");
+        requireFile("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE", "提交整改必须上传整改完成证据");
+        LocalDateTime now = LocalDateTime.now();
+        int changed = rectificationMapper.update(null, new LambdaUpdateWrapper<QualityRectification>()
+                .eq(QualityRectification::getId, rectification.getId())
+                .eq(QualityRectification::getTenantId, tenantId())
+                .in(QualityRectification::getStatus, List.of("DRAFT", "REJECTED", "WITHDRAWN"))
+                .set(QualityRectification::getStatus, "SUBMITTED")
+                .set(QualityRectification::getApprovalInstanceId, instance.getId())
+                .set(QualityRectification::getActualCompletedAt, now)
+                .set(QualityRectification::getSubmittedBy, instance.getInitiatorId())
+                .set(QualityRectification::getSubmittedAt, now)
+                .set(QualityRectification::getReinspectionComment, null)
+                .set(QualityRectification::getReinspectedBy, null)
+                .set(QualityRectification::getReinspectedAt, null));
+        if (changed != 1) throw concurrent();
+        if (issueMapper.update(null, new LambdaUpdateWrapper<QualitySafetyIssue>()
+                .eq(QualitySafetyIssue::getId, issue.getId()).eq(QualitySafetyIssue::getTenantId, tenantId())
+                .eq(QualitySafetyIssue::getStatus, "RECTIFYING")
+                .set(QualitySafetyIssue::getStatus, "PENDING_REINSPECTION")) != 1) throw concurrent();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onRectificationApproved(WfInstance instance) {
+        QualityRectification rectification = requireRectificationWorkflow(instance);
+        QualitySafetyIssue issue = requireIssue(rectification.getIssueId());
+        if ("PASSED".equals(rectification.getStatus()) && "CLOSED".equals(issue.getStatus())) return;
+        if (!"SUBMITTED".equals(rectification.getStatus()) || !"PENDING_REINSPECTION".equals(issue.getStatus())
+                || rectification.getSubmittedAt() == null || rectification.getReinspectedAt() == null
+                || rectification.getReinspectedAt().isBefore(rectification.getSubmittedAt())
+                || rectification.getReinspectionComment() == null
+                || !rectification.getReinspectionComment().startsWith("PASS："))
+            throw new BusinessException("QS_REINSPECTION_REQUIRED", "完成本轮独立复验并通过后才能批准整改");
+        requireFile("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE", "批准整改前必须保留整改证据");
+        requireFile("QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE", "批准整改前必须保留复验证据");
+        if (rectificationMapper.update(null, new LambdaUpdateWrapper<QualityRectification>()
+                .eq(QualityRectification::getId, rectification.getId())
+                .eq(QualityRectification::getTenantId, tenantId())
+                .eq(QualityRectification::getApprovalInstanceId, instance.getId())
+                .eq(QualityRectification::getStatus, "SUBMITTED")
+                .set(QualityRectification::getStatus, "PASSED")) != 1) throw concurrent();
+        LocalDateTime now = LocalDateTime.now();
+        if (issueMapper.update(null, new LambdaUpdateWrapper<QualitySafetyIssue>()
+                .eq(QualitySafetyIssue::getId, issue.getId()).eq(QualitySafetyIssue::getTenantId, tenantId())
+                .eq(QualitySafetyIssue::getStatus, "PENDING_REINSPECTION")
+                .set(QualitySafetyIssue::getStatus, "CLOSED")
+                .set(QualitySafetyIssue::getClosedBy, userId())
+                .set(QualitySafetyIssue::getClosedAt, now)) != 1) throw concurrent();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onRectificationRejected(WfInstance instance) { reopenRectification(instance, "REJECTED"); }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onRectificationWithdrawn(WfInstance instance) { reopenRectification(instance, "WITHDRAWN"); }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onConsequenceRunning(WfInstance instance) {
+        QualityConsequence consequence = requireConsequenceWorkflow(instance);
+        requireWorkflowAmount(instance, consequence.getFineAmount().add(consequence.getReworkCostAmount()));
+        requireConsequenceCostSubject(consequence);
+        if ("SUBMITTED".equals(consequence.getStatus())) {
+            if (!Objects.equals(consequence.getApprovalInstanceId(), instance.getId())) throw workflowBinding();
+            return;
+        }
+        if (!Set.of("DRAFT", "REJECTED", "WITHDRAWN").contains(consequence.getStatus()))
+            throw immutable("处罚成本记录当前状态不能进入审批");
+        if (!"CLOSED".equals(requireIssue(consequence.getIssueId()).getStatus()))
+            throw new BusinessException("QS_ISSUE_NOT_CLOSED", "问题单关闭后才能提交处罚成本与评价");
+        if (consequenceMapper.update(null, new LambdaUpdateWrapper<QualityConsequence>()
+                .eq(QualityConsequence::getId, consequence.getId())
+                .eq(QualityConsequence::getTenantId, tenantId())
+                .in(QualityConsequence::getStatus, List.of("DRAFT", "REJECTED", "WITHDRAWN"))
+                .set(QualityConsequence::getStatus, "SUBMITTED")
+                .set(QualityConsequence::getApprovalInstanceId, instance.getId())) != 1) throw concurrent();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onConsequenceApproved(WfInstance instance) {
+        QualityConsequence consequence = requireConsequenceWorkflow(instance);
+        if ("POSTED".equals(consequence.getStatus())) return;
+        QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
+        if (!"CLOSED".equals(issue.getStatus()) || !"SUBMITTED".equals(consequence.getStatus()))
+            throw immutable("只有审批中的已关闭问题处罚记录可以确认");
+        requireConsequenceCostSubject(consequence);
         Long costItemId = createCostIfRequired(consequence);
-        Long costSubjectId = costItemId == null ? null : costItemMapper.selectById(costItemId).getCostSubjectId();
         QualityPartnerEvaluation evaluation = new QualityPartnerEvaluation();
         evaluation.setTenantId(tenantId());
         evaluation.setConsequenceId(consequence.getId());
@@ -479,17 +601,22 @@ public class QualitySafetyService {
         evaluation.setDeletedFlag(0);
         evaluationMapper.insert(evaluation);
         int updated = consequenceMapper.update(null, new LambdaUpdateWrapper<QualityConsequence>()
-                .eq(QualityConsequence::getId, id).eq(QualityConsequence::getTenantId, tenantId())
-                .eq(QualityConsequence::getStatus, "DRAFT")
+                .eq(QualityConsequence::getId, consequence.getId()).eq(QualityConsequence::getTenantId, tenantId())
+                .eq(QualityConsequence::getApprovalInstanceId, instance.getId())
+                .eq(QualityConsequence::getStatus, "SUBMITTED")
                 .set(QualityConsequence::getStatus, "POSTED")
-                .set(QualityConsequence::getCostSubjectId, costSubjectId)
                 .set(QualityConsequence::getCostItemId, costItemId)
                 .set(QualityConsequence::getEvaluationId, evaluation.getId())
                 .set(QualityConsequence::getPostedBy, userId())
                 .set(QualityConsequence::getPostedAt, LocalDateTime.now()));
         if (updated != 1) throw concurrent();
-        return requireConsequence(id);
     }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onConsequenceRejected(WfInstance instance) { reopenConsequence(instance, "REJECTED"); }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void onConsequenceWithdrawn(WfInstance instance) { reopenConsequence(instance, "WITHDRAWN"); }
 
     public Trace trace(Long issueId) {
         QualitySafetyIssue issue = requireIssue(issueId);
@@ -551,6 +678,58 @@ public class QualitySafetyService {
         if (!valid) throw new BusinessException("QS_CONSEQUENCE_DECISION_INVALID", "处罚决策与罚款、返工成本金额不一致");
     }
 
+    private void reopenRectification(WfInstance instance, String targetStatus) {
+        QualityRectification rectification = requireRectificationWorkflow(instance);
+        QualitySafetyIssue issue = requireIssue(rectification.getIssueId());
+        if (targetStatus.equals(rectification.getStatus()) && "RECTIFYING".equals(issue.getStatus())) return;
+        if (!"SUBMITTED".equals(rectification.getStatus()) || !"PENDING_REINSPECTION".equals(issue.getStatus()))
+            throw immutable("整改记录或问题单状态不能退回");
+        if (rectificationMapper.update(null, new LambdaUpdateWrapper<QualityRectification>()
+                .eq(QualityRectification::getId, rectification.getId())
+                .eq(QualityRectification::getTenantId, tenantId())
+                .eq(QualityRectification::getApprovalInstanceId, instance.getId())
+                .eq(QualityRectification::getStatus, "SUBMITTED")
+                .set(QualityRectification::getStatus, targetStatus)) != 1) throw concurrent();
+        if (issueMapper.update(null, new LambdaUpdateWrapper<QualitySafetyIssue>()
+                .eq(QualitySafetyIssue::getId, issue.getId()).eq(QualitySafetyIssue::getTenantId, tenantId())
+                .eq(QualitySafetyIssue::getStatus, "PENDING_REINSPECTION")
+                .set(QualitySafetyIssue::getStatus, "RECTIFYING")) != 1) throw concurrent();
+    }
+
+    private void reopenConsequence(WfInstance instance, String targetStatus) {
+        QualityConsequence consequence = requireConsequenceWorkflow(instance);
+        if (targetStatus.equals(consequence.getStatus())) return;
+        if (consequenceMapper.update(null, new LambdaUpdateWrapper<QualityConsequence>()
+                .eq(QualityConsequence::getId, consequence.getId())
+                .eq(QualityConsequence::getTenantId, tenantId())
+                .eq(QualityConsequence::getApprovalInstanceId, instance.getId())
+                .eq(QualityConsequence::getStatus, "SUBMITTED")
+                .set(QualityConsequence::getStatus, targetStatus)) != 1) throw concurrent();
+    }
+
+    private QualityRectification requireRectificationWorkflow(WfInstance instance) {
+        if (instance == null || instance.getId() == null || instance.getBusinessId() == null
+                || !WorkflowBusinessTypes.QS_RECTIFICATION.equals(instance.getBusinessType())
+                || !Objects.equals(instance.getTenantId(), tenantId())) throw workflowBinding();
+        QualityRectification rectification = requireRectification(instance.getBusinessId());
+        if (!Objects.equals(rectification.getProjectId(), instance.getProjectId())
+                || rectification.getApprovalInstanceId() != null
+                && !Objects.equals(rectification.getApprovalInstanceId(), instance.getId())) throw workflowBinding();
+        return rectification;
+    }
+
+    private QualityConsequence requireConsequenceWorkflow(WfInstance instance) {
+        if (instance == null || instance.getId() == null || instance.getBusinessId() == null
+                || !WorkflowBusinessTypes.QS_CONSEQUENCE.equals(instance.getBusinessType())
+                || !Objects.equals(instance.getTenantId(), tenantId())) throw workflowBinding();
+        QualityConsequence consequence = requireConsequence(instance.getBusinessId());
+        if (!Objects.equals(consequence.getProjectId(), instance.getProjectId())
+                || !Objects.equals(consequence.getContractId(), instance.getContractId())
+                || consequence.getApprovalInstanceId() != null
+                && !Objects.equals(consequence.getApprovalInstanceId(), instance.getId())) throw workflowBinding();
+        return consequence;
+    }
+
     private Long createCostIfRequired(QualityConsequence consequence) {
         if (consequence.getReworkCostAmount().signum() <= 0) return null;
         CostItem existing = first(costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
@@ -564,7 +743,7 @@ public class QualitySafetyService {
         cost.setPartnerId(consequence.getPartnerId());
         QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
         cost.setWbsTaskId(requireInspection(issue.getInspectionId()).getWbsTaskId());
-        cost.setCostSubjectId(costSubjectV2Service.resolveRule(SOURCE_TYPE, issue.getIssueType(), consequence.getProjectId()));
+        cost.setCostSubjectId(requireConsequenceCostSubject(consequence));
         cost.setCostType(COST_TYPE);
         cost.setAmount(consequence.getReworkCostAmount());
         cost.setTaxAmount(BigDecimal.ZERO);
@@ -586,6 +765,12 @@ public class QualitySafetyService {
             if (existing != null) return existing.getId();
             throw e;
         }
+    }
+
+    private Long requireConsequenceCostSubject(QualityConsequence consequence) {
+        if (consequence.getCostSubjectId() == null)
+            throw new BusinessException("QS_CONSEQUENCE_COST_SUBJECT_REQUIRED", "质量安全金额后果缺少提交时成本科目快照");
+        return consequence.getCostSubjectId();
     }
 
     private void validateContract(Long contractId, Long projectId, Long partnerId) {
@@ -733,10 +918,14 @@ public class QualitySafetyService {
 
     private Long tenantId() { return UserContext.getCurrentTenantId(); }
     private Long userId() { return UserContext.getCurrentUserId(); }
-    private boolean isAdmin() { return UserContext.getCurrentRoles().stream().anyMatch(Set.of("ADMIN", "SUPER_ADMIN")::contains); }
     private String upper(String value) { return value == null ? "" : value.trim().toUpperCase(); }
     private String normalizeCode(String value) { return upper(value); }
     private BusinessException immutable(String message) { return new BusinessException("QS_STATE_IMMUTABLE", message); }
     private BusinessException concurrent() { return new BusinessException("QS_CONCURRENT_MODIFICATION", "数据状态已变化，请刷新后重试"); }
+    private BusinessException workflowBinding() { return new BusinessException("QS_WORKFLOW_BINDING_INVALID", "审批实例与质量安全业务不匹配"); }
+    private void requireWorkflowAmount(WfInstance instance, BigDecimal expected) {
+        if (instance.getAmount() == null || instance.getAmount().compareTo(expected) != 0)
+            throw new BusinessException("WORKFLOW_AMOUNT_MISMATCH", "审批金额与质量安全业务快照不一致");
+    }
     private <T> T first(List<T> values) { return values == null || values.isEmpty() ? null : values.get(0); }
 }

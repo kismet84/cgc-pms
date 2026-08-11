@@ -7,11 +7,9 @@ import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfNodeInstance;
 import com.cgcpms.workflow.entity.WfTask;
-import com.cgcpms.workflow.entity.WfTemplateNode;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfNodeInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
-import com.cgcpms.workflow.mapper.WfTemplateNodeMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -39,7 +37,6 @@ public class WorkflowEngine {
     private final WfInstanceMapper wfInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
-    private final WfTemplateNodeMapper wfTemplateNodeMapper;
 
     // ───────────────────── PERMISSION ─────────────────────
 
@@ -48,6 +45,12 @@ public class WorkflowEngine {
      * to submit a workflow of the given business type.
      */
     public void checkSubmitPermission(String businessType) {
+        if (List.of(WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER,
+                WorkflowBusinessTypes.FINANCE_COST_ALLOCATION,
+                WorkflowBusinessTypes.QS_RECTIFICATION,
+                WorkflowBusinessTypes.QS_CONSEQUENCE).contains(businessType)) {
+            throw new BusinessException("DEDICATED_WORKFLOW_REQUIRED", "该业务必须通过业务单据入口提交审批");
+        }
         String requiredPermission = getRequiredPermission(businessType);
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) {
@@ -96,6 +99,10 @@ public class WorkflowEngine {
             case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
             case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
             case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> "closeout:acceptance:submit";
+            case WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER -> "cost:subject:transfer:submit";
+            case WorkflowBusinessTypes.FINANCE_COST_ALLOCATION -> "cost:subject:allocation:submit";
+            case WorkflowBusinessTypes.QS_RECTIFICATION -> "quality:rectification:submit";
+            case WorkflowBusinessTypes.QS_CONSEQUENCE -> "quality:consequence:submit";
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         };
     }
@@ -181,6 +188,38 @@ public class WorkflowEngine {
                 title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
     }
 
+    public WfInstance submitBidCostTargetTransfer(Long userId, String username, Long tenantId,
+                                                   String businessType, Long businessId, String title,
+                                                   java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                   String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitBidCostTargetTransfer(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitFinanceCostAllocation(Long userId, String username, Long tenantId,
+                                                   String businessType, Long businessId, String title,
+                                                   java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                   String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitFinanceCostAllocation(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitQualityRectification(Long userId, String username, Long tenantId,
+                                                  String businessType, Long businessId, String title,
+                                                  java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                  String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitQualityRectification(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitQualityConsequence(Long userId, String username, Long tenantId,
+                                                String businessType, Long businessId, String title,
+                                                java.math.BigDecimal amount, Long projectId, Long contractId,
+                                                String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitQualityConsequence(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
     // ───────────────────── RESUBMIT ─────────────────────
 
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
@@ -213,6 +252,22 @@ public class WorkflowEngine {
 
     public WfInstance resubmitMaterialReceipt(Long instanceId, Long userId, String username) {
         return submitService.resubmitMaterialReceipt(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitBidCostTargetTransfer(Long instanceId, Long userId, String username) {
+        return submitService.resubmitBidCostTargetTransfer(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitFinanceCostAllocation(Long instanceId, Long userId, String username) {
+        return submitService.resubmitFinanceCostAllocation(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitQualityRectification(Long instanceId, Long userId, String username) {
+        return submitService.resubmitQualityRectification(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitQualityConsequence(Long instanceId, Long userId, String username) {
+        return submitService.resubmitQualityConsequence(instanceId, userId, username);
     }
 
     // ───────────────────── APPROVE ─────────────────────
@@ -283,11 +338,11 @@ public class WorkflowEngine {
             if (!pendingTasks.isEmpty()) {
                 actions.add(WorkflowConstants.UI_APPROVE);
                 actions.add(WorkflowConstants.UI_REJECT);
-                WfTemplateNode templateNode = findTemplateNode(pendingTasks.get(0));
-                if (templateNode != null && Integer.valueOf(1).equals(templateNode.getAllowTransfer())) {
+                WfNodeInstance node = wfNodeInstanceMapper.selectById(pendingTasks.get(0).getNodeInstanceId());
+                if (node != null && Integer.valueOf(1).equals(node.getAllowTransfer())) {
                     actions.add(WorkflowConstants.UI_TRANSFER);
                 }
-                if (templateNode != null && Integer.valueOf(1).equals(templateNode.getAllowAddSign())) {
+                if (node != null && Integer.valueOf(1).equals(node.getAllowAddSign())) {
                     actions.add(WorkflowConstants.UI_ADD_SIGN);
                 }
             }
@@ -306,9 +361,4 @@ public class WorkflowEngine {
         return actions;
     }
 
-    private WfTemplateNode findTemplateNode(WfTask task) {
-        WfNodeInstance node = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
-        if (node == null || node.getTemplateNodeId() == null) return null;
-        return wfTemplateNodeMapper.selectById(node.getTemplateNodeId());
-    }
 }

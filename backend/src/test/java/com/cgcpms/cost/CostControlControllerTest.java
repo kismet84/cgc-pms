@@ -151,7 +151,7 @@ class CostControlControllerTest {
     @Test
     void portfolioOverviewUsesAccessibleProjectsAndCountsMissingForecasts() throws Exception {
         mockMvc.perform(get("/api/cost-controls/overview").contextPath("/api")
-                        .cookie(memberCookie("cost:control:query")))
+                        .cookie(memberCookie("cost:control:query", "business:amount:view")))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
                         "$.data.accessibleProjectCount").value(2))

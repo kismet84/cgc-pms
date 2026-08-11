@@ -8,6 +8,7 @@ import {
   bindDefaultDocumentVersion,
   loadAuditLogs,
   loadDataMaintenancePreview,
+  loadRoles,
   loadUsers,
 } from '@/services/system-management'
 import { apiRequest } from '@/services/request'
@@ -134,8 +135,8 @@ describe('M7 system management contracts', () => {
           },
           {
             id: 2,
-            roleCode: 'BUSINESS_MANAGER',
-            roleName: '商务经理',
+            roleCode: 'TECHNICAL_LEAD',
+            roleName: '技术负责人',
             status: 'ENABLE',
             dataScope: 'SELF',
             menuIds: ['10'],
@@ -271,8 +272,8 @@ describe('M7 system management contracts', () => {
       if (path === '/system/roles/2') {
         return {
           id: 2,
-          roleCode: 'BUSINESS_MANAGER',
-          roleName: '商务经理',
+          roleCode: 'TECHNICAL_LEAD',
+          roleName: '技术负责人',
           status: 'ENABLE',
           dataScope: 'SELF',
           menuIds: ['10'],
@@ -344,7 +345,7 @@ describe('M7 system management contracts', () => {
 
     await wrapper
       .findAll('.permission-role-list__item')
-      .find((button) => button.text().includes('商务经理'))!
+      .find((button) => button.text().includes('技术负责人'))!
       .trigger('click')
     await flushPromises()
     await wrapper
@@ -372,8 +373,8 @@ describe('M7 system management contracts', () => {
           email: 'admin@example.com',
           orgId: '总部',
           status: 'ENABLE',
-          roleIds: [1],
-          roleNames: ['超级管理员'],
+          roleIds: [1, 99],
+          roleNames: ['公司财务', '超级管理员'],
           createdAt: '2026-08-01 09:00:00',
         }
       }
@@ -386,8 +387,8 @@ describe('M7 system management contracts', () => {
           email: 'dual@example.com',
           orgId: '项目部',
           status: dualStatus,
-          roleIds: [1, 2],
-          roleNames: ['超级管理员', '项目经理'],
+          roleIds: [1, 2, 99],
+          roleNames: ['公司财务', '项目经理', '超级管理员'],
           createdAt: '2026-08-02 10:00:00',
         }
       }
@@ -401,8 +402,8 @@ describe('M7 system management contracts', () => {
                   username: 'dual.user',
                   realName: '双岗成员',
                   status: dualStatus,
-                  roleIds: [1, 2],
-                  roleNames: ['超级管理员', '项目经理'],
+                  roleIds: [1, 2, 99],
+                  roleNames: ['公司财务', '项目经理', '超级管理员'],
                 },
               ]
             : [
@@ -411,16 +412,16 @@ describe('M7 system management contracts', () => {
                   username: 'admin',
                   realName: '平台管理员',
                   status: 'ENABLE',
-                  roleIds: [1],
-                  roleNames: ['超级管理员'],
+                  roleIds: [1, 99],
+                  roleNames: ['公司财务', '超级管理员'],
                 },
                 {
                   id: 2,
                   username: 'dual.user',
                   realName: '双岗成员',
                   status: dualStatus,
-                  roleIds: [1, 2],
-                  roleNames: ['超级管理员', '项目经理'],
+                  roleIds: [1, 2, 99],
+                  roleNames: ['公司财务', '项目经理', '超级管理员'],
                 },
               ]
         return {
@@ -434,8 +435,8 @@ describe('M7 system management contracts', () => {
         return [
           {
             id: 1,
-            roleCode: 'SUPER_ADMIN',
-            roleName: '超级管理员',
+            roleCode: 'COMPANY_FINANCE',
+            roleName: '公司财务',
             status: 'ENABLE',
             dataScope: 'ALL',
             userCount: 2,
@@ -448,6 +449,15 @@ describe('M7 system management contracts', () => {
             status: 'ENABLE',
             dataScope: 'SELF',
             userCount: 1,
+            menuIds: [],
+          },
+          {
+            id: 99,
+            roleCode: 'SUPER_ADMIN',
+            roleName: '超级管理员',
+            status: 'ENABLE',
+            dataScope: 'ALL',
+            userCount: 2,
             menuIds: [],
           },
         ]
@@ -477,8 +487,9 @@ describe('M7 system management contracts', () => {
     expect(wrapper.get('#user-workspace-detail-title').text()).toBe('3. 详情')
     const roleButtons = wrapper.findAll('.user-role-list__item')
     expect(roleButtons).toHaveLength(2)
-    expect(roleButtons[0]!.text()).toContain('超级管理员2 人')
+    expect(roleButtons[0]!.text()).toContain('公司财务2 人')
     expect(roleButtons[1]!.text()).toContain('项目经理1 人')
+    expect(wrapper.text()).not.toContain('超级管理员')
     expect(roleButtons[0]!.attributes('aria-pressed')).toBe('true')
     const userList = wrapper.get('.user-workspace__list')
     expect(userList.attributes('role')).toBe('listbox')
@@ -642,116 +653,127 @@ describe('M7 system management contracts', () => {
     expect(wrapper.text()).toContain('暂无用户详情')
   })
 
-  it('keeps role editing separate from permission assignment', async () => {
-    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
+  it('shows only fixed business roles and exposes no role mutation controls', async () => {
+    vi.mocked(apiRequest).mockResolvedValue([
+      {
+        id: 9,
+        roleCode: 'EMPLOYEE',
+        roleName: '员工',
+        roleType: 'SYSTEM',
+        status: 'ENABLE',
+        dataScope: 'PROJECT_MEMBER',
+        menuIds: [],
+      },
+      {
+        id: 99,
+        roleCode: 'SUPER_ADMIN',
+        roleName: '超级管理员',
+        status: 'ENABLE',
+        dataScope: 'ALL',
+        menuIds: [],
+      },
+      {
+        id: 2,
+        roleCode: 'PROJECT_MANAGER',
+        roleName: '项目经理',
+        roleType: 'SYSTEM',
+        status: 'ENABLE',
+        dataScope: 'PROJECT_MEMBER',
+        menuIds: [],
+      },
+      {
+        id: 10,
+        roleCode: 'CUSTOM_ROLE',
+        roleName: '自定义角色',
+        status: 'ENABLE',
+        dataScope: 'SELF',
+        menuIds: [],
+      },
+      {
+        id: 1,
+        roleCode: 'COMPANY_OWNER',
+        roleName: '公司老板',
+        roleType: 'SYSTEM',
+        status: 'ENABLE',
+        dataScope: 'ALL',
+        menuIds: [],
+      },
+    ])
+
+    const roles = await loadRoles()
+    expect(roles.map((role) => role.roleCode)).toEqual([
+      'COMPANY_OWNER',
+      'PROJECT_MANAGER',
+      'EMPLOYEE',
+    ])
+
+    useSessionStore().replaceUserInfo({
+      tenantId: '1001',
+      userId: '1',
+      username: 'admin',
+      roles: ['SUPER_ADMIN'],
+      permissions: [],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/system/roles', component: AccessControlPage }],
+    })
+    await router.push('/system/roles')
+    await router.isReady()
+    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('固定角色清单')
+    expect(wrapper.text()).toContain('公司老板')
+    expect(wrapper.text()).toContain('项目经理')
+    expect(wrapper.text()).toContain('员工')
+    expect(wrapper.text()).not.toContain('超级管理员')
+    expect(wrapper.text()).not.toContain('自定义角色')
+    expect(wrapper.find('button[role="switch"]').exists()).toBe(false)
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toEqual(
+      expect.arrayContaining(['新增角色', '编辑', '删除']),
+    )
+  })
+
+  it('warns that company-finance menu changes do not remove the admin bypass', async () => {
+    vi.mocked(apiRequest).mockImplementation(async (path) => {
       if (path === '/system/roles') {
         return [
           {
             id: 1,
-            roleCode: 'PROJECT_MANAGER',
-            roleName: '项目经理',
-            roleType: 'CUSTOM',
+            roleCode: 'COMPANY_FINANCE',
+            roleName: '公司财务',
+            roleType: 'SYSTEM',
             status: 'ENABLE',
-            dataScope: 'DEPT_AND_CHILD',
-            menuIds: ['12'],
+            dataScope: 'ALL',
+            menuIds: ['10'],
           },
         ]
       }
-      if (path === '/system/roles/1' && options?.method === 'PUT') return undefined
       if (path === '/system/roles/1') {
         return {
           id: 1,
-          roleCode: 'PROJECT_MANAGER',
-          roleName: '项目经理',
-          roleType: 'CUSTOM',
+          roleCode: 'COMPANY_FINANCE',
+          roleName: '公司财务',
+          roleType: 'SYSTEM',
           status: 'ENABLE',
-          dataScope: 'DEPT_AND_CHILD',
-          menuIds: ['12'],
+          dataScope: 'ALL',
+          menuIds: ['10'],
         }
       }
-      throw new Error(`unexpected request: ${path}`)
-    })
-    useSessionStore().replaceUserInfo({
-      tenantId: '1001',
-      userId: '1',
-      username: 'admin',
-      roles: ['SUPER_ADMIN'],
-      permissions: [],
-    })
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/system/roles', component: AccessControlPage }],
-    })
-    await router.push('/system/roles')
-    await router.isReady()
-    const wrapper = mount(AccessControlPage, {
-      attachTo: document.body,
-      global: { plugins: [router] },
-    })
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '编辑')!
-      .trigger('click')
-    await flushPromises()
-    const dialog = document.querySelector<HTMLElement>('.v2-dialog__panel')!
-    expect(dialog.textContent).not.toContain('数据范围')
-    expect(dialog.textContent).not.toContain('菜单与权限')
-    expect(dialog.textContent).not.toContain('contract:submit')
-
-    ;[...dialog.querySelectorAll('button')]
-      .find((button) => button.textContent?.trim() === '保存')!
-      .click()
-    await flushPromises()
-
-    expect(apiRequest).toHaveBeenCalledWith('/system/roles/1', {
-      method: 'PUT',
-      body: {
-        roleCode: 'PROJECT_MANAGER',
-        roleName: '项目经理',
-        status: 'ENABLE',
-        dataScope: 'DEPT_AND_CHILD',
-      },
-    })
-    expect(
-      vi
-        .mocked(apiRequest)
-        .mock.calls.some(
-          ([path, options]) => path === '/system/roles/1/menus' && options?.method === 'PUT',
-        ),
-    ).toBe(false)
-    expect(vi.mocked(apiRequest).mock.calls.some(([path]) => path === '/system/menus')).toBe(false)
-    wrapper.unmount()
-  })
-
-  it('updates an editable role through the shared status pill and rereads the list', async () => {
-    vi.mocked(apiRequest).mockImplementation(async (path, options) => {
-      if (path === '/system/roles') {
+      if (path === '/system/menus')
         return [
           {
-            id: 2,
-            roleCode: 'PROJECT_MANAGER',
-            roleName: '项目经理',
-            roleType: 'CUSTOM',
+            id: 10,
+            parentId: 0,
+            menuName: '报表查询',
+            menuType: 'BUTTON',
+            perms: 'report:catalog:query',
             status: 'ENABLE',
-            dataScope: 'SELF',
-            menuIds: [],
+            visible: 1,
+            orderNum: 1,
           },
         ]
-      }
-      if (path === '/system/roles/2') {
-        if (options?.method === 'PUT') return undefined
-        return {
-          id: 2,
-          roleCode: 'PROJECT_MANAGER',
-          roleName: '项目经理',
-          roleType: 'CUSTOM',
-          status: 'ENABLE',
-          dataScope: 'SELF',
-          menuIds: [],
-        }
-      }
       throw new Error(`unexpected request: ${path}`)
     })
     useSessionStore().replaceUserInfo({
@@ -763,39 +785,14 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/roles', component: AccessControlPage }],
+      routes: [{ path: '/system/permissions', component: AccessControlPage }],
     })
-    await router.push('/system/roles')
+    await router.push('/system/permissions')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, {
-      attachTo: document.body,
-      global: { plugins: [router] },
-    })
+    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
     await flushPromises()
 
-    const statusSwitch = wrapper.get('button[role="switch"]')
-    expect(statusSwitch.attributes('aria-checked')).toBe('true')
-    expect(wrapper.find('input[role="switch"]').exists()).toBe(false)
-    await statusSwitch.trigger('click')
-    await flushPromises()
-    const confirmDialog = document.body.querySelector<HTMLElement>('.v2-confirm-dialog')!
-    ;[...confirmDialog.querySelectorAll('button')]
-      .find((candidate) => candidate.textContent?.trim() === '停用')!
-      .click()
-    await flushPromises()
-
-    expect(apiRequest).toHaveBeenCalledWith('/system/roles/2', {
-      method: 'PUT',
-      body: {
-        roleCode: 'PROJECT_MANAGER',
-        roleName: '项目经理',
-        status: 'DISABLE',
-        dataScope: 'SELF',
-      },
-    })
-    expect(
-      vi.mocked(apiRequest).mock.calls.filter(([path]) => path === '/system/roles'),
-    ).toHaveLength(2)
-    wrapper.unmount()
+    expect(wrapper.text()).toContain('财务权限提示')
+    expect(wrapper.text()).toContain('移除菜单权限不会撤销超级管理员旁路能力。')
   })
 })

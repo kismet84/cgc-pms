@@ -177,6 +177,6 @@ public class RevenueOperationsController {
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<Map<String,Object>>> audit(@RequestParam(required=false)String businessType,@RequestParam(required=false)Long businessId){return ApiResponse.success(advanced.auditEvents(businessType,businessId));}
     @GetMapping(value="/audit/export",produces="text/csv")
-    @PreAuthorize("hasAuthority('revenue:audit:export') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('revenue:audit:export') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ResponseEntity<byte[]> export(@RequestParam Long projectId){return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=revenue-audit.csv").contentType(new MediaType("text","csv",java.nio.charset.StandardCharsets.UTF_8)).body(advanced.exportAudit(projectId));}
 }

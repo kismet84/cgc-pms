@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("292", flyway.info().current().getVersion().getVersion());
+        assertEquals("293", flyway.info().current().getVersion().getVersion());
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
@@ -137,13 +137,6 @@ class BaselineFlywayCompatibilityTest {
                           'cost:target:delete','cost:target:activate','cost:summary:refresh')
                 AND deleted_flag=0
                 """));
-        assertEquals(9, count(flyway, "sys_role_menu", """
-                tenant_id=0 AND role_id=2 AND menu_id IN
-                    (21901,21902,21903,21904,22001,22002,22003,22004,22101)
-                """));
-        assertEquals(4, count(flyway, "sys_role_menu", """
-                tenant_id=0 AND role_id=4 AND menu_id IN (21901,21902,21903,21904)
-                """));
         execute(flyway, """
                 INSERT INTO mat_warehouse
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
@@ -156,7 +149,17 @@ class BaselineFlywayCompatibilityTest {
                 """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(13, count(flyway, "sys_role"));
+        assertEquals(10, count(flyway, "sys_role", "status='ENABLE' AND deleted_flag=0"));
+        assertEquals(9, count(flyway, "sys_role", """
+                status='ENABLE' AND deleted_flag=0 AND role_code IN
+                ('COMPANY_OWNER','COMPANY_FINANCE','PROJECT_MANAGER','PROJECT_ACCOUNTANT','TECHNICAL_LEAD',
+                 'SAFETY_LEAD','CONSTRUCTION_LEAD','PROCUREMENT_LEAD','EMPLOYEE')
+                """));
+        assertEquals(0, count(flyway, "sys_role", """
+                status='ENABLE' AND deleted_flag=0 AND role_code NOT IN
+                ('COMPANY_OWNER','COMPANY_FINANCE','PROJECT_MANAGER','PROJECT_ACCOUNTANT','TECHNICAL_LEAD',
+                 'SAFETY_LEAD','CONSTRUCTION_LEAD','PROCUREMENT_LEAD','EMPLOYEE','SUPER_ADMIN')
+                """));
         assertEquals(0, count(flyway, "sys_user"));
         assertEquals(0, count(flyway, "pm_project"));
         assertEquals(0, count(flyway, "md_material"));
@@ -169,64 +172,35 @@ class BaselineFlywayCompatibilityTest {
                 AND parent_id=(SELECT id FROM sys_menu
                     WHERE tenant_id=0 AND perms='material:dict:list' AND deleted_flag=0)
                 """));
-        assertEquals(1, count(flyway, "sys_role_menu",
-                "role_id=1 AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:direct')"));
-        assertEquals(1, count(flyway, "sys_role_menu",
-                "role_id=1 AND menu_id=(SELECT id FROM sys_menu WHERE perms='audit:query')"));
-        assertEquals(0, count(flyway, "sys_role_menu",
-                "role_id=6 AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:direct')"));
-        assertEquals(1, count(flyway, "sys_role", "role_code='COST_MANAGER'"));
-        assertEquals(1, count(flyway, "sys_role", "role_code='DEPARTMENT_MANAGER'"));
-        assertEquals(1, count(flyway, "sys_role", "role_code='GENERAL_MANAGER'"));
-        assertEquals(1, count(flyway, "wf_template_node",
-                "id=50501 AND approver_config LIKE '%PROJECT_ROLE%' AND approver_config LIKE '%PM%'"));
-        assertEquals(1, count(flyway, "wf_template_node",
-                "id=53001 AND approver_config LIKE '%GENERAL_MANAGER%' AND approve_mode='OR_SIGN'"));
-        assertEquals(4, count(flyway, "wf_template_node",
-                "id IN (50102,50402,50502,50802) AND approver_config LIKE '%DEPARTMENT_MANAGER%'"));
-        assertEquals(0, count(flyway, "wf_template_node",
-                "approver_config LIKE '%MANAGEMENT_EXECUTIVE%'"));
-        assertEquals(9, count(flyway, "wf_template_node",
-                "id IN (50501,50502,50503,52001,52002,52003,52101,52102,52103)"
-                        + " AND approve_mode='OR_SIGN'"));
-        assertEquals(3, count(flyway, "wf_template_node",
-                "id IN (50101,50102,50103) AND approver_config LIKE '%roleCode%'"
-                        + " AND approve_mode='OR_SIGN'"));
-        assertEquals(1, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='COST_MANAGER')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:approve')
-                """));
-        assertEquals(2, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='DEPARTMENT_MANAGER')
-                AND menu_id IN (SELECT id FROM sys_menu WHERE perms IN ('workflow:approve','workflow:reject'))
-                """));
-        assertEquals(1, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:app:submit')
-                """));
-        assertEquals(2, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
-                AND menu_id IN (SELECT id FROM sys_menu
-                    WHERE perms IN ('payment:app:add','payment:app:edit'))
-                """));
-        assertEquals(1, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='FINANCE')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:record:writeback')
-                """));
-        assertEquals(5, count(flyway, "sys_role_menu", """
+        assertEquals(8, count(flyway, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
-                    ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:query')
+                  ('COMPANY_OWNER','COMPANY_FINANCE','PROJECT_MANAGER','PROJECT_ACCOUNTANT','TECHNICAL_LEAD',
+                   'SAFETY_LEAD','CONSTRUCTION_LEAD','PROCUREMENT_LEAD'))
+                AND menu_id=(SELECT id FROM sys_menu WHERE perms='business:amount:view' AND deleted_flag=0)
                 """));
-        assertEquals(1, count(flyway, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:resubmit')
+        assertEquals(0, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='EMPLOYEE' AND deleted_flag=0)
+                AND menu_id=(SELECT id FROM sys_menu WHERE perms='business:amount:view' AND deleted_flag=0)
                 """));
-        assertEquals(2, count(flyway, "sys_role_menu", """
-                role_id IN (SELECT id FROM sys_role WHERE role_code IN
-                    ('DEPARTMENT_MANAGER','GENERAL_MANAGER'))
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:commencement:query')
+        assertEquals(21, count(flyway, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(45, count(flyway, "wf_template_node", """
+                deleted_flag=0 AND template_id IN
+                    (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));
+        assertEquals(0, count(flyway, "wf_template_node", """
+                deleted_flag=0 AND template_id IN
+                    (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
+                AND CAST(approver_config AS VARCHAR) NOT REGEXP
+                    'COMPANY_OWNER|COMPANY_FINANCE|PROJECT_MANAGER|PROJECT_ACCOUNTANT|TECHNICAL_LEAD|SAFETY_LEAD|CONSTRUCTION_LEAD|PROCUREMENT_LEAD|EMPLOYEE'
+                """));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='wf_instance' AND COLUMN_NAME='security_policy_json'"));
+        assertEquals(5, count(flyway, "INFORMATION_SCHEMA.COLUMNS", """
+                TABLE_NAME='wf_node_instance' AND COLUMN_NAME IN
+                    ('node_type','approver_config','allow_transfer','allow_add_sign','timeout_hours')
+                """));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='bid_cost_target_transfer_request'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='finance_cost_allocation_request'"));
     }
 
     @Test
@@ -245,7 +219,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("292", current.info().current().getVersion().getVersion());
+        assertEquals("293", current.info().current().getVersion().getVersion());
         assertEquals(9, count(current, "sys_menu", """
                 perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
                           'variation:order:item:edit','cost:target:add','cost:target:edit',
@@ -261,23 +235,11 @@ class BaselineFlywayCompatibilityTest {
                 AND parent_id=(SELECT id FROM sys_menu
                     WHERE tenant_id=0 AND perms='material:dict:list' AND deleted_flag=0)
                 """));
-        assertEquals(5, count(current, "sys_role_menu", """
-                role_id IN (SELECT id FROM sys_role WHERE role_code IN
-                    ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:query')
-                """));
-        assertEquals(1, count(current, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:resubmit')
-                """));
-        assertEquals(1, count(current, "sys_role_menu", """
-                role_id=(SELECT id FROM sys_role WHERE role_code='SUPER_ADMIN')
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='audit:query')
-                """));
-        assertEquals(2, count(current, "sys_role_menu", """
-                role_id IN (SELECT id FROM sys_role WHERE role_code IN
-                    ('DEPARTMENT_MANAGER','GENERAL_MANAGER'))
-                AND menu_id=(SELECT id FROM sys_menu WHERE perms='project:commencement:query')
+        assertEquals(10, count(current, "sys_role", "status='ENABLE' AND deleted_flag=0"));
+        assertEquals(21, count(current, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(45, count(current, "wf_template_node", """
+                deleted_flag=0 AND template_id IN
+                    (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));
         assertFalse(Arrays.stream(current.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
@@ -501,7 +463,12 @@ class BaselineFlywayCompatibilityTest {
                 ORDER BY 1
                 """);
 
-        Flyway current = flyway("menu_alignment", ACTIVE, LEGACY, JAVA);
+        Flyway current = Flyway.configure()
+                .dataSource(url("menu_alignment"), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("236"))
+                .cleanDisabled(false)
+                .load();
         current.migrate();
 
         assertEquals(roleMenus, rows(current, """

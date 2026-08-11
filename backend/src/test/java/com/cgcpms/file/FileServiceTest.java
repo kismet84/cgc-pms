@@ -29,6 +29,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.net.ConnectException;
 import java.security.MessageDigest;
@@ -88,6 +91,7 @@ class FileServiceTest {
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        authenticate("business:amount:view");
         when(virusScanner.scan(any(byte[].class))).thenReturn(VirusScanner.ScanResult.clean());
         clearInvocations(minioClient, authorizer, virusScanner);
     }
@@ -95,6 +99,7 @@ class FileServiceTest {
     @AfterEach
     void clearContext() {
         TestUserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -664,6 +669,88 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("无金额权限拒绝财务 CSV 和普通业务文件下载")
+    void employeeWithoutAmountPermissionCannotDownloadFinancialFiles() {
+        authenticate("ROLE_EMPLOYEE", "payment:app:query");
+        SysFile csv = insertFile("PAYMENT", 30_021L, TestUserContext.TENANT_0,
+                "payment.csv", "text/csv");
+        SysFile pdf = insertFile("CONTRACT", 30_022L, TestUserContext.TENANT_0,
+                "contract.pdf", "application/pdf");
+
+        assertEquals("AMOUNT_DOWNLOAD_FORBIDDEN",
+                assertThrows(BusinessException.class, () -> fileService.getPresignedUrl(csv.getId())).getCode());
+        assertEquals("AMOUNT_DOWNLOAD_FORBIDDEN",
+                assertThrows(BusinessException.class, () -> fileService.getPresignedUrl(pdf.getId())).getCode());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("无金额权限拒绝系统生成 PDF")
+    void employeeWithoutAmountPermissionCannotDownloadGeneratedPdf() {
+        authenticate("ROLE_EMPLOYEE", "document:download");
+        SysFile file = insertFile("SITE_DAILY_LOG", 30_023L, TestUserContext.TENANT_0,
+                "generated.pdf", "application/pdf");
+        file.setDocumentType("GENERATED_DOCUMENT");
+        sysFileMapper.updateById(file);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> fileService.getGeneratedDocumentPresignedUrl(file.getId()));
+
+        assertEquals("AMOUNT_DOWNLOAD_FORBIDDEN", exception.getCode());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("无金额权限拒绝整改业务中的非证据文件")
+    void employeeWithoutAmountPermissionCannotDownloadOtherRectificationDocuments() {
+        authenticate("ROLE_EMPLOYEE", "quality:safety:query");
+        SysFile file = insertFile("QS_RECTIFICATION", 30_028L, TestUserContext.TENANT_0,
+                "other.pdf", "application/pdf");
+        file.setDocumentType("OTHER");
+        sysFileMapper.updateById(file);
+
+        assertEquals("AMOUNT_DOWNLOAD_FORBIDDEN",
+                assertThrows(BusinessException.class, () -> fileService.getPresignedUrl(file.getId())).getCode());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("无金额权限仍可下载本人日报和被指派整改证据")
+    void employeeWithoutAmountPermissionCanDownloadSelfEvidenceFiles() throws Exception {
+        authenticate("ROLE_EMPLOYEE", "site:daily:query", "quality:safety:query");
+        SysFile daily = insertFile("SITE_DAILY_LOG", 30_024L, TestUserContext.TENANT_0,
+                "daily.pdf", "application/pdf");
+        SysFile rectification = insertFile("QS_RECTIFICATION", 30_025L, TestUserContext.TENANT_0,
+                "rectification.pdf", "application/pdf");
+        rectification.setDocumentType("RECTIFICATION_EVIDENCE");
+        sysFileMapper.updateById(rectification);
+        SysFile reinspection = insertFile("QS_RECTIFICATION", 30_027L, TestUserContext.TENANT_0,
+                "reinspection.pdf", "application/pdf");
+        reinspection.setDocumentType("REINSPECTION_EVIDENCE");
+        sysFileMapper.updateById(reinspection);
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/evidence.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        assertTrue(fileService.getPresignedUrl(daily.getId()).contains("X-Amz-Signature=test"));
+        assertTrue(fileService.getPresignedUrl(rectification.getId()).contains("X-Amz-Signature=test"));
+        assertTrue(fileService.getPresignedUrl(reinspection.getId()).contains("X-Amz-Signature=test"));
+        verify(authorizer).checkReadAccess("SITE_DAILY_LOG", 30_024L);
+        verify(authorizer).checkReadAccess("QS_RECTIFICATION", 30_025L);
+        verify(authorizer).checkReadAccess("QS_RECTIFICATION", 30_027L);
+    }
+
+    @Test
+    @DisplayName("金额权限保持财务文件下载语义")
+    void amountPermissionKeepsFinancialDownloadSemantics() throws Exception {
+        SysFile file = insertFile("PAYMENT", 30_026L, TestUserContext.TENANT_0,
+                "payment.pdf", "application/pdf");
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/payment.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        assertTrue(fileService.getPresignedUrl(file.getId()).contains("X-Amz-Signature=test"));
+    }
+
+    @Test
     @DisplayName("delete rejects cross-tenant file before write auth and MinIO removal")
     void testDeleteHidesCrossTenantFileBeforeSideEffects() {
         SysFile file = insertFile("CONTRACT", 30004L, 9999L,
@@ -1009,6 +1096,12 @@ class FileServiceTest {
         file.setVirusScannedAt(java.time.LocalDateTime.now());
         sysFileMapper.insert(file);
         return file;
+    }
+
+    private void authenticate(String... authorities) {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "user", "n/a", java.util.Arrays.stream(authorities)
+                .map(SimpleGrantedAuthority::new).toList()));
     }
 
     private SysFile onlyFileFor(String businessType, Long businessId) {

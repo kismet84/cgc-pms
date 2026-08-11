@@ -58,12 +58,12 @@ class CostSummaryControllerTest {
         String token = jwtUtils.generateToken(
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
-                List.of());
+                List.of("business:amount:view"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
     private Cookie summaryViewerCookie(long userId, long tenantId, List<String> roles) {
-        return authorityCookie(userId, tenantId, roles, "cost:summary:view");
+        return authorityCookie(userId, tenantId, roles, "cost:summary:view", "business:amount:view");
     }
 
     private Cookie authorityCookie(long userId, long tenantId, List<String> roles, String... authorities) {
@@ -349,21 +349,30 @@ class CostSummaryControllerTest {
     }
 
     private void seedManagedProjectIfAbsent() {
-        if (projectMapper.selectById(MANAGED_PROJECT_ID) != null) {
-            return;
+        if (projectMapper.selectById(MANAGED_PROJECT_ID) == null) {
+            PmProject project = new PmProject();
+            project.setId(MANAGED_PROJECT_ID);
+            project.setTenantId(TENANT_ID);
+            project.setProjectCode("COST-SUMMARY-MANAGED");
+            project.setProjectName("成本摘要项目经理权限测试项目");
+            project.setProjectType("CONSTRUCTION");
+            project.setContractAmount(new java.math.BigDecimal("1000000.00"));
+            project.setTargetCost(new java.math.BigDecimal("800000.00"));
+            project.setProjectManagerId(PROJECT_MANAGER_ID);
+            project.setStatus("ACTIVE");
+            project.setApprovalStatus("APPROVED");
+            project.setCreatedBy(ADMIN_ID);
+            projectMapper.insert(project);
         }
-        PmProject project = new PmProject();
-        project.setId(MANAGED_PROJECT_ID);
-        project.setTenantId(TENANT_ID);
-        project.setProjectCode("COST-SUMMARY-MANAGED");
-        project.setProjectName("成本摘要项目经理权限测试项目");
-        project.setProjectType("CONSTRUCTION");
-        project.setContractAmount(new java.math.BigDecimal("1000000.00"));
-        project.setTargetCost(new java.math.BigDecimal("800000.00"));
-        project.setProjectManagerId(PROJECT_MANAGER_ID);
-        project.setStatus("ACTIVE");
-        project.setApprovalStatus("APPROVED");
-        project.setCreatedBy(ADMIN_ID);
-        projectMapper.insert(project);
+        jdbc.update("""
+                INSERT INTO pm_project_member
+                    (id, tenant_id, project_id, user_id, role_code, status, created_by, created_at, updated_at, deleted_flag)
+                SELECT ?, ?, ?, ?, 'PROJECT_MANAGER', 'ACTIVE', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM pm_project_member
+                    WHERE tenant_id = ? AND project_id = ? AND user_id = ? AND status = 'ACTIVE' AND deleted_flag = 0
+                )
+                """, 8261099L, TENANT_ID, MANAGED_PROJECT_ID, PROJECT_MANAGER_ID, ADMIN_ID,
+                TENANT_ID, MANAGED_PROJECT_ID, PROJECT_MANAGER_ID);
     }
 }

@@ -8,8 +8,10 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandlerRegistry;
@@ -20,11 +22,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +43,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 class WorkflowCoreService {
+
+    private static final ObjectMapper POLICY_MAPPER = new ObjectMapper();
 
     final WfTemplateMapper wfTemplateMapper;
     final WfTemplateNodeMapper wfTemplateNodeMapper;
@@ -151,29 +161,20 @@ class WorkflowCoreService {
     }
 
     // ── Node activation ──
-    void activateNode(WfNodeInstance node, WfTemplateNode tplNode,
-                      Long userId, String username, Long tenantId) {
+    void activateNode(WfNodeInstance node, Long userId, String username, Long tenantId) {
         node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
         node.setStartedAt(LocalDateTime.now());
         wfNodeInstanceMapper.updateById(node);
-        createTasksForNode(node, tplNode, userId, username, tenantId);
+        createTasksForNode(node, userId, username, tenantId);
     }
 
-    void reactivateNode(WfNodeInstance node, WfTemplateNode tplNode,
-                        Long userId, String username, Long tenantId, int roundNo) {
-        node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
-        node.setRoundNo(roundNo);
-        node.setStartedAt(LocalDateTime.now());
-        node.setEndedAt(null);
-        wfNodeInstanceMapper.updateById(node);
-        createTasksForNode(node, tplNode, userId, username, tenantId);
-    }
-
-    private void createTasksForNode(WfNodeInstance node, WfTemplateNode tplNode,
-                                     Long userId, String username, Long tenantId) {
+    private void createTasksForNode(WfNodeInstance node, Long userId, String username, Long tenantId) {
         WfInstance instance = wfInstanceMapper.selectById(node.getInstanceId());
-        List<Long> approverIds = approverResolver.resolve(
-                tplNode.getApproverConfig(), tenantId, instance.getProjectId());
+        List<Long> approverIds = eligibleApproverIds(node, instance);
+        if (approverIds.isEmpty()) {
+            throw new BusinessException("WORKFLOW_APPROVER_SEPARATION_UNSATISFIED",
+                    "审批节点无满足发起人隔离和审批次数限制的候选人");
+        }
         for (Long approverId : approverIds) {
             SysUser approverUser = sysUserMapper.selectById(approverId);
             String approverName = approverUser != null
@@ -194,11 +195,118 @@ class WorkflowCoreService {
         }
     }
 
+    void requireEligibleApprover(WfNodeInstance node, WfInstance instance, Long userId) {
+        if (!eligibleApproverIds(node, instance).contains(userId)) {
+            throw new BusinessException("WORKFLOW_TARGET_NOT_ELIGIBLE", "目标用户不符合当前节点审批人快照与安全策略");
+        }
+    }
+
+    private List<Long> eligibleApproverIds(WfNodeInstance node, WfInstance instance) {
+        WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
+                POLICY_MAPPER, instance.getSecurityPolicyJson());
+        boolean requireAllFinanceProjects = requiresAllFinanceProjects(node, instance);
+        return approverResolver.resolve(
+                        node.getApproverConfig(), instance.getTenantId(), instance.getProjectId(), policy).stream()
+                .filter(approverId -> !policy.preventInitiatorApproval()
+                        || !Objects.equals(approverId, instance.getInitiatorId()))
+                .filter(approverId -> approvedCount(instance.getTenantId(), instance.getId(), approverId, node.getRoundNo())
+                        < policy.maxApprovalsPerUser())
+                .filter(approverId -> !requireAllFinanceProjects
+                        || belongsToAllFinanceProjects(instance, approverId))
+                .distinct()
+                .toList();
+    }
+
+    private boolean requiresAllFinanceProjects(WfNodeInstance node, WfInstance instance) {
+        if (!WorkflowBusinessTypes.FINANCE_COST_ALLOCATION.equals(instance.getBusinessType())) return false;
+        try {
+            JsonNode config = POLICY_MAPPER.readTree(node.getApproverConfig());
+            String type = config.path("type").asText("");
+            if ("PROJECT_ROLE".equalsIgnoreCase(type)) return true;
+            if (!"ROLE".equalsIgnoreCase(type)) return false;
+            String roleCode = config.path("roleCode").asText(null);
+            if (roleCode == null && config.has("roleId")) {
+                List<String> codes = jdbcTemplate.queryForList(
+                        "SELECT role_code FROM sys_role WHERE tenant_id=? AND id=? AND deleted_flag=0",
+                        String.class, instance.getTenantId(), config.get("roleId").asLong());
+                roleCode = codes.isEmpty() ? null : codes.getFirst();
+            }
+            return SystemRoleContract.PROJECT_SCOPED_ROLE_CODES.contains(
+                    SystemRoleContract.canonicalRoleCode(roleCode));
+        } catch (Exception e) {
+            throw new BusinessException("INVALID_APPROVER_CONFIG", "审批人配置JSON格式无效");
+        }
+    }
+
+    private boolean belongsToAllFinanceProjects(WfInstance instance, Long userId) {
+        List<Long> projects = jdbcTemplate.queryForList("""
+                SELECT project_id FROM finance_cost_allocation_request_line
+                WHERE tenant_id=? AND request_id=?
+                """, Long.class, instance.getTenantId(), instance.getBusinessId());
+        List<Long> memberships = jdbcTemplate.queryForList("""
+                SELECT m.project_id
+                FROM finance_cost_allocation_request_line l
+                JOIN pm_project_member m ON m.tenant_id=l.tenant_id AND m.project_id=l.project_id
+                 AND m.user_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+                WHERE l.tenant_id=? AND l.request_id=?
+                FOR UPDATE
+                """, Long.class, userId, instance.getTenantId(), instance.getBusinessId());
+        return !projects.isEmpty() && Set.copyOf(projects).equals(Set.copyOf(memberships));
+    }
+
+    void validateApproverPlan(List<WfTemplateNode> nodes, Long tenantId, Long projectId,
+                              Long initiatorId, WorkflowSecurityPolicy policy) {
+        validateCandidatePlan(nodes.stream().map(WfTemplateNode::getApproverConfig).toList(),
+                tenantId, projectId, initiatorId, policy);
+    }
+
+    void validateApproverSnapshots(List<WfNodeInstance> nodes, Long tenantId, Long projectId,
+                                   Long initiatorId, WorkflowSecurityPolicy policy) {
+        validateCandidatePlan(nodes.stream().map(WfNodeInstance::getApproverConfig).toList(),
+                tenantId, projectId, initiatorId, policy);
+    }
+
+    private void validateCandidatePlan(List<String> approverConfigs, Long tenantId, Long projectId,
+                                       Long initiatorId, WorkflowSecurityPolicy policy) {
+        List<List<Long>> candidatesByNode = new ArrayList<>();
+        for (String config : approverConfigs) {
+            List<Long> candidates = approverResolver.resolve(config, tenantId, projectId, policy).stream()
+                    .filter(candidate -> !policy.preventInitiatorApproval()
+                            || !Objects.equals(candidate, initiatorId))
+                    .distinct()
+                    .toList();
+            if (candidates.isEmpty()) {
+                throw new BusinessException("WORKFLOW_APPROVER_SEPARATION_UNSATISFIED",
+                        "提交时无法解析满足安全策略的审批人");
+            }
+            candidatesByNode.add(candidates);
+        }
+        if (!assignCandidate(0, candidatesByNode, new HashMap<>(), policy.maxApprovalsPerUser())) {
+            throw new BusinessException("WORKFLOW_APPROVER_SEPARATION_UNSATISFIED",
+                    "审批人数量不足以满足每人审批次数限制");
+        }
+    }
+
+    private boolean assignCandidate(int index, List<List<Long>> candidatesByNode,
+                                    Map<Long, Integer> assigned, int maximum) {
+        if (index == candidatesByNode.size()) return true;
+        for (Long candidate : candidatesByNode.get(index)) {
+            int used = assigned.getOrDefault(candidate, 0);
+            if (used >= maximum) continue;
+            assigned.put(candidate, used + 1);
+            if (assignCandidate(index + 1, candidatesByNode, assigned, maximum)) return true;
+            if (used == 0) assigned.remove(candidate); else assigned.put(candidate, used);
+        }
+        return false;
+    }
+
+    long approvedCount(Long tenantId, Long instanceId, Long userId, Integer roundNo) {
+        return wfTaskMapper.selectApprovedIdsForUpdate(tenantId, instanceId, userId, roundNo).size();
+    }
+
     // ── Node completion ──
-    boolean isNodeComplete(Long nodeInstanceId, String approveMode) {
-        long pendingCount = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
-                .eq(WfTask::getNodeInstanceId, nodeInstanceId)
-                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+    boolean isNodeComplete(Long tenantId, Long nodeInstanceId, String approveMode) {
+        long pendingCount = wfTaskMapper.selectPendingIdsForUpdate(tenantId, nodeInstanceId).size();
         return WorkflowConstants.MODE_OR_SIGN.equals(approveMode) || pendingCount == 0;
     }
 

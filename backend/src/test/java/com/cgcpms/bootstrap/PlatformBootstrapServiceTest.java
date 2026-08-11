@@ -54,6 +54,7 @@ class PlatformBootstrapServiceTest {
         jdbcTemplate.execute("CREATE TABLE sys_user_role (id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, user_id BIGINT NOT NULL, role_id BIGINT NOT NULL, UNIQUE(tenant_id,user_id,role_id))");
         jdbcTemplate.update("INSERT INTO sys_bootstrap_state VALUES ('PLATFORM_ADMIN',1,'PENDING',NULL)");
         jdbcTemplate.update("INSERT INTO sys_role VALUES (1,0,'SUPER_ADMIN','ENABLE',0)");
+        jdbcTemplate.update("INSERT INTO sys_role VALUES (2,0,'COMPANY_FINANCE','ENABLE',0)");
         properties.setEnabled(true);
         properties.getAdministrator().setUsername("admin");
         properties.getAdministrator().setPassword("Strong#Password123");
@@ -67,10 +68,17 @@ class PlatformBootstrapServiceTest {
         assertEquals(1, count("org_company"));
         assertEquals(1, count("org_department"));
         assertEquals(1, count("sys_user"));
-        assertEquals(1, count("sys_user_role"));
+        assertEquals(2, count("sys_user_role"));
+        assertEquals(Set.of("COMPANY_FINANCE", "SUPER_ADMIN"), Set.copyOf(jdbcTemplate.queryForList("""
+                SELECT r.role_code
+                FROM sys_user_role ur
+                JOIN sys_role r ON r.id=ur.role_id
+                """, String.class)));
 
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE role_id=2");
         assertEquals(PlatformBootstrapService.Result.ALREADY_COMPLETED, service.bootstrap());
         assertEquals(1, count("sys_user"));
+        assertEquals(1, count("sys_user_role"), "完成态重启不得静默恢复已移除权限");
         assertEquals(passwordHash, jdbcTemplate.queryForObject("SELECT password FROM sys_user", String.class));
     }
 
@@ -87,12 +95,25 @@ class PlatformBootstrapServiceTest {
     }
 
     @Test
-    void existingSuperAdminIsAdoptedWithoutPasswordChange() {
+    void existingPairedFinanceAdministratorIsAdoptedWithoutPasswordChange() {
         jdbcTemplate.update("INSERT INTO sys_user VALUES (9,0,'admin','existing-hash','管理员',NULL,NULL,'ENABLE',1,0,NULL)");
         jdbcTemplate.update("INSERT INTO sys_user_role VALUES (10,0,9,1)");
+        jdbcTemplate.update("INSERT INTO sys_user_role VALUES (11,0,9,2)");
 
         assertEquals(PlatformBootstrapService.Result.ADOPTED, service.bootstrap());
         assertEquals("existing-hash", jdbcTemplate.queryForObject("SELECT password FROM sys_user WHERE id=9", String.class));
+    }
+
+    @Test
+    void existingUnpairedSuperAdminFailsClosed() {
+        jdbcTemplate.update("INSERT INTO sys_user VALUES (9,0,'admin','existing-hash','管理员',NULL,NULL,'ENABLE',1,0,NULL)");
+        jdbcTemplate.update("INSERT INTO sys_user_role VALUES (10,0,9,1)");
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, service::bootstrap);
+
+        assertEquals("BOOTSTRAP_EXISTING_USER_NOT_COMPANY_FINANCE", error.getMessage());
+        assertEquals("PENDING", jdbcTemplate.queryForObject(
+                "SELECT status FROM sys_bootstrap_state WHERE bootstrap_key='PLATFORM_ADMIN'", String.class));
     }
 
     @Test
@@ -115,7 +136,7 @@ class PlatformBootstrapServiceTest {
                     PlatformBootstrapService.Result.ALREADY_COMPLETED), results);
         }
         assertEquals(1, count("sys_user"));
-        assertEquals(1, count("sys_user_role"));
+        assertEquals(2, count("sys_user_role"));
     }
 
     @Test
@@ -128,6 +149,19 @@ class PlatformBootstrapServiceTest {
         assertThrows(IllegalStateException.class, service::bootstrap);
         assertEquals(0, count("org_company"));
         assertTrue(count("sys_user") == 0);
+    }
+
+    @Test
+    void missingOrDisabledFinanceRoleFailsBeforeWritingOrganization() {
+        jdbcTemplate.update("DELETE FROM sys_role WHERE role_code='COMPANY_FINANCE'");
+        IllegalStateException missing = assertThrows(IllegalStateException.class, service::bootstrap);
+        assertEquals("BOOTSTRAP_FINANCE_ROLE_MISSING", missing.getMessage());
+        assertEquals(0, count("org_company"));
+
+        jdbcTemplate.update("INSERT INTO sys_role VALUES (2,0,'COMPANY_FINANCE','DISABLE',0)");
+        IllegalStateException disabled = assertThrows(IllegalStateException.class, service::bootstrap);
+        assertEquals("BOOTSTRAP_FINANCE_ROLE_DISABLED", disabled.getMessage());
+        assertEquals(0, count("org_company"));
     }
 
     private int count(String table) {

@@ -1,7 +1,9 @@
 package com.cgcpms.cost.controller;
 
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.service.CostSubjectV2Service;
+import com.cgcpms.cost.service.CostSubjectV2Service.BidTransferRequestCommand;
 import com.cgcpms.cost.service.CostSubjectV2Service.FinanceAllocationCommand;
 import com.cgcpms.cost.service.CostSubjectV2Service.MappingVersionCommand;
 import com.cgcpms.cost.service.CostSubjectV2Service.RuleCommand;
@@ -100,7 +102,25 @@ public class CostSubjectV2Controller {
     @PostMapping("/bid-transfers")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:bid-transfer')")
     public ApiResponse<String> transferBidCost(@Valid @RequestBody TransferCommand command) {
-        return ApiResponse.success(String.valueOf(service.transferBidCost(command)));
+        throw new BusinessException("WORKFLOW_REQUIRED", "投标成本移交必须先创建申请并完成审批");
+    }
+
+    @GetMapping("/bid-transfer-requests")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('cost:query','cost:subject:bid-transfer','cost:subject:audit:query')")
+    public ApiResponse<List<Map<String, Object>>> bidTransferRequests() {
+        return ApiResponse.success(service.bidTransferRequests());
+    }
+
+    @PostMapping("/bid-transfer-requests")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:bid-transfer')")
+    public ApiResponse<Map<String, Object>> createBidTransferRequest(@Valid @RequestBody BidTransferRequestCommand command) {
+        return ApiResponse.success(service.createBidTransferRequest(command));
+    }
+
+    @PostMapping("/bid-transfer-requests/{id}/submit")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:transfer:submit')")
+    public ApiResponse<Map<String, Object>> submitBidTransferRequest(@PathVariable Long id) {
+        return ApiResponse.success(service.submitBidTransferRequest(id));
     }
 
     @PostMapping("/bid-transfers/{id}/reverse")
@@ -121,7 +141,25 @@ public class CostSubjectV2Controller {
     @PostMapping("/finance-allocations")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:finance-allocate')")
     public ApiResponse<String> allocateFinanceCost(@Valid @RequestBody FinanceAllocationCommand command) {
-        return ApiResponse.success(String.valueOf(service.allocateFinanceCost(command)));
+        throw new BusinessException("WORKFLOW_REQUIRED", "财务成本分摊必须先创建申请并完成审批");
+    }
+
+    @GetMapping("/finance-allocation-requests")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('cost:query','cost:subject:finance-allocate','cost:subject:audit:query')")
+    public ApiResponse<List<Map<String, Object>>> financeAllocationRequests() {
+        return ApiResponse.success(service.financeAllocationRequests());
+    }
+
+    @PostMapping("/finance-allocation-requests")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:finance-allocate')")
+    public ApiResponse<Map<String, Object>> createFinanceAllocationRequest(@Valid @RequestBody FinanceAllocationCommand command) {
+        return ApiResponse.success(service.createFinanceAllocationRequest(command));
+    }
+
+    @PostMapping("/finance-allocation-requests/{id}/submit")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:subject:allocation:submit')")
+    public ApiResponse<Map<String, Object>> submitFinanceAllocationRequest(@PathVariable Long id) {
+        return ApiResponse.success(service.submitFinanceAllocationRequest(id));
     }
 
     @PostMapping("/finance-allocations/{id}/reverse")

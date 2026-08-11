@@ -41,18 +41,13 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("292", flyway.info().current().getVersion().getVersion());
+        assertEquals("293", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
                                 'variation:order:item:edit','cost:target:add','cost:target:edit',
                                 'cost:target:delete','cost:target:activate','cost:summary:refresh')
                   AND deleted_flag=0
-                """));
-        assertEquals(9, count("""
-                SELECT COUNT(*) FROM sys_role_menu
-                WHERE tenant_id=0 AND role_id=2 AND menu_id IN
-                    (21901,21902,21903,21904,22001,22002,22003,22004,22101)
                 """));
         assertEquals(0, count("""
                 SELECT COUNT(*) FROM cost_subject
@@ -61,7 +56,7 @@ class BaselineMySqlSmokeTest {
                 """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(211, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(215, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
         assertEquals(1, count("SELECT COUNT(*) FROM information_schema.views "
@@ -72,32 +67,21 @@ class BaselineMySqlSmokeTest {
                 + "WHERE table_schema=DATABASE() AND table_name='wf_idempotency' "
                 + "AND column_name IN ('business_type','business_id','request_hash','response_json')"));
 
-        assertEquals(13, count("SELECT COUNT(*) FROM sys_role WHERE deleted_flag=0"));
+        assertEquals(10, count("SELECT COUNT(*) FROM sys_role WHERE status='ENABLE' AND deleted_flag=0"));
         assertTrue(count("SELECT COUNT(*) FROM sys_menu WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM wf_template WHERE deleted_flag=0") > 0);
-        assertEquals(5, count("""
+        assertEquals(21, count("SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(45, count("SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id "
+                + "WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0"));
+        assertEquals(8, count("""
                 SELECT COUNT(*) FROM sys_role_menu rm
                 JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
                 JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code IN
-                  ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE')
-                  AND r.deleted_flag=0 AND m.deleted_flag=0 AND m.perms='project:query'
-                """));
-        assertEquals(1, count("""
-                SELECT COUNT(*) FROM sys_role_menu rm
-                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
-                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
-                  AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
-                """));
-        assertEquals(1, count("""
-                SELECT COUNT(*) FROM sys_role_menu rm
-                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
-                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code='SUPER_ADMIN' AND r.deleted_flag=0
-                  AND m.deleted_flag=0 AND m.perms='audit:query'
+                WHERE r.role_code IN ('COMPANY_OWNER','COMPANY_FINANCE','PROJECT_MANAGER','PROJECT_ACCOUNTANT',
+                  'TECHNICAL_LEAD','SAFETY_LEAD','CONSTRUCTION_LEAD','PROCUREMENT_LEAD')
+                  AND r.deleted_flag=0 AND m.deleted_flag=0 AND m.perms='business:amount:view'
                 """));
 
         assertEquals(0, count("SELECT COUNT(*) FROM pm_project WHERE deleted_flag=0"));
@@ -110,8 +94,8 @@ class BaselineMySqlSmokeTest {
         assertEquals(1, count("SELECT COUNT(*) FROM org_department WHERE tenant_id=0 AND deleted_flag=0"));
         assertEquals(1, count("SELECT COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='admin' "
                 + "AND is_admin=1 AND deleted_flag=0"));
-        assertEquals(1, count("SELECT COUNT(*) FROM sys_user_role ur JOIN sys_role r ON r.id=ur.role_id "
-                + "WHERE ur.tenant_id=0 AND r.role_code='SUPER_ADMIN' AND r.deleted_flag=0"));
+        assertEquals(2, count("SELECT COUNT(*) FROM sys_user_role ur JOIN sys_role r ON r.id=ur.role_id "
+                + "WHERE ur.tenant_id=0 AND r.role_code IN ('COMPANY_FINANCE','SUPER_ADMIN') AND r.deleted_flag=0"));
         assertEquals("COMPLETED", jdbcTemplate.queryForObject(
                 "SELECT status FROM sys_bootstrap_state WHERE bootstrap_key='PLATFORM_ADMIN'", String.class));
 

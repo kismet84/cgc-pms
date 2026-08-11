@@ -38,7 +38,7 @@ public final class ProjectScheduleModels {
 
     public record PeriodPlanRequest(
             @NotNull Long schedulePlanId,
-            @Pattern(regexp = "MONTHLY|WEEKLY") String periodType,
+            @Pattern(regexp = "YEARLY|QUARTERLY|MONTHLY|WEEKLY") String periodType,
             Long parentPeriodPlanId,
             @Size(max = 64) String periodCode,
             @NotBlank @Size(max = 200) String periodName,

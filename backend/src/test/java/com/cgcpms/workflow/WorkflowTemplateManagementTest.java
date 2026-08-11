@@ -148,6 +148,11 @@ class WorkflowTemplateManagementTest {
         assertEquals(new BigDecimal("1000.00"), updated.getAmountMin());
         assertEquals(new BigDecimal("9000.00"), updated.getAmountMax());
         assertEquals(BUSINESS_TYPE, updated.getBusinessType(), "业务类型不可被编辑接口改写");
+        assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM sys_operation_audit_log
+                WHERE tenant_id=? AND business_type='WORKFLOW_TEMPLATE' AND business_id=?
+                  AND operation_type='UPDATE_TEMPLATE' AND before_snapshot IS NOT NULL AND after_snapshot IS NOT NULL
+                """, Integer.class, TENANT_ID, Long.toString(TEMPLATE_ID)));
     }
 
     @Test
@@ -214,6 +219,12 @@ class WorkflowTemplateManagementTest {
         assertEquals(2, afterDelete.size());
         assertEquals(1, afterDelete.get(0).getNodeOrder());
         assertEquals(2, afterDelete.get(1).getNodeOrder());
+        assertEquals(List.of("CREATE_TEMPLATE_NODE", "UPDATE_TEMPLATE_NODE", "REORDER_TEMPLATE_NODES", "DELETE_TEMPLATE_NODE"),
+                jdbcTemplate.queryForList("""
+                        SELECT operation_type FROM sys_operation_audit_log
+                        WHERE tenant_id=? AND business_type='WORKFLOW_TEMPLATE' AND business_id=?
+                        ORDER BY id
+                        """, String.class, TENANT_ID, Long.toString(TEMPLATE_ID)));
     }
 
     @Test
@@ -275,7 +286,7 @@ class WorkflowTemplateManagementTest {
     }
 
     @Test
-    @DisplayName("模板变更只影响新发起审批实例，不回写旧实例节点快照")
+    @DisplayName("模板节点删除后旧实例仍按快照推进，新实例采用新节点")
     void templateChangesOnlyAffectNewInstances() {
         seedContract(BUSINESS_ID);
         WfInstance oldInstance = workflowEngine.submit(
@@ -284,6 +295,7 @@ class WorkflowTemplateManagementTest {
                 "模板快照测试-旧实例", TEMPLATE_TEST_AMOUNT,
                 null, null, "{}", "{}", null);
 
+        workflowTemplateService.deleteNode(TEMPLATE_ID, NODE_2_ID);
         WorkflowTemplateNodeRequest createRequest = new WorkflowTemplateNodeRequest();
         createRequest.setNodeName("新增节点");
         createRequest.setNodeType("APPROVAL");
@@ -292,6 +304,20 @@ class WorkflowTemplateManagementTest {
         createRequest.setAllowTransfer(1);
         createRequest.setAllowAddSign(1);
         workflowTemplateService.createNode(TEMPLATE_ID, createRequest);
+
+        Long firstTaskId = jdbcTemplate.queryForObject("""
+                SELECT id FROM wf_task WHERE instance_id=? AND task_status='PENDING'
+                """, Long.class, oldInstance.getId());
+        workflowEngine.approve(firstTaskId, USER_ADMIN, "admin", "旧实例第一节点", "snapshot-old-1");
+        assertEquals("总经理审批", jdbcTemplate.queryForObject("""
+                SELECT n.node_name FROM wf_task t JOIN wf_node_instance n ON n.id=t.node_instance_id
+                WHERE t.instance_id=? AND t.task_status='PENDING'
+                """, String.class, oldInstance.getId()));
+        Long secondTaskId = jdbcTemplate.queryForObject("""
+                SELECT id FROM wf_task WHERE instance_id=? AND task_status='PENDING'
+                """, Long.class, oldInstance.getId());
+        workflowEngine.approve(secondTaskId, USER_ADMIN, "admin", "旧实例第二节点", "snapshot-old-2");
+        assertEquals("APPROVED", instanceMapper.selectById(oldInstance.getId()).getInstanceStatus());
 
         seedContract(BUSINESS_ID + 1);
         WfInstance newInstance = workflowEngine.submit(
@@ -303,8 +329,9 @@ class WorkflowTemplateManagementTest {
         List<WfNodeInstance> oldNodes = selectNodeInstances(oldInstance.getId());
         List<WfNodeInstance> newNodes = selectNodeInstances(newInstance.getId());
         assertEquals(2, oldNodes.size());
-        assertEquals(3, newNodes.size());
-        assertEquals("新增节点", newNodes.get(2).getNodeName());
+        assertEquals(NODE_2_ID, oldNodes.get(1).getTemplateNodeId());
+        assertEquals(2, newNodes.size());
+        assertEquals("新增节点", newNodes.get(1).getNodeName());
     }
 
     @Test
@@ -314,6 +341,7 @@ class WorkflowTemplateManagementTest {
         assertNotNull(classAuth);
         assertTrue(classAuth.value().contains("ADMIN"));
         assertTrue(classAuth.value().contains("SUPER_ADMIN"));
+        assertTrue(classAuth.value().contains("workflow:template:manage"));
     }
 
     private void seedTemplate() {
@@ -326,6 +354,7 @@ class WorkflowTemplateManagementTest {
         template.setEnabled(1);
         template.setAmountMin(TEMPLATE_TEST_AMOUNT);
         template.setAmountMax(TEMPLATE_TEST_AMOUNT);
+        template.setConditionRule("{\"preventInitiatorApproval\":false,\"maxApprovalsPerUser\":2,\"requireProjectMembership\":false,\"allowAdminFallback\":false}");
         templateMapper.insert(template);
 
         WfTemplateNode first = new WfTemplateNode();
@@ -370,6 +399,8 @@ class WorkflowTemplateManagementTest {
     }
 
     private void cleanup() {
+        jdbcTemplate.update("DELETE FROM sys_operation_audit_log WHERE tenant_id=? AND business_type='WORKFLOW_TEMPLATE' AND business_id=?",
+                TENANT_ID, Long.toString(TEMPLATE_ID));
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id IN (?, ?))", BUSINESS_ID, BUSINESS_ID + 1);

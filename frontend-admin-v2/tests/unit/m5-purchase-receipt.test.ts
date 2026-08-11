@@ -16,6 +16,7 @@ import {
   loadPurchaseOrderPricingSuggestion,
   loadPurchaseOrders,
   loadPurchaseRequest,
+  loadPurchaseRequestFormOptions,
   loadPurchaseRequestItems,
   loadPurchaseRequests,
   loadMaterials,
@@ -76,10 +77,10 @@ describe('M5 purchase request, order and receipt contract', () => {
     )
     expect(source).toContain("route.path === '/purchase/order'")
     expect(source).toContain("route.path === '/purchase/receipt'")
-    expect(source).toContain("attachmentDocumentType")
-    expect(source).toContain("uploadReceiptAttachment")
-    expect(source).toContain("DELIVERY_NOTE")
-    expect(source).toContain("MATERIAL_ACCEPTANCE_FORM")
+    expect(source).toContain('attachmentDocumentType')
+    expect(source).toContain('uploadReceiptAttachment')
+    expect(source).toContain('DELIVERY_NOTE')
+    expect(source).toContain('MATERIAL_ACCEPTANCE_FORM')
     expect(source).toContain('attachmentScanStatus')
     expect(source).toContain('systemBatchNo')
     expect(source).toContain('deliveryNoteNo')
@@ -98,6 +99,9 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('await selectRecord(refreshed)')
     expect(source).toContain('loadOrderItemsForReceipt')
     expect(source).toContain('loadMaterials')
+    expect(source).toContain('loadPurchaseRequestFormOptions')
+    expect(source).toContain("hasPermission('purchase:request:self')")
+    expect(source).toContain('v-if="!purchaseRequestSelfOnly"')
     expect(source).toContain('loadPartners')
     expect(source).toContain('loadContractPage')
     expect(source).toContain('loadBudgetPage')
@@ -127,7 +131,7 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('requestCandidates')
     expect(source).toContain('changeOrderRequest')
     expect(source).toContain('createPurchaseOrderFromRequest')
-    expect(source).toContain('status: \'APPROVED\'')
+    expect(source).toContain("status: 'APPROVED'")
     expect(source).toContain('明细来自已审批采购申请，只读展示')
     expect(source).toContain('由服务端合同事实决定')
     expect(source).toContain('updatePurchaseOrder')
@@ -151,10 +155,29 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain("'orderCode' in record")
     expect(source).toContain("CONVERTED: '已转订单'")
     expect(source).toContain("PARTIAL: '部分合格'")
-    expect(source).toContain("if ('receiptCode' in record) return statusLabel(record.approvalStatus)")
+    expect(source).toContain(
+      "if ('receiptCode' in record) return statusLabel(record.approvalStatus)",
+    )
     expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
     expect(source).not.toMatch(
       /frontend-admin\/src|Legacy|totalAmount\s*[+]=|receivedQuantity\s*[+]=|label="[^"]*ID/,
+    )
+  })
+
+  it('loads project-scoped purchase form options without amount fields', async () => {
+    const signal = new AbortController().signal
+    fetchMock.mockResolvedValueOnce(
+      response({
+        materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
+      }),
+    )
+
+    await expect(loadPurchaseRequestFormOptions('P/1', signal)).resolves.toEqual({
+      materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/purchase-requests/form-options?projectId=P%2F1',
+      expect.objectContaining({ method: 'GET', headers: expect.any(Headers), signal }),
     )
   })
 

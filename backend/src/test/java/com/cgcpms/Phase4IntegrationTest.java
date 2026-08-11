@@ -113,10 +113,12 @@ class Phase4IntegrationTest {
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
         seedCcTestUsers();
+        bindWorkflowFallbackRoles();
     }
 
     @AfterEach
     void clearContext() {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE id IN (894001, 894002)");
         UserContext.clear();
     }
 
@@ -880,5 +882,20 @@ class Phase4IntegrationTest {
                 + "'抄送用户2', '13800000998', 'cc2@test.com', 'ENABLE', 0, 1, 'CC测试用户2' "
                 + "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 998)";
         jdbcTemplate.update(sql);
+    }
+
+    private void bindWorkflowFallbackRoles() {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id,user_id,role_id)
+                SELECT 894001, ?, r.id FROM sys_role r
+                WHERE r.tenant_id=0 AND r.role_code='COMPANY_FINANCE' AND r.status='ENABLE' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.id=894001)
+                """, USER_ADMIN);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id,user_id,role_id)
+                SELECT 894002, ?, r.id FROM sys_role r
+                WHERE r.tenant_id=0 AND r.role_code='SUPER_ADMIN' AND r.status='ENABLE' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM sys_user_role ur WHERE ur.id=894002)
+                """, USER_ADMIN);
     }
 }

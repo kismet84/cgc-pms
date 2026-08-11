@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   V2ActionMenu,
+  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -20,16 +21,13 @@ import { isApiClientError } from '@/services/request'
 import {
   assignRoleMenus,
   assignUserRoles,
-  createRole,
   createUser,
-  deleteRole,
   deleteUser,
   loadMenus,
   loadRole,
   loadRoles,
   loadUser,
   loadUsers,
-  updateRole,
   updateUser,
   updateUserStatus,
   type MenuRecord,
@@ -39,8 +37,7 @@ import {
 import { useSessionStore } from '@/stores/session'
 
 type Mode = 'users' | 'roles' | 'permissions'
-type DeleteTarget =
-  { kind: 'user'; id: string; label: string } | { kind: 'role'; id: string; label: string }
+type DeleteTarget = { id: string; label: string }
 type PermissionNode = {
   id: string
   label: string
@@ -93,18 +90,8 @@ const userForm = reactive({
   roleIds: [] as string[],
 })
 
-const roleDialog = ref(false)
-const editingRole = ref<RoleRecord | null>(null)
-const roleForm = reactive({
-  roleCode: '',
-  roleName: '',
-  status: 'ENABLE',
-  dataScope: 'SELF',
-})
-
 const deleteTarget = ref<DeleteTarget | null>(null)
 const statusTarget = ref<UserRecord | null>(null)
-const roleStatusTarget = ref<RoleRecord | null>(null)
 const userRoleSearch = ref('')
 const selectedUserRoleId = ref('')
 const selectedUserId = ref('')
@@ -128,9 +115,6 @@ const canUserAdd = computed(() => session.hasAdminOrPermission('system:user:add'
 const canUserEdit = computed(() => session.hasAdminOrPermission('system:user:edit'))
 const canUserDelete = computed(() => session.hasAdminOrPermission('system:user:delete'))
 const canUserAssign = computed(() => session.hasAdminOrPermission('system:user:assign'))
-const canRoleAdd = computed(() => session.hasAdminOrPermission('system:role:add'))
-const canRoleEdit = computed(() => session.hasAdminOrPermission('system:role:edit'))
-const canRoleDelete = computed(() => session.hasAdminOrPermission('system:role:delete'))
 const canRoleAssign = computed(() => session.hasAdminOrPermission('system:role:assign'))
 const visibleRoles = computed(() =>
   roles.value.slice((rolePageNo.value - 1) * pageSize, rolePageNo.value * pageSize),
@@ -657,6 +641,7 @@ function changeRolePage(next: number): void {
 
 async function openUserEditor(item?: UserRecord): Promise<void> {
   editingUser.value = item ? await loadUser(item.id) : null
+  const visibleRoleIds = new Set(roles.value.map((role) => role.id))
   Object.assign(userForm, {
     username: editingUser.value?.username ?? '',
     password: '',
@@ -664,7 +649,7 @@ async function openUserEditor(item?: UserRecord): Promise<void> {
     phone: editingUser.value?.phone ?? '',
     email: editingUser.value?.email ?? '',
     orgId: editingUser.value?.orgId ?? '',
-    roleIds: [...(editingUser.value?.roleIds ?? [])],
+    roleIds: (editingUser.value?.roleIds ?? []).filter((id) => visibleRoleIds.has(id)),
   })
   userDialog.value = true
 }
@@ -701,42 +686,6 @@ async function saveUser(): Promise<void> {
   }
 }
 
-async function openRoleEditor(item?: RoleRecord): Promise<void> {
-  editingRole.value = item ? await loadRole(item.id) : null
-  Object.assign(roleForm, {
-    roleCode: editingRole.value?.roleCode ?? '',
-    roleName: editingRole.value?.roleName ?? '',
-    status: editingRole.value?.status ?? 'ENABLE',
-    dataScope: editingRole.value?.dataScope ?? 'SELF',
-  })
-  roleDialog.value = true
-}
-
-async function saveRole(): Promise<void> {
-  if (!roleForm.roleCode.trim() || !roleForm.roleName.trim()) {
-    showToast('warning', '信息不完整', '角色编码和名称不能为空。')
-    return
-  }
-  saving.value = true
-  try {
-    const command = {
-      roleCode: roleForm.roleCode.trim(),
-      roleName: roleForm.roleName.trim(),
-      status: roleForm.status,
-      dataScope: roleForm.dataScope,
-    }
-    if (editingRole.value) await updateRole(editingRole.value.id, command)
-    else await createRole(command)
-    roleDialog.value = false
-    await refreshRoles()
-    showToast('success', '角色已保存', '最新角色事实已载入。')
-  } catch (value) {
-    showToast('error', '角色保存失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
 function toggleValue(values: string[], value: string, checked: boolean): void {
   const index = values.indexOf(value)
   if (checked && index < 0) values.push(value)
@@ -764,43 +713,12 @@ async function toggleUserStatus(): Promise<void> {
   }
 }
 
-function requestRoleStatusChange(role: RoleRecord): void {
-  if (!canRoleEdit.value || saving.value || isProtectedRole(role)) return
-  roleStatusTarget.value = role
-}
-
-async function toggleRoleStatus(): Promise<void> {
-  if (!roleStatusTarget.value) return
-  saving.value = true
-  try {
-    const detail = await loadRole(roleStatusTarget.value.id)
-    await updateRole(detail.id, {
-      roleCode: detail.roleCode,
-      roleName: detail.roleName,
-      status: detail.status === 'ENABLE' ? 'DISABLE' : 'ENABLE',
-      dataScope: detail.dataScope,
-    })
-    roleStatusTarget.value = null
-    await refreshRoles()
-    showToast('success', '角色状态已更新', '角色清单已按服务端最新事实刷新。')
-  } catch (value) {
-    showToast('error', '角色状态更新失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
 async function confirmDelete(): Promise<void> {
   if (!deleteTarget.value) return
   saving.value = true
   try {
-    if (deleteTarget.value.kind === 'user') {
-      await deleteUser(deleteTarget.value.id)
-      await refreshUsers()
-    } else if (deleteTarget.value.kind === 'role') {
-      await deleteRole(deleteTarget.value.id)
-      await refreshRoles()
-    }
+    await deleteUser(deleteTarget.value.id)
+    await refreshUsers()
     deleteTarget.value = null
     showToast('success', '已删除', '当前清单已刷新。')
   } catch (value) {
@@ -808,10 +726,6 @@ async function confirmDelete(): Promise<void> {
   } finally {
     saving.value = false
   }
-}
-
-function isProtectedRole(role: RoleRecord): boolean {
-  return role.roleType === 'SYSTEM' || ['ADMIN', 'SUPER_ADMIN'].includes(role.roleCode)
 }
 
 function roleTypeLabel(value?: string): string {
@@ -822,6 +736,7 @@ function dataScopeLabel(value: string): string {
   return (
     {
       ALL: '全部数据',
+      PROJECT_MEMBER: '项目成员范围',
       COMPANY: '本公司',
       DEPT: '本部门',
       DEPT_AND_CHILD: '本部门及下级',
@@ -829,6 +744,14 @@ function dataScopeLabel(value: string): string {
       CUSTOM: '自定义范围',
     }[value] ?? '未配置'
   )
+}
+
+function userRoleNames(user: UserRecord): string {
+  const roleIds = new Set(user.roleIds)
+  return roles.value
+    .filter((role) => roleIds.has(role.id))
+    .map((role) => role.roleName)
+    .join('、')
 }
 
 function menuTypeLabel(value: MenuRecord['menuType']): string {
@@ -877,9 +800,6 @@ onBeforeUnmount(() => controller?.abort())
         <V2Button size="small" variant="secondary" @click="refreshPage">刷新</V2Button>
         <V2Button v-if="mode === 'users' && canUserAdd" size="small" @click="openUserEditor()">
           新增用户
-        </V2Button>
-        <V2Button v-if="mode === 'roles' && canRoleAdd" size="small" @click="openRoleEditor()">
-          新增角色
         </V2Button>
       </template>
     </V2Card>
@@ -980,7 +900,7 @@ onBeforeUnmount(() => controller?.abort())
                     v-if="canUserDelete"
                     size="small"
                     variant="danger"
-                    @click="deleteTarget = { kind: 'user', id: item.id, label: item.username }"
+                    @click="deleteTarget = { id: item.id, label: item.username }"
                   >
                     删除
                   </V2Button>
@@ -1054,7 +974,7 @@ onBeforeUnmount(() => controller?.abort())
             </div>
             <div>
               <dt>角色</dt>
-              <dd>{{ selectedUser.roleNames.join('、') || '—' }}</dd>
+              <dd>{{ userRoleNames(selectedUser) || '—' }}</dd>
             </div>
             <div>
               <dt>状态</dt>
@@ -1079,7 +999,11 @@ onBeforeUnmount(() => controller?.abort())
       </div>
     </V2Card>
 
-    <V2Card v-else-if="mode === 'roles'" title="角色清单">
+    <V2Card
+      v-else-if="mode === 'roles'"
+      title="固定角色清单"
+      description="九类业务角色由系统维护；名称、编码、状态和数据范围不可修改。"
+    >
       <V2PageState
         v-if="!roles.length"
         kind="empty"
@@ -1095,49 +1019,18 @@ onBeforeUnmount(() => controller?.abort())
               <th>类型</th>
               <th>数据范围</th>
               <th>状态</th>
-              <th class="v2-table-cell--actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, index) in visibleRoles" :key="item.id">
+            <tr v-for="item in visibleRoles" :key="item.id">
               <th scope="row">{{ item.roleCode }}</th>
               <td>{{ item.roleName }}</td>
               <td>{{ roleTypeLabel(item.roleType) }}</td>
               <td>{{ dataScopeLabel(item.dataScope) }}</td>
               <td>
-                <V2StatusToggle
-                  :enabled="item.status === 'ENABLE'"
-                  :disabled="!canRoleEdit || saving || isProtectedRole(item)"
-                  :aria-label="`${item.status === 'ENABLE' ? '停用' : '启用'}角色${item.roleName}`"
-                  @toggle="requestRoleStatusChange(item)"
-                />
-              </td>
-              <td class="v2-table-cell--actions">
-                <div class="access-control-page__actions">
-                  <V2ActionMenu
-                    v-if="!isProtectedRole(item) && (canRoleEdit || canRoleDelete)"
-                    :label="`${item.roleCode || item.roleName}更多操作`"
-                    :placement="index >= visibleRoles.length - 3 ? 'top-end' : 'bottom-end'"
-                  >
-                    <V2Button
-                      v-if="canRoleEdit && !isProtectedRole(item)"
-                      size="small"
-                      variant="ghost"
-                      @click="openRoleEditor(item)"
-                    >
-                      编辑
-                    </V2Button>
-                    <V2Button
-                      v-if="canRoleDelete && !isProtectedRole(item)"
-                      size="small"
-                      variant="danger"
-                      @click="deleteTarget = { kind: 'role', id: item.id, label: item.roleName }"
-                    >
-                      删除
-                    </V2Button>
-                  </V2ActionMenu>
-                  <V2Badge v-if="isProtectedRole(item)" tone="warning">受保护</V2Badge>
-                </div>
+                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ item.status === 'ENABLE' ? '启用' : '停用' }}
+                </V2Badge>
               </td>
             </tr>
           </tbody>
@@ -1237,6 +1130,14 @@ onBeforeUnmount(() => controller?.abort())
               保存权限
             </V2Button>
           </template>
+
+          <V2Alert
+            v-if="selectedRole?.roleCode === 'COMPANY_FINANCE'"
+            tone="warning"
+            title="财务权限提示"
+          >
+            移除菜单权限不会撤销超级管理员旁路能力。
+          </V2Alert>
 
           <V2PageState
             v-if="roleLoading"
@@ -1381,28 +1282,6 @@ onBeforeUnmount(() => controller?.abort())
       </template>
     </V2Dialog>
 
-    <V2Dialog
-      v-model:open="roleDialog"
-      :title="editingRole ? '编辑角色' : '新增角色'"
-      :close-disabled="saving"
-      :close-on-backdrop="false"
-    >
-      <div class="access-control-page__form">
-        <V2Input
-          v-model="roleForm.roleCode"
-          label="角色编码"
-          required
-          :disabled="Boolean(editingRole)"
-        />
-        <V2Input v-model="roleForm.roleName" label="角色名称" required />
-        <V2Select v-model="roleForm.status" label="状态" :options="statusOptions.slice(1)" />
-      </div>
-      <template #footer>
-        <V2Button variant="secondary" :disabled="saving" @click="roleDialog = false">取消</V2Button>
-        <V2Button :loading="saving" @click="saveRole">保存</V2Button>
-      </template>
-    </V2Dialog>
-
     <V2ConfirmDialog
       :open="Boolean(statusTarget)"
       title="确认更新用户状态"
@@ -1416,21 +1295,6 @@ onBeforeUnmount(() => controller?.abort())
       :loading="saving"
       @close="statusTarget = null"
       @confirm="toggleUserStatus"
-    />
-
-    <V2ConfirmDialog
-      :open="Boolean(roleStatusTarget)"
-      title="确认更新角色状态"
-      :description="
-        roleStatusTarget
-          ? `${roleStatusTarget.status === 'ENABLE' ? '停用' : '启用'}“${roleStatusTarget.roleName}”？`
-          : ''
-      "
-      :confirm-text="roleStatusTarget?.status === 'ENABLE' ? '停用' : '启用'"
-      :danger="roleStatusTarget?.status === 'ENABLE'"
-      :loading="saving"
-      @close="roleStatusTarget = null"
-      @confirm="toggleRoleStatus"
     />
 
     <V2ConfirmDialog

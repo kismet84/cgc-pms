@@ -8,6 +8,8 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.notification.vo.NotificationVO;
+import com.cgcpms.security.BusinessAmountAccess;
+import com.cgcpms.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NotificationService {
 
     private final SysNotificationMapper notificationMapper;
+    private final SysUserMapper userMapper;
 
     /**
      * Per-user SSE emitter map. Keyed by "tenantId:userId" composite key
@@ -99,6 +102,9 @@ public class NotificationService {
         if (Boolean.TRUE.equals(unreadOnly)) {
             wrapper.eq(SysNotification::getIsRead, 0);
         }
+        if (!canReceiveAmountAlerts(tenantId, userId)) {
+            wrapper.ne(SysNotification::getBizType, "ALERT");
+        }
         wrapper.orderByDesc(SysNotification::getCreatedTime);
 
         IPage<SysNotification> page = notificationMapper.selectPage(
@@ -117,6 +123,9 @@ public class NotificationService {
         wrapper.eq(SysNotification::getTenantId, tenantId);
         wrapper.eq(SysNotification::getUserId, userId);
         wrapper.eq(SysNotification::getIsRead, 0);
+        if (!canReceiveAmountAlerts(tenantId, userId)) {
+            wrapper.ne(SysNotification::getBizType, "ALERT");
+        }
         return notificationMapper.selectCount(wrapper);
     }
 
@@ -264,6 +273,10 @@ public class NotificationService {
     }
 
     private void pushToUser(SysNotification notification) {
+        if ("ALERT".equals(notification.getBizType())
+                && !canReceiveAmountAlerts(notification.getTenantId(), notification.getUserId())) {
+            return;
+        }
         String key = emitterKey(notification.getTenantId(), notification.getUserId());
         Map<String, SseEmitter> userEmitters = emitters.get(key);
         if (userEmitters == null) return;
@@ -280,6 +293,11 @@ public class NotificationService {
                         sendFailure.getClass().getSimpleName());
             }
         });
+    }
+
+    private boolean canReceiveAmountAlerts(Long tenantId, Long userId) {
+        var permissions = userMapper.selectEnabledPermissionCodesByTenantAndUserId(tenantId, userId);
+        return permissions != null && permissions.contains(BusinessAmountAccess.PERMISSION);
     }
 
     private void removeEmitter(String key, String clientId, SseEmitter emitter) {

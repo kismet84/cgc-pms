@@ -40,6 +40,9 @@ class SiteDailyLogControllerTest {
 
     @BeforeAll
     void setUpExecutionFixtures() {
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) "
+                + "SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 "
+                + "WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'SITE-DAILY-HTTP','现场日报HTTP测试项目','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT_ID);
         jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'SITE-DAILY-SP','现场日报测试基线','BASELINE',1,'2099-01-01','2099-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SCHEDULE_ID, PROJECT_ID);
         jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,planned_quantity,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'SITE-DAILY-WBS','现场日报测试WBS','2099-01-01','2099-12-31',100,100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_ID, PROJECT_ID, SCHEDULE_ID);
@@ -85,6 +88,25 @@ class SiteDailyLogControllerTest {
     }
 
     @Test
+    void selfPermissionPassesDailyLogReadAndWriteGuards() throws Exception {
+        Cookie self = permissionCookie("site:daily:self");
+
+        mockMvc.perform(get("/api/site-daily-logs").contextPath("/api").cookie(self))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/site-daily-logs/999999999").contextPath("/api").cookie(self))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/site-daily-logs").contextPath("/api").cookie(self)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/api/site-daily-logs/999999999").contextPath("/api").cookie(self)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/site-daily-logs/999999999/submit").contextPath("/api").cookie(self)
+                        .param("expectedVersion", "0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void draftCanBeEditedAndSubmittedOnlyOnce() throws Exception {
         String body = "{\"projectId\":" + PROJECT_ID + ",\"reportDate\":\"2099-01-01\","
                 + "\"constructionContent\":\"完成基础施工\",\"issuesDelays\":\"材料晚到\","
@@ -112,7 +134,10 @@ class SiteDailyLogControllerTest {
         mockMvc.perform(put("/api/project-schedules/daily-logs/" + id + "/progress").contextPath("/api")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"items\":[{\"wbsTaskId\":" + WBS_ID + ",\"currentProgress\":10,\"completedQuantity\":10,\"workDescription\":\"完成基础施工\"}]}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].previousProgress").value(0))
+                .andExpect(jsonPath("$.data[0].currentProgress").value(10))
+                .andExpect(jsonPath("$.data[0].completedQuantity").value(10));
         mockMvc.perform(post("/api/site-daily-logs/" + id + "/submit").contextPath("/api")
                         .cookie(adminCookie()))
                 .andExpect(status().isBadRequest());

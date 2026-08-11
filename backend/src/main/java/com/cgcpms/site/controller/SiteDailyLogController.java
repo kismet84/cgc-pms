@@ -26,7 +26,7 @@ public class SiteDailyLogController {
     private final SiteDailyQualitySafetyService qualitySafetyService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query') or hasAuthority('site:daily:self')")
     public ApiResponse<PageResult<SiteDailyLogVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -39,7 +39,7 @@ public class SiteDailyLogController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query') or hasAuthority('site:daily:self')")
     public ApiResponse<SiteDailyLogVO> detail(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));
     }
@@ -52,14 +52,14 @@ public class SiteDailyLogController {
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "SITE_DAILY_LOG", businessIdExpression = "#log.id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit') or hasAuthority('site:daily:self')")
     public ApiResponse<Long> create(@Valid @RequestBody SiteDailyLog log) {
         return ApiResponse.success(service.create(log));
     }
 
     @PutMapping("/{id}")
     @AuditedOperation(type = "UPDATE", businessType = "SITE_DAILY_LOG", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit') or hasAuthority('site:daily:self')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SiteDailyLog log) {
         log.setId(id);
         service.update(log);
@@ -68,7 +68,7 @@ public class SiteDailyLogController {
 
     @PostMapping("/{id}/submit")
     @AuditedOperation(type = "SUBMIT", businessType = "SITE_DAILY_LOG", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit') or hasAuthority('site:daily:self')")
     public ApiResponse<Void> submit(@PathVariable Long id,
                                     @RequestParam Integer expectedVersion) {
         service.submit(id, expectedVersion);

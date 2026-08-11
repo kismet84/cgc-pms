@@ -82,14 +82,14 @@ public class ProjectScheduleController {
     }
 
     @GetMapping("/daily-logs/{dailyLogId}/progress")
-    @PreAuthorize("hasAuthority('schedule:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('schedule:query') or hasAuthority('schedule:daily-progress:self') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<Map<String,Object>>> dailyProgress(@PathVariable Long dailyLogId) {
         return ApiResponse.success(service.dailyProgress(dailyLogId));
     }
 
     @PutMapping("/daily-logs/{dailyLogId}/progress")
     @AuditedOperation(type="REPORT_PROGRESS", businessType="SITE_DAILY_LOG", businessIdExpression="#dailyLogId")
-    @PreAuthorize("hasAuthority('schedule:progress') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('schedule:progress') or hasAuthority('schedule:daily-progress:self') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<Map<String,Object>>> replaceDailyProgress(@PathVariable Long dailyLogId, @Valid @RequestBody DailyProgressBatch batch) {
         return ApiResponse.success(service.replaceDailyProgress(dailyLogId, batch));
     }

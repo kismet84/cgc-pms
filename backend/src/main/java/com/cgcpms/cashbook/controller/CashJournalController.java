@@ -51,7 +51,7 @@ public class CashJournalController {
 
     @GetMapping("/export")
     @AuditedOperation(type = "DOWNLOAD", businessType = "CASH_JOURNAL_EXPORT")
-    @PreAuthorize("hasAuthority('cashbook:journal:export') or hasAuthority('bid:cost:export') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("(hasAuthority('cashbook:journal:export') or hasAuthority('bid:cost:export') or hasAnyRole('ADMIN','SUPER_ADMIN')) and hasAuthority('business:amount:view')")
     public ResponseEntity<byte[]> export(@ModelAttribute CashJournalQuery query) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));

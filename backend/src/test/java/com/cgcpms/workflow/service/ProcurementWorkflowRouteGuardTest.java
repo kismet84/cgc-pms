@@ -3,6 +3,9 @@ package com.cgcpms.workflow.service;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfTask;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfNodeInstance;
+import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfNodeInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
@@ -16,6 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.*;
 
 class ProcurementWorkflowRouteGuardTest {
 
@@ -49,13 +55,34 @@ class ProcurementWorkflowRouteGuardTest {
         WorkflowNotificationAlertService alerts = mock(WorkflowNotificationAlertService.class);
         WorkflowApprovalService service = new WorkflowApprovalService(core, instances, nodes, tasks, alerts);
         WfTask task = new WfTask();
+        task.setId(20L);
+        task.setTenantId(0L);
+        task.setInstanceId(21L);
+        task.setNodeInstanceId(22L);
         task.setBusinessType(WorkflowBusinessTypes.PURCHASE_REQUEST);
-        when(tasks.selectById(20L)).thenReturn(task);
+        task.setTaskStatus(WorkflowConstants.TASK_PENDING);
+        task.setApproverId(1L);
+        task.setTaskVersion(0);
+        WfInstance instance = new WfInstance();
+        instance.setId(21L);
+        instance.setTenantId(0L);
+        instance.setInstanceStatus(WorkflowConstants.INSTANCE_RUNNING);
+        WfNodeInstance node = new WfNodeInstance();
+        node.setId(22L);
+        node.setTenantId(0L);
+        node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
+        when(tasks.selectByIdIgnoringTenant(20L)).thenReturn(task);
+        when(instances.pingInstanceRunning(21L, WorkflowConstants.INSTANCE_RUNNING)).thenReturn(1);
+        when(instances.selectByIdForUpdate(21L, 0L)).thenReturn(instance);
+        when(nodes.selectByIdForUpdate(22L, 0L)).thenReturn(node);
+        when(tasks.selectByIdForUpdate(20L, 0L)).thenReturn(task);
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.approve(20L, 1L, "approver", "同意", "purchase-request-route-20"));
 
         assertEquals("PURCHASE_REQUEST_DEDICATED_APPROVAL_REQUIRED", error.getCode());
-        verifyNoInteractions(core, instances, nodes, alerts);
+        verify(tasks, never()).updateTaskStatusWithCas(anyLong(), anyString(), anyInt(), anyString(),
+                anyString(), nullable(String.class), any(), anyLong());
+        verifyNoInteractions(alerts);
     }
 }

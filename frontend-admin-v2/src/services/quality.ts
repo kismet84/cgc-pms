@@ -15,6 +15,16 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
+export type QualityRectificationWorkflowRecord = Omit<QualityRectificationRecord, 'status'> & {
+  status: string
+  approvalInstanceId?: string | null
+}
+
+export type QualityConsequenceWorkflowRecord = Omit<QualityConsequenceRecord, 'status'> & {
+  status: string
+  approvalInstanceId?: string | null
+}
+
 export function loadQualityPlans(projectId: string, signal?: AbortSignal) {
   return apiRequest<QualityPlanRecord[]>(`${QUALITY_API.plans}?projectId=${id(projectId)}`, {
     signal,
@@ -72,10 +82,9 @@ export function createQualityRectification(command: FieldQualityRectificationCom
   )
 }
 export function submitQualityRectification(rectificationId: string) {
-  return apiRequest<QualityRectificationRecord>(
-    QUALITY_API.submitRectification(id(rectificationId)),
-    { method: 'POST' },
-  )
+  return apiRequest<Record<string, unknown>>(QUALITY_API.submitRectification(id(rectificationId)), {
+    method: 'POST',
+  }).then(normalizeRectificationWorkflow)
 }
 export function reinspectQualityRectification(
   rectificationId: string,
@@ -92,10 +101,11 @@ export function createQualityConsequence(command: QualityConsequenceCommand) {
     body: command,
   }).then(normalizeConsequence)
 }
-export function postQualityConsequence(consequenceId: string) {
-  return apiRequest<Record<string, unknown>>(QUALITY_API.postConsequence(id(consequenceId)), {
-    method: 'POST',
-  }).then(normalizeConsequence)
+export function submitQualityConsequence(consequenceId: string) {
+  return apiRequest<Record<string, unknown>>(
+    `${QUALITY_API.consequences}/${id(consequenceId)}/submit`,
+    { method: 'POST' },
+  ).then(normalizeConsequenceWorkflow)
 }
 export function loadQualityTrace(
   issueId: string,
@@ -122,6 +132,28 @@ function normalizeConsequence(row: Record<string, unknown>): QualityConsequenceR
     fineAmount: String(row.fineAmount),
     reworkCostAmount: String(row.reworkCostAmount),
     evaluationScore: String(row.evaluationScore),
+  }
+}
+function normalizeConsequenceWorkflow(
+  row: Record<string, unknown>,
+): QualityConsequenceWorkflowRecord {
+  return {
+    ...normalizeConsequence(row),
+    status: String(row.status),
+    approvalInstanceId: row.approvalInstanceId == null ? null : String(row.approvalInstanceId),
+  }
+}
+function normalizeRectificationWorkflow(
+  row: Record<string, unknown>,
+): QualityRectificationWorkflowRecord {
+  return {
+    ...(row as unknown as QualityRectificationWorkflowRecord),
+    id: String(row.id),
+    issueId: String(row.issueId),
+    projectId: String(row.projectId),
+    responsibleUserId: String(row.responsibleUserId),
+    status: String(row.status),
+    approvalInstanceId: row.approvalInstanceId == null ? null : String(row.approvalInstanceId),
   }
 }
 function required(value: string): string {

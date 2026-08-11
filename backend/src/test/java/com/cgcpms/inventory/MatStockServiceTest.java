@@ -481,6 +481,12 @@ class MatStockServiceTest {
         long matId = 9001L;
         insertWarehouse(whId0, 10001L, "WH-TENANT-0");
         insertWarehouse(999L, whId999, 99901L, "WH-TENANT-999", "ENABLE");
+        jdbcTemplate.update("""
+                INSERT INTO pm_project_member
+                    (id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_at,deleted_flag)
+                SELECT 9990199,999,99901,999,'EMPLOYEE','ACTIVE',999,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE id=9990199)
+                """);
 
         // 租户0入库
         stockService.stockIn(whId0, matId, new BigDecimal("100.0000"));

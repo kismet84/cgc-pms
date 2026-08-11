@@ -106,7 +106,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("292", current.info().current().getVersion().getVersion());
+        assertEquals("293", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, """
                 SELECT COUNT(*) FROM information_schema.views
                 WHERE table_schema=DATABASE() AND table_name='v_business_audit_event'
@@ -122,27 +122,13 @@ class BaselineMySqlUpgradeTest {
                 WHERE id=9276003 AND tenant_id=7
                   AND pay_application_id=9276001 AND approval_instance_id=9276004
                 """));
-        assertEquals(5, count(current, """
-                SELECT COUNT(*) FROM sys_role_menu rm
-                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
-                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code IN
-                  ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE')
-                  AND r.deleted_flag=0 AND m.deleted_flag=0 AND m.perms='project:query'
-                """));
-        assertEquals(1, count(current, """
-                SELECT COUNT(*) FROM sys_role_menu rm
-                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
-                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
-                  AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
-                """));
-        assertEquals(1, count(current, """
-                SELECT COUNT(*) FROM sys_role_menu rm
-                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
-                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-                WHERE r.role_code='SUPER_ADMIN' AND r.deleted_flag=0
-                  AND m.deleted_flag=0 AND m.perms='audit:query'
+        assertEquals(10, count(current,
+                "SELECT COUNT(*) FROM sys_role WHERE status='ENABLE' AND deleted_flag=0"));
+        assertEquals(21, count(current,
+                "SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(45, count(current, """
+                SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id
+                WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0
                 """));
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));

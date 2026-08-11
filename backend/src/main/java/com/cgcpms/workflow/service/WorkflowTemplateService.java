@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.cgcpms.workflow.dto.WorkflowTemplateNodeReorderRequest;
 import com.cgcpms.workflow.dto.WorkflowTemplateNodeRequest;
 import com.cgcpms.workflow.dto.WorkflowTemplateUpdateRequest;
@@ -26,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +38,7 @@ public class WorkflowTemplateService {
 
     private final WfTemplateMapper templateMapper;
     private final WfTemplateNodeMapper nodeMapper;
+    private final OperationAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
     private final WorkflowVOAssembler voAssembler;
 
@@ -74,18 +78,20 @@ public class WorkflowTemplateService {
     @Transactional(rollbackFor = Exception.class)
     public void updateTemplate(Long templateId, WorkflowTemplateUpdateRequest request) {
         WfTemplate template = getTemplateForUpdate(templateId);
+        String before = snapshot(templateId);
         validateAmountRange(request.getAmountMin(), request.getAmountMax());
         validateEnabled(request.getEnabled());
-        rejectUnsupportedConfig(request.getConditionRule(), "conditionRule");
         rejectUnsupportedConfig(request.getFormSchema(), "formSchema");
+        String policyJson = normalizeSecurityPolicy(template.getBusinessType(), request.getConditionRule());
         template.setTemplateName(request.getTemplateName());
         template.setEnabled(request.getEnabled() == null ? template.getEnabled() : request.getEnabled());
         template.setAmountMin(request.getAmountMin());
         template.setAmountMax(request.getAmountMax());
-        template.setConditionRule(blankToNull(request.getConditionRule()));
+        template.setConditionRule(policyJson);
         template.setFormSchema(blankToNull(request.getFormSchema()));
         template.setRemark(request.getRemark());
         templateMapper.updateById(template);
+        audit(templateId, "UPDATE_TEMPLATE", before);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -95,6 +101,7 @@ public class WorkflowTemplateService {
     @Transactional(rollbackFor = Exception.class)
     public WfTemplateNodeVO createNode(Long templateId, WorkflowTemplateNodeRequest request) {
         WfTemplate template = getTemplateForUpdate(templateId);
+        String before = snapshot(templateId);
         validateNodeRequest(request);
         List<WfTemplateNode> existingNodes = listNodes(templateId);
         int targetOrder = request.getNodeOrder() == null ? existingNodes.size() + 1 : request.getNodeOrder();
@@ -102,12 +109,14 @@ public class WorkflowTemplateService {
         WfTemplateNode node = buildNodeFromRequest(template, templateId, request, targetOrder);
         nodeMapper.insert(node);
         normalizeOrders(templateId);
+        audit(templateId, "CREATE_TEMPLATE_NODE", before);
         return voAssembler.toTemplateNodeVO(nodeMapper.selectById(node.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void updateNode(Long templateId, Long nodeId, WorkflowTemplateNodeRequest request) {
         getTemplateForUpdate(templateId);
+        String before = snapshot(templateId);
         validateNodeRequest(request);
         WfTemplateNode node = getNodeOrThrow(templateId, nodeId);
         if (request.getNodeCode() != null && !request.getNodeCode().isBlank()) {
@@ -119,20 +128,24 @@ public class WorkflowTemplateService {
         applyNodeRequest(node, request);
         nodeMapper.updateById(node);
         normalizeOrders(templateId);
+        audit(templateId, "UPDATE_TEMPLATE_NODE", before);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteNode(Long templateId, Long nodeId) {
         getTemplateForUpdate(templateId);
+        String before = snapshot(templateId);
         getNodeOrThrow(templateId, nodeId);
         if (countNodes(templateId) <= 1) throw new BusinessException("TEMPLATE_LAST_NODE", "至少保留一个审批节点");
         nodeMapper.deleteById(nodeId);
         normalizeOrders(templateId);
+        audit(templateId, "DELETE_TEMPLATE_NODE", before);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void reorderNodes(Long templateId, WorkflowTemplateNodeReorderRequest request) {
         getTemplateForUpdate(templateId);
+        String before = snapshot(templateId);
         List<WfTemplateNode> nodes = listNodes(templateId);
         if (request.getNodeIds().size() != nodes.size())
             throw new BusinessException("TEMPLATE_NODE_REORDER_INVALID", "排序节点数量不一致");
@@ -146,6 +159,7 @@ public class WorkflowTemplateService {
             update.setNodeOrder(order++);
             nodeMapper.updateById(update);
         }
+        audit(templateId, "REORDER_TEMPLATE_NODES", before);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -258,6 +272,13 @@ public class WorkflowTemplateService {
                 fieldName + " 尚未接入审批执行引擎，禁止保存为生效配置");
     }
 
+    private String normalizeSecurityPolicy(String businessType, String json) {
+        WorkflowSecurityPolicy policy = json == null || json.isBlank()
+                ? WorkflowSecurityPolicy.defaultFor(businessType)
+                : WorkflowSecurityPolicy.parse(objectMapper, json);
+        return policy.toCanonicalJson(objectMapper);
+    }
+
     private void validateApproverConfig(String json) {
         if (json == null || json.isBlank()) return;
         final com.fasterxml.jackson.databind.JsonNode node;
@@ -285,6 +306,22 @@ public class WorkflowTemplateService {
         });
     }
 
+    private String snapshot(Long templateId) {
+        LinkedHashMap<String, Object> state = new LinkedHashMap<>();
+        state.put("template", getTemplateOrThrow(templateId));
+        state.put("nodes", listNodes(templateId));
+        try {
+            return objectMapper.writeValueAsString(state);
+        } catch (Exception e) {
+            throw new BusinessException("TEMPLATE_AUDIT_SERIALIZATION_FAILED", "审批模板审计快照生成失败");
+        }
+    }
+
+    private void audit(Long templateId, String operationType, String beforeSnapshot) {
+        auditLogMapper.insertWorkflowTemplateAudit(UserContext.getCurrentTenantId(), UserContext.getCurrentUserId(),
+                operationType, templateId.toString(), beforeSnapshot, snapshot(templateId));
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Private helpers — Node code uniqueness
     // ═══════════════════════════════════════════════════════════
@@ -305,9 +342,12 @@ public class WorkflowTemplateService {
     }
 
     private boolean nodeCodeExists(Long templateId, Long currentNodeId, String nodeCode) {
+        if (currentNodeId == null) {
+            return nodeMapper.countNodeCodeIncludingDeleted(templateId, nodeCode) > 0;
+        }
         LambdaQueryWrapper<WfTemplateNode> wrapper = new LambdaQueryWrapper<WfTemplateNode>()
                 .eq(WfTemplateNode::getTemplateId, templateId).eq(WfTemplateNode::getNodeCode, nodeCode);
-        if (currentNodeId != null) wrapper.ne(WfTemplateNode::getId, currentNodeId);
+        wrapper.ne(WfTemplateNode::getId, currentNodeId);
         return nodeMapper.selectCount(wrapper) > 0;
     }
 

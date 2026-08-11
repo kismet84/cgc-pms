@@ -13,6 +13,7 @@ import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.requisition.entity.MatRequisition;
@@ -50,6 +51,7 @@ class MatRequisitionAccessScopeTest {
             mock(CtContractMapper.class),
             mock(MatWarehouseMapper.class),
             materialMapper,
+            mock(MdPartnerMapper.class),
             mock(MatStockService.class),
             mock(CostGenerationService.class),
             projectAccessChecker,
@@ -177,7 +179,6 @@ class MatRequisitionAccessScopeTest {
         item.setWbsTaskId(401L);
         item.setMaterialId(301L);
         item.setQuantity(BigDecimal.ONE);
-        item.setUnitPrice(BigDecimal.ZERO);
 
         service.saveItemsBatch(201L, List.of(item));
 

@@ -30,6 +30,9 @@ import com.cgcpms.schedule.service.ProjectScheduleService;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -50,7 +53,7 @@ import com.cgcpms.common.exception.BusinessException;
 
 @SuppressWarnings("unchecked")
 class SiteDailyLogServiceTest {
-    @AfterEach void clear() { UserContext.clear(); }
+    @AfterEach void clear() { UserContext.clear(); SecurityContextHolder.clearContext(); }
 
     @Test
     void detailChecksProjectAccess() {
@@ -111,6 +114,47 @@ class SiteDailyLogServiceTest {
         verify(checker).checkAccess(21L, "创建现场日报");
         assertEquals(11L, log.getTenantId());
         assertEquals("DRAFT", log.getStatus());
+    }
+
+    @Test
+    void selfPermissionScopesListAndRejectsForeignReadAndWrites() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        SiteDailyLogService service = service(mapper, mock(PmProjectMapper.class), checker);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "site-self", "n/a", List.of(new SimpleGrantedAuthority("site:daily:self"))));
+        doReturn(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<SiteDailyLog>())
+                .when(mapper).selectPage(any(), any());
+
+        service.getPage(1, 20, 21L, null, null, null);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SiteDailyLog>> query =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(mapper).selectPage(any(), query.capture());
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SiteDailyLog.class);
+        assertTrue(query.getValue().getSqlSegment().contains("created_by"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(7L));
+
+        SiteDailyLog foreign = dailyCommand(null, "他人日报");
+        foreign.setId(31L); foreign.setTenantId(11L); foreign.setCreatedBy(8L);
+        foreign.setStatus("DRAFT"); foreign.setVersion(0);
+        when(mapper.selectById(31L)).thenReturn(foreign);
+        when(mapper.selectByIdForUpdate(31L, 11L)).thenReturn(foreign);
+
+        assertEquals("SITE_DAILY_LOG_NOT_FOUND",
+                assertThrows(BusinessException.class, () -> service.getById(31L)).getCode());
+        SiteDailyLog update = dailyCommand(null, "越权修改");
+        update.setId(31L); update.setExpectedVersion(0);
+        assertEquals("SITE_DAILY_LOG_NOT_FOUND",
+                assertThrows(BusinessException.class, () -> service.update(update)).getCode());
+        assertEquals("SITE_DAILY_LOG_NOT_FOUND",
+                assertThrows(BusinessException.class, () -> service.submit(31L, 0)).getCode());
+
+        SiteDailyLog own = dailyCommand(null, "本人日报");
+        doAnswer(invocation -> { own.setId(32L); return 1; }).when(mapper).insert(own);
+        assertEquals(32L, service.create(own));
+        assertEquals(7L, own.getCreatedBy());
     }
 
     @Test

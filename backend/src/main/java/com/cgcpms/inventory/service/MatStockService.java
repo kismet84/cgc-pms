@@ -1039,13 +1039,16 @@ public class MatStockService {
             }
         } else if ("createdTime".equals(sortField)) {
             if (asc) {
-                wrapper.orderByAsc(MatStockTxn::getCreatedTime);
+                wrapper.orderByAsc(MatStockTxn::getCreatedTime)
+                        .orderByAsc(MatStockTxn::getId);
             } else {
-                wrapper.orderByDesc(MatStockTxn::getCreatedTime);
+                wrapper.orderByDesc(MatStockTxn::getCreatedTime)
+                        .orderByDesc(MatStockTxn::getId);
             }
         } else {
             // 默认按创建时间倒序
-            wrapper.orderByDesc(MatStockTxn::getCreatedTime);
+            wrapper.orderByDesc(MatStockTxn::getCreatedTime)
+                    .orderByDesc(MatStockTxn::getId);
         }
     }
 

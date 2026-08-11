@@ -3,13 +3,13 @@ package com.cgcpms.workflow.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.workflow.dto.WorkflowActionRequest;
 import com.cgcpms.workflow.dto.WorkflowAddSignRequest;
 import com.cgcpms.workflow.dto.WorkflowSubmitRequest;
 import com.cgcpms.workflow.dto.WorkflowTransferRequest;
-import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
 import com.cgcpms.workflow.vo.WfCcVO;
@@ -43,16 +43,8 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<String> submit(@Valid @RequestBody WorkflowSubmitRequest request) {
         workflowEngine.checkSubmitPermission(request.getBusinessType());
-        Long userId = UserContext.getCurrentUserId();
-        String username = UserContext.getCurrentUsername();
-        Long tenantId = UserContext.getCurrentTenantId();
-        WfInstance instance = workflowEngine.submit(userId, username, tenantId,
-                request.getBusinessType(), request.getBusinessId(),
-                request.getTitle(), request.getAmount(),
-                request.getProjectId(), request.getContractId(),
-                request.getBusinessSummary(), request.getVariables(),
-                request.getCcUserIds());
-        return ApiResponse.success(String.valueOf(instance.getId()));
+        throw new BusinessException("WORKFLOW_DEDICATED_SUBMIT_REQUIRED",
+                "审批必须通过业务专用提交入口，金额与业务快照由服务端确定");
     }
 
     @PostMapping("/tasks/{taskId}/approve")

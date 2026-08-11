@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ public class CostSubjectV2Service {
 
     private final JdbcTemplate jdbc;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ObjectProvider<WorkflowEngine> workflowEngineProvider;
 
     public record MappingItem(Long sourceSubjectId, String targetGroupCode, Long targetSubjectId,
                               String historicalDisplayName, String mappingReason) {}
@@ -42,6 +46,10 @@ public class CostSubjectV2Service {
 
     public record TransferCommand(Long bidCostId, Long projectId, Long targetId, Long mappingVersionId,
                                   Long approvalInstanceId, String idempotencyKey, String remark) {}
+
+    public record BidTransferRequestCommand(Long bidCostId, Long projectId, Long targetId,
+                                            Long mappingVersionId, String idempotencyKey,
+                                            String remark) {}
 
     public record AllocationLine(Long projectId, BigDecimal basisValue) {}
 
@@ -153,10 +161,12 @@ public class CostSubjectV2Service {
 
     public List<Map<String, Object>> rules() {
         return jdbc.queryForList("""
-                SELECT r.*,s.subject_code,s.subject_name,v.version_code
+                SELECT r.*,s.subject_code,s.subject_name,v.version_code,
+                       p.project_code,p.project_name
                 FROM cost_subject_assignment_rule r
                 JOIN cost_subject s ON s.id=r.cost_subject_id AND s.tenant_id=r.tenant_id
                 JOIN cost_subject_mapping_version v ON v.id=r.mapping_version_id AND v.tenant_id=r.tenant_id
+                LEFT JOIN pm_project p ON p.id=r.project_id AND p.tenant_id=r.tenant_id
                 WHERE r.tenant_id=? ORDER BY r.status,r.priority,r.rule_code
                 """, tenantId());
     }
@@ -270,6 +280,236 @@ public class CostSubjectV2Service {
         result.put("assignmentRules", count("cost_subject_assignment_rule", "1=1", subjectId));
         result.put("projectScopes", count("project_cost_subject_scope", "1=1", subjectId));
         return result;
+    }
+
+    public List<Map<String, Object>> bidTransferRequests() {
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenantId());
+        parameters.addAll(projectIds);
+        return jdbc.queryForList("""
+                SELECT r.id,r.request_code requestCode,r.bid_cost_id bidCostId,b.bid_code bidCode,
+                       r.project_id projectId,p.project_code projectCode,p.project_name projectName,
+                       r.target_id targetId,t.version_no targetVersionNo,t.version_name targetVersionName,
+                       r.mapping_version_id mappingVersionId,r.total_amount totalAmount,
+                       r.status,r.approval_instance_id approvalInstanceId,r.final_transfer_id finalTransferId,
+                       r.created_at createdAt,r.remark
+                FROM bid_cost_target_transfer_request r
+                LEFT JOIN bid_cost b ON b.tenant_id=r.tenant_id AND b.id=r.bid_cost_id
+                LEFT JOIN pm_project p ON p.tenant_id=r.tenant_id AND p.id=r.project_id
+                LEFT JOIN cost_target t ON t.tenant_id=r.tenant_id AND t.id=r.target_id
+                WHERE r.tenant_id=? AND r.deleted_flag=0 AND r.project_id IN (%s)
+                ORDER BY r.created_at DESC,r.id DESC
+                """.formatted(placeholders(projectIds)), parameters.toArray());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> createBidTransferRequest(BidTransferRequestCommand command) {
+        requireText(command.idempotencyKey(), "幂等键不能为空");
+        requireProject(command.projectId());
+        Map<String, Object> bid = one("SELECT id,project_id,bid_status FROM bid_cost WHERE tenant_id=? AND id=? AND deleted_flag=0", command.bidCostId());
+        if (!"WON".equals(bid.get("bid_status")) || !Objects.equals(longValue(bid.get("project_id")), command.projectId())) {
+            throw new BusinessException("BID_COST_NOT_WON", "仅已中标且绑定当前项目的投标成本可以转入");
+        }
+        requireNoCompetingBidTransfer(command.bidCostId(), command.targetId(), null);
+        Map<String, Object> target = one("SELECT id,project_id,approval_status,is_active FROM cost_target WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE", command.targetId());
+        if (!Objects.equals(longValue(target.get("project_id")), command.projectId())) {
+            throw new BusinessException("COST_TARGET_PROJECT_MISMATCH", "目标成本不属于中标项目");
+        }
+        if (!List.of("DRAFT", "REJECTED").contains(String.valueOf(target.get("approval_status")))
+                || intValue(target.get("is_active")) == 1) {
+            throw new BusinessException("COST_TARGET_NOT_EDITABLE", "投标成本仅可转入草稿或驳回且未生效的目标成本版本");
+        }
+        requireMappingVersion(command.mappingVersionId(), "ACTIVE");
+        List<Map<String, Object>> sourceItems = jdbc.queryForList("""
+                SELECT c.id,c.cost_subject_id,c.amount_without_tax,m.target_subject_id
+                FROM cost_item c JOIN cost_subject_mapping_item m ON m.tenant_id=c.tenant_id
+                  AND m.mapping_version_id=? AND m.source_subject_id=c.cost_subject_id
+                WHERE c.tenant_id=? AND c.source_id=? AND c.source_type IN ('BID_COST','BID_COST_TRANSFERRED')
+                  AND c.deleted_flag=0 AND c.cost_status<>'WRITE_OFF' AND m.target_subject_id IS NOT NULL
+                """, command.mappingVersionId(), tenantId(), command.bidCostId());
+        if (sourceItems.isEmpty()) throw new BusinessException("BID_COST_MAPPING_MISSING", "投标成本没有可转入的末级科目映射");
+        BigDecimal total = BigDecimal.ZERO;
+        for (Map<String, Object> row : sourceItems) {
+            Long targetSubjectId = longValue(row.get("target_subject_id"));
+            requireSubject(targetSubjectId, true);
+            BigDecimal transferred = jdbc.queryForObject("""
+                    SELECT COALESCE(SUM(l.amount),0) FROM bid_cost_target_transfer_line l
+                    JOIN bid_cost_target_transfer h ON h.id=l.transfer_id AND h.tenant_id=l.tenant_id
+                    WHERE l.tenant_id=? AND h.target_id=? AND l.source_cost_item_id=?
+                    """, BigDecimal.class, tenantId(), command.targetId(), longValue(row.get("id")));
+            if (transferred != null && transferred.signum() != 0) {
+                throw new BusinessException("BID_COST_TRANSFER_DUPLICATE", "同一投标成本事实在当前目标成本版本中已转入");
+            }
+            total = total.add(money(row.get("amount_without_tax")));
+        }
+        if (total.signum() <= 0) throw new BusinessException("BID_COST_TRANSFER_AMOUNT_INVALID", "可转入投标成本必须大于零");
+        Long id = IdWorker.getId();
+        try {
+            jdbc.update("""
+                    INSERT INTO bid_cost_target_transfer_request
+                    (id,tenant_id,request_code,bid_cost_id,project_id,target_id,mapping_version_id,idempotency_key,
+                     total_amount,status,version,created_by,updated_by,remark)
+                    VALUES (?,?,?,?,?,?,?,?,?,'DRAFT',0,?,?,?)
+                    """, id, tenantId(), "BCTRQ-" + id, command.bidCostId(), command.projectId(), command.targetId(),
+                    command.mappingVersionId(), command.idempotencyKey().trim(), total, userId(), userId(), command.remark());
+            for (Map<String, Object> row : sourceItems) {
+                jdbc.update("""
+                        INSERT INTO bid_cost_target_transfer_request_line
+                        (id,tenant_id,request_id,source_cost_item_id,source_subject_id,target_subject_id,amount)
+                        VALUES (?,?,?,?,?,?,?)
+                        """, IdWorker.getId(), tenantId(), id, longValue(row.get("id")),
+                        longValue(row.get("cost_subject_id")), longValue(row.get("target_subject_id")),
+                        money(row.get("amount_without_tax")));
+            }
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException("BID_COST_TRANSFER_REQUEST_DUPLICATE", "转入申请幂等键重复", ex);
+        }
+        return bidTransferRequest(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> submitBidTransferRequest(Long id) {
+        Map<String, Object> request = bidTransferRequestForUpdate(id);
+        String status = String.valueOf(request.get("status"));
+        if (!List.of("DRAFT", "REJECTED", "WITHDRAWN").contains(status)) {
+            throw new BusinessException("BID_COST_TRANSFER_REQUEST_NOT_SUBMITTABLE", "仅草稿、驳回或撤回申请可以提交");
+        }
+        requireProject(longValue(request.get("projectId")));
+        Map<String, Object> target = one("SELECT id,project_id,approval_status,is_active FROM cost_target " +
+                        "WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE",
+                longValue(request.get("targetId")));
+        if (!Objects.equals(longValue(target.get("project_id")), longValue(request.get("projectId")))
+                || !List.of("DRAFT", "REJECTED").contains(String.valueOf(target.get("approval_status")))
+                || intValue(target.get("is_active")) == 1) {
+            throw new BusinessException("COST_TARGET_NOT_EDITABLE", "目标成本已进入审批或生效，不能提交投标成本移交");
+        }
+        requireNoCompetingBidTransfer(longValue(request.get("bidCostId")),
+                longValue(request.get("targetId")), id);
+        Long instanceId = longValue(request.get("approvalInstanceId"));
+        if (instanceId == null) {
+            workflowEngineProvider.getObject().submitBidCostTargetTransfer(userId(), UserContext.getCurrentUsername(), tenantId(),
+                    WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER, id,
+                    "投标成本移交 " + request.get("requestCode"), money(request.get("totalAmount")),
+                    longValue(request.get("projectId")), null, null, null, null);
+        } else {
+            workflowEngineProvider.getObject().resubmitBidCostTargetTransfer(
+                    instanceId, userId(), UserContext.getCurrentUsername());
+        }
+        return bidTransferRequest(id);
+    }
+
+    public Map<String, Object> bidTransferRequest(Long id) {
+        return one("""
+                SELECT id,request_code requestCode,bid_cost_id bidCostId,project_id projectId,
+                       target_id targetId,mapping_version_id mappingVersionId,total_amount totalAmount,
+                       status,approval_instance_id approvalInstanceId,final_transfer_id finalTransferId,
+                       created_at createdAt,remark
+                FROM bid_cost_target_transfer_request WHERE tenant_id=? AND id=? AND deleted_flag=0
+                """, id);
+    }
+
+    public void markBidTransferRequestSubmitted(Long id, Long instanceId) {
+        Map<String, Object> request = bidTransferRequest(id);
+        requireWorkflowAmount(instanceId, WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER,
+                id, money(request.get("totalAmount")));
+        int updated = jdbc.update("""
+                UPDATE bid_cost_target_transfer_request
+                SET status='SUBMITTED',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 AND status IN ('DRAFT','REJECTED','WITHDRAWN')
+                  AND (approval_instance_id IS NULL OR approval_instance_id=?)
+                """, instanceId, userId(), tenantId(), id, instanceId);
+        if (updated != 1) throw new BusinessException("BID_COST_TRANSFER_REQUEST_STATE_INVALID", "投标成本移交申请状态已变化");
+    }
+
+    public void markBidTransferRequestRejected(Long id, Long instanceId, String status) {
+        if (!List.of("REJECTED", "WITHDRAWN").contains(status)) throw new IllegalArgumentException("unsupported status");
+        int updated = jdbc.update("""
+                UPDATE bid_cost_target_transfer_request
+                SET status=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 AND status='SUBMITTED' AND approval_instance_id=?
+                """, status, userId(), tenantId(), id, instanceId);
+        if (updated != 1) throw new BusinessException("BID_COST_TRANSFER_REQUEST_STATE_INVALID", "投标成本移交申请状态已变化");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long postBidTransferRequest(Long requestId, Long instanceId) {
+        Map<String, Object> request = one("""
+                SELECT id,bid_cost_id,project_id,target_id,mapping_version_id,idempotency_key,total_amount,
+                       status,approval_instance_id,final_transfer_id,remark
+                FROM bid_cost_target_transfer_request WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, requestId);
+        if ("POSTED".equals(request.get("status"))) return longValue(request.get("final_transfer_id"));
+        if (!"SUBMITTED".equals(request.get("status"))
+                || !Objects.equals(longValue(request.get("approval_instance_id")), instanceId)) {
+            throw new BusinessException("BID_COST_TRANSFER_REQUEST_STATE_INVALID", "投标成本移交申请未处于当前审批中");
+        }
+        requireApprovedWorkflow(instanceId, WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER, requestId);
+        Long projectId = longValue(request.get("project_id"));
+        Long targetId = longValue(request.get("target_id"));
+        requireProject(projectId);
+        Map<String, Object> target = one("SELECT id,project_id,approval_status,is_active FROM cost_target WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE", targetId);
+        if (!Objects.equals(longValue(target.get("project_id")), projectId)
+                || !List.of("DRAFT", "REJECTED").contains(String.valueOf(target.get("approval_status")))
+                || intValue(target.get("is_active")) == 1) {
+            throw new BusinessException("COST_TARGET_NOT_EDITABLE", "目标成本在审批期间已变为不可编辑状态");
+        }
+        List<Map<String, Object>> lines = jdbc.queryForList("""
+                SELECT source_cost_item_id,source_subject_id,target_subject_id,amount
+                FROM bid_cost_target_transfer_request_line WHERE tenant_id=? AND request_id=? ORDER BY id
+                """, tenantId(), requestId);
+        if (lines.isEmpty()) throw new BusinessException("BID_COST_TRANSFER_REQUEST_LINES_MISSING", "投标成本移交申请缺少快照明细");
+        for (Map<String, Object> line : lines) {
+            BigDecimal transferred = jdbc.queryForList("""
+                    SELECT l.amount FROM bid_cost_target_transfer_line l
+                    JOIN bid_cost_target_transfer h ON h.id=l.transfer_id AND h.tenant_id=l.tenant_id
+                    WHERE l.tenant_id=? AND h.target_id=? AND l.source_cost_item_id=?
+                    ORDER BY l.id FOR UPDATE
+                    """, BigDecimal.class, tenantId(), targetId, longValue(line.get("source_cost_item_id")))
+                    .stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (transferred.signum() != 0) {
+                throw new BusinessException("BID_COST_TRANSFER_DUPLICATE", "审批期间投标成本事实已被其他申请转入");
+            }
+        }
+        Long finalId = IdWorker.getId();
+        BigDecimal total = money(request.get("total_amount"));
+        try {
+            jdbc.update("""
+                    INSERT INTO bid_cost_target_transfer
+                    (id,tenant_id,bid_cost_id,project_id,target_id,mapping_version_id,transfer_code,idempotency_key,total_amount,
+                     status,approval_instance_id,posted_by,remark)
+                    VALUES (?,?,?,?,?,?,?,?,?,'POSTED',?,?,?)
+                    """, finalId, tenantId(), longValue(request.get("bid_cost_id")), projectId, targetId,
+                    longValue(request.get("mapping_version_id")), "BCT-" + finalId, request.get("idempotency_key"),
+                    total, instanceId, userId(), request.get("remark"));
+            for (Map<String, Object> line : lines) {
+                Long targetSubjectId = longValue(line.get("target_subject_id"));
+                BigDecimal amount = money(line.get("amount"));
+                jdbc.update("""
+                        INSERT INTO bid_cost_target_transfer_line
+                        (id,tenant_id,transfer_id,source_cost_item_id,source_subject_id,target_subject_id,amount)
+                        VALUES (?,?,?,?,?,?,?)
+                        """, IdWorker.getId(), tenantId(), finalId, longValue(line.get("source_cost_item_id")),
+                        longValue(line.get("source_subject_id")), targetSubjectId, amount);
+                upsertTargetItem(targetId, projectId, targetSubjectId, amount);
+            }
+            jdbc.update("""
+                    UPDATE cost_target SET total_target_amount=total_target_amount+?,total_bid_cost_amount=total_bid_cost_amount+?,
+                        total_responsibility_amount=total_responsibility_amount+?,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                    WHERE tenant_id=? AND id=?
+                    """, total, total, total, userId(), tenantId(), targetId);
+            if (jdbc.update("""
+                    UPDATE bid_cost_target_transfer_request
+                    SET status='POSTED',final_transfer_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                    WHERE tenant_id=? AND id=? AND status='SUBMITTED' AND approval_instance_id=?
+                    """, finalId, userId(), tenantId(), requestId, instanceId) != 1) {
+                throw new BusinessException("BID_COST_TRANSFER_REQUEST_STATE_INVALID", "投标成本移交申请终态写入失败");
+            }
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException("BID_COST_TRANSFER_DUPLICATE", "投标成本移交申请已处理或事实重复", ex);
+        }
+        return finalId;
     }
 
     public List<Map<String, Object>> transfers() {
@@ -452,6 +692,219 @@ public class CostSubjectV2Service {
         return reversalId;
     }
 
+    public List<Map<String, Object>> financeAllocationRequests() {
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenantId());
+        parameters.addAll(projectIds);
+        parameters.addAll(projectIds);
+        return jdbc.queryForList("""
+                SELECT r.id,r.request_code requestCode,r.project_id projectId,
+                       p.project_code projectCode,p.project_name projectName,
+                       r.source_type sourceType,r.source_id sourceId,
+                       COALESCE(e.entry_code,x.expense_code) sourceCode,
+                       r.source_amount sourceAmount,r.allocation_basis allocationBasis,
+                       r.accounting_period accountingPeriod,r.cost_subject_id costSubjectId,
+                       s.subject_code costSubjectCode,s.subject_name costSubjectName,
+                       r.status,r.approval_instance_id approvalInstanceId,
+                       r.final_batch_id finalBatchId,r.created_at createdAt,r.remark
+                FROM finance_cost_allocation_request r
+                LEFT JOIN pm_project p ON p.tenant_id=r.tenant_id AND p.id=r.project_id
+                LEFT JOIN cost_subject s ON s.tenant_id=r.tenant_id AND s.id=r.cost_subject_id
+                LEFT JOIN accounting_entry_line l ON r.source_type='ACCOUNTING_ENTRY_LINE'
+                  AND l.tenant_id=r.tenant_id AND l.id=r.source_id
+                LEFT JOIN accounting_entry e ON e.tenant_id=r.tenant_id AND e.id=l.entry_id
+                LEFT JOIN expense_application x ON r.source_type='EXPENSE_APPLICATION'
+                  AND x.tenant_id=r.tenant_id AND x.id=r.source_id
+                WHERE r.tenant_id=? AND r.deleted_flag=0 AND r.project_id IN (%s)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM finance_cost_allocation_request_line l
+                    WHERE l.tenant_id=r.tenant_id AND l.request_id=r.id AND l.project_id NOT IN (%s)
+                  )
+                ORDER BY r.created_at DESC,r.id DESC
+                """.formatted(placeholders(projectIds), placeholders(projectIds)), parameters.toArray());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> createFinanceAllocationRequest(FinanceAllocationCommand command) {
+        validateFinanceAllocationCommand(command);
+        command.lines().stream().map(AllocationLine::projectId).distinct().forEach(this::requireProject);
+        requireSubject(command.costSubjectId(), true);
+        requireNoCompetingFinanceAllocation(command.sourceType(), command.sourceId(), null);
+        BigDecimal sourceAmount = sourceAmount(command.sourceType(), command.sourceId());
+        BigDecimal allocatedBefore = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(source_amount),0)
+                FROM finance_cost_allocation_batch WHERE tenant_id=? AND source_type=? AND source_id=?
+                """, BigDecimal.class, tenantId(), command.sourceType(), command.sourceId());
+        BigDecimal remaining = sourceAmount.subtract(allocatedBefore == null ? BigDecimal.ZERO : allocatedBefore);
+        if (remaining.signum() <= 0) throw new BusinessException("FINANCE_COST_ALREADY_ALLOCATED", "来源财务费用已全部分摊");
+        BigDecimal basisTotal = command.lines().stream().map(AllocationLine::basisValue)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (basisTotal.signum() <= 0) throw new BusinessException("FINANCE_COST_BASIS_INVALID", "分摊依据合计必须大于零");
+        List<BigDecimal> amounts = calculateAllocation(remaining, command.lines(), basisTotal);
+        Long id = IdWorker.getId();
+        try {
+            jdbc.update("""
+                    INSERT INTO finance_cost_allocation_request
+                    (id,tenant_id,request_code,project_id,source_type,source_id,source_amount,allocation_basis,
+                     accounting_period,cost_subject_id,idempotency_key,status,version,created_by,updated_by,remark)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,?,?)
+                    """, id, tenantId(), "FCARQ-" + id, command.lines().get(0).projectId(), command.sourceType(),
+                    command.sourceId(), remaining, command.allocationBasis(), command.accountingPeriod(),
+                    command.costSubjectId(), command.idempotencyKey().trim(), userId(), userId(), command.remark());
+            for (int index = 0; index < command.lines().size(); index++) {
+                AllocationLine line = command.lines().get(index);
+                requireScope(line.projectId(), command.costSubjectId());
+                jdbc.update("""
+                        INSERT INTO finance_cost_allocation_request_line
+                        (id,tenant_id,request_id,project_id,basis_value,allocated_amount)
+                        VALUES (?,?,?,?,?,?)
+                        """, IdWorker.getId(), tenantId(), id, line.projectId(), line.basisValue(), amounts.get(index));
+            }
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_DUPLICATE", "财务分摊申请幂等键或项目明细重复", ex);
+        }
+        return financeAllocationRequest(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> submitFinanceAllocationRequest(Long id) {
+        Map<String, Object> request = financeAllocationRequestForUpdate(id);
+        String status = String.valueOf(request.get("status"));
+        if (!List.of("DRAFT", "REJECTED", "WITHDRAWN").contains(status)) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_NOT_SUBMITTABLE", "仅草稿、驳回或撤回申请可以提交");
+        }
+        sourceAmount(String.valueOf(request.get("sourceType")), longValue(request.get("sourceId")));
+        requireNoCompetingFinanceAllocation(String.valueOf(request.get("sourceType")),
+                longValue(request.get("sourceId")), id);
+        jdbc.queryForList("""
+                SELECT DISTINCT project_id FROM finance_cost_allocation_request_line
+                WHERE tenant_id=? AND request_id=?
+                """, Long.class, tenantId(), id).forEach(this::requireProject);
+        Long instanceId = longValue(request.get("approvalInstanceId"));
+        if (instanceId == null) {
+            workflowEngineProvider.getObject().submitFinanceCostAllocation(userId(), UserContext.getCurrentUsername(), tenantId(),
+                    WorkflowBusinessTypes.FINANCE_COST_ALLOCATION, id,
+                    "财务成本分摊 " + request.get("requestCode"), money(request.get("sourceAmount")),
+                    longValue(request.get("projectId")), null, null, null, null);
+        } else {
+            workflowEngineProvider.getObject().resubmitFinanceCostAllocation(
+                    instanceId, userId(), UserContext.getCurrentUsername());
+        }
+        return financeAllocationRequest(id);
+    }
+
+    public Map<String, Object> financeAllocationRequest(Long id) {
+        return one("""
+                SELECT id,request_code requestCode,project_id projectId,source_type sourceType,source_id sourceId,
+                       source_amount sourceAmount,allocation_basis allocationBasis,accounting_period accountingPeriod,
+                       cost_subject_id costSubjectId,status,approval_instance_id approvalInstanceId,
+                       final_batch_id finalBatchId,created_at createdAt,remark
+                FROM finance_cost_allocation_request WHERE tenant_id=? AND id=? AND deleted_flag=0
+                """, id);
+    }
+
+    public void markFinanceAllocationRequestSubmitted(Long id, Long instanceId) {
+        Map<String, Object> request = financeAllocationRequest(id);
+        requireWorkflowAmount(instanceId, WorkflowBusinessTypes.FINANCE_COST_ALLOCATION,
+                id, money(request.get("sourceAmount")));
+        int updated = jdbc.update("""
+                UPDATE finance_cost_allocation_request
+                SET status='SUBMITTED',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 AND status IN ('DRAFT','REJECTED','WITHDRAWN')
+                  AND (approval_instance_id IS NULL OR approval_instance_id=?)
+                """, instanceId, userId(), tenantId(), id, instanceId);
+        if (updated != 1) throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请状态已变化");
+    }
+
+    public void markFinanceAllocationRequestRejected(Long id, Long instanceId, String status) {
+        if (!List.of("REJECTED", "WITHDRAWN").contains(status)) throw new IllegalArgumentException("unsupported status");
+        int updated = jdbc.update("""
+                UPDATE finance_cost_allocation_request
+                SET status=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 AND status='SUBMITTED' AND approval_instance_id=?
+                """, status, userId(), tenantId(), id, instanceId);
+        if (updated != 1) throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请状态已变化");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long postFinanceAllocationRequest(Long requestId, Long instanceId) {
+        Map<String, Object> request = one("""
+                SELECT id,project_id,source_type,source_id,source_amount,allocation_basis,accounting_period,
+                       cost_subject_id,idempotency_key,status,approval_instance_id,final_batch_id,remark
+                FROM finance_cost_allocation_request WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, requestId);
+        if ("POSTED".equals(request.get("status"))) return longValue(request.get("final_batch_id"));
+        if (!"SUBMITTED".equals(request.get("status"))
+                || !Objects.equals(longValue(request.get("approval_instance_id")), instanceId)) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请未处于当前审批中");
+        }
+        requireApprovedWorkflow(instanceId, WorkflowBusinessTypes.FINANCE_COST_ALLOCATION, requestId);
+        BigDecimal sourceTotal = sourceAmount(String.valueOf(request.get("source_type")),
+                longValue(request.get("source_id")));
+        requireSubject(longValue(request.get("cost_subject_id")), true);
+        List<Map<String, Object>> lines = jdbc.queryForList("""
+                SELECT project_id,basis_value,allocated_amount
+                FROM finance_cost_allocation_request_line WHERE tenant_id=? AND request_id=? ORDER BY id
+                """, tenantId(), requestId);
+        if (lines.isEmpty()) throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_LINES_MISSING", "财务分摊申请缺少快照明细");
+        lines.stream().map(line -> longValue(line.get("project_id"))).distinct().forEach(projectId -> {
+            requireProject(projectId);
+            requireScope(projectId, longValue(request.get("cost_subject_id")));
+        });
+        BigDecimal alreadyAllocated = jdbc.queryForList("""
+                SELECT source_amount FROM finance_cost_allocation_batch
+                WHERE tenant_id=? AND source_type=? AND source_id=?
+                ORDER BY id FOR UPDATE
+                """, BigDecimal.class, tenantId(), request.get("source_type"), request.get("source_id"))
+                .stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = money(request.get("source_amount"));
+        BigDecimal remaining = sourceTotal.subtract(alreadyAllocated);
+        if (remaining.compareTo(total) != 0) {
+            throw new BusinessException("FINANCE_COST_ALREADY_ALLOCATED", "审批期间来源财务费用已被其他申请分摊");
+        }
+        Long batchId = IdWorker.getId();
+        try {
+            jdbc.update("""
+                    INSERT INTO finance_cost_allocation_batch
+                    (id,tenant_id,batch_code,source_type,source_id,source_amount,allocation_basis,accounting_period,
+                     cost_subject_id,idempotency_key,status,approval_instance_id,posted_by,remark)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,'POSTED',?,?,?)
+                    """, batchId, tenantId(), "FCA-" + batchId, request.get("source_type"), request.get("source_id"),
+                    total, request.get("allocation_basis"), request.get("accounting_period"),
+                    request.get("cost_subject_id"), request.get("idempotency_key"), instanceId, userId(), request.get("remark"));
+            int index = 0;
+            for (Map<String, Object> line : lines) {
+                Long projectId = longValue(line.get("project_id"));
+                BigDecimal amount = money(line.get("allocated_amount"));
+                Long costItemId = IdWorker.getId();
+                jdbc.update("""
+                        INSERT INTO cost_item
+                        (id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,
+                         source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag,remark)
+                        VALUES (?,?,?,?,?,?,?,?,'FINANCE_COST_ALLOCATION',?,?,CURRENT_DATE,'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
+                        """, costItemId, tenantId(), projectId, request.get("cost_subject_id"), "FINANCE", amount,
+                        BigDecimal.ZERO, amount, batchId, ++index, userId(), request.get("remark"));
+                jdbc.update("""
+                        INSERT INTO finance_cost_allocation_line
+                        (id,tenant_id,batch_id,project_id,basis_value,allocated_amount,cost_item_id)
+                        VALUES (?,?,?,?,?,?,?)
+                        """, IdWorker.getId(), tenantId(), batchId, projectId, line.get("basis_value"), amount, costItemId);
+            }
+            if (jdbc.update("""
+                    UPDATE finance_cost_allocation_request
+                    SET status='POSTED',final_batch_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                    WHERE tenant_id=? AND id=? AND status='SUBMITTED' AND approval_instance_id=?
+                    """, batchId, userId(), tenantId(), requestId, instanceId) != 1) {
+                throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请终态写入失败");
+            }
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_DUPLICATE", "财务分摊申请已处理或事实重复", ex);
+        }
+        return batchId;
+    }
+
     public List<Map<String, Object>> financeAllocations() {
         List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
         if (projectIds.isEmpty()) return List.of();
@@ -510,26 +963,7 @@ public class CostSubjectV2Service {
 
     @Transactional(rollbackFor = Exception.class)
     public Long allocateFinanceCost(FinanceAllocationCommand command) {
-        requireText(command.idempotencyKey(), "幂等键不能为空");
-        requireText(command.accountingPeriod(), "会计期间不能为空");
-        if (!command.accountingPeriod().matches("\\d{4}-(0[1-9]|1[0-2])")) {
-            throw new BusinessException("FINANCE_COST_PERIOD_INVALID", "会计期间必须为YYYY-MM");
-        }
-        if (!List.of("DIRECT_PROJECT", "BENEFIT_AMOUNT", "OCCUPIED_DAYS", "CONTRACT_AMOUNT_EXCEPTION")
-                .contains(command.allocationBasis())) {
-            throw new BusinessException("FINANCE_COST_BASIS_INVALID", "不支持的财务费用分摊依据");
-        }
-        if (command.lines() == null || command.lines().isEmpty()) throw new BusinessException("FINANCE_COST_LINES_EMPTY", "财务费用分摊至少包含一个项目");
-        if (command.lines().stream().map(AllocationLine::projectId).distinct().count() != command.lines().size()) {
-            throw new BusinessException("FINANCE_COST_PROJECT_DUPLICATE", "同一分摊批次不能重复选择项目");
-        }
-        if ("DIRECT_PROJECT".equals(command.allocationBasis()) && command.lines().size() != 1) {
-            throw new BusinessException("FINANCE_COST_DIRECT_PROJECT_INVALID", "直接归属只能选择一个项目");
-        }
-        if ("CONTRACT_AMOUNT_EXCEPTION".equals(command.allocationBasis())
-                && (command.remark() == null || command.remark().isBlank())) {
-            throw new BusinessException("FINANCE_COST_EXCEPTION_REASON_REQUIRED", "合同额例外分摊必须说明原因");
-        }
+        validateFinanceAllocationCommand(command);
         command.lines().stream().map(AllocationLine::projectId).distinct().forEach(this::requireProject);
         requireApprovedWorkflow(command.approvalInstanceId(), "FINANCE_COST_ALLOCATION", command.sourceId());
         requireSubject(command.costSubjectId(), true);
@@ -689,6 +1123,35 @@ public class CostSubjectV2Service {
         return result;
     }
 
+    private void validateFinanceAllocationCommand(FinanceAllocationCommand command) {
+        requireText(command.idempotencyKey(), "幂等键不能为空");
+        requireText(command.accountingPeriod(), "会计期间不能为空");
+        if (!command.accountingPeriod().matches("\\d{4}-(0[1-9]|1[0-2])")) {
+            throw new BusinessException("FINANCE_COST_PERIOD_INVALID", "会计期间必须为YYYY-MM");
+        }
+        if (!List.of("DIRECT_PROJECT", "BENEFIT_AMOUNT", "OCCUPIED_DAYS", "CONTRACT_AMOUNT_EXCEPTION")
+                .contains(command.allocationBasis())) {
+            throw new BusinessException("FINANCE_COST_BASIS_INVALID", "不支持的财务费用分摊依据");
+        }
+        if (command.lines() == null || command.lines().isEmpty()) {
+            throw new BusinessException("FINANCE_COST_LINES_EMPTY", "财务费用分摊至少包含一个项目");
+        }
+        if (command.lines().stream().anyMatch(line -> line.projectId() == null || line.basisValue() == null
+                || line.basisValue().signum() < 0)) {
+            throw new BusinessException("FINANCE_COST_BASIS_INVALID", "项目和分摊依据必须有效");
+        }
+        if (command.lines().stream().map(AllocationLine::projectId).distinct().count() != command.lines().size()) {
+            throw new BusinessException("FINANCE_COST_PROJECT_DUPLICATE", "同一分摊批次不能重复选择项目");
+        }
+        if ("DIRECT_PROJECT".equals(command.allocationBasis()) && command.lines().size() != 1) {
+            throw new BusinessException("FINANCE_COST_DIRECT_PROJECT_INVALID", "直接归属只能选择一个项目");
+        }
+        if ("CONTRACT_AMOUNT_EXCEPTION".equals(command.allocationBasis())
+                && (command.remark() == null || command.remark().isBlank())) {
+            throw new BusinessException("FINANCE_COST_EXCEPTION_REASON_REQUIRED", "合同额例外分摊必须说明原因");
+        }
+    }
+
     private List<BigDecimal> calculateAllocation(BigDecimal total, List<AllocationLine> lines, BigDecimal basisTotal) {
         List<BigDecimal> result = new ArrayList<>();
         BigDecimal assigned = BigDecimal.ZERO;
@@ -701,6 +1164,52 @@ public class CostSubjectV2Service {
             assigned = assigned.add(amount);
         }
         return result;
+    }
+
+    private Map<String, Object> bidTransferRequestForUpdate(Long id) {
+        return one("""
+                SELECT id,request_code requestCode,bid_cost_id bidCostId,project_id projectId,
+                       target_id targetId,mapping_version_id mappingVersionId,total_amount totalAmount,
+                       status,approval_instance_id approvalInstanceId,final_transfer_id finalTransferId,
+                       created_at createdAt,remark
+                FROM bid_cost_target_transfer_request
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, id);
+    }
+
+    private void requireNoCompetingBidTransfer(Long bidCostId, Long targetId, Long excludedId) {
+        List<Long> competing = jdbc.queryForList("""
+                SELECT id FROM bid_cost_target_transfer_request
+                WHERE tenant_id=? AND bid_cost_id=? AND target_id=? AND deleted_flag=0
+                  AND status IN ('DRAFT','SUBMITTED') AND (? IS NULL OR id<>?)
+                ORDER BY id FOR UPDATE
+                """, Long.class, tenantId(), bidCostId, targetId, excludedId, excludedId);
+        if (!competing.isEmpty()) {
+            throw new BusinessException("BID_COST_TRANSFER_REQUEST_ACTIVE", "同一投标成本与目标版本已有活动移交申请");
+        }
+    }
+
+    private Map<String, Object> financeAllocationRequestForUpdate(Long id) {
+        return one("""
+                SELECT id,request_code requestCode,project_id projectId,source_type sourceType,source_id sourceId,
+                       source_amount sourceAmount,allocation_basis allocationBasis,accounting_period accountingPeriod,
+                       cost_subject_id costSubjectId,status,approval_instance_id approvalInstanceId,
+                       final_batch_id finalBatchId,created_at createdAt,remark
+                FROM finance_cost_allocation_request
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, id);
+    }
+
+    private void requireNoCompetingFinanceAllocation(String sourceType, Long sourceId, Long excludedId) {
+        List<Long> competing = jdbc.queryForList("""
+                SELECT id FROM finance_cost_allocation_request
+                WHERE tenant_id=? AND source_type=? AND source_id=? AND deleted_flag=0
+                  AND status IN ('DRAFT','SUBMITTED') AND (? IS NULL OR id<>?)
+                ORDER BY id FOR UPDATE
+                """, Long.class, tenantId(), sourceType, sourceId, excludedId, excludedId);
+        if (!competing.isEmpty()) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_ACTIVE", "同一财务来源已有活动分摊申请");
+        }
     }
 
     private BigDecimal sourceAmount(String sourceType, Long sourceId) {
@@ -731,6 +1240,17 @@ public class CostSubjectV2Service {
         }
         if (businessId != null && !Objects.equals(longValue(instances.get(0).get("business_id")), businessId)) {
             throw new BusinessException("APPROVAL_BUSINESS_MISMATCH", "审批实例业务单据不匹配");
+        }
+    }
+
+    private void requireWorkflowAmount(Long instanceId, String businessType, Long businessId, BigDecimal expected) {
+        List<Map<String, Object>> instances = jdbc.queryForList("""
+                SELECT amount FROM wf_instance
+                WHERE tenant_id=? AND id=? AND business_type=? AND business_id=?
+                  AND instance_status='RUNNING' AND deleted_flag=0
+                """, tenantId(), instanceId, businessType, businessId);
+        if (instances.size() != 1 || money(instances.getFirst().get("amount")).compareTo(expected) != 0) {
+            throw new BusinessException("WORKFLOW_AMOUNT_MISMATCH", "审批金额与业务快照不一致");
         }
     }
 

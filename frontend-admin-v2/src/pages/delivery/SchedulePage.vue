@@ -4,6 +4,7 @@ import { formatDecimal } from '@/pages/dashboard/model'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   CorrectiveActionCommand,
+  PeriodType,
   PeriodPlanCommand,
   PeriodPlanRecord,
   ScheduleCommand,
@@ -137,12 +138,32 @@ const latestSnapshotStatus = computed(() => detail.value?.latestSnapshot?.status
 const latestSnapshotNeedsCorrection = computed(() =>
   ['LAGGING', 'OVERDUE'].includes(latestSnapshotStatus.value),
 )
-const approvedMonthlyPlans = computed(
+const periodTypeLabels: Record<PeriodType, string> = {
+  YEARLY: '年',
+  QUARTERLY: '季',
+  MONTHLY: '月',
+  WEEKLY: '周',
+}
+const parentPeriodTypes: Partial<Record<PeriodType, PeriodType>> = {
+  QUARTERLY: 'YEARLY',
+  MONTHLY: 'QUARTERLY',
+  WEEKLY: 'MONTHLY',
+}
+const parentPeriodType = computed(() => parentPeriodTypes[periodForm.periodType])
+const parentPeriodLabel = computed(() =>
+  parentPeriodType.value ? periodTypeLabels[parentPeriodType.value] : '',
+)
+const approvedParentPlans = computed(
   () =>
     detail.value?.periodPlans.filter(
-      (item) => item.periodType === 'MONTHLY' && item.status === 'APPROVED',
+      (item) => item.periodType === parentPeriodType.value && item.status === 'APPROVED',
     ) ?? [],
 )
+
+function periodPlanLabel(id?: string | null): string {
+  const parent = detail.value?.periodPlans.find((item) => item.id === id)
+  return parent ? `${parent.periodCode} ${parent.periodName}` : '—'
+}
 
 function hasPermission(code: string): boolean {
   return (
@@ -334,7 +355,7 @@ async function saveWbs(): Promise<void> {
   }
 }
 
-function openPeriod(periodType: 'MONTHLY' | 'WEEKLY'): void {
+function openPeriod(periodType: PeriodType): void {
   if (!detail.value) return
   const today = new Date().toISOString().slice(0, 10)
   Object.assign(periodForm, {
@@ -342,7 +363,7 @@ function openPeriod(periodType: 'MONTHLY' | 'WEEKLY'): void {
     periodType,
     parentPeriodPlanId: '',
     periodCode: '',
-    periodName: periodType === 'MONTHLY' ? '月计划' : '周计划',
+    periodName: `${periodTypeLabels[periodType]}计划`,
     startDate: today,
     endDate: today,
     remark: '',
@@ -357,11 +378,11 @@ function openPeriod(periodType: 'MONTHLY' | 'WEEKLY'): void {
 async function savePeriod(): Promise<void> {
   if (!detail.value) return
   if (!periodForm.taskIds.length) {
-    errorMessage.value = '月周计划至少选择一条 WBS 任务'
+    errorMessage.value = '周期计划至少选择一条 WBS 任务'
     return
   }
-  if (periodForm.periodType === 'WEEKLY' && !periodForm.parentPeriodPlanId.trim()) {
-    errorMessage.value = '周计划必须关联已审批月计划'
+  if (parentPeriodType.value && !periodForm.parentPeriodPlanId.trim()) {
+    errorMessage.value = `${periodTypeLabels[periodForm.periodType]}计划必须关联已审批${periodTypeLabels[parentPeriodType.value]}计划`
     return
   }
   saving.value = true
@@ -379,11 +400,11 @@ async function savePeriod(): Promise<void> {
     )
     await submitPeriodPlan(itemDetail.id)
     periodOpen.value = false
-    showToast('success', '操作成功', '月周计划已提交。')
+    showToast('success', '操作成功', '周期计划已提交。')
     await openDetail(detail.value.id, true)
     await reloadList(true)
   } catch (error) {
-    errorMessage.value = message(error, '月周计划提交失败')
+    errorMessage.value = message(error, '周期计划提交失败')
     await openDetail(detail.value.id, true)
   } finally {
     saving.value = false
@@ -831,12 +852,28 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           />
         </V2Card>
 
-        <V2Card title="月周计划" :heading-level="3">
+        <V2Card title="年季月周计划" :heading-level="3">
           <template #title-extra>
             <V2Badge tone="neutral">共 {{ detail.periodPlans.length }} 条</V2Badge>
           </template>
           <template #actions>
             <div class="schedule-page__actions">
+              <V2Button
+                v-if="canMaintain && detail.status === 'ACTIVE'"
+                size="small"
+                variant="ghost"
+                @click="openPeriod('YEARLY')"
+              >
+                新建年计划
+              </V2Button>
+              <V2Button
+                v-if="canMaintain && detail.status === 'ACTIVE'"
+                size="small"
+                variant="ghost"
+                @click="openPeriod('QUARTERLY')"
+              >
+                新建季计划
+              </V2Button>
               <V2Button
                 v-if="canMaintain && detail.status === 'ACTIVE'"
                 size="small"
@@ -862,22 +899,24 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
                   <th>类型</th>
                   <th>编码</th>
                   <th>名称</th>
+                  <th>上级计划</th>
                   <th>周期</th>
                   <th>状态</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="period in detail.periodPlans" :key="period.id">
-                  <td>{{ period.periodType === 'MONTHLY' ? '月计划' : '周计划' }}</td>
+                  <td>{{ periodTypeLabels[period.periodType] }}计划</td>
                   <td>{{ period.periodCode }}</td>
                   <td>{{ period.periodName }}</td>
+                  <td>{{ periodPlanLabel(period.parentPeriodPlanId) }}</td>
                   <td>{{ period.startDate }} 至 {{ period.endDate }}</td>
                   <td>{{ deliveryLabel(period.status) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p v-else class="schedule-page__empty-copy">暂无月周计划。</p>
+          <p v-else class="schedule-page__empty-copy">暂无周期计划。</p>
         </V2Card>
 
         <V2Card title="纠偏链与追溯" :heading-level="3">
@@ -1008,17 +1047,17 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 
     <V2Dialog
       v-model:open="periodOpen"
-      :title="periodForm.periodType === 'MONTHLY' ? '新建月计划' : '新建周计划'"
+      :title="`新建${periodTypeLabels[periodForm.periodType]}计划`"
       :close-on-backdrop="false"
       panel-class="v2-dialog-standard"
     >
       <form id="schedule-period-form" class="schedule-page__form" @submit.prevent="savePeriod">
         <V2Select
-          v-if="periodForm.periodType === 'WEEKLY'"
+          v-if="parentPeriodType"
           v-model="periodForm.parentPeriodPlanId"
-          label="所属月计划"
+          :label="`所属${parentPeriodLabel}计划`"
           :options="
-            approvedMonthlyPlans.map((item: PeriodPlanRecord) => ({
+            approvedParentPlans.map((item: PeriodPlanRecord) => ({
               value: item.id,
               label: `${item.periodCode} ${item.periodName}`,
             }))

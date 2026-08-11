@@ -121,8 +121,12 @@ const projectOptions = computed(() => {
     options.unshift({ value: form.projectId, label: `本地草稿项目（${form.projectId}）` })
   return options
 })
-const canEdit = computed(() => hasPermission('site:daily:edit'))
-const canReportProgress = computed(() => hasPermission('schedule:progress'))
+const canEdit = computed(
+  () => hasPermission('site:daily:edit') || session.hasPermission('site:daily:self'),
+)
+const canReportProgress = computed(
+  () => hasPermission('schedule:progress') || session.hasPermission('schedule:daily-progress:self'),
+)
 const canViewQuality = computed(() => hasPermission('quality:safety:query'))
 const selectedProjectId = computed(() => workspace.selectedProjectId || '')
 const selectedReportPeriod = computed(() =>
@@ -477,11 +481,11 @@ async function restoreDailyDraft(): Promise<void> {
   if (!offlineDraftEnabled.value) return
   try {
     const repository = localRepository()
-    const draft = (activeRecord.value
-      ? await repository.get<DailyDraftPayload>(dailyDraftId(cleanLogCommand(form)))
-      : (await repository.list('DAILY_LOG')).find((item) => item.status !== 'SYNCED')) as
-      | FieldDraft<DailyDraftPayload>
-      | undefined
+    const draft = (
+      activeRecord.value
+        ? await repository.get<DailyDraftPayload>(dailyDraftId(cleanLogCommand(form)))
+        : (await repository.list('DAILY_LOG')).find((item) => item.status !== 'SYNCED')
+    ) as FieldDraft<DailyDraftPayload> | undefined
     if (!draft || draft.status === 'SYNCED') return
     localDraft.value = draft
     Object.assign(form, draft.payload.command)

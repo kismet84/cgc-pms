@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/purchase-requests")
@@ -29,7 +30,7 @@ public class MatPurchaseRequestController {
     private final PurchaseRequestApprovalService approvalService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:list','purchase:request:self')")
     public ApiResponse<PageResult<MatPurchaseRequestVO>> list(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -43,25 +44,25 @@ public class MatPurchaseRequestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:list','purchase:request:self')")
     public ApiResponse<MatPurchaseRequestVO> getById(@PathVariable Long id) {
         return ApiResponse.success(requestService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:add','purchase:request:self')")
     public ApiResponse<String> create(@Valid @RequestBody MatPurchaseRequest request) {
         return ApiResponse.success(String.valueOf(requestService.create(request)));
     }
 
     @PostMapping("/with-items")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:add','purchase:request:self')")
     public ApiResponse<String> createWithItems(@Valid @RequestBody PurchaseRequestCreateCommand command) {
         return ApiResponse.success(String.valueOf(requestService.create(command.header(), command.items())));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:edit','purchase:request:self')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatPurchaseRequest request) {
         request.setId(id);
         requestService.update(request);
@@ -69,21 +70,21 @@ public class MatPurchaseRequestController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:delete','purchase:request:self')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         requestService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('purchase:request:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('purchase:request:submit','purchase:request:self') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         requestService.submitForApproval(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/resubmit")
-    @PreAuthorize("hasAuthority('purchase:request:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('purchase:request:submit','purchase:request:self') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> resubmitForApproval(@PathVariable Long id, @RequestParam Long instanceId) {
         requestService.resubmitForApproval(id, instanceId);
         return ApiResponse.success();
@@ -105,13 +106,13 @@ public class MatPurchaseRequestController {
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:list','purchase:request:self')")
     public ApiResponse<List<MatPurchaseRequestItemVO>> getItems(@PathVariable Long id) {
         return ApiResponse.success(requestService.getItems(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:edit','purchase:request:self')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @Size(max = 200, message = "批量明细不能超过200条")
                                              @RequestBody List<MatPurchaseRequestItem> items) {
@@ -124,5 +125,11 @@ public class MatPurchaseRequestController {
         }
         requestService.saveItemsBatch(id, items);
         return ApiResponse.success();
+    }
+
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('purchase:request:add','purchase:request:self')")
+    public ApiResponse<Map<String, Object>> formOptions(@RequestParam Long projectId) {
+        return ApiResponse.success(requestService.formOptions(projectId));
     }
 }
