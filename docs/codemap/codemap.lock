@@ -1,7 +1,7 @@
 {
-  "current_commit": "2bce3a694622f515d50ea72d2613b2e20e827861",
-  "working_tree_dirty": true,
-  "generation_time": "2026-08-11T12:57:17.562Z",
+  "current_commit": "a0c35342a6ddb71726f1883d9167206d0ea72dfb",
+  "working_tree_dirty": false,
+  "generation_time": "2026-08-11T12:58:46.317Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -53,15 +53,13 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 3896,
-  "repository_file_count": 3895,
+  "repository_file_count": 3896,
   "included_file_count": 2632,
-  "excluded_file_count": 1263,
+  "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
-    "stale_modules": [
-      "backend"
-    ],
-    "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
+    "stale_modules": [],
+    "reason": "Current snapshot matches previous code map inputs."
   },
   "modules": [
     {
