@@ -93,7 +93,7 @@ public interface CashJournalEntryMapper extends BaseMapper<CashJournalEntry> {
             WHERE tenant_id = #{tenantId}
               AND deleted_flag = 0
             <if test="ew != null and ew.sqlSegment != null and ew.sqlSegment != ''">
-              AND ${ew.sqlSegment}
+              AND ${ew.sqlSegment} /* SQL-SAFETY: fixed-sql-fragment - server-built LambdaQueryWrapper with bound values */
             </if>
             </script>
             """)

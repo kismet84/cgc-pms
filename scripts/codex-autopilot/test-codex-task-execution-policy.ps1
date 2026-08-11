@@ -97,9 +97,12 @@ Assert-Contains 'docs index' $docsIndex @(
   '12 | 已退役 | Retired','状态` 只描述文档生命周期','日期、分支、提交、CI run','Skill、插件 references、配置和 Schema 必须保留在所属包内',
   '../.agents/skills/cgc-pms-ci-gate-triage/SKILL.md','../.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md',
   '../.agents/skills/cgc-pms-runtime-refresh/SKILL.md','../.agents/skills/long-task-gate/SKILL.md',
-  '../.agents/skills/release-skills/SKILL.md','../.agents/skills/lark-slides/SKILL.md',
+  '../.agents/skills/release-skills/SKILL.md',
   '../plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md'
 )
+if ($docsIndex -match [regex]::Escape('../.agents/skills/lark-slides/SKILL.md')) {
+  throw 'docs index references provider-managed lark-slides as an untracked repository Skill'
+}
 
 Assert-Contains 'route index' $policy @(
   '普通代码、文档、审查和解释任务','显式规则读取为 0','任务路由',
