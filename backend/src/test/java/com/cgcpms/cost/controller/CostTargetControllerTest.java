@@ -108,6 +108,7 @@ class CostTargetControllerTest {
         jdbcTemplate.update("UPDATE pm_project SET owner_contract_id=?, contract_amount=? WHERE id=?",
                 previousOwnerContractId, previousProjectContractAmount, PROJECT_ID);
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id=?", OWNER_CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE id=33004 AND user_id=?", OUTSIDER_USER_ID);
     }
 
     /** Generate a valid JWT token for the admin user and wrap as HttpOnly cookie. */
@@ -197,6 +198,13 @@ class CostTargetControllerTest {
                 SELECT 33003,0,?,?,'CSTM','成本经理',CURRENT_DATE,'ACTIVE',1,0
                 WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE id=33003)
                 """, PROJECT_ID, ACTION_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
+                SELECT 33004,0,?,r.id FROM sys_role r
+                WHERE r.tenant_id=0 AND r.role_code='PROJECT_MANAGER'
+                  AND r.status='ENABLE' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM sys_user_role WHERE id=33004)
+                """, OUTSIDER_USER_ID);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -608,6 +616,35 @@ class CostTargetControllerTest {
 
     @Test
     @Order(16)
+    @DisplayName("project-manager options need only cost permission and draft rejects non-manager")
+    void testProjectManagerCandidatesAndWriteValidation() throws Exception {
+        String response = mockMvc.perform(getWithApiContext("/cost-targets/project-manager-options")
+                        .cookie(authorityCookie(ACTION_USER_ID, "cost.action.user", "cost:target:add"))
+                        .param("projectId", String.valueOf(PROJECT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        Assertions.assertTrue(response.contains("\"id\":\"" + OUTSIDER_USER_ID + "\""));
+
+        String body = """
+                {
+                  "projectId": %d,
+                  "projectManagerId": %d,
+                  "versionNo": "V-MANAGER-INVALID-%d",
+                  "versionName": "非法项目经理候选",
+                  "items": %s
+                }
+                """.formatted(PROJECT_ID, ACTION_USER_ID, System.nanoTime(), defaultItemsJson());
+        mockMvc.perform(postWithApiContext("/cost-targets/drafts")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_MANAGER_INVALID"));
+    }
+
+    @Test
+    @Order(17)
     @DisplayName("activate endpoint keeps one active version per project")
     void testActivateEndpointKeepsUniqueActiveVersion() throws Exception {
         long firstId = 3399101L;
@@ -638,7 +675,7 @@ class CostTargetControllerTest {
     }
 
     @Test
-    @Order(17)
+    @Order(18)
     @DisplayName("composite draft saves header and items with server-computed totals")
     void testCompositeDraftComputesTotals() throws Exception {
         previousCompositeManagerId = jdbcTemplate.queryForObject(

@@ -62,6 +62,13 @@ public class CostTargetController {
         return ApiResponse.success(costTargetService.getDefaultAllocation(projectId));
     }
 
+    @GetMapping("/project-manager-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add') or hasAuthority('cost:target:edit')")
+    public ApiResponse<List<CostTargetService.ProjectManagerOption>> getProjectManagerOptions(
+            @RequestParam Long projectId) {
+        return ApiResponse.success(costTargetService.getProjectManagerOptions(projectId));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add')")
     public ApiResponse<String> create(@Valid @RequestBody CostTarget target) {

@@ -74,6 +74,7 @@ import type {
   CollectionRecord,
   ContractRevenueRecord,
   CollectionCommand,
+  ContractRecord,
   ExpenseApplicationCommand,
   ExpenseApplicationRecord,
   FundAccountRecord,
@@ -294,7 +295,7 @@ const dialog = ref(false)
 const editor = ref<FinanceEditor | null>(null)
 const editorKind = ref<EditorKind>('payment')
 const pending = ref<{ row: Row; action: Action } | null>(null)
-const contracts = ref<Array<{ id: string; contractCode: string; contractName: string }>>([])
+const contracts = ref<ContractRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
 const budgetLines = ref<BudgetLineRecord[]>([])
@@ -486,32 +487,78 @@ function changePage(next: number): void {
   void load(true)
 }
 
-const projectOptions = computed(() => workspace.projects)
+const projectOptions = computed(() =>
+  workspace.projects.filter(
+    (item) => item.status === 'ACTIVE' || item.value === editor.value?.projectId,
+  ),
+)
+const selectedContract = computed(() =>
+  contracts.value.find((item) => item.id === editor.value?.contractId),
+)
 const contractOptions = computed(() =>
-  contracts.value.map((item) => ({
-    value: item.id,
-    label: `${item.contractCode} · ${item.contractName}`,
-  })),
+  contracts.value
+    .filter((item) => {
+      const currentHistorical = Boolean(editor.value?.id) && item.id === editor.value?.contractId
+      const performing = item.approvalStatus === 'APPROVED' && item.contractStatus === 'PERFORMING'
+      if (
+        editorKind.value === 'settlement' ||
+        editorKind.value === 'salesInvoice' ||
+        editorKind.value === 'collection'
+      ) {
+        return currentHistorical || (performing && item.contractType === 'MAIN')
+      }
+      return currentHistorical || performing
+    })
+    .map((item) => ({
+      value: item.id,
+      label: `${item.contractCode} · ${item.contractName}`,
+    })),
 )
-const partnerOptions = computed(() =>
-  partners.value.map((item) => ({
-    value: item.id,
-    label: `${item.partnerCode} · ${item.partnerName}`,
-  })),
-)
-const customerOptions = computed(() =>
-  partners.value
-    .filter((item) => item.partnerType === 'CUSTOMER')
+function linkedPartnerOptions(expectedId?: string | null, currentId?: string | null) {
+  const options = partners.value
+    .filter((item) => Boolean(expectedId) && item.id === expectedId)
     .map((item) => ({
       value: item.id,
       label: `${item.partnerCode} · ${item.partnerName}`,
-    })),
+    }))
+  if (currentId && !options.some((item) => item.value === currentId)) {
+    const current = partners.value.find((item) => item.id === currentId)
+    options.push({
+      value: currentId,
+      label: `${current?.partnerCode ? `${current.partnerCode} · ` : ''}${current?.partnerName || '历史往来单位'}（历史值）`,
+    })
+  }
+  return options
+}
+const partnerOptions = computed(() =>
+  linkedPartnerOptions(selectedContract.value?.partyBId, editor.value?.partnerId),
+)
+const payeePartnerOptions = computed(() => {
+  const options = partners.value.map((item) => ({
+    value: item.id,
+    label: `${item.partnerCode} · ${item.partnerName}`,
+  }))
+  const currentId = editor.value?.payeePartnerId
+  if (currentId && !options.some((item) => item.value === currentId)) {
+    options.push({ value: currentId, label: '历史收款单位（历史值）' })
+  }
+  return options
+})
+const customerOptions = computed(() =>
+  linkedPartnerOptions(selectedContract.value?.partyAId, editor.value?.customerId),
 )
 const costSubjectOptions = computed(() =>
-  costSubjects.value.map((item) => ({
-    value: item.id,
-    label: `${item.subjectCode} · ${item.subjectName}`,
-  })),
+  (() => {
+    const parentIds = new Set(
+      costSubjects.value.map((item) => item.parentId).filter((id): id is string => Boolean(id)),
+    )
+    return costSubjects.value
+      .filter((item) => item.status === 'ENABLE' && !parentIds.has(item.id))
+      .map((item) => ({
+        value: item.id,
+        label: `${item.subjectCode} · ${item.subjectName}`,
+      }))
+  })(),
 )
 const budgetLineOptions = computed(() =>
   budgetLines.value
@@ -607,11 +654,7 @@ async function loadContracts(value: string): Promise<void> {
   contracts.value = []
   if (!value) return
   const page = await loadContractPage({ pageNo: 1, pageSize: 200, projectId: value })
-  contracts.value = page.records.map((item) => ({
-    id: item.id,
-    contractCode: item.contractCode,
-    contractName: item.contractName,
-  }))
+  contracts.value = page.records
 }
 
 async function loadBudgetLines(value: string): Promise<void> {
@@ -648,6 +691,11 @@ async function changeContract(value: string): Promise<void> {
   if (!editor.value) return
   editor.value.contractId = value
   editor.value.revenueId = ''
+  const contract = contracts.value.find((item) => item.id === value)
+  if (editorKind.value === 'payment') editor.value.partnerId = contract?.partyBId || ''
+  if (['settlement', 'salesInvoice', 'collection'].includes(editorKind.value)) {
+    editor.value.customerId = contract?.partyAId || ''
+  }
   contractRevenues.value = []
   if (editorKind.value === 'payment') {
     await loadPaymentSources()
@@ -1592,7 +1640,7 @@ onBeforeUnmount(() => controller?.abort())
             <V2Select
               v-model="editor.payeePartnerId"
               label="收款单位"
-              :options="partnerOptions"
+              :options="payeePartnerOptions"
               required
             />
             <V2Select

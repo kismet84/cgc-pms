@@ -64,7 +64,7 @@ const filter = reactive({
   endDate: undefined as string | undefined,
 })
 const records = ref<BidCostRecord[]>([])
-const ownerOptions = ref<Array<{ value: string; label: string }>>([])
+const ownerOptions = ref<Array<{ value: string; label: string; disabled?: boolean }>>([])
 const total = ref(0)
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -121,6 +121,13 @@ function errorText(error: unknown, fallback: string): string {
 const nullable = (value: string) => value.trim() || null
 const datetimeLocal = (value?: string | null) => (value ? value.replace(' ', 'T').slice(0, 16) : '')
 function fillForm(value?: BidCostRecord): void {
+  if (value?.ownerId && !ownerOptions.value.some((option) => option.value === value.ownerId)) {
+    ownerOptions.value.push({
+      value: value.ownerId,
+      label: `${value.ownerName || value.ownerId}（历史负责人）`,
+      disabled: true,
+    })
+  }
   Object.assign(form, {
     bidProjectName: value?.bidProjectName ?? '',
     bidSectionName: value?.bidSectionName ?? '',

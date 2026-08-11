@@ -182,14 +182,35 @@ const userOptions = (value = '') => {
   return options
 }
 const partnerOptions = computed(() =>
-  partners.value.map((item) => ({
-    value: item.id,
-    label: `${item.partnerCode} · ${item.partnerName}`,
-  })),
+  partners.value
+    .filter(
+      (item) =>
+        item.status === 'ENABLE' &&
+        ['SUPPLIER', 'SUB', 'SUBCONTRACTOR'].includes((item.partnerType || '').toUpperCase()),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.partnerCode} · ${item.partnerName}`,
+    })),
 )
+const consequencePartnerOptions = computed(() => {
+  const partnerId = activeIssue.value?.responsiblePartnerId
+  if (!partnerId) return []
+  return [
+    partnerOptions.value.find((item) => item.value === partnerId) ?? {
+      value: partnerId,
+      label: partnerLabel(partnerId),
+    },
+  ]
+})
 const contractOptions = computed(() =>
   contracts.value
-    .filter((item) => !projectId.value || item.projectId === projectId.value)
+    .filter(
+      (item) =>
+        (!projectId.value || item.projectId === projectId.value) &&
+        Boolean(consequenceForm.partnerId) &&
+        [item.partyAId, item.partyBId].includes(consequenceForm.partnerId),
+    )
     .map((item) => ({
       value: item.id,
       label: `${item.contractCode} · ${item.contractName}`,
@@ -400,10 +421,9 @@ async function openTrace(issue: QualityIssueRecord, preserveNotice = false): Pro
 }
 
 async function loadCommercialOptions(): Promise<void> {
-  if (partners.value.length && contracts.value.length) return
   try {
     const [partnerPage, contractPage] = await Promise.all([
-      loadPartners(),
+      loadPartners({ pageNo: 1, pageSize: 200, status: 'ENABLE' }),
       loadContractPage({ pageNo: 1, pageSize: 200, projectId: projectId.value || undefined }),
     ])
     partners.value = partnerPage.records
@@ -1180,7 +1200,7 @@ onBeforeUnmount(() => {
                     </td>
                     <td>
                       <V2Button
-                        v-if="canConsequence"
+                        v-if="canConsequence && issue.responsibleKind === 'PARTNER'"
                         size="small"
                         variant="ghost"
                         @click="show('consequence', issue)"
@@ -1579,8 +1599,9 @@ onBeforeUnmount(() => {
         <V2Select
           v-model="consequenceForm.partnerId"
           label="合作方"
-          :options="partnerOptions"
+          :options="consequencePartnerOptions"
           required
+          disabled
           placeholder="请选择合作方"
         /><V2Select
           v-model="consequenceForm.contractId"

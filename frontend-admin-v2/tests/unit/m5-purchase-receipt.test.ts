@@ -76,10 +76,10 @@ describe('M5 purchase request, order and receipt contract', () => {
     )
     expect(source).toContain("route.path === '/purchase/order'")
     expect(source).toContain("route.path === '/purchase/receipt'")
-    expect(source).toContain("attachmentDocumentType")
-    expect(source).toContain("uploadReceiptAttachment")
-    expect(source).toContain("DELIVERY_NOTE")
-    expect(source).toContain("MATERIAL_ACCEPTANCE_FORM")
+    expect(source).toContain('attachmentDocumentType')
+    expect(source).toContain('uploadReceiptAttachment')
+    expect(source).toContain('DELIVERY_NOTE')
+    expect(source).toContain('MATERIAL_ACCEPTANCE_FORM')
     expect(source).toContain('attachmentScanStatus')
     expect(source).toContain('systemBatchNo')
     expect(source).toContain('deliveryNoteNo')
@@ -100,6 +100,15 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('loadMaterials')
     expect(source).toContain('loadPartners')
     expect(source).toContain('loadContractPage')
+    expect(source).toContain('loadContractItems')
+    expect(source).toContain("contractStatus: 'PERFORMING'")
+    expect(source).toContain(
+      'form.partnerId = contracts.value.find((item) => item.id === value)?.partyBId',
+    )
+    expect(source).toContain('contractItems.value.map((item) => item.materialId)')
+    expect(source).toContain("['PERFORMING', 'PARTIAL_RECEIVED'].includes(item.orderStatus || '')")
+    expect(source).toContain('item.id === form.orderId')
+    expect(source).not.toContain('changeOrderEditContract')
     expect(source).toContain('loadBudgetPage')
     expect(source).toContain('budgetLineId: requiredDraft')
     expect(source).not.toContain('estimatedUnitPrice')
@@ -127,7 +136,7 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('requestCandidates')
     expect(source).toContain('changeOrderRequest')
     expect(source).toContain('createPurchaseOrderFromRequest')
-    expect(source).toContain('status: \'APPROVED\'')
+    expect(source).toContain("status: 'APPROVED'")
     expect(source).toContain('明细来自已审批采购申请，只读展示')
     expect(source).toContain('由服务端合同事实决定')
     expect(source).toContain('updatePurchaseOrder')
@@ -151,7 +160,9 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain("'orderCode' in record")
     expect(source).toContain("CONVERTED: '已转订单'")
     expect(source).toContain("PARTIAL: '部分合格'")
-    expect(source).toContain("if ('receiptCode' in record) return statusLabel(record.approvalStatus)")
+    expect(source).toContain(
+      "if ('receiptCode' in record) return statusLabel(record.approvalStatus)",
+    )
     expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
     expect(source).not.toMatch(
       /frontend-admin\/src|Legacy|totalAmount\s*[+]=|receivedQuantity\s*[+]=|label="[^"]*ID/,

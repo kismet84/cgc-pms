@@ -150,6 +150,10 @@ const roleLabel = (value: string) =>
   PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ?? value
 const memberName = (userId: string) =>
   userOptions.value.find((item) => item.value === userId)?.label ?? '成员姓名缺失'
+const availableMemberUserOptions = computed(() => {
+  const existingUserIds = new Set(members.value.map((member) => member.userId))
+  return userOptions.value.filter((option) => !existingUserIds.has(option.value))
+})
 const memberStatusLabel = (status: string) =>
   ({ ACTIVE: '在岗', INACTIVE: '离岗', ENABLE: '启用', DISABLE: '停用' })[status] ?? '状态缺失'
 const dictLabel = (items: DictionaryItem[], value: string) =>
@@ -1245,9 +1249,9 @@ onBeforeUnmount(() => {
           v-if="!editingMemberId"
           v-model="memberForm.userId"
           label="用户"
-          :options="userOptions"
+          :options="availableMemberUserOptions"
           placeholder="请选择用户"
-          :disabled="!userOptions.length"
+          :disabled="!availableMemberUserOptions.length"
           required
         /><V2Select
           v-model="memberForm.roleCode"

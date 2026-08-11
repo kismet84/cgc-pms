@@ -83,6 +83,38 @@ public class CostTargetService {
         return costTargetMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     }
 
+    public List<ProjectManagerOption> getProjectManagerOptions(Long projectId) {
+        PmProject project = projectMapper.selectById(projectId);
+        if (project == null || !Objects.equals(project.getTenantId(), UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        projectAccessChecker.checkAccess(project, "选择项目经理");
+        Long currentManagerId = project.getProjectManagerId();
+        return jdbc.query("""
+                SELECT u.id,u.username,u.real_name,u.status,
+                  CASE WHEN u.status='ENABLE' AND (
+                    u.id=? OR EXISTS (
+                      SELECT 1 FROM sys_user_role ur
+                      JOIN sys_role r ON r.tenant_id=u.tenant_id AND r.id=ur.role_id
+                        AND r.role_code='PROJECT_MANAGER' AND r.status='ENABLE' AND r.deleted_flag=0
+                      WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+                    )) THEN 1 ELSE 0 END eligible
+                FROM sys_user u
+                WHERE u.tenant_id=? AND u.deleted_flag=0 AND (
+                  u.id=? OR (u.status='ENABLE' AND EXISTS (
+                    SELECT 1 FROM sys_user_role ur
+                    JOIN sys_role r ON r.tenant_id=u.tenant_id AND r.id=ur.role_id
+                      AND r.role_code='PROJECT_MANAGER' AND r.status='ENABLE' AND r.deleted_flag=0
+                    WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+                  )))
+                ORDER BY eligible DESC,COALESCE(u.real_name,u.username),u.id
+                """, (rs, rowNum) -> new ProjectManagerOption(
+                        String.valueOf(rs.getLong("id")), rs.getString("username"),
+                        rs.getString("real_name"), rs.getString("status"),
+                        rs.getInt("eligible") == 1),
+                currentManagerId, UserContext.getCurrentTenantId(), currentManagerId);
+    }
+
     public CostTarget getById(Long id) {
         CostTarget target = costTargetMapper.selectById(id);
         if (target == null || !target.getTenantId().equals(UserContext.getCurrentTenantId())) {
@@ -196,13 +228,13 @@ public class CostTargetService {
         if (items == null || items.isEmpty()) {
             throw new BusinessException("COST_TARGET_NO_ITEMS", "项目成本预算至少需要一条科目明细");
         }
-        requireEnabledProjectManager(projectManagerId);
         Long projectId = target.getProjectId();
         if (target.getId() != null) {
             CostTarget existing = getOwnedTarget(target.getId());
             if (existing == null) throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
             projectId = existing.getProjectId();
         }
+        requireEligibleProjectManager(projectId, projectManagerId);
         lockWritableProject(projectId, "保存项目成本预算");
         normalizeItems(items);
         target.setTotalTargetAmount(sum(items, CostTargetItem::getTargetAmount));
@@ -529,12 +561,23 @@ public class CostTargetService {
         if (count == null || count != 1) throw new BusinessException("COST_TARGET_RESPONSIBLE_INVALID", "责任人不存在、跨租户或已停用");
     }
 
-    private void requireEnabledProjectManager(Long userId) {
+    private void requireEligibleProjectManager(Long projectId, Long userId) {
         Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE id=? AND tenant_id=? AND status='ENABLE' AND deleted_flag=0",
-                Integer.class, userId, UserContext.getCurrentTenantId());
+                """
+                SELECT COUNT(*) FROM sys_user u
+                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                  AND (EXISTS (
+                    SELECT 1 FROM sys_user_role ur
+                    JOIN sys_role r ON r.tenant_id=u.tenant_id AND r.id=ur.role_id
+                      AND r.role_code='PROJECT_MANAGER' AND r.status='ENABLE' AND r.deleted_flag=0
+                    WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+                  ) OR EXISTS (
+                    SELECT 1 FROM pm_project p WHERE p.id=? AND p.tenant_id=u.tenant_id
+                      AND p.project_manager_id=u.id AND p.deleted_flag=0
+                  ))
+                """, Integer.class, userId, UserContext.getCurrentTenantId(), projectId);
         if (count == null || count != 1) {
-            throw new BusinessException("PROJECT_MANAGER_INVALID", "项目经理不存在、跨租户或已停用");
+            throw new BusinessException("PROJECT_MANAGER_INVALID", "项目经理不存在、已停用或未配置项目经理角色");
         }
     }
 
@@ -656,6 +699,10 @@ public class CostTargetService {
     }
 
     private record TargetSubject(Long id, String code, String name, String type, BigDecimal ratio) {
+    }
+
+    public record ProjectManagerOption(String id, String username, String realName,
+                                       String status, boolean eligible) {
     }
 
     public record DefaultAllocation(String projectId, String projectManagerId,

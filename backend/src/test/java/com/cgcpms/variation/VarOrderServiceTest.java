@@ -56,6 +56,12 @@ class VarOrderServiceTest {
     private static final long CONTRACT_ID = 30018L;
     private static final long SCHEDULE_ID = 40018L;
     private static final long WBS_ID = 50018L;
+    private static final long COST_SUBJECT_PARENT_ID = 99018010L;
+    private static final long COST_SUBJECT_ID = 99018011L;
+    private static final long SECOND_COST_SUBJECT_ID = 99018012L;
+    private static final long TEST_DISABLED_SUBJECT_ID = 99018013L;
+    private static final long TEST_CROSS_TENANT_SUBJECT_ID = 99018014L;
+    private static final long TEST_REVENUE_SUBJECT_ID = 99018015L;
 
     @Autowired
     private VarOrderService varOrderService;
@@ -153,6 +159,26 @@ class VarOrderServiceTest {
                        CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0
                 WHERE NOT EXISTS (SELECT 1 FROM project_wbs_task WHERE id=?)
                 """, WBS_ID, PROJECT_ID, SCHEDULE_ID, WBS_ID);
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject
+                    (id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,status,account_category)
+                SELECT ?,0,0,'VAR.TEST.PARENT','签证测试父科目','TEST',2,'ENABLE','COST'
+                WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=?)
+                """, COST_SUBJECT_PARENT_ID, COST_SUBJECT_PARENT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject
+                    (id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,status,account_category)
+                SELECT ?,0,?,'VAR.TEST.LEAF.1','签证测试末级科目一','TEST',3,'ENABLE','COST'
+                WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=?)
+                """, COST_SUBJECT_ID, COST_SUBJECT_PARENT_ID, COST_SUBJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject
+                    (id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,status,account_category)
+                SELECT ?,0,?,'VAR.TEST.LEAF.2','签证测试末级科目二','TEST',3,'ENABLE','COST'
+                WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=?)
+                """, SECOND_COST_SUBJECT_ID, COST_SUBJECT_PARENT_ID, SECOND_COST_SUBJECT_ID);
+        jdbcTemplate.update("UPDATE cost_subject SET status='ENABLE', deleted_flag=0 WHERE id IN (?,?,?)",
+                COST_SUBJECT_PARENT_ID, COST_SUBJECT_ID, SECOND_COST_SUBJECT_ID);
 
         if (partnerMapper.selectById(PARTNER_ID) == null) {
             MdPartner partner = new MdPartner();
@@ -299,7 +325,7 @@ class VarOrderServiceTest {
         item1.setQuantity(new BigDecimal("10"));
         item1.setUnitPrice(new BigDecimal("200.00"));
         item1.setAmount(new BigDecimal("2000.00"));
-        item1.setCostSubjectId(90001L);
+        item1.setCostSubjectId(COST_SUBJECT_ID);
         item1.setWbsTaskId(WBS_ID);
 
         VarOrderItem item2 = new VarOrderItem();
@@ -309,7 +335,7 @@ class VarOrderServiceTest {
         item2.setQuantity(new BigDecimal("50"));
         item2.setUnitPrice(new BigDecimal("60.00"));
         item2.setAmount(new BigDecimal("3000.00"));
-        item2.setCostSubjectId(90002L);
+        item2.setCostSubjectId(SECOND_COST_SUBJECT_ID);
         item2.setWbsTaskId(WBS_ID);
 
         varOrderService.saveItems(id, java.util.List.of(item1, item2));
@@ -327,7 +353,7 @@ class VarOrderServiceTest {
         item.setQuantity(BigDecimal.ONE);
         item.setUnitPrice(new BigDecimal("100.00"));
         item.setClaimUnitPrice(new BigDecimal("120.00"));
-        item.setCostSubjectId(90001L);
+        item.setCostSubjectId(COST_SUBJECT_ID);
         item.setWbsTaskId(WBS_ID);
         varOrderService.saveItems(id, java.util.List.of(item));
         jdbcTemplate.update("""
@@ -395,6 +421,98 @@ class VarOrderServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("签证明细仅接受本租户启用末级科目，历史原值可保留")
+    void costSubjectCandidatesMatchAuthoritativeSaveValidation() {
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject
+                    (id, tenant_id, parent_id, subject_code, subject_name, level, status, account_category)
+                VALUES (?, 0, 0, 'VAR.TEST.DISABLED', '签证测试停用科目', 3, 'DISABLE', 'COST'),
+                       (?, 999, 0, 'VAR.TEST.CROSS', '签证测试跨租户科目', 3, 'ENABLE', 'COST'),
+                       (?, 0, 0, 'VAR.TEST.REVENUE', '签证测试收入科目', 3, 'ENABLE', 'REVENUE')
+                """, TEST_DISABLED_SUBJECT_ID, TEST_CROSS_TENANT_SUBJECT_ID, TEST_REVENUE_SUBJECT_ID);
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-成本科目候选");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+
+        VarOrderItem item = new VarOrderItem();
+        item.setItemName("科目校验明细");
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(BigDecimal.ONE);
+        item.setWbsTaskId(WBS_ID);
+
+        item.setCostSubjectId(COST_SUBJECT_PARENT_ID);
+        BusinessException parent = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(item)));
+        assertEquals("VAR_ORDER_COST_SUBJECT_INVALID", parent.getCode());
+
+        item.setCostSubjectId(TEST_DISABLED_SUBJECT_ID);
+        BusinessException disabled = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(item)));
+        assertEquals("VAR_ORDER_COST_SUBJECT_INVALID", disabled.getCode());
+
+        item.setCostSubjectId(TEST_CROSS_TENANT_SUBJECT_ID);
+        BusinessException crossTenant = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(item)));
+        assertEquals("VAR_ORDER_COST_SUBJECT_INVALID", crossTenant.getCode());
+
+        item.setCostSubjectId(TEST_REVENUE_SUBJECT_ID);
+        BusinessException revenue = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(item)));
+        assertEquals("VAR_ORDER_COST_SUBJECT_INVALID", revenue.getCode());
+
+        item.setCostSubjectId(COST_SUBJECT_ID);
+        varOrderService.saveItems(id, List.of(item));
+        VarOrderItem historical = varOrderItemMapper.selectOne(new LambdaQueryWrapper<VarOrderItem>()
+                .eq(VarOrderItem::getVarOrderId, id));
+        jdbcTemplate.update("UPDATE cost_subject SET status='DISABLE' WHERE id=?", COST_SUBJECT_ID);
+        Integer version = varOrderMapper.selectById(id).getVersion();
+        VarOrderItem duplicate = new VarOrderItem();
+        duplicate.setId(historical.getId());
+        duplicate.setItemName("复制历史科目明细");
+        duplicate.setQuantity(BigDecimal.ONE);
+        duplicate.setUnitPrice(BigDecimal.ONE);
+        duplicate.setCostSubjectId(historical.getCostSubjectId());
+        duplicate.setWbsTaskId(WBS_ID);
+        BusinessException duplicatedHistory = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(historical, duplicate), version));
+        assertEquals("VAR_ORDER_COST_SUBJECT_INVALID", duplicatedHistory.getCode());
+        assertDoesNotThrow(() -> varOrderService.saveItems(id, List.of(historical), version));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("签证往来单位必须匹配合同方向对应方")
+    void partnerCandidateMatchesContractDirection() {
+        MdPartner other = new MdPartner();
+        other.setId(com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
+        other.setTenantId(TENANT_ID);
+        other.setPartnerCode("PT-VAR-OTHER-" + other.getId());
+        other.setPartnerName("非合同往来单位");
+        other.setPartnerType("SUPPLIER");
+        other.setBlacklistFlag(0);
+        other.setStatus("ENABLE");
+        partnerMapper.insert(other);
+
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(other.getId());
+        order.setVarName("变更单测-往来单位候选");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+
+        BusinessException mismatch = assertThrows(BusinessException.class,
+                () -> varOrderService.create(order));
+        assertEquals("VAR_ORDER_PARTNER_CONTRACT_MISMATCH", mismatch.getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("新签证明细缺失或无效WBS时失败且保留原明细")
     void invalidWbsRejectsBeforeExistingItemsAreDeleted() {
         VarOrder order = new VarOrder();
@@ -410,7 +528,7 @@ class VarOrderServiceTest {
         original.setItemName("原明细");
         original.setQuantity(BigDecimal.ONE);
         original.setUnitPrice(BigDecimal.ONE);
-        original.setCostSubjectId(90001L);
+        original.setCostSubjectId(COST_SUBJECT_ID);
         original.setWbsTaskId(WBS_ID);
         varOrderService.saveItems(id, List.of(original));
         Integer version = varOrderMapper.selectById(id).getVersion();
@@ -419,7 +537,7 @@ class VarOrderServiceTest {
         replacement.setItemName("非法替换");
         replacement.setQuantity(BigDecimal.ONE);
         replacement.setUnitPrice(BigDecimal.ONE);
-        replacement.setCostSubjectId(90001L);
+        replacement.setCostSubjectId(COST_SUBJECT_ID);
         BusinessException missing = assertThrows(BusinessException.class,
                 () -> varOrderService.saveItems(id, List.of(replacement), version));
         assertEquals("PROJECT_WBS_REQUIRED", missing.getCode());
@@ -461,7 +579,7 @@ class VarOrderServiceTest {
         item.setItemName("旧版本明细");
         item.setQuantity(BigDecimal.ONE);
         item.setUnitPrice(BigDecimal.ONE);
-        item.setCostSubjectId(90001L);
+        item.setCostSubjectId(COST_SUBJECT_ID);
         BusinessException itemError = assertThrows(BusinessException.class,
                 () -> varOrderService.saveItems(id, List.of(item), staleVersion));
         assertEquals("VAR_ORDER_VERSION_CONFLICT", itemError.getCode());
@@ -512,7 +630,7 @@ class VarOrderServiceTest {
         item.setQuantity(new BigDecimal("2"));
         item.setUnitPrice(new BigDecimal("800.00"));
         item.setAmount(new BigDecimal("1600.00"));
-        item.setCostSubjectId(90001L);
+        item.setCostSubjectId(COST_SUBJECT_ID);
         item.setWbsTaskId(WBS_ID);
         varOrderService.saveItems(id, java.util.List.of(item));
 

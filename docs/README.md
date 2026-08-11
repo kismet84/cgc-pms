@@ -86,6 +86,7 @@ Skill、插件 references、配置和 Schema 必须保留在所属包内；文�
 ## 当前状态与证据入口
 
 - [当前 Backlog](backlog/current-focus.md)
+- [灵感与想法暂存](ideas.md)
 - [v1.6 计划书](plans/README.md)
 - [v1.6 质量报告](quality/README.md)
 - [产品情报、项目地图与迭代决策](product-intelligence/README.md)

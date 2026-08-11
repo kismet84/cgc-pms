@@ -1,5 +1,6 @@
 import type {
   CommunicationEvent,
+  CommunicationMemberSummary,
   CommunicationUnreadCount,
   CommunicationUserSummary,
   ConversationSummary,
@@ -28,6 +29,13 @@ export function loadCommunicationUsers(
 
 export function loadConversations(signal?: AbortSignal): Promise<ConversationSummary[]> {
   return apiRequest(`${BASE}/conversations`, { signal })
+}
+
+export function loadConversationMembers(
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<CommunicationMemberSummary[]> {
+  return apiRequest(`${BASE}/conversations/${id(conversationId)}/members`, { signal })
 }
 
 export function createConversation(command: {

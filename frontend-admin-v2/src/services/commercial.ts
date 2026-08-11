@@ -8,6 +8,7 @@ import {
   type ContractItemRecord,
   type ContractKpi,
   type ContractPaymentTermRecord,
+  type ContractProjectOption,
   type ContractPage,
   type ContractQuery,
   type ContractRecord,
@@ -25,6 +26,7 @@ import {
   type CostTargetRecord,
   type CostTargetSaveCommand,
   type CostTargetDefaultAllocation,
+  type CostTargetProjectManagerOption,
   type CostBudgetDraftSaveCommand,
   type CostSummaryHistoryRecord,
   type CostProjectSummary,
@@ -37,6 +39,7 @@ import {
   type CostForecastCommand,
   type CostCorrectiveCommand,
   type CostCorrectiveCloseCommand,
+  type CostCorrectiveOwnerOption,
   type BudgetAvailabilityRecord,
   type BudgetLineRecord,
   type BudgetPage,
@@ -64,6 +67,7 @@ import { apiRequest } from '@/services/request'
 
 export interface CostSubjectOption {
   id: string
+  parentId?: string | null
   subjectCode: string
   subjectName: string
   status: string
@@ -83,11 +87,30 @@ export function loadContractPage(
   return apiRequest<ContractPage>(withQuery(COMMERCIAL_API.contracts, query), { signal })
 }
 
+export async function loadAllContracts(
+  query: Omit<ContractQuery, 'pageNo' | 'pageSize'> = {},
+  signal?: AbortSignal,
+): Promise<ContractRecord[]> {
+  const pageSize = 200
+  const first = await loadContractPage({ ...query, pageNo: 1, pageSize }, signal)
+  const records = [...first.records]
+  const pageCount = Math.ceil(Number(first.total) / pageSize)
+  for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
+    const page = await loadContractPage({ ...query, pageNo, pageSize }, signal)
+    records.push(...page.records)
+  }
+  return records
+}
+
 export function loadContractKpi(
   query: Omit<ContractQuery, 'pageNo' | 'pageSize' | 'keyword'> = {},
   signal?: AbortSignal,
 ): Promise<ContractKpi> {
   return apiRequest<ContractKpi>(withQuery(COMMERCIAL_API.contractKpi, query), { signal })
+}
+
+export function loadContractProjectOptions(signal?: AbortSignal): Promise<ContractProjectOption[]> {
+  return apiRequest<ContractProjectOption[]>(COMMERCIAL_API.contractProjectOptions, { signal })
 }
 
 export function loadContract(id: string, signal?: AbortSignal): Promise<ContractRecord> {
@@ -489,6 +512,16 @@ export function loadCostControl(
   )
 }
 
+export function loadCostCorrectiveOwnerOptions(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<CostCorrectiveOwnerOption[]> {
+  return apiRequest<CostCorrectiveOwnerOption[]>(
+    COMMERCIAL_API.costCorrectiveOwnerOptions(requiredId(projectId, '项目ID')),
+    { signal, notifyError: false },
+  )
+}
+
 export function loadCostForecastTrace(
   id: string,
   signal?: AbortSignal,
@@ -599,6 +632,16 @@ export function loadCostTargetDefaultAllocation(
 ): Promise<CostTargetDefaultAllocation> {
   return apiRequest<CostTargetDefaultAllocation>(
     `${COMMERCIAL_API.costTargetDefaultAllocation}?projectId=${encodeURIComponent(requiredId(projectId, '项目ID'))}`,
+    { signal },
+  )
+}
+
+export function loadCostTargetProjectManagerOptions(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<CostTargetProjectManagerOption[]> {
+  return apiRequest<CostTargetProjectManagerOption[]>(
+    withSearchParams(COMMERCIAL_API.costTargetProjectManagerOptions, { projectId }),
     { signal },
   )
 }

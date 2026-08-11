@@ -24,7 +24,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { loadContractItems, loadContractPage } from '@/services/commercial'
+import { loadContract, loadContractItems, loadContractPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import {
   createSubcontractMeasure,
@@ -111,16 +111,55 @@ const confirmationDescription = computed(() => {
     : `确认删除“${recordCode(selected.value)}”？`
 })
 const contractOptions = computed(() =>
-  contracts.value.map((item) => ({
-    value: item.id,
-    label: `${item.contractCode || '未编号'} · ${item.contractName}`,
-  })),
+  contracts.value
+    .filter(
+      (item) =>
+        mode.value === 'task' ||
+        item.id === form.contractId ||
+        (item.approvalStatus === 'APPROVED' && item.contractStatus === 'PERFORMING'),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.contractCode || '未编号'} · ${item.contractName}`,
+    })),
 )
-const taskOptions = computed(() =>
-  taskCandidates.value
-    .filter((item) => item.id !== selected.value?.id)
-    .map((item) => ({ value: item.id, label: `${item.taskCode || '未编号'} · ${item.taskName}` })),
-)
+const excludedPredecessorIds = computed(() => {
+  const rootId =
+    formMode.value === 'edit' && selected.value && 'taskCode' in selected.value
+      ? selected.value.id
+      : ''
+  const excluded = new Set<string>()
+  if (!rootId) return excluded
+  const children = new Map<string, string[]>()
+  for (const item of taskCandidates.value) {
+    if (!item.predecessorTaskId) continue
+    children.set(item.predecessorTaskId, [...(children.get(item.predecessorTaskId) ?? []), item.id])
+  }
+  const pending = [rootId]
+  while (pending.length) {
+    const id = pending.pop()
+    if (!id || excluded.has(id)) continue
+    excluded.add(id)
+    pending.push(...(children.get(id) ?? []))
+  }
+  return excluded
+})
+const taskOptions = computed(() => {
+  const options = taskCandidates.value
+    .filter((item) => !excludedPredecessorIds.value.has(item.id))
+    .map((item) => ({ value: item.id, label: `${item.taskCode || '未编号'} · ${item.taskName}` }))
+  const historicalId = mode.value === 'task' ? form.predecessorTaskId : form.subTaskId
+  if (historicalId && !options.some((item) => item.value === historicalId)) {
+    const historicalName =
+      selected.value && 'taskCode' in selected.value
+        ? selected.value.predecessorTaskName
+        : selected.value && 'measureCode' in selected.value
+          ? selected.value.subTaskName
+          : ''
+    options.push({ value: historicalId, label: historicalName || '历史分包任务' })
+  }
+  return options
+})
 const contractItemOptions = computed(() =>
   contractItems.value
     .filter((item): item is ContractItemRecord & { id: string } => Boolean(item.id))
@@ -303,9 +342,21 @@ async function loadCandidates(candidateProjectId: string, contractId = ''): Prom
       controller.signal,
     )
     if (generation !== candidateGeneration) return
-    contracts.value = contractPage.records
+    const currentContract =
+      contractId && !contractPage.records.some((item) => item.id === contractId)
+        ? await loadContract(contractId, controller.signal)
+        : null
+    if (generation !== candidateGeneration) return
+    contracts.value = currentContract
+      ? [...contractPage.records, currentContract]
+      : contractPage.records
     if (contractId && contracts.value.some((item) => item.id === contractId)) {
+      const predecessorTaskId = form.predecessorTaskId
+      const subTaskId = form.subTaskId
       await changeContract(contractId, controller.signal, generation)
+      if (generation !== candidateGeneration) return
+      form.predecessorTaskId = predecessorTaskId
+      form.subTaskId = subTaskId
     }
   } catch (error) {
     if (!controller.signal.aborted && generation === candidateGeneration)

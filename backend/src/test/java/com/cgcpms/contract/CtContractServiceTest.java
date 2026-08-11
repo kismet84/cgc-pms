@@ -263,6 +263,54 @@ class CtContractServiceTest {
         assertEquals("DRAFT", contractMapper.selectById(contractId).getApprovalStatus());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("合同项目候选与主合同、非主合同创建门禁一致")
+    void projectOptionsMatchContractCreationGuards() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        ProjectBudget budget = projectBudgetMapper.selectById(BUDGET_ID);
+
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.updateById(project);
+        budget.setStatus("ACTIVE");
+        budget.setActiveFlag(1);
+        projectBudgetMapper.updateById(budget);
+        CtContractService.ContractProjectOption active = contractService.getProjectOptions().stream()
+                .filter(option -> String.valueOf(PROJECT_ID).equals(option.id()))
+                .findFirst().orElseThrow();
+        assertTrue(active.mainEligible());
+        assertTrue(active.nonMainEligible());
+
+        budget.setStatus("CLOSED");
+        budget.setActiveFlag(0);
+        projectBudgetMapper.updateById(budget);
+        CtContractService.ContractProjectOption withoutBudget = contractService.getProjectOptions().stream()
+                .filter(option -> String.valueOf(PROJECT_ID).equals(option.id()))
+                .findFirst().orElseThrow();
+        assertTrue(withoutBudget.mainEligible());
+        assertFalse(withoutBudget.nonMainEligible());
+        budget.setStatus("ACTIVE");
+        budget.setActiveFlag(1);
+        projectBudgetMapper.updateById(budget);
+
+        project.setStatus("PREPARING");
+        projectMapper.updateById(project);
+        CtContractService.ContractProjectOption preparing = contractService.getProjectOptions().stream()
+                .filter(option -> String.valueOf(PROJECT_ID).equals(option.id()))
+                .findFirst().orElseThrow();
+        assertTrue(preparing.mainEligible());
+        assertFalse(preparing.nonMainEligible());
+
+        project.setApprovalStatus("DRAFT");
+        projectMapper.updateById(project);
+        CtContractService.ContractProjectOption unapproved = contractService.getProjectOptions().stream()
+                .filter(option -> String.valueOf(PROJECT_ID).equals(option.id()))
+                .findFirst().orElseThrow();
+        assertFalse(unapproved.mainEligible());
+        assertFalse(unapproved.nonMainEligible());
+    }
+
     /** Ensure project 10001 + partners 20001/20002 + admin user exist for foreign-key references. */
     private void seedReferenceData() {
         if (projectMapper.selectById(PROJECT_ID) == null) {

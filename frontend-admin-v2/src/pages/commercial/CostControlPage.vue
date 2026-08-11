@@ -19,6 +19,7 @@ import {
   V2PageState,
   V2Pagination,
   V2Select,
+  type V2SelectOption,
   showToast,
   useToastMessage,
 } from '@/components'
@@ -28,15 +29,15 @@ import {
   createCostCorrective,
   createCostForecast,
   loadAccessibleCostControl,
-  loadCostSubjectOptions,
   loadCostControl,
+  loadCostCorrectiveOwnerOptions,
+  loadCostSubjectOptions,
   loadCostForecastTrace,
   submitCostCorrective,
   updateCostCorrective,
   updateCostForecast,
 } from '@/services/commercial'
 import type { CostSubjectOption } from '@/services/commercial'
-import { loadProjectUsers } from '@/services/projects'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 const route = useRoute()
@@ -46,7 +47,8 @@ const accessible = ref<AccessibleCostControlOverview | null>(null)
 const overview = ref<CostControlOverview | null>(null)
 const trace = ref<CostControlOverview | null>(null)
 const costSubjects = ref<CostSubjectOption[]>([])
-const userOptions = ref<Array<{ value: string; label: string }>>([])
+const userOptions = ref<V2SelectOption[]>([])
+const historicalResponsibleOption = ref<V2SelectOption | null>(null)
 const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
@@ -100,6 +102,12 @@ const canCorrective = computed(() => session.hasPermission('cost:corrective:main
 const canSubmit = computed(() => session.hasPermission('cost:corrective:submit'))
 const latest = computed(() => overview.value?.latestForecast ?? {})
 const actions = computed(() => overview.value?.correctiveActions ?? [])
+const correctiveUserOptions = computed(() => {
+  const historical = historicalResponsibleOption.value
+  return historical && !userOptions.value.some((option) => option.value === historical.value)
+    ? [...userOptions.value, historical]
+    : userOptions.value
+})
 const pagedProjects = computed(() =>
   (accessible.value?.projects ?? []).slice(
     (projectPageNo.value - 1) * pageSize,
@@ -172,29 +180,25 @@ async function load() {
       return
     }
     accessible.value = null
-    const [value, subjects, users] = await Promise.all([
+    const [value, subjects] = await Promise.all([
       loadCostControl(projectId.value, current.signal),
       loadCostSubjectOptions(current.signal),
-      loadProjectUsers(current.signal).catch(() => null),
     ])
     if (token === generation) {
       overview.value = value
       costSubjects.value = subjects
-      userOptions.value =
-        users?.records
-          .filter((user) => ['ACTIVE', 'ENABLE'].includes(user.status))
-          .map((user) => ({
-            value: user.id,
-            label: user.realName ? `${user.realName}（${user.username}）` : user.username,
-          })) ??
-        (session.userInfo?.userId
-          ? [
-              {
-                value: session.userInfo.userId,
-                label: session.userInfo.username || '当前用户',
-              },
-            ]
-          : [])
+      userOptions.value = []
+      if (canCorrective.value) {
+        void loadCostCorrectiveOwnerOptions(projectId.value, current.signal)
+          .then((owners) => {
+            if (token !== generation) return
+            userOptions.value = owners.map((user) => ({
+              value: user.userId,
+              label: user.realName ? `${user.realName}（${user.username}）` : user.username,
+            }))
+          })
+          .catch(() => undefined)
+      }
     }
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
@@ -289,6 +293,15 @@ async function showTrace() {
 }
 function openCorrective(row?: CostControlAmountRow) {
   editingCorrectiveId.value = row ? text(row, 'id') : ''
+  const responsibleUserId = row ? text(row, 'responsible_user_id') : ''
+  const responsibleUserName = row ? text(row, 'responsible_user_name') : ''
+  historicalResponsibleOption.value = responsibleUserId
+    ? {
+        value: responsibleUserId,
+        label: `${responsibleUserName || '原负责人'}（历史）`,
+        disabled: true,
+      }
+    : null
   Object.assign(corrective, {
     forecastId: row ? text(row, 'forecast_id') : text(latest.value, 'id'),
     actionCode: row ? text(row, 'action_code') : '',
@@ -296,7 +309,7 @@ function openCorrective(row?: CostControlAmountRow) {
     rootCause: row ? text(row, 'root_cause') : '',
     actionPlan: row ? text(row, 'action_plan') : '',
     expectedSavingAmount: row ? text(row, 'expected_saving_amount') : '',
-    responsibleUserId: row ? text(row, 'responsible_user_id') : '',
+    responsibleUserId,
     dueDate: row ? text(row, 'due_date') : '',
     remark: row ? text(row, 'remark') : null,
     version: row ? text(row, 'version') : null,
@@ -311,7 +324,7 @@ async function saveCorrective() {
     !corrective.rootCause.trim() ||
     !corrective.actionPlan.trim() ||
     !validDecimal(corrective.expectedSavingAmount, true) ||
-    !corrective.responsibleUserId ||
+    !correctiveUserOptions.value.some((option) => option.value === corrective.responsibleUserId) ||
     !corrective.dueDate
   ) {
     errorMessage.value = '请完整填写纠偏措施'
@@ -687,7 +700,7 @@ onBeforeUnmount(() => {
         /><V2Select
           v-model="corrective.responsibleUserId"
           label="负责人"
-          :options="userOptions"
+          :options="correctiveUserOptions"
           required
         /><V2Input v-model="corrective.dueDate" label="截止日期" type="date" required />
       </form>

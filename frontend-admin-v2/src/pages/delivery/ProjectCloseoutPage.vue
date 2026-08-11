@@ -162,31 +162,67 @@ const openBlocker = (domain: string, bizId?: string | null) =>
     query: { projectId: projectId.value, ...(bizId ? { bizId } : {}) },
   })
 const sectionQualityOptions = computed(() =>
-  (overview.value?.qualityInspections ?? []).map((item) => ({
-    value: item.id,
-    label: `${item.inspectionCode} · ${item.conclusion}`,
-  })),
+  (overview.value?.qualityInspections ?? [])
+    .filter(
+      (item) =>
+        item.wbsTaskId === sectionForm.wbsTaskId &&
+        item.status === 'SUBMITTED' &&
+        item.conclusion === 'PASS' &&
+        !(overview.value?.sectionAcceptances ?? []).some(
+          (acceptance) => acceptance.qualityInspectionId === item.id,
+        ),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.inspectionCode} · ${item.conclusion}`,
+    })),
 )
 const sectionWbsOptions = computed(() =>
-  (overview.value?.wbsTasks ?? []).map((item) => ({
-    value: item.id,
-    label: `${item.taskCode} · ${item.taskName}`,
-  })),
+  (overview.value?.wbsTasks ?? [])
+    .filter(
+      (item) =>
+        item.status === 'COMPLETED' &&
+        !(overview.value?.sectionAcceptances ?? []).some(
+          (acceptance) => acceptance.wbsTaskId === item.id,
+        ),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.taskCode} · ${item.taskName}`,
+    })),
 )
 const retentionReceivables = computed(() =>
-  (overview.value?.receivables ?? []).filter((item) => item.receivableType === 'RETENTION'),
+  (overview.value?.receivables ?? []).filter(
+    (item) =>
+      item.receivableType === 'RETENTION' &&
+      item.settlementId === overview.value?.closeout?.finalOwnerSettlementId,
+  ),
 )
 const warrantyContractOptions = computed(() =>
-  (overview.value?.settlements ?? []).map((item) => ({
-    value: item.contractId,
-    label: `${item.settlementCode} · ${deliveryLabel(item.settlementType)}结算`,
-  })),
+  (overview.value?.settlements ?? [])
+    .filter((item) => item.id === overview.value?.closeout?.finalOwnerSettlementId)
+    .map((item) => ({
+      value: item.contractId,
+      label: `${item.settlementCode} · ${deliveryLabel(item.settlementType)}结算`,
+    })),
 )
 const settlementOptions = computed(() =>
-  (overview.value?.settlements ?? []).map((item) => ({
-    value: item.id,
-    label: `${item.settlementCode} · ${formatAmount(item.netReceivableAmount)}`,
-  })),
+  (overview.value?.settlements ?? [])
+    .filter((item) => {
+      const receivables = (overview.value?.receivables ?? []).filter(
+        (receivable) => receivable.settlementId === item.id,
+      )
+      return (
+        item.status === 'RECEIVABLE_CREATED' &&
+        Number(item.retentionAmount) > 0 &&
+        receivables.some((receivable) => receivable.receivableType === 'PROGRESS') &&
+        receivables.some((receivable) => receivable.receivableType === 'RETENTION')
+      )
+    })
+    .map((item) => ({
+      value: item.id,
+      label: `${item.settlementCode} · ${formatAmount(item.netReceivableAmount)}`,
+    })),
 )
 const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
 const userOptions = (value = '') => {
@@ -217,6 +253,19 @@ const sectionForm = reactive<SectionAcceptanceCommand>({
   conclusion: 'PASS',
   remark: '',
 })
+function selectSectionWbs(wbsTaskId: string): void {
+  sectionForm.wbsTaskId = wbsTaskId
+  sectionForm.qualityInspectionId =
+    overview.value?.qualityInspections.find(
+      (item) =>
+        item.wbsTaskId === wbsTaskId &&
+        item.status === 'SUBMITTED' &&
+        item.conclusion === 'PASS' &&
+        !(overview.value?.sectionAcceptances ?? []).some(
+          (acceptance) => acceptance.qualityInspectionId === item.id,
+        ),
+    )?.id ?? ''
+}
 const finalAcceptanceForm = reactive<FinalAcceptanceCommand>({
   acceptanceCode: '',
   acceptanceDate: today(),
@@ -329,9 +378,15 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
     })
   }
   if (kind === 'section') {
+    const wbsTaskId = sectionWbsOptions.value[0]?.value ?? ''
+    const qualityInspectionId =
+      overview.value?.qualityInspections.find(
+        (item) =>
+          item.wbsTaskId === wbsTaskId && item.status === 'SUBMITTED' && item.conclusion === 'PASS',
+      )?.id ?? ''
     Object.assign(sectionForm, {
-      wbsTaskId: overview.value?.wbsTasks[0]?.id ?? '',
-      qualityInspectionId: overview.value?.qualityInspections[0]?.id ?? '',
+      wbsTaskId,
+      qualityInspectionId,
       acceptanceCode: '',
       acceptanceName: '分部分项验收',
       acceptanceDate: today(),
@@ -354,7 +409,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   if (kind === 'warranty') {
     const retention = retentionReceivables.value[0]
     Object.assign(warrantyForm, {
-      contractId: overview.value?.settlements[0]?.contractId ?? '',
+      contractId: warrantyContractOptions.value[0]?.value ?? '',
       receivableId: retention?.id ?? '',
       warrantyCode: '',
       warrantyAmount: retention?.originalAmount ?? '',
@@ -1318,7 +1373,12 @@ onBeforeUnmount(() => {
           <label class="closeout-page__wide">备注<textarea v-model="initiateForm.remark" /></label>
         </template>
         <template v-else-if="dialog === 'section'">
-          <V2Select v-model="sectionForm.wbsTaskId" label="WBS 任务" :options="sectionWbsOptions" />
+          <V2Select
+            :model-value="sectionForm.wbsTaskId"
+            label="WBS 任务"
+            :options="sectionWbsOptions"
+            @update:model-value="selectSectionWbs"
+          />
           <V2Select
             v-model="sectionForm.qualityInspectionId"
             label="质量验收记录"

@@ -104,17 +104,43 @@ const selectedDepartment = computed(
   () => selectedDepartments.value.find((item) => item.id === selectedDepartmentId.value) ?? null,
 )
 const companyOptions = computed(() =>
-  companyDirectory.value.map((item) => ({ value: item.id, label: item.companyName })),
+  companyDirectory.value
+    .filter(
+      (item) =>
+        item.status === 'ENABLE' ||
+        (Boolean(editingId.value) &&
+          ((dialogKind.value === 'department' && item.id === departmentForm.companyId) ||
+            (dialogKind.value === 'position' && item.id === positionForm.companyId))),
+    )
+    .map((item) => ({ value: item.id, label: item.companyName })),
 )
-const parentOptions = computed(() => [
-  { value: '0', label: '根部门' },
-  ...flatDepartments.value
-    .filter((item) => item.companyId === departmentForm.companyId && item.id !== editingId.value)
-    .map((item) => ({ value: item.id, label: item.deptName })),
-])
+const parentOptions = computed(() => {
+  const current = flatDepartments.value.find((item) => item.id === editingId.value)
+  const excluded = new Set([
+    editingId.value ?? '',
+    ...flattenDepartments(current?.children ?? []).map((item) => item.id),
+  ])
+  return [
+    { value: '0', label: '根部门' },
+    ...flatDepartments.value
+      .filter(
+        (item) =>
+          item.companyId === departmentForm.companyId &&
+          !excluded.has(item.id) &&
+          (item.status === 'ENABLE' ||
+            (Boolean(editingId.value) && item.id === departmentForm.parentId)),
+      )
+      .map((item) => ({ value: item.id, label: item.deptName })),
+  ]
+})
 const positionDepartmentOptions = computed(() =>
   flatDepartments.value
-    .filter((item) => item.companyId === positionForm.companyId)
+    .filter(
+      (item) =>
+        item.companyId === positionForm.companyId &&
+        (item.status === 'ENABLE' ||
+          (Boolean(editingId.value) && item.id === positionForm.departmentId)),
+    )
     .map((item) => ({ value: item.id, label: item.deptName })),
 )
 const statusOptions = [
@@ -278,8 +304,14 @@ function openCreate(kind: Kind): void {
   if (kind === 'company') {
     Object.assign(companyForm, { companyCode: '', companyName: '', status: 'ENABLE', remark: '' })
   } else if (kind === 'department') {
+    const companyId =
+      companyDirectory.value.find(
+        (item) => item.id === selectedCompanyId.value && item.status === 'ENABLE',
+      )?.id ??
+      companyDirectory.value.find((item) => item.status === 'ENABLE')?.id ??
+      ''
     Object.assign(departmentForm, {
-      companyId: selectedCompanyId.value || companyDirectory.value[0]?.id || '',
+      companyId,
       parentId: '0',
       deptCode: '',
       deptName: '',
@@ -288,12 +320,24 @@ function openCreate(kind: Kind): void {
       remark: '',
     })
   } else {
-    const companyId = selectedCompanyId.value || companyDirectory.value[0]?.id || ''
+    const companyId =
+      companyDirectory.value.find(
+        (item) => item.id === selectedCompanyId.value && item.status === 'ENABLE',
+      )?.id ??
+      companyDirectory.value.find((item) => item.status === 'ENABLE')?.id ??
+      ''
     Object.assign(positionForm, {
       companyId,
       departmentId:
-        selectedDepartmentId.value ||
-        flatDepartments.value.find((item) => item.companyId === companyId)?.id ||
+        flatDepartments.value.find(
+          (item) =>
+            item.id === selectedDepartmentId.value &&
+            item.companyId === companyId &&
+            item.status === 'ENABLE',
+        )?.id ||
+        flatDepartments.value.find(
+          (item) => item.companyId === companyId && item.status === 'ENABLE',
+        )?.id ||
         '',
       positionCode: '',
       positionName: '',
@@ -302,6 +346,18 @@ function openCreate(kind: Kind): void {
     })
   }
   dialogKind.value = kind
+}
+
+function changeDepartmentCompany(companyId: string): void {
+  departmentForm.companyId = companyId
+  departmentForm.parentId = '0'
+}
+
+function changePositionCompany(companyId: string): void {
+  positionForm.companyId = companyId
+  positionForm.departmentId =
+    flatDepartments.value.find((item) => item.companyId === companyId && item.status === 'ENABLE')
+      ?.id ?? ''
 }
 
 function openCompany(record: OrgCompanyRecord): void {
@@ -727,10 +783,11 @@ onBeforeUnmount(() => loadController?.abort())
         </template>
         <template v-else-if="dialogKind === 'department'">
           <V2Select
-            v-model="departmentForm.companyId"
+            :model-value="departmentForm.companyId"
             :options="companyOptions"
             label="所属公司"
             required
+            @update:model-value="changeDepartmentCompany"
           />
           <V2Select v-model="departmentForm.parentId" :options="parentOptions" label="上级部门" />
           <V2Input v-model="departmentForm.deptCode" label="部门编码" required />
@@ -747,10 +804,11 @@ onBeforeUnmount(() => loadController?.abort())
         </template>
         <template v-else>
           <V2Select
-            v-model="positionForm.companyId"
+            :model-value="positionForm.companyId"
             :options="companyOptions"
             label="所属公司"
             required
+            @update:model-value="changePositionCompany"
           />
           <V2Select
             v-model="positionForm.departmentId"

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type {
   ContractRecord,
-  PartnerRecord,
   ProjectContextOption,
   VariationItemRecord,
   VariationOwnerReviewCommand,
@@ -31,9 +30,8 @@ import {
   type CostSubjectOption,
   createVariation,
   deleteVariation,
-  loadContractPage,
+  loadAllContracts,
   loadCostSubjectOptions,
-  loadPartners,
   loadProjectContextOptions,
   loadVariation,
   loadVariationPage,
@@ -70,7 +68,6 @@ const form = ref<VariationSaveCommand>(emptyForm())
 const items = ref<VariationItemRecord[]>([])
 const projects = ref<ProjectContextOption[]>([])
 const contracts = ref<ContractRecord[]>([])
-const partners = ref<PartnerRecord[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
 const wbsTasks = ref<WbsTaskRecord[]>([])
 const siteEvidenceFile = ref<File | null>(null)
@@ -131,10 +128,15 @@ const latestSubmission = computed<VariationOwnerSubmissionRecord | null>(
 )
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 10))))
 const projectOptions = computed(() => {
-  const options = projects.value.map((item) => ({
-    value: item.id,
-    label: `${item.projectCode} · ${item.projectName}`,
-  }))
+  const options = projects.value
+    .filter(
+      (item) =>
+        item.status === 'ACTIVE' || (mode.value === 'edit' && item.id === form.value.projectId),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.projectCode} · ${item.projectName}`,
+    }))
   if (
     form.value.projectId &&
     !options.some((option) => option.value === form.value.projectId) &&
@@ -147,6 +149,14 @@ const projectOptions = computed(() => {
 const contractOptions = computed(() => {
   const options = contracts.value
     .filter((item) => !form.value.projectId || item.projectId === form.value.projectId)
+    .filter(
+      (item) =>
+        form.value.direction !== 'INCOME' ||
+        (item.approvalStatus === 'APPROVED' &&
+          item.contractStatus === 'PERFORMING' &&
+          item.contractType === 'MAIN') ||
+        (mode.value === 'edit' && item.id === form.value.contractId),
+    )
     .map((item) => ({
       value: item.id,
       label: `${item.contractCode} · ${item.contractName}`,
@@ -160,30 +170,61 @@ const contractOptions = computed(() => {
   }
   return options
 })
+const directionOptions = computed(() => {
+  const contract = contracts.value.find((item) => item.id === form.value.contractId)
+  const incomeEligible =
+    !contract ||
+    (contract.contractType === 'MAIN' &&
+      contract.approvalStatus === 'APPROVED' &&
+      contract.contractStatus === 'PERFORMING') ||
+    (mode.value === 'edit' && form.value.direction === 'INCOME')
+  return [
+    { value: 'COST', label: '成本' },
+    { value: 'INCOME', label: '收入', disabled: !incomeEligible },
+  ]
+})
 const partnerOptions = computed(() => {
-  const options = partners.value.map((item) => ({
-    value: item.id,
-    label: `${item.partnerCode} · ${item.partnerName}`,
-  }))
+  const contract = contracts.value.find((item) => item.id === form.value.contractId)
+  const expectedPartnerId =
+    form.value.direction === 'INCOME' ? contract?.partyAId : contract?.partyBId
+  const expectedPartnerName =
+    form.value.direction === 'INCOME' ? contract?.partyAName : contract?.partyBName
+  const options = expectedPartnerId
+    ? [{ value: expectedPartnerId, label: expectedPartnerName || '合同往来单位', disabled: false }]
+    : []
   if (
     form.value.partnerId &&
     !options.some((option) => option.value === form.value.partnerId) &&
     detail.value?.partnerName
   ) {
-    options.push({ value: form.value.partnerId, label: detail.value.partnerName })
+    options.push({
+      value: form.value.partnerId,
+      label: `${detail.value.partnerName}（历史值）`,
+      disabled: true,
+    })
   }
   return options
 })
 const costSubjectOptions = computed(() => {
-  const options = costSubjects.value.map((item) => ({
-    value: item.id,
-    label: `${item.subjectCode} · ${item.subjectName}`,
-  }))
+  const parentIds = new Set(
+    costSubjects.value.map((item) => item.parentId).filter((id): id is string => Boolean(id)),
+  )
+  const options = costSubjects.value
+    .filter((item) => item.status === 'ENABLE' && !parentIds.has(item.id))
+    .map((item) => ({
+      value: item.id,
+      label: `${item.subjectCode} · ${item.subjectName}`,
+      disabled: false,
+    }))
   for (const [index, item] of items.value.entries()) {
     if (item.costSubjectId && !options.some((option) => option.value === item.costSubjectId)) {
+      const historical = costSubjects.value.find((subject) => subject.id === item.costSubjectId)
       options.push({
         value: item.costSubjectId,
-        label: `成本科目名称缺失（第 ${index + 1} 行）`,
+        label: historical
+          ? `${historical.subjectCode} · ${historical.subjectName}（历史值）`
+          : `成本科目名称缺失（第 ${index + 1} 行）`,
+        disabled: true,
       })
     }
   }
@@ -596,8 +637,40 @@ function updateForm(key: keyof VariationSaveCommand, value: string): void {
   form.value = { ...form.value, [key]: value }
 }
 
-function updateProject(value: string): void {
-  form.value = { ...form.value, projectId: value, contractId: '' }
+async function updateProject(value: string): Promise<void> {
+  form.value = { ...form.value, projectId: value, contractId: '', partnerId: null }
+  await loadReferences()
+}
+
+function updateContract(value: string): void {
+  const contract = contracts.value.find((item) => item.id === value)
+  form.value = {
+    ...form.value,
+    contractId: value,
+    partnerId:
+      (form.value.direction === 'INCOME' ? contract?.partyAId : contract?.partyBId) ?? null,
+  }
+}
+
+function updateDirection(value: string): void {
+  const contract = contracts.value.find((item) => item.id === form.value.contractId)
+  const direction = value || 'COST'
+  const contractStillEligible =
+    direction === 'COST' ||
+    (contract?.approvalStatus === 'APPROVED' &&
+      contract.contractStatus === 'PERFORMING' &&
+      contract.contractType === 'MAIN') ||
+    (mode.value === 'edit' && form.value.direction === 'INCOME')
+  form.value = {
+    ...form.value,
+    direction,
+    contractId: contractStillEligible ? form.value.contractId : '',
+    partnerId: contractStillEligible
+      ? direction === 'INCOME'
+        ? (contract?.partyAId ?? null)
+        : (contract?.partyBId ?? null)
+      : null,
+  }
 }
 
 async function loadReferences(): Promise<void> {
@@ -605,14 +678,15 @@ async function loadReferences(): Promise<void> {
   const controller = new AbortController()
   referenceController = controller
   try {
-    const [projectValues, contractPage, partnerPage, subjectValues] = await Promise.all([
+    const projectId = detail.value?.projectId || form.value.projectId
+    const [projectValues, contractValues, subjectValues] = await Promise.all([
       loadProjectContextOptions(controller.signal),
-      loadContractPage({ pageNo: 1, pageSize: 200 }, controller.signal),
-      loadPartners(undefined, controller.signal),
+      projectId
+        ? loadAllContracts({ projectId }, controller.signal)
+        : Promise.resolve([] as ContractRecord[]),
       loadCostSubjectOptions(controller.signal),
     ])
     let taskValues: WbsTaskRecord[] = []
-    const projectId = detail.value?.projectId || form.value.projectId
     if (projectId) {
       const activeSchedules = (await loadSchedules(projectId, controller.signal)).filter(
         (item) => item.status === 'ACTIVE',
@@ -623,8 +697,7 @@ async function loadReferences(): Promise<void> {
     }
     if (referenceController !== controller) return
     projects.value = projectValues
-    contracts.value = contractPage.records
-    partners.value = partnerPage.records
+    contracts.value = contractValues
     costSubjects.value = subjectValues
     wbsTasks.value = taskValues
   } catch (error) {
@@ -877,7 +950,7 @@ onBeforeUnmount(() => {
           :options="contractOptions"
           required
           :disabled="mode === 'edit'"
-          @update:model-value="updateForm('contractId', $event)"
+          @update:model-value="updateContract"
         />
         <V2Select
           :model-value="form.partnerId ?? ''"
@@ -907,11 +980,8 @@ onBeforeUnmount(() => {
         <V2Select
           :model-value="form.direction ?? ''"
           label="方向"
-          :options="[
-            { value: 'COST', label: '成本' },
-            { value: 'INCOME', label: '收入' },
-          ]"
-          @update:model-value="updateForm('direction', $event)"
+          :options="directionOptions"
+          @update:model-value="updateDirection"
         />
         <V2Input
           :model-value="form.eventDate ?? ''"

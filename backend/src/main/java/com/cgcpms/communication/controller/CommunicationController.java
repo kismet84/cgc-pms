@@ -49,6 +49,12 @@ public class CommunicationController {
         return ApiResponse.success(service.conversations());
     }
 
+    @GetMapping("/conversations/{id}/members")
+    @PreAuthorize(VIEW)
+    public ApiResponse<List<CommunicationService.MemberSummary>> members(@PathVariable long id) {
+        return ApiResponse.success(service.members(id));
+    }
+
     @PostMapping("/conversations")
     @PreAuthorize(SEND)
     @AuditedOperation(type = "CREATE", businessType = "COMMUNICATION_CONVERSATION")

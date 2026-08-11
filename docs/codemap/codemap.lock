@@ -1,7 +1,7 @@
 {
-  "current_commit": "cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6",
+  "current_commit": "ce669b33d135e643cb48dc78b68ac9dbdcf6aedd",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-10T17:46:07.082Z",
+  "generation_time": "2026-08-11T05:03:16.651Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -53,13 +53,15 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 3871,
-  "repository_file_count": 3871,
-  "included_file_count": 2607,
+  "repository_file_count": 3874,
+  "included_file_count": 2610,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
     "stale_modules": [
-      "documentation"
+      "backend",
+      "frontend_v2",
+      "shared_packages"
     ],
     "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
   },
@@ -80,7 +82,7 @@
         "backend/**"
       ],
       "file_count": 1808,
-      "fingerprint": "a431530b8a65b7291dc3caf01d7fac0e94b8c4305cdc3341266c9e3346a1ca33"
+      "fingerprint": "50c6ec0b1fcb2e41fa1e76ef6d27b95c3b5c86660d8990782d517bd26c78d2ab"
     },
     {
       "id": "delivery_tooling",
@@ -107,8 +109,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 128,
-      "fingerprint": "6d4ef4bee4fde4566ec0b1c8c89b8a03b33eb2672c6097678bc4a0100f57014c"
+      "file_count": 131,
+      "fingerprint": "52ab85a58ca183667350fca79baa21fa657ab04ac3da594b6e9a8ab27c20c9ba"
     },
     {
       "id": "frontend_v2",
@@ -116,7 +118,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 268,
-      "fingerprint": "aef991ae9863eb216ea7bbaedc2ef5c6924217821982485b1b60e4d694b8a456"
+      "fingerprint": "48077d9e07c416f54a415c5500eb5895694aaadc679635ea83d17579a0508f14"
     },
     {
       "id": "mobile",
@@ -140,7 +142,7 @@
         "packages/**"
       ],
       "file_count": 19,
-      "fingerprint": "c19afbbab1dc35fb15d36bbd641489f09484ea48cd5f9e08c389b65ed413753f"
+      "fingerprint": "d307174fe7bed60d96cfda313d7819f0b5c8eff089757a0a056f78261dd0b515"
     }
   ]
 }

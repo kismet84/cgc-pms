@@ -153,6 +153,7 @@ export interface CloseoutWbsTask {
 
 export interface CloseoutQualityInspection {
   id: string;
+  wbsTaskId?: string | null;
   inspectionCode: string;
   inspectionDate: string;
   location?: string | null;

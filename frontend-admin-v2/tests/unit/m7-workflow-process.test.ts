@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -319,5 +321,72 @@ describe('M7 workflow process page', () => {
       '21',
       expect.objectContaining({ approverConfig: '{"type":"USER","userId":"1"}' }),
     )
+  })
+
+  it('offers only enabled fixed users while preserving the disabled user on edit', async () => {
+    vi.mocked(systemService.loadUsers).mockResolvedValueOnce({
+      pageNo: 1,
+      pageSize: 1000,
+      total: 2,
+      records: [
+        {
+          id: '1',
+          username: 'enabled',
+          realName: '启用用户',
+          status: 'ENABLE',
+          roleNames: [],
+          roleIds: [],
+        },
+        {
+          id: '9',
+          username: 'disabled',
+          realName: '历史停用用户',
+          status: 'DISABLE',
+          roleNames: [],
+          roleIds: [],
+        },
+      ],
+    })
+    vi.mocked(processService.loadWorkflowTemplate).mockImplementation(async (id) => {
+      if (id !== '10') return id === '11' ? projectDetail : scheduleDetail
+      return {
+        ...detail,
+        nodes: [
+          {
+            ...detail.nodes[0]!,
+            approverConfig: '{"type":"USER","userId":9}',
+          },
+        ],
+      }
+    })
+    mount(WorkflowProcessPage, { attachTo: document.body })
+    await flushPromises()
+
+    button('新增节点').click()
+    await flushPromises()
+    expect([...selectByLabel('审批人员').options].map((option) => option.value)).toEqual(['', '1'])
+    button('取消').click()
+    await flushPromises()
+
+    button('编辑').click()
+    await flushPromises()
+    expect(selectByLabel('审批人员').value).toBe('9')
+    expect([...selectByLabel('审批人员').options].map((option) => option.value)).toEqual([
+      '',
+      '1',
+      '9',
+    ])
+  })
+
+  it('filters role and position approvers in computed candidates instead of discarding history', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/system/WorkflowProcessPage.vue'),
+      'utf8',
+    )
+    expect(source).toContain("if (nodeForm.approverType === 'ROLE')")
+    expect(source).toContain("if (nodeForm.approverType === 'POSITION')")
+    expect(source).toContain("disabled: item.status !== 'ENABLE'")
+    expect(source).toContain('roles.value = roleRows')
+    expect(source).toContain('positions.value = positionPage.records')
   })
 })

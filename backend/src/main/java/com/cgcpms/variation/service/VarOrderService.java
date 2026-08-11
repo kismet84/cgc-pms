@@ -13,6 +13,8 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.service.BusinessMatterRegistryService;
 import com.cgcpms.contract.service.CtContractChangeService;
+import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -44,9 +46,11 @@ import java.time.LocalDateTime;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -59,6 +63,7 @@ public class VarOrderService {
     private final VarOrderItemMapper varOrderItemMapper;
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
+    private final CostSubjectMapper costSubjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
@@ -157,8 +162,9 @@ public class VarOrderService {
         normalizeDirection(order);
         applyClaimDefaults(order);
         validateDraftOrder(order);
-        validateProjectAndContract(order.getProjectId(), order.getContractId(), "创建变更签证");
-        validatePartner(order.getPartnerId());
+        CtContract contract = requireProjectContract(
+                order.getProjectId(), order.getContractId(), "创建变更签证");
+        validatePartner(order.getPartnerId(), contract, order.getDirection(), false);
 
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         order.setVarCode(codeGenerationService.nextCode(
@@ -218,8 +224,11 @@ public class VarOrderService {
         normalizeDirection(order);
         applyClaimDefaults(order);
         validateDraftOrder(order);
-        validateProjectAndContract(existing.getProjectId(), existing.getContractId(), "编辑变更签证");
-        validatePartner(order.getPartnerId());
+        CtContract contract = requireProjectContract(
+                existing.getProjectId(), existing.getContractId(), "编辑变更签证");
+        boolean unchangedPartnerContext = Objects.equals(existing.getPartnerId(), order.getPartnerId())
+                && Objects.equals(existing.getDirection(), order.getDirection());
+        validatePartner(order.getPartnerId(), contract, order.getDirection(), unchangedPartnerContext);
 
         if (order.getBusinessMatterKey() != null) {
             businessMatterRegistryService.replace(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
@@ -272,6 +281,7 @@ public class VarOrderService {
             throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
 
         List<VarOrderItem> validItems = normalizeDraftItems(items);
+        validateCostSubjects(varOrderId, validItems);
         validItems.forEach(item -> projectExecutionGuard.requireActiveWbs(
                 order.getProjectId(), item.getWbsTaskId(), "保存签证明细"));
 
@@ -697,7 +707,7 @@ public class VarOrderService {
         }
     }
 
-    private void validateProjectAndContract(Long projectId, Long contractId, String action) {
+    private CtContract requireProjectContract(Long projectId, Long contractId, String action) {
         checkProjectAccess(projectId, action);
         CtContract contract = ctContractMapper.selectById(contractId);
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId())) {
@@ -706,13 +716,49 @@ public class VarOrderService {
         if (!java.util.Objects.equals(contract.getProjectId(), projectId)) {
             throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "合同不属于当前项目");
         }
+        return contract;
     }
 
-    private void validatePartner(Long partnerId) {
+    private void validatePartner(
+            Long partnerId, CtContract contract, String direction, boolean allowHistoricalValue) {
         if (partnerId == null) return;
+        if (allowHistoricalValue) return;
         MdPartner partner = mdPartnerMapper.selectById(partnerId);
         if (partner == null || !java.util.Objects.equals(partner.getTenantId(), UserContext.getCurrentTenantId()))
             throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
+        Long expectedPartnerId = "INCOME".equals(direction) ? contract.getPartyAId() : contract.getPartyBId();
+        if (!Objects.equals(partnerId, expectedPartnerId)) {
+            throw new BusinessException("VAR_ORDER_PARTNER_CONTRACT_MISMATCH", "往来单位必须匹配合同方向对应的甲方或乙方");
+        }
+    }
+
+    private void validateCostSubjects(Long varOrderId, List<VarOrderItem> items) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Set<Long> subjectIds = items.stream().map(VarOrderItem::getCostSubjectId).collect(Collectors.toSet());
+        Set<Long> enabledIds = costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, tenantId)
+                        .eq(CostSubject::getStatus, "ENABLE")
+                        .eq(CostSubject::getAccountCategory, "COST")
+                        .in(CostSubject::getId, subjectIds))
+                .stream().map(CostSubject::getId).collect(Collectors.toSet());
+        Set<Long> parentIds = costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, tenantId)
+                        .in(CostSubject::getParentId, subjectIds))
+                .stream().map(CostSubject::getParentId).collect(Collectors.toSet());
+        enabledIds.removeAll(parentIds);
+        Map<Long, Long> historicalSubjects = varOrderItemMapper.selectList(
+                        new LambdaQueryWrapper<VarOrderItem>()
+                                .eq(VarOrderItem::getTenantId, tenantId)
+                                .eq(VarOrderItem::getVarOrderId, varOrderId))
+                .stream().collect(Collectors.toMap(VarOrderItem::getId, VarOrderItem::getCostSubjectId));
+        Set<Long> usedHistoricalIds = new HashSet<>();
+        for (VarOrderItem item : items) {
+            if (enabledIds.contains(item.getCostSubjectId())) continue;
+            if (item.getId() != null
+                    && Objects.equals(historicalSubjects.get(item.getId()), item.getCostSubjectId())
+                    && usedHistoricalIds.add(item.getId())) continue;
+            throw new BusinessException("VAR_ORDER_COST_SUBJECT_INVALID", "成本科目不存在、跨租户、已停用、非成本类或不是末级科目");
+        }
     }
 
     private int requiredVersion(Integer version) {
