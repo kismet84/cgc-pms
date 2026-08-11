@@ -92,7 +92,7 @@ abstract class BidProjectScopeDataTestSupport {
         assertEquals(Set.of(UNBOUND_BID), bidCostService.listCostOptions().stream()
                 .map(BidCostOption::id).collect(java.util.stream.Collectors.toSet()));
 
-        TestUserContext.setAdmin(TENANT, USER);
+        TestUserContext.setUser(TENANT, USER, "m72-super-admin", List.of("SUPER_ADMIN"));
         assertEquals(Set.of(UNBOUND_BID, ALLOWED_BID, DENIED_BID), bidCostService.listCostOptions().stream()
                 .map(BidCostOption::id).collect(java.util.stream.Collectors.toSet()));
     }

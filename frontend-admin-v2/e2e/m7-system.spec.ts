@@ -80,11 +80,11 @@ async function installMocks(page: Page, identity: Identity) {
       return success(route, [
         {
           id: '3',
-          roleCode: 'PROJECT_MEMBER',
-          roleName: '服务端角色',
-          roleType: 'CUSTOM',
+          roleCode: 'COMPANY_OWNER',
+          roleName: '公司老板',
+          roleType: 'SYSTEM',
           status: 'ENABLE',
-          dataScope: 'SELF',
+          dataScope: 'ALL',
           menuIds: ['9'],
         },
       ])
@@ -92,11 +92,11 @@ async function installMocks(page: Page, identity: Identity) {
     if (path === '/api/system/roles/3') {
       return success(route, {
         id: '3',
-        roleCode: 'PROJECT_MEMBER',
-        roleName: '服务端角色',
-        roleType: 'CUSTOM',
+        roleCode: 'COMPANY_OWNER',
+        roleName: '公司老板',
+        roleType: 'SYSTEM',
         status: 'ENABLE',
-        dataScope: 'SELF',
+        dataScope: 'ALL',
         menuIds: ['9'],
       })
     }
@@ -308,7 +308,7 @@ test('super administrator reads all server facts while destructive traffic stays
   const traffic = await installMocks(page, superAdmin)
   const routes = [
     ['/system/users', '用户管理', '服务端用户'],
-    ['/system/roles', '角色管理', '服务端角色'],
+    ['/system/roles', '角色管理', '公司老板'],
     ['/system/permissions', '权限清单', 'system:menu:query'],
     ['/system/dict', '字典管理', '服务端字典项'],
     ['/system/audit', '操作审计', '/auth/login'],
