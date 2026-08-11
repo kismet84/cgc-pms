@@ -3,7 +3,7 @@
 ## 2026-08-12 第91条主线：架构边界与查询性能本地收口，Git 交付待执行
 
 - 目标：保持业务结果、权限、金额、租户和状态语义，关闭请求放大、查询 N+1、无界通讯历史、跨域 Dashboard 膨胀、采购页面职责混杂和 assembler 反射问题。
-- 状态：`IMPLEMENTED / AUTHORIZED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；代码实现证据 SHA `3aa0ec789465775ead00d27dc999851ab5fc5d0c`，唯一状态源为[`第91条主线计划`](../plans/第91条主线-架构边界与查询性能分阶段整改任务计划书.md)。
+- 状态：`IMPLEMENTED / AUTHORIZED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；最终代码证据 SHA `2a33977cf54add580734d5bccb1aac0518fdd4bf`（核心实现 `3aa0ec789465`），唯一状态源为[`第91条主线计划`](../plans/第91条主线-架构边界与查询性能分阶段整改任务计划书.md)。
 - 性能结果：认证 `Qauth=3`；四域活动视图各 1 个数据 HTTP 且查询数不随项目数增长；预警 `Q(1)=Q(50)=Q(500)=11`；通讯每页 3 查询、首屏≤100、DOM≤200；付款内部批量组装器每个≤100申请分片固定 25 Mapper+1 JDBC，`byProject` 在 SUPER_ADMIN 下端点总计 30 MyBatis+1 JDBC；现金摘要 2～3 聚合；账龄 1 SQL；财务 Dashboard `17/6/18/3`。
 - 架构结果：非财务 Dashboard 服务脱离 26 依赖基类，SharedSupport 收敛为 8 个真实共享依赖；采购申请/订单/验收进入三个页面私有 application；26 个业务页改用中性展示 helper；两个物料 assembler 改用显式 ID 函数。
 - F13：固定 JVM 下 3 场景、90 个正式 PDF 样本 0 失败；因无签认时限/堆/失败率阈值，以 `CLOSED / INSUFFICIENT_SIGNED_THRESHOLDS / NO_ASYNC` 关闭，保留同步链，不建后续项。
