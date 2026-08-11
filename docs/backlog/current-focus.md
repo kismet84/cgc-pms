@@ -1,13 +1,13 @@
 # Current Focus
 
-## 2026-08-12 第91条主线：架构边界与查询性能本地收口，Git 交付待执行
+## 2026-08-12 第91条主线：架构边界与查询性能已合并并完成 post-merge
 
 - 目标：保持业务结果、权限、金额、租户和状态语义，关闭请求放大、查询 N+1、无界通讯历史、跨域 Dashboard 膨胀、采购页面职责混杂和 assembler 反射问题。
-- 状态：`IMPLEMENTED / AUTHORIZED / G0-G5_LOCAL_PASSED / GIT_DELIVERY_PENDING`；最终代码证据 SHA `b5b8eeaa8d65c848819145b30a04aa229b3b8d1a`（核心实现 `3aa0ec789465`），唯一状态源为[`第91条主线计划`](../plans/第91条主线-架构边界与查询性能分阶段整改任务计划书.md)。
+- 状态：`IMPLEMENTED / AUTHORIZED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；最终代码证据 SHA `b5b8eeaa8d65c848819145b30a04aa229b3b8d1a`（核心实现 `3aa0ec789465`），交付源 HEAD `24499ae89eeb72ebe3272cb20e3c303350b1ce4e`，实现 PR #433 合并 SHA `6322785c08377fbb0cf190c835898f6aa2cb03ba`；唯一状态源为[`第91条主线计划`](../plans/第91条主线-架构边界与查询性能分阶段整改任务计划书.md)。
 - 性能结果：认证 `Qauth=3`；四域活动视图各 1 个数据 HTTP 且查询数不随项目数增长；预警 `Q(1)=Q(50)=Q(500)=11`；通讯每页 3 查询、首屏≤100、DOM≤200；付款内部批量组装器每个≤100申请分片固定 25 Mapper+1 JDBC，`byProject` 在 SUPER_ADMIN 下端点总计 30 MyBatis+1 JDBC；现金摘要 2～3 聚合；账龄 1 SQL；财务 Dashboard `17/6/18/3`。
 - 架构结果：非财务 Dashboard 服务脱离 26 依赖基类，SharedSupport 收敛为 8 个真实共享依赖；采购申请/订单/验收进入三个页面私有 application；26 个业务页改用中性展示 helper；两个物料 assembler 改用显式 ID 函数。
 - F13：固定 JVM 下 3 场景、90 个正式 PDF 样本 0 失败；因无签认时限/堆/失败率阈值，以 `CLOSED / INSUFFICIENT_SIGNED_THRESHOLDS / NO_ASYNC` 关闭，保留同步链，不建后续项。
-- 证据：本地 MySQL 8.0.46 `EXPLAIN` 无无界扫描，无 migration；后端 2723 项、前端 567 项、类型/构建/包体、真实浏览器 8 路由、目标 HTTP、DOM/交互/console、Codemap 和 diff 门禁通过。质量报告见[`第91条收口报告`](../quality/2026-08-12-issue-091-架构边界与查询性能分阶段整改.md)与[`PDF 基准裁决`](../quality/2026-08-12-第91条主线-PDF本地基准与F13裁决.md)。
+- 证据：本地 MySQL 8.0.46 `EXPLAIN` 无无界扫描，无 migration；后端 2723 项、前端 567 项、类型/构建/包体、真实浏览器 8 路由、目标 HTTP、DOM/交互/console、Codemap 和 diff 门禁通过；源 HEAD push CI `31541061971`、PR CI `31541836973`、合并后 run `31542616004` 与 pre/post-merge verifier 全部通过。质量报告见[`第91条收口报告`](../quality/2026-08-12-issue-091-架构边界与查询性能分阶段整改.md)与[`PDF 基准裁决`](../quality/2026-08-12-第91条主线-PDF本地基准与F13裁决.md)。
 - 边界：继续模块化单体；不建缓存中台、Query Bus、消息队列、第二权限/财务事实或异步 PDF；仅本地 dev/test/demo 与受保护 Git 交付，不连接非本地环境。
 - 第90条：整体仍未授权；仅财务依赖批次在 `c47f4fa76c41` 验收并集成到第91条实现 SHA。
 - 零悬空：本次收口新增 0、关闭 13、净变化 `-13`；第91条周期承接 5、新增 8、关闭 13，净变化 `-5`；正式 Issue 新增 0、关闭 0、净变化 `0`，无无载体遗留项。
