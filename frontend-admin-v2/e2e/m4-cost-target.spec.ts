@@ -149,7 +149,17 @@ async function installCostTargetMock(
     }
     const currentTarget = options.readTarget?.() ?? target
     let data: unknown = null
-    if (request.method() === 'GET' && /\/cost-targets\/81\/items$/.test(url.pathname)) data = [item]
+    if (request.method() === 'GET' && /\/cost-targets\/project-manager-options$/.test(url.pathname))
+      data = [
+        {
+          id: '1',
+          username: 'cost.manager',
+          realName: '目标成本经理',
+          eligible: true,
+        },
+      ]
+    else if (request.method() === 'GET' && /\/cost-targets\/81\/items$/.test(url.pathname))
+      data = [item]
     else if (request.method() === 'GET' && /\/cost-targets\/81$/.test(url.pathname))
       data = currentTarget
     else if (request.method() === 'GET' && /\/cost-targets$/.test(url.pathname)) {

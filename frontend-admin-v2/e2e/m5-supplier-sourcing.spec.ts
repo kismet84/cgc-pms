@@ -103,6 +103,8 @@ async function install(page: Page, permissions = allPermissions) {
           id: 'PO1',
           projectId: 'P1',
           orderCode: 'PO-001',
+          contractId: 'C1',
+          partnerId: 'P100',
           partnerName: '供应商甲',
           approvalStatus: 'APPROVED',
         },
@@ -136,6 +138,10 @@ async function install(page: Page, permissions = allPermissions) {
           projectId: 'P1',
           contractCode: 'CT-001',
           contractName: '采购合同',
+          contractType: 'PURCHASE',
+          approvalStatus: 'APPROVED',
+          contractStatus: 'PERFORMING',
+          partyBId: 'P100',
         },
       ],
       total: 1,
@@ -202,7 +208,8 @@ async function install(page: Page, permissions = allPermissions) {
         totalScore: '88.00',
         ...request.postDataJSON(),
       })
-    } else if (path.endsWith('/award')) event.status = 'AWARDED'
+    } else if (path.endsWith('/award'))
+      Object.assign(event, { status: 'AWARDED', awardedPartnerId: 'P100' })
     else if (path.endsWith('/link-contract')) {
       event.status = 'CONTRACTED'
       Object.assign(event, { contractId: 'C1' })

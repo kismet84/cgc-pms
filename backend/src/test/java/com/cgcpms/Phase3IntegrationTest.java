@@ -703,7 +703,7 @@ class Phase3IntegrationTest {
         VarOrder varOrder = new VarOrder();
         varOrder.setProjectId(PROJECT_ID);
         varOrder.setContractId(CONTRACT_ID);
-        varOrder.setPartnerId(PARTNER_ID);
+        varOrder.setPartnerId(contractMapper.selectById(CONTRACT_ID).getPartyBId());
         varOrder.setVarName("现场签证-额外土方开挖-共存测试");
         varOrder.setVarType("FIELD");
         varOrder.setDirection("COST");
