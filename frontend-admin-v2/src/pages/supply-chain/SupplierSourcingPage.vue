@@ -13,7 +13,7 @@ import type {
   SupplierReturnRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/shared/display'
 import {
   V2Badge,
   V2Button,
@@ -572,10 +572,7 @@ onBeforeUnmount(() => {
             :page-no="pageNo"
             :page-size="pageSize"
             label="招采事件分页"
-            @update:page-no="
-              pageNo = $event
-              loadPage()
-            "
+            @update:page-no="pageNo = $event; loadPage()"
           />
         </template>
       </V2Card>
@@ -878,10 +875,7 @@ onBeforeUnmount(() => {
               :page-no="performancePageNo"
               :page-size="pageSize"
               label="履约评价分页"
-              @update:page-no="
-                performancePageNo = $event
-                loadPage()
-              "
+              @update:page-no="performancePageNo = $event; loadPage()"
             />
           </section>
           <section>
@@ -913,10 +907,7 @@ onBeforeUnmount(() => {
               :page-no="returnPageNo"
               :page-size="pageSize"
               label="供应商退货分页"
-              @update:page-no="
-                returnPageNo = $event
-                loadPage()
-              "
+              @update:page-no="returnPageNo = $event; loadPage()"
             />
           </section>
         </div>

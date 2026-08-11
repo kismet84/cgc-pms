@@ -17,7 +17,7 @@ import {
   voidBidDocument,
 } from '@/services/commercial'
 import { getSiteFileUrl, uploadSiteFile } from '@/services/delivery'
-import { dashboardStatusLabel } from '@/pages/dashboard/model'
+import { dashboardStatusLabel } from '@/shared/display'
 import { isApiClientError } from '@/services/request'
 import { localDateTimeInputValue } from '@/services/workspace-context'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'

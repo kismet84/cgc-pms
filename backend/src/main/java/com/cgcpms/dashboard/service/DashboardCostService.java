@@ -18,55 +18,18 @@ import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.dashboard.vo.*;
-import com.cgcpms.inventory.entity.MatStock;
-import com.cgcpms.inventory.entity.MatWarehouse;
-import com.cgcpms.inventory.mapper.MatStockMapper;
-import com.cgcpms.inventory.mapper.MatWarehouseMapper;
-import com.cgcpms.material.entity.MdMaterial;
-import com.cgcpms.material.mapper.MdMaterialMapper;
-import com.cgcpms.partner.entity.MdPartner;
-import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
-import com.cgcpms.purchase.entity.MatPurchaseOrder;
-import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
-import com.cgcpms.purchase.entity.MatPurchaseRequest;
-import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
-import com.cgcpms.receipt.entity.MatReceipt;
-import com.cgcpms.receipt.entity.MatReceiptItem;
-import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
-import com.cgcpms.receipt.mapper.MatReceiptMapper;
-import com.cgcpms.requisition.entity.MatRequisition;
-import com.cgcpms.requisition.mapper.MatRequisitionMapper;
-import com.cgcpms.settlement.entity.StlSettlement;
-import com.cgcpms.settlement.mapper.StlSettlementMapper;
-import com.cgcpms.subcontract.entity.SubMeasure;
-import com.cgcpms.subcontract.mapper.SubMeasureMapper;
-import com.cgcpms.tech.entity.TechItem;
-import com.cgcpms.tech.mapper.TechItemMapper;
-import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
-import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.mapper.SysUserMapper;
-import com.cgcpms.variation.entity.VarOrder;
-import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowConstants;
-import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -74,17 +37,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Slf4j
 @Service
 public class DashboardCostService extends DashboardSharedSupport {
 
+    private final CostSubjectMapper costSubjectMapper;
+    private final CostItemMapper costItemMapper;
     private final ProjectAccessChecker projectAccessChecker;
 
     public DashboardCostService(
@@ -97,25 +60,12 @@ public class DashboardCostService extends DashboardSharedSupport {
             WfTaskMapper wfTaskMapper,
             WfInstanceMapper wfInstanceMapper,
             PayRecordMapper payRecordMapper,
-            StlSettlementMapper stlSettlementMapper,
-            VarOrderMapper varOrderMapper,
-            SubMeasureMapper subMeasureMapper,
             AlertLogMapper alertLogMapper,
-            MatPurchaseRequestMapper purchaseRequestMapper,
-            MatPurchaseRequestItemMapper purchaseRequestItemMapper,
-            MatPurchaseOrderMapper purchaseOrderMapper,
-            MatPurchaseOrderItemMapper purchaseOrderItemMapper,
-            MatReceiptMapper receiptMapper,
-            MatReceiptItemMapper receiptItemMapper,
-            MatRequisitionMapper requisitionMapper,
-            MatWarehouseMapper warehouseMapper,
-            MatStockMapper stockMapper,
-            TechItemMapper techItemMapper,
-            MdPartnerMapper partnerMapper,
-            MdMaterialMapper materialMapper,
-            SysUserMapper userMapper,
             ProjectAccessChecker projectAccessChecker) {
-        super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        super(costSummaryService, costSummaryMapper, projectMapper, ctContractMapper,
+                wfTaskMapper, wfInstanceMapper, payRecordMapper, alertLogMapper);
+        this.costSubjectMapper = costSubjectMapper;
+        this.costItemMapper = costItemMapper;
         this.projectAccessChecker = projectAccessChecker;
     }
 

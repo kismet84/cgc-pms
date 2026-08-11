@@ -1,15 +1,13 @@
 import type { DashboardDataByRole } from '@cgc-pms/frontend-contracts'
 import { describe, expect, it } from 'vitest'
+import { dashboardStatusLabel, formatAmount, formatDecimal } from '@/shared/display'
 import {
   alertRiskLevel,
   compactDashboardValue,
   dashboardActivityItems,
   dashboardHealth,
   dashboardMetrics,
-  dashboardStatusLabel,
   deriveDashboardHealth,
-  formatAmount,
-  formatDecimal,
   formatRatio,
   normalizeGaugeValue,
   primaryRiskItems,

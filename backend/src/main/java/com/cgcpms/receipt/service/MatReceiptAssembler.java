@@ -19,7 +19,6 @@ import com.cgcpms.receipt.vo.MatReceiptItemVO;
 import com.cgcpms.receipt.vo.MatReceiptVO;
 import com.cgcpms.common.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -37,7 +36,6 @@ import java.util.function.Function;
  * </ul>
  * Item-level assembly via {@link #assembleItem(MatReceiptItem, Map)}.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MatReceiptAssembler {
@@ -79,17 +77,18 @@ public class MatReceiptAssembler {
         Set<Long> materialIds = ids(items, MatReceiptItem::getMaterialId);
         Map<Long, String> materialNames = resolveNames(materialIds, mdMaterialMapper,
                 MdMaterial::getId, MdMaterial::getMaterialName);
-        Map<Long, MdMaterial> materials = resolveEntities(materialIds, mdMaterialMapper);
+        Map<Long, MdMaterial> materials = resolveEntities(materialIds, mdMaterialMapper, MdMaterial::getId);
         Set<Long> orderItemIds = ids(items, MatReceiptItem::getOrderItemId);
-        Map<Long, MatPurchaseOrderItem> orderItems = resolveEntities(orderItemIds, matPurchaseOrderItemMapper);
+        Map<Long, MatPurchaseOrderItem> orderItems = resolveEntities(
+                orderItemIds, matPurchaseOrderItemMapper, MatPurchaseOrderItem::getId);
         return items.stream().map(i -> {
             MatReceiptItemVO vo = toItemVO(i, materialNames);
-            MdMaterial material = materials.get(i.getMaterialId());
+            MdMaterial material = i.getMaterialId() == null ? null : materials.get(i.getMaterialId());
             if (material != null) {
                 vo.setSpecification(material.getSpecification());
                 vo.setUnit(material.getUnit());
             }
-            MatPurchaseOrderItem orderItem = orderItems.get(i.getOrderItemId());
+            MatPurchaseOrderItem orderItem = i.getOrderItemId() == null ? null : orderItems.get(i.getOrderItemId());
             if (orderItem != null) {
                 BigDecimal ordered = Optional.ofNullable(orderItem.getQuantity()).orElse(BigDecimal.ZERO);
                 BigDecimal received = Optional.ofNullable(orderItem.getReceivedQuantity()).orElse(BigDecimal.ZERO);
@@ -110,7 +109,7 @@ public class MatReceiptAssembler {
         Set<Long> materialIds = ids(orderItems, MatPurchaseOrderItem::getMaterialId);
         Map<Long, String> materialNames = resolveNames(materialIds, mdMaterialMapper,
                 MdMaterial::getId, MdMaterial::getMaterialName);
-        Map<Long, MdMaterial> materialMap = resolveEntities(materialIds, mdMaterialMapper);
+        Map<Long, MdMaterial> materialMap = resolveEntities(materialIds, mdMaterialMapper, MdMaterial::getId);
         return orderItems.stream().map(i -> {
             MatReceiptItemVO vo = new MatReceiptItemVO();
             vo.setOrderItemId(i.getId() != null ? i.getId().toString() : null);
@@ -257,18 +256,14 @@ public class MatReceiptAssembler {
         return map;
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> Map<Long, T> resolveEntities(Set<Long> ids, BaseMapper<T> mapper) {
+    private <T> Map<Long, T> resolveEntities(Set<Long> ids,
+                                              BaseMapper<T> mapper,
+                                              Function<T, Long> idExtractor) {
         if (ids.isEmpty()) return Map.of();
         List<T> entities = mapper.selectByIds(ids);
         Map<Long, T> map = new HashMap<>();
         for (T e : entities) {
-            try {
-                Long id = (Long) e.getClass().getMethod("getId").invoke(e);
-                map.put(id, e);
-            } catch (Exception ignored) {
-                log.warn("Failed to extract entity id via reflection", ignored);
-            }
+            map.put(idExtractor.apply(e), e);
         }
         return map;
     }

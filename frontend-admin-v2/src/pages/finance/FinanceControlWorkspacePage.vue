@@ -13,7 +13,7 @@ import {
 } from '@/components'
 import { showToast } from '@/components/toast'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount } from '@/shared/display'
 import { uploadSiteFile } from '@/services/delivery'
 import { localDateInputValue } from '@/services/workspace-context'
 import {

@@ -84,8 +84,8 @@ class AuthControllerTest {
     private LoginLockoutStore lockoutStore;
 
     @BeforeEach
-    void allowCurrentAuthorizationSnapshot() {
-        when(authService.isCurrentAuthorization(any())).thenReturn(true);
+    void allowCurrentCredential() {
+        when(authService.isCurrentCredential(any())).thenReturn(true);
     }
 
     @Test

@@ -12,7 +12,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { dashboardStatusLabel, formatAmount, formatDecimal } from '@/pages/dashboard/model'
+import { dashboardStatusLabel, formatAmount, formatDecimal } from '@/shared/display'
 import {
   BusinessAttachmentPanel,
   V2ActionMenu,

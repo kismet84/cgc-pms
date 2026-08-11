@@ -25,7 +25,7 @@ import {
   updateBidCost,
 } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount } from '@/shared/display'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 

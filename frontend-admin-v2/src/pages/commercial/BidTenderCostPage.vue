@@ -26,7 +26,7 @@ import {
 } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { dashboardStatusLabel } from '@/pages/dashboard/model'
+import { dashboardStatusLabel } from '@/shared/display'
 
 const session = useSessionStore()
 const workspace = useWorkspaceStore()

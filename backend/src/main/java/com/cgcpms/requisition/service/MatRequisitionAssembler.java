@@ -17,7 +17,6 @@ import com.cgcpms.requisition.entity.MatRequisitionItem;
 import com.cgcpms.requisition.vo.MatRequisitionItemVO;
 import com.cgcpms.requisition.vo.MatRequisitionVO;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -34,7 +33,6 @@ import java.util.function.Function;
  * </ul>
  * Item-level assembly via {@link #assembleItem(MatRequisitionItem, Map, Map)}.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MatRequisitionAssembler {
@@ -79,7 +77,7 @@ public class MatRequisitionAssembler {
         Set<Long> materialIds = ids(items, MatRequisitionItem::getMaterialId);
         Map<Long, String> materialNames = resolveNames(materialIds, mdMaterialMapper,
                 MdMaterial::getId, MdMaterial::getMaterialName);
-        Map<Long, MdMaterial> materialMap = resolveEntities(materialIds, mdMaterialMapper);
+        Map<Long, MdMaterial> materialMap = resolveEntities(materialIds, mdMaterialMapper, MdMaterial::getId);
         return items.stream().map(i -> toItemVO(i, materialNames, materialMap)).toList();
     }
 
@@ -100,7 +98,7 @@ public class MatRequisitionAssembler {
                 resolveNames(projectIds, pmProjectMapper, PmProject::getId, PmProject::getProjectName),
                 resolveNames(contractIds, ctContractMapper, CtContract::getId, CtContract::getContractName),
                 resolveNames(partnerIds, mdPartnerMapper, MdPartner::getId, MdPartner::getPartnerName),
-                resolveEntities(warehouseIds, matWarehouseMapper));
+                resolveEntities(warehouseIds, matWarehouseMapper, MatWarehouse::getId));
     }
 
     // ──────── internal VO builders ────────
@@ -195,18 +193,14 @@ public class MatRequisitionAssembler {
         return map;
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> Map<Long, T> resolveEntities(Set<Long> ids, BaseMapper<T> mapper) {
+    private <T> Map<Long, T> resolveEntities(Set<Long> ids,
+                                              BaseMapper<T> mapper,
+                                              Function<T, Long> idExtractor) {
         if (ids.isEmpty()) return Map.of();
         List<T> entities = mapper.selectByIds(ids);
         Map<Long, T> map = new HashMap<>();
         for (T e : entities) {
-            try {
-                Long id = (Long) e.getClass().getMethod("getId").invoke(e);
-                map.put(id, e);
-            } catch (Exception ignored) {
-                log.warn("Failed to extract entity id via reflection", ignored);
-            }
+            map.put(idExtractor.apply(e), e);
         }
         return map;
     }

@@ -11,7 +11,7 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount } from '@/shared/display'
 import {
   loadBudget,
   loadCostControl,

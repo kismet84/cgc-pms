@@ -14,7 +14,7 @@ import {
 } from '@/components'
 import { showToast } from '@/components/toast'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
-import { dashboardStatusLabel, formatAmount } from '@/pages/dashboard/model'
+import { dashboardStatusLabel, formatAmount } from '@/shared/display'
 import {
   loadBudget,
   loadBudgetPage,

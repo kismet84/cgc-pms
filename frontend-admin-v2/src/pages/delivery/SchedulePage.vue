@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { formatDecimal } from '@/pages/dashboard/model'
+import { formatDecimal } from '@/shared/display'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   CorrectiveActionCommand,
