@@ -102,6 +102,16 @@ export function loadMessages(
   return apiRequest(`${BASE}/conversations/${id(conversationId)}/messages?${query}`, { signal })
 }
 
+export function loadPreviousMessages(
+  conversationId: string,
+  beforeSeq = '0',
+  pageSize = 100,
+  signal?: AbortSignal,
+): Promise<MessageRecord[]> {
+  const query = new URLSearchParams({ beforeSeq, pageSize: String(pageSize) })
+  return apiRequest(`${BASE}/conversations/${id(conversationId)}/messages?${query}`, { signal })
+}
+
 export function createMessageDraft(conversationId: string, body: string, clientMessageId: string) {
   return apiRequest<MessageRecord>(`${BASE}/conversations/${id(conversationId)}/drafts`, {
     method: 'POST',

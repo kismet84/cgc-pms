@@ -24,7 +24,7 @@ import {
   loadConversationMembers,
   loadCommunicationUsers,
   loadConversations,
-  loadMessages,
+  loadPreviousMessages,
   markConversationRead,
   removeConversationMember,
   renameConversation,
@@ -36,6 +36,8 @@ import {
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
+const HISTORY_PAGE_SIZE = 100
+const MESSAGE_WINDOW_SIZE = 200
 const conversations = ref<ConversationSummary[]>([])
 const users = ref<CommunicationUserSummary[]>([])
 const members = ref<CommunicationMemberSummary[]>([])
@@ -51,6 +53,11 @@ const body = ref('')
 const attachments = ref<File[]>([])
 const loading = ref(true)
 const messagesLoading = ref(false)
+const earlierMessagesLoading = ref(false)
+const hasEarlierMessages = ref(false)
+const latestWindow = ref(true)
+const atLatest = ref(true)
+const hasNewMessages = ref(false)
 const sending = ref(false)
 const error = ref('')
 const status = ref('')
@@ -58,6 +65,7 @@ const pendingGroupAction = ref<'leave' | 'close' | null>(null)
 const messageList = ref<HTMLElement | null>(null)
 let requestController: AbortController | null = null
 let conversationHistoryController: AbortController | null = null
+let messagePageController: AbortController | null = null
 let conversationGeneration = 0
 const sendMessageDependencies = {
   retryStore: createSessionSendRetryStore(sessionStorage),
@@ -140,6 +148,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   requestController?.abort()
   conversationHistoryController?.abort()
+  messagePageController?.abort()
   window.removeEventListener('communication-refresh', onCommunicationRefresh)
   window.removeEventListener('focus', refreshAfterReconnect)
 })
@@ -177,6 +186,10 @@ async function refreshConversations(): Promise<void> {
     selectedConversationId.value = ''
     messages.value = []
     members.value = []
+    hasEarlierMessages.value = false
+    latestWindow.value = true
+    atLatest.value = true
+    hasNewMessages.value = false
   } else if (!isManageableGroup(selectedConversation.value)) {
     members.value = []
   }
@@ -194,10 +207,16 @@ async function searchUsers(): Promise<void> {
 async function selectConversation(id: string): Promise<void> {
   const token = ++conversationGeneration
   conversationHistoryController?.abort()
+  messagePageController?.abort()
   const controller = new AbortController()
   conversationHistoryController = controller
   selectedConversationId.value = id
+  messages.value = []
   members.value = []
+  hasEarlierMessages.value = false
+  latestWindow.value = true
+  atLatest.value = true
+  hasNewMessages.value = false
   memberTargetId.value = ''
   memberAction.value = 'ADD'
   messagesLoading.value = true
@@ -205,7 +224,7 @@ async function selectConversation(id: string): Promise<void> {
   try {
     const conversation = conversations.value.find((item) => item.id === id)
     const [loaded, loadedMembers] = await Promise.all([
-      loadAllMessages(id, '0', controller.signal),
+      loadPreviousMessages(id, '0', HISTORY_PAGE_SIZE, controller.signal),
       isManageableGroup(conversation)
         ? loadConversationMembers(id, controller.signal)
         : Promise.resolve([]),
@@ -216,7 +235,11 @@ async function selectConversation(id: string): Promise<void> {
       selectedConversationId.value !== id
     )
       return
-    messages.value = loaded
+    messages.value = deduplicateAndSort(loaded).slice(-MESSAGE_WINDOW_SIZE)
+    hasEarlierMessages.value = loaded.length === HISTORY_PAGE_SIZE
+    latestWindow.value = true
+    atLatest.value = true
+    hasNewMessages.value = false
     members.value = loadedMembers
     await markCurrentRead()
     if (token !== conversationGeneration || selectedConversationId.value !== id) return
@@ -232,41 +255,119 @@ async function selectConversation(id: string): Promise<void> {
   }
 }
 
-async function loadAllMessages(
-  conversationId: string,
-  afterSeq = '0',
-  signal?: AbortSignal,
-): Promise<MessageRecord[]> {
-  const result: MessageRecord[] = []
-  let cursor = afterSeq
-  while (true) {
-    const page = await loadMessages(conversationId, cursor, 100, signal)
-    result.push(...page)
-    const next = page.at(-1)?.seq
-    if (page.length < 100 || !next || next === cursor) return result
-    cursor = next
+function deduplicateAndSort(records: MessageRecord[]): MessageRecord[] {
+  const byId = new Map(records.map((item) => [item.id, item]))
+  return [...byId.values()].sort((left, right) => {
+    const leftSeq = BigInt(left.seq ?? '0')
+    const rightSeq = BigInt(right.seq ?? '0')
+    return leftSeq < rightSeq ? -1 : leftSeq > rightSeq ? 1 : 0
+  })
+}
+
+async function loadEarlierMessages(): Promise<void> {
+  const conversationId = selectedConversationId.value
+  const beforeSeq = messages.value[0]?.seq
+  if (!conversationId || !beforeSeq || earlierMessagesLoading.value || !hasEarlierMessages.value)
+    return
+  const token = conversationGeneration
+  messagePageController?.abort()
+  const controller = new AbortController()
+  messagePageController = controller
+  const previousHeight = messageList.value?.scrollHeight ?? 0
+  const previousTop = messageList.value?.scrollTop ?? 0
+  earlierMessagesLoading.value = true
+  try {
+    const page = await loadPreviousMessages(
+      conversationId,
+      beforeSeq,
+      HISTORY_PAGE_SIZE,
+      controller.signal,
+    )
+    if (
+      controller.signal.aborted ||
+      token !== conversationGeneration ||
+      selectedConversationId.value !== conversationId
+    )
+      return
+    hasEarlierMessages.value = page.length === HISTORY_PAGE_SIZE
+    if (!page.length) return
+    const combined = deduplicateAndSort([...page, ...messages.value])
+    if (combined.length > MESSAGE_WINDOW_SIZE) {
+      messages.value = combined.slice(0, MESSAGE_WINDOW_SIZE)
+      latestWindow.value = false
+    } else messages.value = combined
+    atLatest.value = false
+    await nextTick()
+    if (messageList.value) {
+      messageList.value.scrollTop =
+        previousTop + Math.max(0, messageList.value.scrollHeight - previousHeight)
+    }
+  } catch {
+    if (!controller.signal.aborted) status.value = '更早消息加载失败，请重试。'
+  } finally {
+    if (token === conversationGeneration) earlierMessagesLoading.value = false
+    if (messagePageController === controller) messagePageController = null
+  }
+}
+
+async function jumpToLatest(showLoading = true): Promise<void> {
+  const conversationId = selectedConversationId.value
+  if (!conversationId) return
+  const token = conversationGeneration
+  messagePageController?.abort()
+  const controller = new AbortController()
+  messagePageController = controller
+  if (showLoading) messagesLoading.value = true
+  try {
+    const latest = await loadPreviousMessages(
+      conversationId,
+      '0',
+      HISTORY_PAGE_SIZE,
+      controller.signal,
+    )
+    if (
+      controller.signal.aborted ||
+      token !== conversationGeneration ||
+      selectedConversationId.value !== conversationId
+    )
+      return
+    messages.value = deduplicateAndSort(latest).slice(-MESSAGE_WINDOW_SIZE)
+    hasEarlierMessages.value = latest.length === HISTORY_PAGE_SIZE
+    latestWindow.value = true
+    atLatest.value = true
+    hasNewMessages.value = false
+    await markCurrentRead()
+    if (token !== conversationGeneration || selectedConversationId.value !== conversationId) return
+    await scrollToLatest()
+  } catch {
+    if (!controller.signal.aborted) status.value = '最新消息加载失败，请重试。'
+  } finally {
+    if (showLoading && token === conversationGeneration) messagesLoading.value = false
+    if (messagePageController === controller) messagePageController = null
   }
 }
 
 async function loadNewMessages(): Promise<void> {
-  const conversationId = selectedConversationId.value
-  if (!conversationId) return
-  const token = conversationGeneration
-  const afterSeq = messages.value.at(-1)?.seq ?? '0'
-  const incoming = await loadAllMessages(conversationId, afterSeq)
-  if (token !== conversationGeneration || selectedConversationId.value !== conversationId) return
-  const known = new Set(messages.value.map((item) => item.id))
-  messages.value.push(...incoming.filter((item) => !known.has(item.id)))
-  await markCurrentRead()
-  if (token !== conversationGeneration || selectedConversationId.value !== conversationId) return
-  await scrollToLatest()
+  if (!selectedConversationId.value) return
+  if (!atLatest.value) {
+    hasNewMessages.value = true
+    return
+  }
+  await jumpToLatest(false)
 }
 
 async function markCurrentRead(): Promise<void> {
   const last = messages.value.at(-1)
-  if (!last || last.seq === '0' || !selectedConversationId.value) return
+  if (!atLatest.value || !last?.seq || last.seq === '0' || !selectedConversationId.value) return
   await markConversationRead(selectedConversationId.value, last.seq)
   window.dispatchEvent(new Event('communication-unread-changed'))
+}
+
+function onMessageScroll(): void {
+  const element = messageList.value
+  if (!element) return
+  const nearBottom = element.scrollHeight - element.scrollTop - element.clientHeight <= 24
+  atLatest.value = latestWindow.value && !hasNewMessages.value && nearBottom
 }
 
 async function onCommunicationRefresh(event: Event): Promise<void> {
@@ -336,17 +437,21 @@ async function send(): Promise<void> {
     )
     await refreshConversations()
     if (selectedConversationId.value === conversationId) {
-      messages.value.push(sent)
       if (messageSendFingerprint(body.value, attachments.value) === fingerprint) {
         body.value = ''
         attachments.value = []
       }
       status.value = '消息已发送。'
-      if (sent.seq) {
-        await markConversationRead(conversationId, sent.seq)
-        window.dispatchEvent(new Event('communication-unread-changed'))
+      if (!atLatest.value) await jumpToLatest(false)
+      else {
+        messages.value = deduplicateAndSort([...messages.value, sent]).slice(-MESSAGE_WINDOW_SIZE)
+        latestWindow.value = true
+        if (sent.seq) {
+          await markConversationRead(conversationId, sent.seq)
+          window.dispatchEvent(new Event('communication-unread-changed'))
+        }
+        if (selectedConversationId.value === conversationId) await scrollToLatest()
       }
-      if (selectedConversationId.value === conversationId) await scrollToLatest()
     }
   } catch {
     if (selectedConversationId.value === conversationId) {
@@ -464,7 +569,10 @@ async function confirmGroupAction(): Promise<void> {
 
 async function scrollToLatest(): Promise<void> {
   await nextTick()
-  if (messageList.value) messageList.value.scrollTop = messageList.value.scrollHeight
+  if (messageList.value) {
+    messageList.value.scrollTop = messageList.value.scrollHeight
+    atLatest.value = latestWindow.value && !hasNewMessages.value
+  }
 }
 
 function formatTime(value?: string | null): string {
@@ -646,7 +754,22 @@ function scanStatusLabel(value: string): string {
             role="log"
             aria-live="polite"
             aria-relevant="additions"
+            @scroll="onMessageScroll"
           >
+            <div v-if="messages.length" class="communication-page__history-actions">
+              <button
+                v-if="hasEarlierMessages"
+                type="button"
+                :disabled="earlierMessagesLoading"
+                @click="loadEarlierMessages"
+              >
+                {{ earlierMessagesLoading ? '正在加载…' : '加载更早消息' }}
+              </button>
+              <span v-else>已到达可见历史起点</span>
+              <button v-if="hasNewMessages || !latestWindow" type="button" @click="jumpToLatest()">
+                {{ hasNewMessages ? '有新消息，跳至最新' : '跳至最新' }}
+              </button>
+            </div>
             <p v-if="messagesLoading" class="communication-page__state">正在加载消息…</p>
             <p v-else-if="!messages.length" class="communication-page__state">暂无消息</p>
             <article
@@ -899,6 +1022,19 @@ function scanStatusLabel(value: string): string {
   overflow-y: auto;
   padding: var(--v2-space-4);
   background: var(--v2-color-canvas);
+}
+.communication-page__history-actions {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v2-space-2);
+  padding-block-end: var(--v2-space-3);
+  background: var(--v2-color-canvas);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
 }
 .communication-page__messages article {
   width: min(42rem, 85%);

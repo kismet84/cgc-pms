@@ -16,8 +16,6 @@ import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
-import com.cgcpms.inventory.mapper.MatStockTxnMapper;
-import com.cgcpms.inventory.entity.MatStockTxn;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
@@ -55,25 +53,163 @@ class AlertRuleEvaluator {
     private final PayRecordMapper payRecordMapper;
     private final SubMeasureMapper subMeasureMapper;
     private final MatReceiptMapper matReceiptMapper;
-    private final MatStockTxnMapper matStockTxnMapper;
     private final MatPurchaseOrderMapper purchaseOrderMapper;
     private final VarOrderMapper varOrderMapper;
     private final StlSettlementMapper stlSettlementMapper;
 
+    Map<Long, List<AlertLog>> evaluateProjects(Long tenantId, Collection<Long> projectIds) {
+        LinkedHashSet<Long> ids = projectIds.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, AlertRuleConfig> ruleConfigs = loadRuleConfigs(tenantId);
+        BatchSnapshot snapshot = loadSnapshot(tenantId, ids, ruleConfigs);
+        Map<Long, List<AlertLog>> result = new LinkedHashMap<>();
+        for (Long projectId : ids) {
+            List<AlertLog> alerts = new ArrayList<>();
+            alerts.addAll(evaluateDynamicCostExceedsTarget(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateMaterialExceedsBudget(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateSubcontractExceedsContract(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateContractOverdue(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluatePaymentExceedsRatio(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateWarrantyEarlyRelease(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateContractExpiring(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluateVariationUnconfirmed(tenantId, projectId, ruleConfigs, snapshot));
+            alerts.addAll(evaluatePurchaseDeliveryOverdue(tenantId, projectId, ruleConfigs, snapshot));
+            result.put(projectId, alerts);
+        }
+        return result;
+    }
+
+    private BatchSnapshot loadSnapshot(Long tenantId, Set<Long> projectIds,
+                                       Map<String, AlertRuleConfig> ruleConfigs) {
+        List<CostSummary> summaries = costSummaryMapper.selectList(new LambdaQueryWrapper<CostSummary>()
+                .eq(CostSummary::getTenantId, tenantId)
+                .in(CostSummary::getProjectId, projectIds));
+        List<MatReceipt> receipts = matReceiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
+                .eq(MatReceipt::getTenantId, tenantId)
+                .in(MatReceipt::getProjectId, projectIds)
+                .eq(MatReceipt::getApprovalStatus, "APPROVED"));
+        List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .in(SubMeasure::getProjectId, projectIds)
+                .eq(SubMeasure::getApprovalStatus, "APPROVED"));
+        List<PayRecord> payments = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId)
+                .in(PayRecord::getProjectId, projectIds)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        List<StlSettlement> settlements = stlSettlementMapper.selectList(new LambdaQueryWrapper<StlSettlement>()
+                .eq(StlSettlement::getTenantId, tenantId)
+                .in(StlSettlement::getProjectId, projectIds)
+                .eq(StlSettlement::getSettlementStatus, "FINALIZED")
+                .gt(StlSettlement::getWarrantyAmount, BigDecimal.ZERO));
+        Set<Long> referencedContractIds = new LinkedHashSet<>();
+        receipts.stream().map(MatReceipt::getContractId).filter(Objects::nonNull)
+                .forEach(referencedContractIds::add);
+        measures.stream().map(SubMeasure::getContractId).filter(Objects::nonNull)
+                .forEach(referencedContractIds::add);
+        payments.stream().map(PayRecord::getContractId).filter(Objects::nonNull)
+                .forEach(referencedContractIds::add);
+        settlements.stream().map(StlSettlement::getContractId).filter(Objects::nonNull)
+                .forEach(referencedContractIds::add);
+        List<CtContract> contracts = ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId)
+                .and(scope -> {
+                    scope.in(CtContract::getProjectId, projectIds);
+                    if (!referencedContractIds.isEmpty()) {
+                        scope.or().in(CtContract::getId, referencedContractIds);
+                    }
+                })).stream()
+                .filter(contract -> Objects.equals(contract.getTenantId(), tenantId))
+                .toList();
+        List<MatPurchaseOrder> purchaseOrders = purchaseOrderMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getTenantId, tenantId)
+                        .in(MatPurchaseOrder::getProjectId, projectIds)
+                        .lt(MatPurchaseOrder::getDeliveryDate, LocalDate.now())
+                        .notIn(MatPurchaseOrder::getOrderStatus, List.of("COMPLETED", "CANCELLED"))
+                        .orderByAsc(MatPurchaseOrder::getDeliveryDate));
+        List<VarOrder> variations = varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
+                .eq(VarOrder::getTenantId, tenantId)
+                .in(VarOrder::getProjectId, projectIds)
+                .eq(VarOrder::getApprovalStatus, "APPROVED")
+                .eq(VarOrder::getOwnerConfirmFlag, 0));
+        Set<Long> completedStockInOrderIds = new HashSet<>(
+                matReceiptMapper.selectCompletedStockInOrderIds(tenantId, projectIds));
+
+        int configuredMaxDedupHours = ruleConfigs.values().stream()
+                .mapToInt(this::dedupHours)
+                .map(hours -> Math.max(hours, 1))
+                .max()
+                .orElse(DEFAULT_DEDUP_HOURS);
+        int maxDedupHours = Math.max(DEFAULT_DEDUP_HOURS, configuredMaxDedupHours);
+        Set<String> candidateDedupKeys = candidateDedupKeys(projectIds, receipts, measures, payments,
+                settlements, purchaseOrders);
+        List<AlertLog> duplicateCandidates = alertLogMapper.selectList(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, tenantId)
+                .in(AlertLog::getDedupKey, candidateDedupKeys)
+                .and(status -> status.eq(AlertLog::getProcessStatus, "OPEN")
+                        .or(processed -> processed.eq(AlertLog::getProcessStatus, "PROCESSED")
+                                .ge(AlertLog::getTriggeredAt, LocalDateTime.now().minusHours(maxDedupHours)))));
+
+        return new BatchSnapshot(
+                groupByProject(summaries, CostSummary::getProjectId),
+                groupByProject(receipts, MatReceipt::getProjectId),
+                groupByProject(measures, SubMeasure::getProjectId),
+                groupByProject(contracts, CtContract::getProjectId),
+                contracts.stream().collect(Collectors.toMap(CtContract::getId, item -> item,
+                        (left, right) -> left)),
+                groupByProject(payments, PayRecord::getProjectId),
+                groupByProject(settlements, StlSettlement::getProjectId),
+                groupByProject(purchaseOrders, MatPurchaseOrder::getProjectId),
+                groupByProject(variations, VarOrder::getProjectId),
+                completedStockInOrderIds,
+                duplicateCandidates.stream()
+                        .filter(item -> StringUtils.hasText(item.getDedupKey()))
+                        .collect(Collectors.groupingBy(AlertLog::getDedupKey)));
+    }
+
+    private Set<String> candidateDedupKeys(Set<Long> projectIds,
+                                           List<MatReceipt> receipts,
+                                           List<SubMeasure> measures,
+                                           List<PayRecord> payments,
+                                           List<StlSettlement> settlements,
+                                           List<MatPurchaseOrder> purchaseOrders) {
+        Set<String> keys = new LinkedHashSet<>();
+        for (Long projectId : projectIds) {
+            keys.add(projectRuleDedupKey(projectId, "DYNAMIC_COST_EXCEEDS_TARGET"));
+            keys.add(projectRuleDedupKey(projectId, "CONTRACT_OVERDUE"));
+            keys.add(projectRuleDedupKey(projectId, "CONTRACT_EXPIRING"));
+            keys.add(projectRuleDedupKey(projectId, "VARIATION_UNCONFIRMED"));
+        }
+        receipts.stream().map(MatReceipt::getContractId).filter(Objects::nonNull)
+                .map(id -> contractRuleDedupKey(id, "MATERIAL_EXCEEDS_BUDGET")).forEach(keys::add);
+        measures.stream().map(SubMeasure::getContractId).filter(Objects::nonNull)
+                .map(id -> contractRuleDedupKey(id, "SUBCONTRACT_EXCEEDS_CONTRACT")).forEach(keys::add);
+        payments.stream().map(PayRecord::getContractId).filter(Objects::nonNull)
+                .map(id -> contractRuleDedupKey(id, "PAYMENT_EXCEEDS_RATIO")).forEach(keys::add);
+        settlements.stream().map(StlSettlement::getContractId).filter(Objects::nonNull)
+                .map(id -> contractRuleDedupKey(id, "WARRANTY_EARLY_RELEASE")).forEach(keys::add);
+        purchaseOrders.stream().map(MatPurchaseOrder::getId).filter(Objects::nonNull)
+                .map(id -> sourceRuleDedupKey("PURCHASE_ORDER", id, "PURCHASE_DELIVERY_OVERDUE"))
+                .forEach(keys::add);
+        return keys;
+    }
+
     List<AlertLog> evaluateDynamicCostExceedsTarget(Long tenantId, Long projectId,
-                                                     Map<String, AlertRuleConfig> ruleConfigs) {
+                                                     Map<String, AlertRuleConfig> ruleConfigs,
+                                                     BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "DYNAMIC_COST_EXCEEDS_TARGET");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
         String dedupKey = projectRuleDedupKey(projectId, "DYNAMIC_COST_EXCEEDS_TARGET");
-        if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+        if (isDuplicate(snapshot, dedupKey, dedupHours(config))) {
             return Collections.emptyList();
         }
-        List<CostSummary> summaries = costSummaryMapper.selectList(
-                new LambdaQueryWrapper<CostSummary>()
-                        .eq(CostSummary::getTenantId, tenantId)
-                        .eq(CostSummary::getProjectId, projectId));
+        List<CostSummary> summaries = snapshot.costSummaries().getOrDefault(projectId, List.of());
         for (CostSummary s : summaries) {
             BigDecimal dynamic = nvl(s.getDynamicCost());
             BigDecimal target = nvl(s.getTargetCost());
@@ -92,30 +228,26 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateMaterialExceedsBudget(Long tenantId, Long projectId,
-                                                  Map<String, AlertRuleConfig> ruleConfigs) {
+                                                  Map<String, AlertRuleConfig> ruleConfigs,
+                                                  BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "MATERIAL_EXCEEDS_BUDGET");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        List<MatReceipt> receipts = matReceiptMapper.selectList(
-                new LambdaQueryWrapper<MatReceipt>()
-                        .eq(MatReceipt::getTenantId, tenantId)
-                        .eq(MatReceipt::getProjectId, projectId)
-                        .eq(MatReceipt::getApprovalStatus, "APPROVED"));
+        List<MatReceipt> receipts = snapshot.receipts().getOrDefault(projectId, List.of());
         Map<Long, BigDecimal> receiptByContract = new HashMap<>();
         for (MatReceipt r : receipts) {
             Long cid = r.getContractId();
             if (cid == null) continue;
             receiptByContract.merge(cid, nvl(r.getTotalAmount()), BigDecimal::add);
         }
-        Map<Long, CtContract> contractMap = batchLoadContracts(receiptByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : receiptByContract.entrySet()) {
-            CtContract contract = contractMap.get(entry.getKey());
+            CtContract contract = snapshot.contractsById().get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             String dedupKey = contractRuleDedupKey(entry.getKey(), "MATERIAL_EXCEEDS_BUDGET");
-            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) continue;
+            if (isDuplicate(snapshot, dedupKey, dedupHours(config))) continue;
             if (ratio(entry.getValue(), contractAmount).compareTo(thresholdRatio(config)) > 0) {
                 return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "MATERIAL_EXCEEDS_BUDGET", "MEDIUM",
@@ -131,30 +263,26 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateSubcontractExceedsContract(Long tenantId, Long projectId,
-                                                       Map<String, AlertRuleConfig> ruleConfigs) {
+                                                       Map<String, AlertRuleConfig> ruleConfigs,
+                                                       BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "SUBCONTRACT_EXCEEDS_CONTRACT");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        List<SubMeasure> measures = subMeasureMapper.selectList(
-                new LambdaQueryWrapper<SubMeasure>()
-                        .eq(SubMeasure::getTenantId, tenantId)
-                        .eq(SubMeasure::getProjectId, projectId)
-                        .eq(SubMeasure::getApprovalStatus, "APPROVED"));
+        List<SubMeasure> measures = snapshot.measures().getOrDefault(projectId, List.of());
         Map<Long, BigDecimal> measureByContract = new HashMap<>();
         for (SubMeasure m : measures) {
             Long cid = m.getContractId();
             if (cid == null) continue;
             measureByContract.merge(cid, nvl(m.getApprovedAmount()), BigDecimal::add);
         }
-        Map<Long, CtContract> contractMap = batchLoadContracts(measureByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : measureByContract.entrySet()) {
-            CtContract contract = contractMap.get(entry.getKey());
+            CtContract contract = snapshot.contractsById().get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             String dedupKey = contractRuleDedupKey(entry.getKey(), "SUBCONTRACT_EXCEEDS_CONTRACT");
-            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) continue;
+            if (isDuplicate(snapshot, dedupKey, dedupHours(config))) continue;
             if (ratio(entry.getValue(), contractAmount).compareTo(thresholdRatio(config)) > 0) {
                 return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "SUBCONTRACT_EXCEEDS_CONTRACT", "HIGH",
@@ -170,22 +298,21 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateContractOverdue(Long tenantId, Long projectId,
-                                           Map<String, AlertRuleConfig> ruleConfigs) {
+                                           Map<String, AlertRuleConfig> ruleConfigs,
+                                           BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "CONTRACT_OVERDUE");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
         String dedupKey = projectRuleDedupKey(projectId, "CONTRACT_OVERDUE");
-        if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+        if (isDuplicate(snapshot, dedupKey, dedupHours(config))) {
             return Collections.emptyList();
         }
         LocalDate today = LocalDate.now();
-        List<CtContract> contracts = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .eq(CtContract::getProjectId, projectId)
-                        .eq(CtContract::getContractStatus, "PERFORMING")
-                        .lt(CtContract::getEndDate, today));
+        List<CtContract> contracts = snapshot.contracts().getOrDefault(projectId, List.of()).stream()
+                .filter(contract -> "PERFORMING".equals(contract.getContractStatus()))
+                .filter(contract -> contract.getEndDate() != null && contract.getEndDate().isBefore(today))
+                .toList();
         if (!contracts.isEmpty()) {
             List<String> names = contracts.stream()
                     .map(c -> c.getContractCode() + "(" + c.getContractName() + ") 截止 " + c.getEndDate())
@@ -199,31 +326,27 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluatePaymentExceedsRatio(Long tenantId, Long projectId,
-                                                Map<String, AlertRuleConfig> ruleConfigs) {
+                                                Map<String, AlertRuleConfig> ruleConfigs,
+                                                BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "PAYMENT_EXCEEDS_RATIO");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        List<PayRecord> records = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getTenantId, tenantId)
-                        .eq(PayRecord::getProjectId, projectId)
-                        .eq(PayRecord::getPayStatus, "SUCCESS"));
+        List<PayRecord> records = snapshot.payments().getOrDefault(projectId, List.of());
         Map<Long, BigDecimal> paidByContract = new HashMap<>();
         for (PayRecord r : records) {
             Long cid = r.getContractId();
             if (cid == null) continue;
             paidByContract.merge(cid, nvl(r.getPayAmount()), BigDecimal::add);
         }
-        Map<Long, CtContract> contractMap = batchLoadContracts(paidByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
-            CtContract contract = contractMap.get(entry.getKey());
+            CtContract contract = snapshot.contractsById().get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             BigDecimal ratioValue = entry.getValue().divide(contractAmount, 2, RoundingMode.HALF_UP);
             String dedupKey = contractRuleDedupKey(entry.getKey(), "PAYMENT_EXCEEDS_RATIO");
-            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) continue;
+            if (isDuplicate(snapshot, dedupKey, dedupHours(config))) continue;
             if (ratioValue.compareTo(thresholdRatio(config)) > 0) {
                 return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "PAYMENT_EXCEEDS_RATIO", "HIGH",
@@ -240,28 +363,19 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateWarrantyEarlyRelease(Long tenantId, Long projectId,
-                                                 Map<String, AlertRuleConfig> ruleConfigs) {
+                                                 Map<String, AlertRuleConfig> ruleConfigs,
+                                                 BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "WARRANTY_EARLY_RELEASE");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        List<StlSettlement> settlements = stlSettlementMapper.selectList(
-                new LambdaQueryWrapper<StlSettlement>()
-                        .eq(StlSettlement::getTenantId, tenantId)
-                        .eq(StlSettlement::getProjectId, projectId)
-                        .eq(StlSettlement::getSettlementStatus, "FINALIZED")
-                        .gt(StlSettlement::getWarrantyAmount, BigDecimal.ZERO));
-        Set<Long> contractIds = settlements.stream()
-                .map(StlSettlement::getContractId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, CtContract> contractMap = batchLoadContracts(contractIds);
+        List<StlSettlement> settlements = snapshot.settlements().getOrDefault(projectId, List.of());
         for (StlSettlement stl : settlements) {
             if (stl.getContractId() == null) continue;
-            CtContract contract = contractMap.get(stl.getContractId());
+            CtContract contract = snapshot.contractsById().get(stl.getContractId());
             if (contract == null) continue;
             String dedupKey = contractRuleDedupKey(stl.getContractId(), "WARRANTY_EARLY_RELEASE");
-            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) continue;
+            if (isDuplicate(snapshot, dedupKey, dedupHours(config))) continue;
             if (contract.getEndDate() != null && contract.getEndDate().isAfter(LocalDate.now())) {
                 return List.of(buildAlert(tenantId, projectId, stl.getContractId(),
                         "WARRANTY_EARLY_RELEASE", "MEDIUM",
@@ -278,24 +392,23 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateContractExpiring(Long tenantId, Long projectId,
-                                            Map<String, AlertRuleConfig> ruleConfigs) {
+                                            Map<String, AlertRuleConfig> ruleConfigs,
+                                            BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "CONTRACT_EXPIRING");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
         String dedupKey = projectRuleDedupKey(projectId, "CONTRACT_EXPIRING");
-        if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+        if (isDuplicate(snapshot, dedupKey, dedupHours(config))) {
             return Collections.emptyList();
         }
         LocalDate today = LocalDate.now();
         LocalDate threshold = today.plusDays(windowDays(config, DEFAULT_EXPIRING_DAYS));
-        List<CtContract> contracts = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .eq(CtContract::getProjectId, projectId)
-                        .eq(CtContract::getContractStatus, "PERFORMING")
-                        .ge(CtContract::getEndDate, today)
-                        .le(CtContract::getEndDate, threshold));
+        List<CtContract> contracts = snapshot.contracts().getOrDefault(projectId, List.of()).stream()
+                .filter(contract -> "PERFORMING".equals(contract.getContractStatus()))
+                .filter(contract -> contract.getEndDate() != null && !contract.getEndDate().isBefore(today))
+                .filter(contract -> !contract.getEndDate().isAfter(threshold))
+                .toList();
         if (!contracts.isEmpty()) {
             List<String> names = contracts.stream()
                     .map(c -> c.getContractCode() + "(" + c.getContractName() + ") " + c.getEndDate())
@@ -310,23 +423,20 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluateVariationUnconfirmed(Long tenantId, Long projectId,
-                                                 Map<String, AlertRuleConfig> ruleConfigs) {
+                                                 Map<String, AlertRuleConfig> ruleConfigs,
+                                                 BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "VARIATION_UNCONFIRMED");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
         String dedupKey = projectRuleDedupKey(projectId, "VARIATION_UNCONFIRMED");
-        if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+        if (isDuplicate(snapshot, dedupKey, dedupHours(config))) {
             return Collections.emptyList();
         }
         LocalDateTime staleThreshold = LocalDateTime.now().minusDays(windowDays(config, DEFAULT_VARIATION_STALE_DAYS));
-        List<VarOrder> vars = varOrderMapper.selectList(
-                new LambdaQueryWrapper<VarOrder>()
-                        .eq(VarOrder::getTenantId, tenantId)
-                        .eq(VarOrder::getProjectId, projectId)
-                        .eq(VarOrder::getApprovalStatus, "APPROVED")
-                        .eq(VarOrder::getOwnerConfirmFlag, 0)
-                        .lt(VarOrder::getCreatedAt, staleThreshold));
+        List<VarOrder> vars = snapshot.variations().getOrDefault(projectId, List.of()).stream()
+                .filter(item -> item.getCreatedAt() != null && item.getCreatedAt().isBefore(staleThreshold))
+                .toList();
         if (!vars.isEmpty()) {
             List<String> names = vars.stream()
                     .map(v -> v.getVarCode() + "(" + v.getVarName() + ")")
@@ -341,24 +451,19 @@ class AlertRuleEvaluator {
     }
 
     List<AlertLog> evaluatePurchaseDeliveryOverdue(Long tenantId, Long projectId,
-                                                    Map<String, AlertRuleConfig> ruleConfigs) {
+                                                    Map<String, AlertRuleConfig> ruleConfigs,
+                                                    BatchSnapshot snapshot) {
         AlertRuleConfig config = configFor(ruleConfigs, "PURCHASE_DELIVERY_OVERDUE");
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        List<MatPurchaseOrder> overdueOrders = purchaseOrderMapper.selectList(
-                new LambdaQueryWrapper<MatPurchaseOrder>()
-                        .eq(MatPurchaseOrder::getTenantId, tenantId)
-                        .eq(MatPurchaseOrder::getProjectId, projectId)
-                        .lt(MatPurchaseOrder::getDeliveryDate, LocalDate.now())
-                        .notIn(MatPurchaseOrder::getOrderStatus, List.of("COMPLETED", "CANCELLED"))
-                        .orderByAsc(MatPurchaseOrder::getDeliveryDate));
+        List<MatPurchaseOrder> overdueOrders = snapshot.purchaseOrders().getOrDefault(projectId, List.of());
         for (MatPurchaseOrder order : overdueOrders) {
-            if (isReceiptAndStockInCompleted(tenantId, order.getId())) {
+            if (snapshot.completedStockInOrderIds().contains(order.getId())) {
                 continue;
             }
             String dedupKey = sourceRuleDedupKey("PURCHASE_ORDER", order.getId(), "PURCHASE_DELIVERY_OVERDUE");
-            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+            if (isDuplicate(snapshot, dedupKey, dedupHours(config))) {
                 continue;
             }
             return List.of(buildAlert(tenantId, projectId, order.getContractId(),
@@ -422,38 +527,13 @@ class AlertRuleEvaluator {
 
     // ── shared helpers ──
 
-    private boolean isDuplicate(Long tenantId, String dedupKey, int dedupHours) {
+    private boolean isDuplicate(BatchSnapshot snapshot, String dedupKey, int dedupHours) {
         LocalDateTime since = LocalDateTime.now().minusHours(Math.max(dedupHours, 1));
-        Long count = alertLogMapper.selectCount(
-                new LambdaQueryWrapper<AlertLog>()
-                        .eq(AlertLog::getTenantId, tenantId)
-                        .eq(AlertLog::getDedupKey, dedupKey)
-                        .and(status -> status
-                                .eq(AlertLog::getProcessStatus, "OPEN")
-                                .or(processed -> processed
-                                        .eq(AlertLog::getProcessStatus, "PROCESSED")
-                                        .ge(AlertLog::getTriggeredAt, since))));
-        return count != null && count > 0;
-    }
-
-    private boolean isReceiptAndStockInCompleted(Long tenantId, Long orderId) {
-        List<MatReceipt> approvedReceipts = matReceiptMapper.selectList(
-                new LambdaQueryWrapper<MatReceipt>()
-                        .eq(MatReceipt::getTenantId, tenantId)
-                        .eq(MatReceipt::getOrderId, orderId)
-                        .eq(MatReceipt::getApprovalStatus, "APPROVED"));
-        for (MatReceipt receipt : approvedReceipts) {
-            Long stockInCount = matStockTxnMapper.selectCount(
-                    new LambdaQueryWrapper<MatStockTxn>()
-                            .eq(MatStockTxn::getTenantId, tenantId)
-                            .eq(MatStockTxn::getSourceType, "MAT_RECEIPT")
-                            .eq(MatStockTxn::getSourceId, receipt.getId())
-                            .eq(MatStockTxn::getTxnType, "IN"));
-            if (stockInCount != null && stockInCount > 0) {
-                return true;
-            }
-        }
-        return false;
+        return snapshot.duplicateCandidates().getOrDefault(dedupKey, List.of()).stream()
+                .anyMatch(alert -> "OPEN".equals(alert.getProcessStatus())
+                        || ("PROCESSED".equals(alert.getProcessStatus())
+                        && alert.getTriggeredAt() != null
+                        && !alert.getTriggeredAt().isBefore(since)));
     }
 
     private AlertLog buildAlert(Long tenantId, Long projectId, Long contractId,
@@ -504,9 +584,22 @@ class AlertRuleEvaluator {
         return "S:" + sourceType + ":" + sourceId + ":R:" + ruleType;
     }
 
-    private Map<Long, CtContract> batchLoadContracts(Set<Long> contractIds) {
-        if (contractIds.isEmpty()) return Collections.emptyMap();
-        List<CtContract> contracts = ctContractMapper.selectByIds(contractIds);
-        return contracts.stream().collect(Collectors.toMap(CtContract::getId, c -> c));
+    private static <T> Map<Long, List<T>> groupByProject(List<T> items,
+                                                         java.util.function.Function<T, Long> projectId) {
+        return items.stream().collect(Collectors.groupingBy(projectId, LinkedHashMap::new, Collectors.toList()));
+    }
+
+    private record BatchSnapshot(
+            Map<Long, List<CostSummary>> costSummaries,
+            Map<Long, List<MatReceipt>> receipts,
+            Map<Long, List<SubMeasure>> measures,
+            Map<Long, List<CtContract>> contracts,
+            Map<Long, CtContract> contractsById,
+            Map<Long, List<PayRecord>> payments,
+            Map<Long, List<StlSettlement>> settlements,
+            Map<Long, List<MatPurchaseOrder>> purchaseOrders,
+            Map<Long, List<VarOrder>> variations,
+            Set<Long> completedStockInOrderIds,
+            Map<String, List<AlertLog>> duplicateCandidates) {
     }
 }

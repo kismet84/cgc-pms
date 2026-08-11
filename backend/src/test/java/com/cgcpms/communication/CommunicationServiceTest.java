@@ -408,6 +408,52 @@ class CommunicationServiceTest {
     }
 
     @Test
+    void backwardCursorReturnsBoundedAscendingWindowsWithConstantQueryCount() {
+        var conversation = transactions.execute(status ->
+                service.createConversation("DIRECT", null, List.of(USER_TWO)));
+        long conversationId = Long.parseLong(conversation.id());
+        List<Object[]> messages = new ArrayList<>(10_000);
+        for (int index = 1; index <= 10_000; index++) {
+            messages.add(new Object[]{910_000L + index, conversationId, USER_ONE, index,
+                    "history-" + index, "history-client-" + index});
+        }
+        jdbc.batchUpdate("""
+                INSERT INTO communication_message(
+                    id,tenant_id,conversation_id,sender_id,status,seq,body,client_message_id,
+                    created_at,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'SENT',?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, messages);
+
+        jdbc.resetQueryCount();
+        var latest = service.messagesBefore(conversationId, 0, 1_000);
+        assertEquals(3, jdbc.queryCount());
+        assertEquals(100, latest.size());
+        assertEquals("9901", latest.getFirst().seq());
+        assertEquals("10000", latest.getLast().seq());
+
+        jdbc.resetQueryCount();
+        var previous = service.messagesBefore(conversationId, 9901, 100);
+        assertEquals(3, jdbc.queryCount());
+        assertEquals("9801", previous.getFirst().seq());
+        assertEquals("9900", previous.getLast().seq());
+
+        jdbc.update("""
+                UPDATE communication_member SET join_seq=9900,last_read_seq=9900
+                WHERE tenant_id=0 AND conversation_id=? AND user_id=?
+                """, conversationId, USER_TWO);
+        TestUserContext.setUser(0, USER_TWO, "comm-two", List.of());
+        jdbc.resetQueryCount();
+        var joined = service.messagesBefore(conversationId, 0, 100);
+        assertEquals(3, jdbc.queryCount());
+        assertEquals(100, joined.size());
+        assertEquals("9901", joined.getFirst().seq());
+
+        BusinessException invalid = assertThrows(BusinessException.class,
+                () -> service.messagesBefore(conversationId, -1, 100));
+        assertEquals("COMMUNICATION_CURSOR_INVALID", invalid.getCode());
+    }
+
+    @Test
     void draftCleanupSkipsExpectedRacesButPropagatesUnknownFailures() {
         var conversation = transactions.execute(status ->
                 service.createConversation("DIRECT", null, List.of(USER_TWO)));
