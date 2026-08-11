@@ -1,5 +1,12 @@
 package com.cgcpms.dashboard.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.cost.entity.CostSubject;
+
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.plugin.Interceptor;
@@ -19,6 +26,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +44,8 @@ class DashboardFinanceQueryBudgetTest extends DashboardServiceTestSupport {
     private static final ThreadLocal<AtomicInteger> SQL_COUNT = new ThreadLocal<>();
 
     @Autowired private SqlSessionTemplate sqlSessionTemplate;
+    @Autowired private ProjectBudgetMapper projectBudgetMapper;
+    @Autowired private ProjectBudgetLineMapper projectBudgetLineMapper;
 
     @AfterEach
     void clearUser() {
@@ -46,6 +57,7 @@ class DashboardFinanceQueryBudgetTest extends DashboardServiceTestSupport {
     @Transactional
     void locksFourModeBudgetsAndKeepsAllProjectQueriesConstant() {
         SeedResult first = seed("M91_FIN_Q_001");
+        seedActiveBudget(first, "M91_FIN_Q_001");
         String historyMonth = YearMonth.now().minusMonths(1).toString();
 
         int singleCurrent = measure(() -> dashboardService.getFinanceView(first.projectId));
@@ -59,15 +71,45 @@ class DashboardFinanceQueryBudgetTest extends DashboardServiceTestSupport {
         int allCurrentFifty = measure(() -> dashboardService.getFinanceView(null));
         int allHistoryFifty = measure(() -> dashboardService.getFinanceView(null, historyMonth));
 
-        assertEquals(16, singleCurrent, "单项目实时模式 SQL 预算漂移");
+        System.out.printf("M91_F08_QUERY_BUDGET singleCurrent=%d singleHistory=%d allCurrent=%d allHistory=%d%n",
+                singleCurrent, singleHistory, allCurrentOne, allHistoryOne);
+        assertEquals(17, singleCurrent, "单项目实时模式 SQL 预算漂移");
         assertEquals(6, singleHistory, "单项目历史模式 SQL 预算漂移");
         assertEquals(18, allCurrentOne, "全项目实时模式 SQL 预算漂移");
         assertEquals(3, allHistoryOne, "全项目历史模式 SQL 预算漂移");
         assertEquals(allCurrentOne, allCurrentFifty, "当前全项目查询数不得随项目数增长");
         assertEquals(allHistoryOne, allHistoryFifty, "历史全项目查询数不得随项目数增长");
         assertTrue(singleCurrent > 0 && singleHistory > 0 && allCurrentOne > 0 && allHistoryOne > 0);
-        System.out.printf("M91_F08_QUERY_BUDGET singleCurrent=%d singleHistory=%d allCurrent=%d allHistory=%d%n",
-                singleCurrent, singleHistory, allCurrentOne, allHistoryOne);
+    }
+
+    private void seedActiveBudget(SeedResult seed, String suffix) {
+        Long subjectId = costSubjectMapper.selectOne(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, TENANT_ID)
+                .eq(CostSubject::getSubjectCode, "SUBJ-" + suffix)).getId();
+        ProjectBudget budget = new ProjectBudget();
+        budget.setTenantId(TENANT_ID);
+        budget.setProjectId(seed.projectId);
+        budget.setBudgetCode("BUD-" + suffix);
+        budget.setVersionNo("V1");
+        budget.setBudgetName("Dashboard budget " + suffix);
+        budget.setTotalAmount(new BigDecimal("1000.00"));
+        budget.setApprovalStatus("APPROVED");
+        budget.setStatus("ACTIVE");
+        budget.setActiveFlag(1);
+        budget.setActiveToken(seed.projectId);
+        budget.setEffectiveAt(LocalDateTime.now());
+        budget.setVersion(0);
+        projectBudgetMapper.insert(budget);
+
+        ProjectBudgetLine line = new ProjectBudgetLine();
+        line.setTenantId(TENANT_ID);
+        line.setBudgetId(budget.getId());
+        line.setProjectId(seed.projectId);
+        line.setCostSubjectId(subjectId);
+        line.setBudgetAmount(new BigDecimal("1000.00"));
+        line.setReservedAmount(new BigDecimal("200.00"));
+        line.setConsumedAmount(new BigDecimal("300.00"));
+        projectBudgetLineMapper.insert(line);
     }
 
     private int measure(Runnable query) {

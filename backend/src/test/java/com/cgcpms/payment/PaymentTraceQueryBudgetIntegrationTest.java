@@ -3,6 +3,8 @@ package com.cgcpms.payment;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.service.PaymentTraceService;
@@ -46,6 +48,7 @@ class PaymentTraceQueryBudgetIntegrationTest {
     @Autowired private PaymentTraceService traceService;
     @Autowired private PmProjectMapper projectMapper;
     @Autowired private CtContractMapper contractMapper;
+    @Autowired private MdPartnerMapper partnerMapper;
     @Autowired private PayApplicationMapper applicationMapper;
 
     @AfterEach
@@ -90,6 +93,11 @@ class PaymentTraceQueryBudgetIntegrationTest {
         project.setStatus("ACTIVE");
         projectMapper.insert(project);
 
+        long partyAId = 994_940_000L + suffix * 2L;
+        long partyBId = partyAId + 1L;
+        partnerMapper.insert(partner(partyAId, "CUSTOMER", suffix, "A"));
+        partnerMapper.insert(partner(partyBId, "SUPPLIER", suffix, "B"));
+
         CtContract contract = new CtContract();
         contract.setId(contractId);
         contract.setTenantId(TENANT_ID);
@@ -97,6 +105,8 @@ class PaymentTraceQueryBudgetIntegrationTest {
         contract.setContractCode("PAY-TRACE-Q-C-" + suffix);
         contract.setContractName("Payment trace query budget contract " + suffix);
         contract.setContractType("SUBCONTRACT");
+        contract.setPartyAId(partyAId);
+        contract.setPartyBId(partyBId);
         contract.setContractAmount(new BigDecimal("1000.00"));
         contract.setCurrentAmount(new BigDecimal("1000.00"));
         contract.setPaidAmount(BigDecimal.ZERO);
@@ -104,6 +114,17 @@ class PaymentTraceQueryBudgetIntegrationTest {
         contract.setApprovalStatus("APPROVED");
         contract.setVersion(0);
         contractMapper.insert(contract);
+    }
+
+    private MdPartner partner(long id, String type, int suffix, String side) {
+        MdPartner partner = new MdPartner();
+        partner.setId(id);
+        partner.setTenantId(TENANT_ID);
+        partner.setPartnerCode("PAY-TRACE-Q-P-" + suffix + "-" + side);
+        partner.setPartnerName("Payment trace query party " + suffix + " " + side);
+        partner.setPartnerType(type);
+        partner.setStatus("ENABLE");
+        return partner;
     }
 
     private void seedDraftApplications(long projectId, long contractId, int applicationCount) {
