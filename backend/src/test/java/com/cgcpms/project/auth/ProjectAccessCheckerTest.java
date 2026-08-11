@@ -38,7 +38,7 @@ class ProjectAccessCheckerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"DEPT_AND_CHILD", "3", "UNKNOWN"})
-    void unknownOrUnimplementedScopeDoesNotExpandToTenantWide(String dataScope) {
+    void unknownOrUnimplementedScopeFailsClosedWithoutManagerBypass(String dataScope) {
         setUser("PROJECT_MANAGER");
         when(roleMapper.selectList(any())).thenReturn(List.of(role("PROJECT_MANAGER", dataScope)));
         when(projectMemberMapper.selectList(any())).thenReturn(List.of());
@@ -47,7 +47,7 @@ class ProjectAccessCheckerTest {
                 project(2L, TENANT_ID, 88L, USER_ID),
                 project(3L, TENANT_ID, 88L, 99L)));
 
-        assertEquals(List.of(1L), checker.accessibleProjectIds());
+        assertEquals(List.of(), checker.accessibleProjectIds());
     }
 
     @Test
@@ -63,24 +63,41 @@ class ProjectAccessCheckerTest {
     }
 
     @Test
-    void activeProjectMembershipGrantsOnlyTheAssignedProject() {
-        setUser("PROJECT_OPERATOR");
-        when(roleMapper.selectList(any())).thenReturn(List.of(role("PROJECT_OPERATOR", "UNKNOWN")));
+    void projectMemberScopeUsesMembershipWithoutProjectManagerIdBypass() {
+        setUser("PROJECT_MANAGER");
+        when(roleMapper.selectList(any())).thenReturn(List.of(role("PROJECT_MANAGER", "PROJECT_MEMBER")));
         when(projectMemberMapper.selectList(any())).thenReturn(List.of(member(2L, USER_ID, "ACTIVE")));
         when(projectMapper.selectList(any())).thenReturn(List.of(
-                project(1L, TENANT_ID, 88L, 99L),
+                project(1L, TENANT_ID, USER_ID, 99L),
                 project(2L, TENANT_ID, 88L, 99L),
-                project(3L, TENANT_ID, 88L, 99L)));
+                project(3L, TENANT_ID, 88L, USER_ID)));
 
         assertEquals(List.of(2L), checker.accessibleProjectIds());
     }
 
-    private void setUser(String roleCode) {
+    @Test
+    void projectMemberScopeWinsOverNarrowerScopesInRoleUnion() {
+        setUser("PROJECT_MANAGER", "LEGACY_SELF");
+        when(roleMapper.selectList(any())).thenReturn(List.of(
+                role("PROJECT_MANAGER", "PROJECT_MEMBER"),
+                role("LEGACY_SELF", "SELF")));
+        when(projectMemberMapper.selectList(any())).thenReturn(List.of(
+                member(2L, USER_ID, "ACTIVE"),
+                member(3L, USER_ID, "ACTIVE")));
+        when(projectMapper.selectList(any())).thenReturn(List.of(
+                project(1L, TENANT_ID, 88L, USER_ID),
+                project(2L, TENANT_ID, 88L, 99L),
+                project(3L, TENANT_ID, 88L, 99L)));
+
+        assertEquals(List.of(2L, 3L), checker.accessibleProjectIds());
+    }
+
+    private void setUser(String... roleCodes) {
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ID)
                 .add("username", "scope-user")
                 .add("tenantId", TENANT_ID)
-                .add("roleCodes", List.of(roleCode))
+                .add("roleCodes", List.of(roleCodes))
                 .build());
     }
 

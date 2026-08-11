@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/workflow/templates")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+@PreAuthorize("hasAuthority('workflow:template:manage') or hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class WorkflowTemplateController {
 
     private final WorkflowTemplateService workflowTemplateService;

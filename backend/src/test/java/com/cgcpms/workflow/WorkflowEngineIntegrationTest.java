@@ -51,6 +51,7 @@ class WorkflowEngineIntegrationTest {
      *  See the business ID allocation comment at the top of cleanupTestData(). */
     private static final long BID_FIRST = RUN_ID + 1;
     private static final long BID_LAST  = RUN_ID + 25;
+    private static final String TEST_APPROVER_ROLE = "WF_ENGINE_TEST_APPROVER";
 
     @Autowired private WorkflowEngine workflowEngine;
     @Autowired private WorkflowQueryService queryService;
@@ -88,6 +89,7 @@ class WorkflowEngineIntegrationTest {
                 "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
         restoreUsersToTenant0();
+        ensureTestApproverRole(0L);
     }
 
     /**
@@ -95,11 +97,14 @@ class WorkflowEngineIntegrationTest {
      * Call restoreUsersToTenant0() to move them back.
      */
     private void moveUsersToTenant(long tenantId) {
+        deleteTestApproverBindings();
         jdbcTemplate.update("UPDATE sys_user SET tenant_id = ?, status = 'ENABLE', remark = 'test-seed' WHERE id BETWEEN 1 AND 5",
                 tenantId);
+        ensureTestApproverRole(tenantId);
     }
 
     private void restoreUsersToTenant0() {
+        deleteTestApproverBindings();
         jdbcTemplate.update("""
                 UPDATE sys_user
                 SET tenant_id = 0,
@@ -231,6 +236,7 @@ class WorkflowEngineIntegrationTest {
         assertEquals(1, pendingTasks.size(), "COUNTERSIGN节点初始只有1个任务");
 
         // 加签给 USER_BIZ 和 USER_COST
+        useTestApproverRoleSnapshot(testInstanceId);
         workflowEngine.addSign(pendingTasks.get(0).getId(),
                 List.of(USER_BIZ, USER_COST),
                 USER_ADMIN, "admin", "加签给商务和成本");
@@ -389,6 +395,7 @@ class WorkflowEngineIntegrationTest {
                         .eq(WfTask::getInstanceId, instance.getId())
                         .eq(WfTask::getTaskStatus, "PENDING")).get(0);
 
+        useTestApproverRoleSnapshot(instance.getId());
         workflowEngine.transfer(originalTask.getId(), USER_MANAGER,
                 USER_ADMIN, "admin", "转给项目经理");
 
@@ -647,7 +654,7 @@ class WorkflowEngineIntegrationTest {
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 workflowEngine.addSign(task.getId(), List.of(USER_BIZ),
                         USER_ADMIN, "admin", "已处理后加签"));
-        assertEquals("TASK_ALREADY_HANDLED", ex.getCode());
+        assertEquals("NODE_NOT_ACTIVE", ex.getCode());
 
         System.out.println("✅ 场景13 通过: 已处理任务加签被拒绝");
     }
@@ -843,6 +850,7 @@ class WorkflowEngineIntegrationTest {
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instance4.getId())
                         .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        useTestApproverRoleSnapshot(instance4.getId());
         workflowEngine.transfer(task4.getId(), USER_MANAGER,
                 USER_ADMIN, "admin", "转给项目经理");
 
@@ -868,6 +876,7 @@ class WorkflowEngineIntegrationTest {
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instance5.getId())
                         .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        useTestApproverRoleSnapshot(instance5.getId());
         workflowEngine.addSign(task5.getId(), List.of(USER_BIZ, USER_COST),
                 USER_ADMIN, "admin", "加签测试");
 
@@ -1105,6 +1114,45 @@ class WorkflowEngineIntegrationTest {
                 """,
                 projectId, tenantId, "WF-ENG-PRJ-" + tenantId, "workflow集成测试项目-" + tenantId,
                 USER_ADMIN, USER_ADMIN, projectId);
+        for (long userId = USER_ADMIN; userId <= USER_COST; userId++) {
+            long memberId = 880520000000000L + tenantId * 10 + userId;
+            jdbcTemplate.update("""
+                    INSERT INTO pm_project_member
+                        (id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_at,deleted_flag)
+                    SELECT ?,?,?,?,'EMPLOYEE','ACTIVE',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                    WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE id=?)
+                    """, memberId, tenantId, projectId, userId, USER_ADMIN, memberId);
+        }
+    }
+
+    private void ensureTestApproverRole(long tenantId) {
+        long roleId = 880500000000000L + tenantId;
+        jdbcTemplate.update("""
+                INSERT INTO sys_role
+                    (id,tenant_id,role_code,role_name,role_type,status,data_scope,created_at,updated_at,deleted_flag)
+                SELECT ?,?,?,'工作流集成测试审批人','BUSINESS','ENABLE','ALL',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE id=?)
+                """, roleId, tenantId, TEST_APPROVER_ROLE, roleId);
+        for (long userId = USER_ADMIN; userId <= USER_COST; userId++) {
+            long bindingId = 880510000000000L + tenantId * 10 + userId;
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
+                    SELECT ?,?,?,?
+                    WHERE NOT EXISTS (SELECT 1 FROM sys_user_role WHERE id=?)
+                    """, bindingId, tenantId, userId, roleId, bindingId);
+        }
+    }
+
+    private void deleteTestApproverBindings() {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE id BETWEEN 880510000000000 AND 880510000010000");
+    }
+
+    private void useTestApproverRoleSnapshot(long instanceId) {
+        jdbcTemplate.update("""
+                UPDATE wf_node_instance
+                SET approver_config=?
+                WHERE instance_id=? AND node_status='ACTIVE'
+                """, "{\"type\":\"ROLE\",\"roleCode\":\"" + TEST_APPROVER_ROLE + "\"}", instanceId);
     }
 
     /**
@@ -1164,6 +1212,10 @@ class WorkflowEngineIntegrationTest {
 
         // 9. ct_contract — business fixtures for submit validation
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
+
+        jdbcTemplate.update("DELETE FROM pm_project_member WHERE id BETWEEN 880520000000000 AND 880520000010000");
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE id BETWEEN 880510000000000 AND 880510000010000");
+        jdbcTemplate.update("DELETE FROM sys_role WHERE id BETWEEN 880500000000000 AND 880500000010000");
 
         // 10. Do NOT delete test-seeded users — other test classes (WorkflowApproverResolverTest,
         // WorkflowConcurrencyTest) also need them. Each class seeds via WHERE NOT EXISTS;

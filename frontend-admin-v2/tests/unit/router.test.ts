@@ -404,6 +404,31 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.fullPath).toBe('/project-schedule/11?projectId=23')
   })
 
+  it('guards reports with the catalog permission and accepts employee self-service permissions', async () => {
+    for (const [permission, path] of [
+      ['report:catalog:query', '/dashboard/reports'],
+      ['site:daily:self', '/site/daily-log'],
+      ['purchase:request:self', '/inventory/purchase-request'],
+      ['requisition:self', '/inventory/material-requisition'],
+    ] as const) {
+      setActivePinia(createPinia())
+      vi.mocked(getCurrentUser).mockResolvedValue(user([permission]))
+      const router = guardedRouter()
+
+      await router.push(path)
+      await router.isReady()
+
+      expect(router.currentRoute.value.path).toBe(path)
+    }
+
+    setActivePinia(createPinia())
+    vi.mocked(getCurrentUser).mockResolvedValue(user([]))
+    const forbiddenRouter = guardedRouter()
+    await forbiddenRouter.push('/dashboard/reports')
+    await forbiddenRouter.isReady()
+    expect(forbiddenRouter.currentRoute.value.path).toBe('/forbidden')
+  })
+
   it('uses wildcard permission for the administrator sample without role-name checks', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(user(['*']))
     const router = guardedRouter()

@@ -867,12 +867,15 @@ class WorkflowQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getInstanceDetail 模板禁用转办加签时可用动作不包含对应动作")
-    void getInstanceDetailAvailableActionsRespectTemplateSwitches() {
-        WfTemplateNode node = templateNodeMapper.selectById(NODE_1_ID);
+    @DisplayName("getInstanceDetail 节点快照禁用转办加签时可用动作不包含对应动作")
+    void getInstanceDetailAvailableActionsRespectNodeSnapshotSwitches() {
+        WfNodeInstance node = nodeInstanceMapper.selectOne(new LambdaQueryWrapper<WfNodeInstance>()
+                .eq(WfNodeInstance::getInstanceId, submittedInstanceId)
+                .eq(WfNodeInstance::getNodeStatus, WorkflowConstants.NODE_ACTIVE));
+        assertNotNull(node);
         node.setAllowTransfer(0);
         node.setAllowAddSign(0);
-        templateNodeMapper.updateById(node);
+        nodeInstanceMapper.updateById(node);
 
         WfInstanceVO detail = queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_ADMIN);
 

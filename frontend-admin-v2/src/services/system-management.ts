@@ -42,12 +42,17 @@ export interface RoleRecord {
   menuIds: string[]
 }
 
-export interface RoleCommand {
-  roleCode: string
-  roleName: string
-  status: string
-  dataScope: string
-}
+export const VISIBLE_ROLE_CODES = [
+  'COMPANY_OWNER',
+  'COMPANY_FINANCE',
+  'PROJECT_MANAGER',
+  'PROJECT_ACCOUNTANT',
+  'TECHNICAL_LEAD',
+  'SAFETY_LEAD',
+  'CONSTRUCTION_LEAD',
+  'PROCUREMENT_LEAD',
+  'EMPLOYEE',
+] as const
 
 export interface MenuRecord {
   id: string
@@ -383,29 +388,17 @@ export function assignUserRoles(id: string, roleIds: string[]): Promise<void> {
 }
 
 export function loadRoles(): Promise<RoleRecord[]> {
-  return apiRequest<RoleRecord[]>('/system/roles').then((rows) => rows.map(normalizeRole))
+  return apiRequest<RoleRecord[]>('/system/roles').then((rows) => {
+    const order = new Map<string, number>(VISIBLE_ROLE_CODES.map((code, index) => [code, index]))
+    return rows
+      .map(normalizeRole)
+      .filter((role) => order.has(role.roleCode))
+      .sort((left, right) => order.get(left.roleCode)! - order.get(right.roleCode)!)
+  })
 }
 
 export function loadRole(id: string): Promise<RoleRecord> {
   return apiRequest<RoleRecord>(`/system/roles/${requiredId(id)}`).then(normalizeRole)
-}
-
-export function createRole(command: RoleCommand): Promise<string> {
-  return apiRequest<string, RoleCommand>('/system/roles', {
-    method: 'POST',
-    body: command,
-  }).then(String)
-}
-
-export function updateRole(id: string, command: RoleCommand): Promise<void> {
-  return apiRequest<void, RoleCommand>(`/system/roles/${requiredId(id)}`, {
-    method: 'PUT',
-    body: command,
-  })
-}
-
-export function deleteRole(id: string): Promise<void> {
-  return apiRequest<void>(`/system/roles/${requiredId(id)}`, { method: 'DELETE' })
 }
 
 export function assignRoleMenus(id: string, menuIds: string[]): Promise<void> {

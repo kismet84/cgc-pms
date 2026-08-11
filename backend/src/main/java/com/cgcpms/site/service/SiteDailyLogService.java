@@ -38,6 +38,7 @@ import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.site.vo.SiteDailyAuditEntryVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -75,6 +76,7 @@ public class SiteDailyLogService {
                                          LocalDate startDate, LocalDate endDate, String status) {
         LambdaQueryWrapper<SiteDailyLog> query = new LambdaQueryWrapper<SiteDailyLog>()
                 .eq(SiteDailyLog::getTenantId, UserContext.getCurrentTenantId());
+        if (selfOnly("site:daily:query")) query.eq(SiteDailyLog::getCreatedBy, UserContext.getCurrentUserId());
         if (projectId != null) {
             projectAccessChecker.checkAccess(projectId, "查询现场日报");
             query.eq(SiteDailyLog::getProjectId, projectId);
@@ -101,6 +103,7 @@ public class SiteDailyLogService {
 
     public SiteDailyLogVO getById(Long id) {
         SiteDailyLog log = requireLog(id);
+        requireOwner(log, "site:daily:query");
         projectAccessChecker.checkAccess(log.getProjectId(), "访问现场日报");
         PmProject project = projectMapper.selectById(log.getProjectId());
         SiteDailyLogVO detail = toVO(log, project);
@@ -128,6 +131,7 @@ public class SiteDailyLogService {
         log.setRequestHash(clientRequestId == null ? null : requestHash);
         log.setVersion(0);
         log.setStatus(DRAFT);
+        if (selfOnly("site:daily:edit")) log.setCreatedBy(UserContext.getCurrentUserId());
         log.setSubmittedBy(null);
         log.setSubmittedAt(null);
         requireUniqueDate(log.getProjectId(), log.getReportDate(), null);
@@ -144,6 +148,7 @@ public class SiteDailyLogService {
     @Transactional(rollbackFor = Exception.class)
     public void update(SiteDailyLog command) {
         SiteDailyLog existing = requireLogForUpdate(command.getId());
+        requireOwner(existing, "site:daily:edit");
         projectAccessChecker.checkAccess(existing.getProjectId(), "修改现场日报");
         projectAccessChecker.checkAccess(command.getProjectId(), "修改现场日报");
         projectExecutionGuard.requireActiveSchedule(command.getProjectId(), "修改现场日报");
@@ -183,6 +188,7 @@ public class SiteDailyLogService {
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long id, Integer expectedVersion) {
         SiteDailyLog log = requireLogForUpdate(id);
+        requireOwner(log, "site:daily:edit");
         projectAccessChecker.checkAccess(log.getProjectId(), "提交现场日报");
         projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "提交现场日报");
         requireDraft(log);
@@ -268,6 +274,23 @@ public class SiteDailyLogService {
     private void requireStatus(String status) {
         if (!Set.of(DRAFT, SUBMITTED).contains(status))
             throw new BusinessException("SITE_DAILY_LOG_STATUS_INVALID", "现场日报状态不合法");
+    }
+
+    private void requireOwner(SiteDailyLog log, String fullAuthority) {
+        if (selfOnly(fullAuthority) && !Objects.equals(log.getCreatedBy(), UserContext.getCurrentUserId())) {
+            throw new BusinessException("SITE_DAILY_LOG_NOT_FOUND", "现场日报不存在");
+        }
+    }
+
+    private boolean selfOnly(String fullAuthority) {
+        return !UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN")
+                && hasAuthority("site:daily:self") && !hasAuthority(fullAuthority);
+    }
+
+    private boolean hasAuthority(String authority) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream().anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     private SiteDailyLogVO toVO(SiteDailyLog log, PmProject project) {

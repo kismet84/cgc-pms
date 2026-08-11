@@ -63,6 +63,29 @@ const POST_METHOD = 'POST'
 const PUT_METHOD = 'PUT'
 const DELETE_METHOD = 'DELETE'
 
+export interface SupplyFormMaterialOption {
+  id: string
+  materialCode: string
+  materialName: string
+  unit?: string | null
+}
+
+export interface PurchaseRequestFormOptions {
+  materials: SupplyFormMaterialOption[]
+}
+
+export interface RequisitionFormOptions {
+  warehouses: Array<{
+    id: string
+    warehouseCode: string
+    warehouseName: string
+    projectId: string
+  }>
+  materials: SupplyFormMaterialOption[]
+  partners: Array<{ id: string; partnerCode: string; partnerName: string }>
+  contracts: Array<{ id: string; contractCode: string; contractName: string; projectId: string }>
+}
+
 export function loadWarehouses(
   query: WarehouseQuery = {},
   signal?: AbortSignal,
@@ -176,6 +199,16 @@ export function loadRequisitions(
   return apiRequest<RequisitionPage>(withQuery(SUPPLY_CHAIN_API.requisitions, query), { signal })
 }
 
+export function loadRequisitionFormOptions(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<RequisitionFormOptions> {
+  return apiRequest<RequisitionFormOptions>(
+    withQuery(`${SUPPLY_CHAIN_API.requisitions}/form-options`, { projectId }),
+    { signal, notifyError: false },
+  )
+}
+
 export function loadRequisition(id: string, signal?: AbortSignal) {
   return apiRequest<RequisitionRecord>(resourcePath(SUPPLY_CHAIN_API.requisitions, id), {
     signal,
@@ -253,6 +286,16 @@ export function loadPurchaseRequests(
   return apiRequest<PurchaseRequestPage>(withQuery(SUPPLY_CHAIN_API.purchaseRequests, query), {
     signal,
   })
+}
+
+export function loadPurchaseRequestFormOptions(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<PurchaseRequestFormOptions> {
+  return apiRequest<PurchaseRequestFormOptions>(
+    withQuery(`${SUPPLY_CHAIN_API.purchaseRequests}/form-options`, { projectId }),
+    { signal, notifyError: false },
+  )
 }
 
 export function loadPurchaseRequest(id: string, signal?: AbortSignal) {

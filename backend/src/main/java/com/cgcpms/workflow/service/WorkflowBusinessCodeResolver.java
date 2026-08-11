@@ -50,7 +50,10 @@ public class WorkflowBusinessCodeResolver {
             Map.entry("TECHNICAL_SCHEME", new CodeSource("technical_scheme", "scheme_code", true)),
             Map.entry("PROJECT_FINAL_ACCEPTANCE", new CodeSource("closeout_final_acceptance", "acceptance_code", true)),
             Map.entry("COST_SUBJECT_MAPPING", new CodeSource("cost_subject_mapping_version", "version_code", false)),
-            Map.entry("BID_COST_TARGET_TRANSFER", new CodeSource("bid_cost_target_transfer", "transfer_code", false)),
+            Map.entry("BID_COST_TARGET_TRANSFER", new CodeSource("bid_cost_target_transfer_request", "request_code", true)),
+            Map.entry("FINANCE_COST_ALLOCATION", new CodeSource("finance_cost_allocation_request", "request_code", true)),
+            Map.entry("QS_RECTIFICATION", new CodeSource("qs_rectification", "id", true)),
+            Map.entry("QS_CONSEQUENCE", new CodeSource("qs_consequence", "consequence_code", true)),
             Map.entry("BID_COST_TARGET_TRANSFER_REVERSAL", new CodeSource("bid_cost_target_transfer", "transfer_code", false))
     );
 

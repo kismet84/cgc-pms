@@ -25,6 +25,7 @@ test('cost-subject deep links render server facts and preserve root redirect sta
           'cost:subject:rule:query',
           'cost:subject:scope:query',
           'cost:subject:audit:query',
+          'business:amount:view',
         ],
       })
     }
@@ -119,6 +120,10 @@ test('cost-subject deep links render server facts and preserve root redirect sta
         },
       ])
     }
+    if (path.endsWith('/api/cost-subject-v2/bid-transfer-requests'))
+      return success(route, [])
+    if (path.endsWith('/api/cost-subject-v2/finance-allocation-requests'))
+      return success(route, [])
     if (path.endsWith('/api/cost-subject-v2/finance-allocations')) return success(route, [])
     return route.fulfill({
       status: 500,

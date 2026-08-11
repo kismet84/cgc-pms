@@ -52,6 +52,8 @@ public class WfInstance extends BaseEntity {
 
     private String variables;
 
+    private String securityPolicyJson;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime startedAt;
 

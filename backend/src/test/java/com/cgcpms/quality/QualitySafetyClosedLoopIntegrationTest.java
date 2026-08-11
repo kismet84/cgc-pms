@@ -1,11 +1,17 @@
 package com.cgcpms.quality;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.quality.dto.QualitySafetyModels.*;
 import com.cgcpms.quality.entity.*;
 import com.cgcpms.quality.service.QualitySafetyService;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfTask;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.mapper.WfTaskMapper;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +26,9 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
@@ -55,16 +63,26 @@ class QualitySafetyClosedLoopIntegrationTest {
     private static final long WBS = 99188024L;
     private static final long OTHER_SCHEDULE = 99188025L;
     private static final long OTHER_WBS = 99188026L;
+    private static final long SAFETY_LEAD_ROLE = 99188910L;
+    private static final long RECTIFICATION_TEMPLATE = 99188920L;
+    private static final long CONSEQUENCE_TEMPLATE = 99188921L;
+    private static final long AMBIGUOUS_SUBJECT = 99188922L;
+    private static final long AMBIGUOUS_RULE = 99188923L;
     private static final AtomicLong FILE_ID = new AtomicLong(99188100L);
 
     @Autowired QualitySafetyService service;
     @Autowired BusinessObjectAuthorizer fileAuthorizer;
+    @Autowired WorkflowEngine workflowEngine;
+    @Autowired WfInstanceMapper instanceMapper;
+    @Autowired WfTaskMapper taskMapper;
     @Autowired JdbcTemplate jdbc;
+    private String projectManagerDataScope;
 
     @BeforeEach
     void setup() {
         asUser(1L);
         cleanup();
+        ensureWorkflowFixture();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 2,0,'qs-reviewer-2','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','质量复检人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=2)");
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'qs-outsider','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','非项目成员','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OUTSIDE_USER);
@@ -83,6 +101,9 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'QS-COST','质量安全返工','质量安全','COST',1,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", SUBJECT);
         jdbc.update("INSERT INTO cost_subject_mapping_version(id,tenant_id,version_code,version_name,status,effective_date,created_by) VALUES(?,0,'QS-TEST-V2','质量安全测试映射','ACTIVE',CURRENT_DATE,1)", MAPPING_VERSION);
         jdbc.update("INSERT INTO cost_subject_assignment_rule(id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,cost_subject_id,priority,status,effective_from,created_by) VALUES(?,0,?,'QS-REWORK','QUALITY_SAFETY_CONSEQUENCE','SAFETY',NULL,?,1,'ACTIVE',CURRENT_DATE,1)", ASSIGNMENT_RULE, MAPPING_VERSION, SUBJECT);
+        jdbc.update("INSERT INTO sys_user_role(id,tenant_id,user_id,role_id) SELECT 99188901,0,2,r.id FROM sys_role r WHERE r.tenant_id=0 AND r.role_code='SAFETY_LEAD' AND r.deleted_flag=0 AND NOT EXISTS(SELECT 1 FROM sys_user_role ur WHERE ur.tenant_id=0 AND ur.user_id=2 AND ur.role_id=r.id)");
+        jdbc.update("INSERT INTO sys_user_role(id,tenant_id,user_id,role_id) SELECT 99188902,0,1,r.id FROM sys_role r WHERE r.tenant_id=0 AND r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0 AND NOT EXISTS(SELECT 1 FROM sys_user_role ur WHERE ur.tenant_id=0 AND ur.user_id=1 AND ur.role_id=r.id)");
+        authenticate("ROLE_ADMIN");
     }
 
     @AfterEach
@@ -114,12 +135,17 @@ class QualitySafetyClosedLoopIntegrationTest {
         QualityRectification rectification = service.createRectification(new RectificationCommand(
                 issue.getId(), "按专项方案重新布置立杆并由班组自检", 1L, LocalDate.now().plusDays(5), null));
         evidence("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE");
-        assertEquals("SUBMITTED", service.submitRectification(rectification.getId()).getStatus());
+        rectification = service.submitRectification(rectification.getId());
+        assertEquals("SUBMITTED", rectification.getStatus());
+        assertNotNull(rectification.getApprovalInstanceId());
 
         asUser(2L);
         evidence("QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE");
-        assertEquals("PASSED", service.reinspect(rectification.getId(),
+        assertEquals("SUBMITTED", service.reinspect(rectification.getId(),
                 new ReinspectionCommand("PASS", "复测间距符合方案，现场清理完成")).getStatus());
+        assertEquals("PENDING_REINSPECTION", service.listIssues(PROJECT, null).get(0).getStatus());
+        approveAll("QS_RECTIFICATION", rectification.getId());
+        assertEquals("PASSED", service.trace(issue.getId()).rectifications().get(0).getStatus());
         assertEquals("CLOSED", service.listIssues(PROJECT, null).get(0).getStatus());
 
         BusinessException missingContract = assertThrows(BusinessException.class,
@@ -148,7 +174,39 @@ class QualitySafetyClosedLoopIntegrationTest {
                 "本次高等级质量问题扣减履约评分", null));
         assertTrue(consequence.getConsequenceCode().matches("QCO-\\d{8}-\\d{3}"));
         assertNotEquals("QS-C-001", consequence.getConsequenceCode());
-        consequence = service.postConsequence(consequence.getId());
+        Long consequenceId = consequence.getId();
+        assertEquals("WORKFLOW_REQUIRED", assertThrows(BusinessException.class,
+                () -> service.postConsequence(consequenceId)).getCode());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM cost_item WHERE source_type='QUALITY_SAFETY_CONSEQUENCE' AND source_id=?", Integer.class, consequenceId));
+
+        jdbc.update("UPDATE cost_subject_assignment_rule SET status='RETIRED' WHERE id=?", ASSIGNMENT_RULE);
+        assertEquals("COST_SUBJECT_UNCLASSIFIED", assertThrows(BusinessException.class,
+                () -> service.submitConsequence(consequenceId)).getCode());
+        jdbc.update("UPDATE cost_subject_assignment_rule SET status='ACTIVE' WHERE id=?", ASSIGNMENT_RULE);
+        jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'QS-COST-AMBIGUOUS','质量安全返工歧义科目','质量安全','COST',1,2,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", AMBIGUOUS_SUBJECT);
+        jdbc.update("INSERT INTO cost_subject_assignment_rule(id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,cost_subject_id,priority,status,effective_from,created_by) VALUES(?,0,?,'QS-REWORK-AMBIGUOUS','QUALITY_SAFETY_CONSEQUENCE','SAFETY',NULL,?,1,'ACTIVE',CURRENT_DATE,1)", AMBIGUOUS_RULE, MAPPING_VERSION, AMBIGUOUS_SUBJECT);
+        assertEquals("COST_SUBJECT_RULE_AMBIGUOUS", assertThrows(BusinessException.class,
+                () -> service.submitConsequence(consequenceId)).getCode());
+        assertEquals("DRAFT", service.trace(issue.getId()).consequence().getStatus());
+        assertNull(service.trace(issue.getId()).consequence().getCostSubjectId());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM wf_instance WHERE business_type='QS_CONSEQUENCE' AND business_id=?",
+                Integer.class, consequenceId));
+        jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id=?", AMBIGUOUS_RULE);
+        jdbc.update("DELETE FROM cost_subject WHERE id=?", AMBIGUOUS_SUBJECT);
+
+        consequence = service.submitConsequence(consequenceId);
+        assertEquals("SUBMITTED", consequence.getStatus());
+        assertNotNull(consequence.getApprovalInstanceId());
+        assertEquals(SUBJECT, consequence.getCostSubjectId());
+        jdbc.update("UPDATE cost_subject_assignment_rule SET status='RETIRED' WHERE id=?", ASSIGNMENT_RULE);
+        rejectCurrent("QS_CONSEQUENCE", consequence.getId());
+        asUser(1L);
+        consequence = service.submitConsequence(consequence.getId());
+        assertEquals("SUBMITTED", consequence.getStatus());
+        assertEquals(SUBJECT, consequence.getCostSubjectId());
+        approveAll("QS_CONSEQUENCE", consequence.getId());
+        consequence = service.trace(issue.getId()).consequence();
         assertEquals("POSTED", consequence.getStatus());
         assertNotNull(consequence.getCostItemId());
         assertEquals(SUBJECT, consequence.getCostSubjectId());
@@ -189,19 +247,53 @@ class QualitySafetyClosedLoopIntegrationTest {
 
         QualityRectification first = service.createRectification(new RectificationCommand(
                 issue.getId(), "恢复临边防护", 1L, LocalDate.now().plusDays(2), null));
-        evidence("QS_RECTIFICATION", first.getId(), "RECTIFICATION_EVIDENCE");
-        service.submitRectification(first.getId());
-        evidence("QS_RECTIFICATION", first.getId(), "REINSPECTION_EVIDENCE");
+        long firstId = first.getId();
+        evidence("QS_RECTIFICATION", firstId, "RECTIFICATION_EVIDENCE");
+        service.submitRectification(firstId);
+        evidence("QS_RECTIFICATION", firstId, "REINSPECTION_EVIDENCE");
         assertEquals("QS_REINSPECTION_SEGREGATION_REQUIRED", assertThrows(BusinessException.class,
-                () -> service.reinspect(first.getId(), new ReinspectionCommand("PASS", "自验"))).getCode());
+                () -> service.reinspect(firstId, new ReinspectionCommand("PASS", "自验"))).getCode());
 
         asUser(2L);
-        assertEquals("REJECTED", service.reinspect(first.getId(),
-                new ReinspectionCommand("REJECT", "立柱固定不牢，退回整改")).getStatus());
+        QualityRectification reinspected = service.reinspect(firstId,
+                new ReinspectionCommand("PASS", "首轮复验通过，但审批退回"));
+        assertEquals("SUBMITTED", reinspected.getStatus());
+        LocalDateTime firstReinspectedAt = reinspected.getReinspectedAt();
+        assertEquals("QS_CONCURRENT_MODIFICATION", assertThrows(BusinessException.class,
+                () -> service.reinspect(firstId,
+                        new ReinspectionCommand("REJECT", "重复复验不得覆盖首轮结果"))).getCode());
+        QualityRectification afterDuplicate = service.trace(issue.getId()).rectifications().get(0);
+        assertEquals(firstReinspectedAt, afterDuplicate.getReinspectedAt());
+        assertEquals("PASS：首轮复验通过，但审批退回", afterDuplicate.getReinspectionComment());
+        rejectCurrent("QS_RECTIFICATION", firstId);
+        assertEquals("REJECTED", service.trace(issue.getId()).rectifications().get(0).getStatus());
+
         asUser(1L);
-        QualityRectification second = service.createRectification(new RectificationCommand(
-                issue.getId(), "更换固定件并重新安装防护栏", 1L, LocalDate.now().plusDays(3), null));
-        assertEquals(2, second.getRoundNo());
+        first = service.submitRectification(firstId);
+        assertEquals("SUBMITTED", first.getStatus());
+        assertNull(first.getReinspectionComment());
+        assertNull(first.getReinspectedBy());
+        assertNull(first.getReinspectedAt());
+        assertFalse(first.getSubmittedAt().isBefore(firstReinspectedAt));
+
+        asUser(2L);
+        first = service.reinspect(firstId, new ReinspectionCommand("PASS", "第二轮复验通过"));
+        asUser(1L);
+        workflowEngine.withdraw(first.getApprovalInstanceId(), 1L, "admin-1");
+        assertEquals("WITHDRAWN", service.trace(issue.getId()).rectifications().get(0).getStatus());
+
+        asUser(1L);
+        first = service.submitRectification(firstId);
+        assertNull(first.getReinspectedAt());
+        WfInstance running = instanceMapper.selectById(first.getApprovalInstanceId());
+        assertEquals("QS_REINSPECTION_REQUIRED", assertThrows(BusinessException.class,
+                () -> service.onRectificationApproved(running)).getCode());
+
+        asUser(2L);
+        first = service.reinspect(firstId, new ReinspectionCommand("PASS", "第三轮复验通过"));
+        assertFalse(first.getReinspectedAt().isBefore(first.getSubmittedAt()));
+        approveAll("QS_RECTIFICATION", firstId);
+        assertEquals("PASSED", service.trace(issue.getId()).rectifications().get(0).getStatus());
     }
 
     @Test
@@ -307,6 +399,7 @@ class QualitySafetyClosedLoopIntegrationTest {
 
         authenticate("quality:safety:rectify");
         evidence("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE");
+        authenticate("quality:rectification:submit");
         service.submitRectification(rectification.getId());
 
         asUser(1L);
@@ -424,9 +517,40 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,CURRENT_DATE,DATEADD('DAY',30,CURRENT_DATE),100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", wbsId, projectId, scheduleId, code, code + "任务");
     }
 
+    private void approveAll(String businessType, long businessId) {
+        WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, businessType).eq(WfInstance::getBusinessId, businessId));
+        assertNotNull(instance);
+        for (int i = 0; i < 10; i++) {
+            List<WfTask> pending = taskMapper.selectList(new LambdaQueryWrapper<WfTask>()
+                    .eq(WfTask::getInstanceId, instance.getId()).eq(WfTask::getTaskStatus, "PENDING"));
+            if (pending.isEmpty()) break;
+            for (WfTask task : pending) {
+                asUser(task.getApproverId());
+                authenticate("ROLE_ADMIN");
+                workflowEngine.approve(task.getId(), task.getApproverId(), "qs-approver", "同意",
+                        "qs-it-" + UUID.randomUUID());
+            }
+        }
+        assertEquals("APPROVED", instanceMapper.selectById(instance.getId()).getInstanceStatus());
+    }
+
+    private void rejectCurrent(String businessType, long businessId) {
+        WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, businessType).eq(WfInstance::getBusinessId, businessId));
+        WfTask task = taskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getInstanceId, instance.getId()).eq(WfTask::getTaskStatus, "PENDING"));
+        asUser(task.getApproverId());
+        authenticate("ROLE_ADMIN");
+        workflowEngine.reject(task.getId(), task.getApproverId(), "qs-rejector", "退回整改",
+                "qs-it-" + UUID.randomUUID());
+        assertEquals("REJECTED", instanceMapper.selectById(instance.getId()).getInstanceStatus());
+    }
+
     private void asUser(long userId) {
+        String roleCode = userId == 1L ? "PROJECT_MANAGER" : userId == 2L ? "SAFETY_LEAD" : "EMPLOYEE";
         UserContext.set(Jwts.claims().subject("admin-" + userId).add("userId", userId).add("username", "admin-" + userId)
-                .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+                .add("tenantId", 0L).add("roleCodes", List.of(roleCode)).build());
     }
 
     private void authenticate(String authority) {
@@ -434,7 +558,43 @@ class QualitySafetyClosedLoopIntegrationTest {
                 "tester", "n/a", List.of(new SimpleGrantedAuthority(authority))));
     }
 
+    private void ensureWorkflowFixture() {
+        jdbc.execute("ALTER TABLE qs_rectification ADD COLUMN IF NOT EXISTS approval_instance_id BIGINT");
+        jdbc.execute("ALTER TABLE qs_consequence ADD COLUMN IF NOT EXISTS approval_instance_id BIGINT");
+        jdbc.execute("ALTER TABLE wf_instance ADD COLUMN IF NOT EXISTS security_policy_json VARCHAR(1000)");
+        jdbc.execute("ALTER TABLE wf_node_instance ADD COLUMN IF NOT EXISTS node_type VARCHAR(50)");
+        jdbc.execute("ALTER TABLE wf_node_instance ADD COLUMN IF NOT EXISTS approver_config VARCHAR(1000)");
+        jdbc.execute("ALTER TABLE wf_node_instance ADD COLUMN IF NOT EXISTS allow_transfer SMALLINT");
+        jdbc.execute("ALTER TABLE wf_node_instance ADD COLUMN IF NOT EXISTS allow_add_sign SMALLINT");
+        jdbc.execute("ALTER TABLE wf_node_instance ADD COLUMN IF NOT EXISTS timeout_hours INT");
+        projectManagerDataScope = jdbc.queryForObject(
+                "SELECT data_scope FROM sys_role WHERE tenant_id=0 AND role_code='PROJECT_MANAGER' AND deleted_flag=0",
+                String.class);
+        jdbc.update("UPDATE sys_role SET data_scope='PROJECT_MEMBER' WHERE tenant_id=0 AND role_code='PROJECT_MANAGER' AND deleted_flag=0");
+        jdbc.update("INSERT INTO sys_role(id,tenant_id,role_code,role_name,role_type,status,data_scope,created_by,created_at,updated_by,updated_at,deleted_flag,remark,role_level) " +
+                "SELECT ?,0,'SAFETY_LEAD','安全负责人','SYSTEM','ENABLE','PROJECT_MEMBER',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0,'QS-IT',2 " +
+                "WHERE NOT EXISTS(SELECT 1 FROM sys_role WHERE tenant_id=0 AND role_code='SAFETY_LEAD' AND deleted_flag=0)", SAFETY_LEAD_ROLE);
+        insertWorkflowTemplate(RECTIFICATION_TEMPLATE, "QS-IT-RECTIFICATION", "QS_RECTIFICATION", "质量安全整改审批", 99188930L, 99188931L);
+        insertWorkflowTemplate(CONSEQUENCE_TEMPLATE, "QS-IT-CONSEQUENCE", "QS_CONSEQUENCE", "质量安全金额后果审批", 99188932L, 99188933L);
+    }
+
+    private void insertWorkflowTemplate(long templateId, String templateCode, String businessType,
+                                        String templateName, long safetyNodeId, long managerNodeId) {
+        String policy = "{\"preventInitiatorApproval\":false,\"maxApprovalsPerUser\":1," +
+                "\"requireProjectMembership\":true,\"allowAdminFallback\":false}";
+        jdbc.update("INSERT INTO wf_template(id,tenant_id,template_code,template_name,business_type,enabled,amount_min,amount_max,condition_rule,form_schema,created_by,created_at,updated_by,updated_at,deleted_flag,remark) " +
+                        "VALUES(?,0,?,?,?,1,NULL,NULL,?,NULL,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0,'QS-IT')",
+                templateId, templateCode, templateName, businessType, policy);
+        jdbc.update("INSERT INTO wf_template_node(id,tenant_id,template_id,node_code,node_name,node_order,node_type,approve_mode,approver_config,pass_rule_json,reject_rule_json,condition_rule,node_config,allow_transfer,allow_add_sign,timeout_hours,created_by,created_at,updated_by,updated_at,deleted_flag,remark) " +
+                        "VALUES(?,0,?,'QS_IT_01','安全负责人审批',1,'APPROVAL','SEQUENTIAL','{\"type\":\"ROLE\",\"roleCode\":\"SAFETY_LEAD\"}',NULL,NULL,NULL,NULL,1,1,48,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0,'QS-IT')",
+                safetyNodeId, templateId);
+        jdbc.update("INSERT INTO wf_template_node(id,tenant_id,template_id,node_code,node_name,node_order,node_type,approve_mode,approver_config,pass_rule_json,reject_rule_json,condition_rule,node_config,allow_transfer,allow_add_sign,timeout_hours,created_by,created_at,updated_by,updated_at,deleted_flag,remark) " +
+                        "VALUES(?,0,?,'QS_IT_02','项目经理审批',2,'APPROVAL','SEQUENTIAL','{\"type\":\"ROLE\",\"roleCode\":\"PROJECT_MANAGER\"}',NULL,NULL,NULL,NULL,1,1,48,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0,'QS-IT')",
+                managerNodeId, templateId);
+    }
+
     private void cleanup() {
+        jdbc.update("DELETE FROM sys_user_role WHERE id IN (99188901,99188902)");
         jdbc.update("DELETE FROM pm_project_member WHERE id IN (?,?,?)", MEMBER_ONE, MEMBER_TWO, MEMBER_DISABLED);
         jdbc.update("UPDATE qs_consequence SET evaluation_id=NULL,cost_item_id=NULL WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_partner_evaluation WHERE project_id=?", PROJECT);
@@ -445,14 +605,29 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM qs_issue WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_inspection_record WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_inspection_plan WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM wf_idempotency WHERE business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE')");
+        jdbc.update("DELETE FROM wf_record WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE'))", PROJECT);
+        jdbc.update("DELETE FROM wf_task WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE'))", PROJECT);
+        jdbc.update("DELETE FROM wf_node_instance WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE'))", PROJECT);
+        jdbc.update("DELETE FROM wf_cc WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE'))", PROJECT);
+        jdbc.update("DELETE FROM sys_notification WHERE biz_type='WORKFLOW' AND biz_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE'))", PROJECT);
+        jdbc.update("DELETE FROM wf_instance WHERE project_id=? AND business_type IN('QS_RECTIFICATION','QS_CONSEQUENCE')", PROJECT);
+        jdbc.update("DELETE FROM wf_template_node WHERE template_id IN (?,?)", RECTIFICATION_TEMPLATE, CONSEQUENCE_TEMPLATE);
+        jdbc.update("DELETE FROM wf_template WHERE id IN (?,?)", RECTIFICATION_TEMPLATE, CONSEQUENCE_TEMPLATE);
+        jdbc.update("DELETE FROM sys_role WHERE id=?", SAFETY_LEAD_ROLE);
         jdbc.update("DELETE FROM ct_contract WHERE id IN (?,?,?,?)", CONTRACT, OTHER_PROJECT_CONTRACT, UNRELATED_CONTRACT, CROSS_TENANT_CONTRACT);
         jdbc.update("DELETE FROM md_partner WHERE id IN (?,?,?,?,?,?)", PARTNER, CONTRACT_COUNTERPARTY, OTHER_PARTNER_A, OTHER_PARTNER_B, CROSS_TENANT_PARTNER_A, CROSS_TENANT_PARTNER_B);
-        jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id=?", ASSIGNMENT_RULE);
+        jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id IN (?,?)", ASSIGNMENT_RULE, AMBIGUOUS_RULE);
         jdbc.update("DELETE FROM cost_subject_mapping_version WHERE id=?", MAPPING_VERSION);
-        jdbc.update("DELETE FROM cost_subject WHERE id=?", SUBJECT);
+        jdbc.update("DELETE FROM cost_subject WHERE id IN (?,?)", SUBJECT, AMBIGUOUS_SUBJECT);
         jdbc.update("DELETE FROM project_wbs_task WHERE id IN (?,?)", WBS, OTHER_WBS);
         jdbc.update("DELETE FROM project_schedule_plan WHERE id IN (?,?)", SCHEDULE, OTHER_SCHEDULE);
         jdbc.update("DELETE FROM pm_project WHERE id IN (?,?,?)", PROJECT, OTHER_PROJECT, CROSS_TENANT_PROJECT);
         jdbc.update("DELETE FROM sys_user WHERE id IN (?,?,?)", OUTSIDE_USER, DISABLED_USER, CROSS_TENANT_USER);
+        if (projectManagerDataScope != null) {
+            jdbc.update("UPDATE sys_role SET data_scope=? WHERE tenant_id=0 AND role_code='PROJECT_MANAGER' AND deleted_flag=0",
+                    projectManagerDataScope);
+            projectManagerDataScope = null;
+        }
     }
 }

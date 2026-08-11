@@ -174,6 +174,35 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
     const body = request.postDataJSON() as Record<string, unknown> | undefined
     if (method !== 'GET') writes.push({ path: `${method} ${path}`, body })
 
+    if (path === '/requisitions/form-options' && method === 'GET')
+      return fulfill(route, {
+        warehouses: [
+          {
+            id: 'W1',
+            projectId: 'P1',
+            warehouseCode: 'WH-001',
+            warehouseName: '主仓',
+          },
+        ],
+        materials: [
+          {
+            id: 'M1',
+            materialCode: 'MAT-001',
+            materialName: '钢筋',
+            specification: 'HRB400',
+            unit: '吨',
+          },
+        ],
+        partners: [{ id: 'S1', partnerCode: 'SUP-001', partnerName: '供应商甲' }],
+        contracts: [
+          {
+            id: 'C1',
+            projectId: 'P1',
+            contractCode: 'CT-001',
+            contractName: '示范项目材料合同',
+          },
+        ],
+      })
     if (path === '/requisitions' && method === 'GET')
       return fulfill(route, {
         records: requisitions,

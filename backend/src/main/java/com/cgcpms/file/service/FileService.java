@@ -10,6 +10,7 @@ import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
+import com.cgcpms.security.BusinessAmountAccess;
 import com.cgcpms.projectfile.ProjectFileService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.Counter;
@@ -616,9 +617,20 @@ public class FileService {
     }
 
     private void ensureDownloadAllowed(SysFile file) {
+        if (!BusinessAmountAccess.canView() && !isEmployeeEvidence(file)) {
+            throw new BusinessException("AMOUNT_DOWNLOAD_FORBIDDEN", "当前账号无价格型下载权限");
+        }
         if (!isScanClean(file)) {
             throw new BusinessException("FILE_VIRUS_SCAN_REQUIRED", "文件尚未通过安全检查，暂不可下载");
         }
+    }
+
+    private boolean isEmployeeEvidence(SysFile file) {
+        if ("GENERATED_DOCUMENT".equals(file.getDocumentType())) return false;
+        if ("SITE_DAILY_LOG".equals(file.getBusinessType())) return true;
+        return "QS_RECTIFICATION".equals(file.getBusinessType())
+                && ("RECTIFICATION_EVIDENCE".equals(file.getDocumentType())
+                || "REINSPECTION_EVIDENCE".equals(file.getDocumentType()));
     }
 
     private boolean isScanClean(SysFile file) {

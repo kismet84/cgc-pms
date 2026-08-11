@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import type { PeriodType } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 import {
   loadSchedule,
@@ -33,6 +36,27 @@ afterEach(() => {
 })
 
 describe('M3 delivery request and service contracts', () => {
+  it('supports year-quarter-month-week hierarchy and employee daily self-service', () => {
+    const periodTypes: PeriodType[] = ['YEARLY', 'QUARTERLY', 'MONTHLY', 'WEEKLY']
+    const scheduleSource = readFileSync(
+      resolve(process.cwd(), 'src/pages/delivery/SchedulePage.vue'),
+      'utf8',
+    )
+    const dailySource = readFileSync(
+      resolve(process.cwd(), 'src/pages/delivery/DailyLogPage.vue'),
+      'utf8',
+    )
+
+    expect(periodTypes).toEqual(['YEARLY', 'QUARTERLY', 'MONTHLY', 'WEEKLY'])
+    expect(scheduleSource).toContain("QUARTERLY: 'YEARLY'")
+    expect(scheduleSource).toContain("MONTHLY: 'QUARTERLY'")
+    expect(scheduleSource).toContain("WEEKLY: 'MONTHLY'")
+    expect(scheduleSource).toContain('approvedParentPlans')
+    expect(scheduleSource).toContain('v-model="periodForm.parentPeriodPlanId"')
+    expect(dailySource).toContain("session.hasPermission('site:daily:self')")
+    expect(dailySource).toContain("session.hasPermission('schedule:daily-progress:self')")
+  })
+
   it('omits projectId when loading schedules for all accessible projects', async () => {
     fetchMock.mockResolvedValueOnce(apiResponse([]))
 

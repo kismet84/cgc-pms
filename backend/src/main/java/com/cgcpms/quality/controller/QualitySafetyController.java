@@ -95,7 +95,7 @@ public class QualitySafetyController {
 
     @PostMapping("/rectifications/{id}/submit")
     @AuditedOperation(type = "SUBMIT", businessType = "QS_RECTIFICATION", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:safety:rectify')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:rectification:submit')")
     public ApiResponse<QualityRectification> submitRectification(@PathVariable Long id) {
         return ApiResponse.success(service.submitRectification(id));
     }
@@ -113,6 +113,13 @@ public class QualitySafetyController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:safety:consequence')")
     public ApiResponse<QualityConsequence> createConsequence(@Valid @RequestBody ConsequenceCommand command) {
         return ApiResponse.success(service.createConsequence(command));
+    }
+
+    @PostMapping("/consequences/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "QS_CONSEQUENCE", businessIdExpression = "#id")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:consequence:submit')")
+    public ApiResponse<QualityConsequence> submitConsequence(@PathVariable Long id) {
+        return ApiResponse.success(service.submitConsequence(id));
     }
 
     @PostMapping("/consequences/{id}/post")

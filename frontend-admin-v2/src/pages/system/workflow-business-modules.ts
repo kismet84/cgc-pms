@@ -12,6 +12,8 @@ const workflowModules: Record<string, WorkflowBusinessModule> = {
   TECH_ITEM: { key: 'delivery', label: '项目履约' },
   TECHNICAL_SCHEME: { key: 'delivery', label: '项目履约' },
   PROJECT_FINAL_ACCEPTANCE: { key: 'delivery', label: '项目履约' },
+  QS_RECTIFICATION: { key: 'delivery', label: '项目履约' },
+  QS_CONSEQUENCE: { key: 'delivery', label: '项目履约' },
   CONTRACT_APPROVAL: { key: 'commercial', label: '商务合约' },
   VAR_ORDER: { key: 'commercial', label: '商务合约' },
   CT_CHANGE: { key: 'commercial', label: '商务合约' },

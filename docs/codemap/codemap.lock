@@ -1,7 +1,7 @@
 {
-  "current_commit": "cc72802134f2c536a22ad8c9c8c3c1ffb1edaea6",
+  "current_commit": "2f295ad63b1d2b214a3ce94d16e7e428fc09cd03",
   "working_tree_dirty": true,
-  "generation_time": "2026-08-10T17:46:07.082Z",
+  "generation_time": "2026-08-11T02:02:32.496Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -52,9 +52,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3871,
-  "repository_file_count": 3871,
-  "included_file_count": 2607,
+  "tracked_file_count": 3894,
+  "repository_file_count": 3894,
+  "included_file_count": 2630,
   "excluded_file_count": 1264,
   "comparison": {
     "previous_lock_found": true,
@@ -79,8 +79,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1808,
-      "fingerprint": "a431530b8a65b7291dc3caf01d7fac0e94b8c4305cdc3341266c9e3346a1ca33"
+      "file_count": 1830,
+      "fingerprint": "4725ab417e1caca077cd631c6b1c5af09639b3a1ff708d6a70af8ca534036a20"
     },
     {
       "id": "delivery_tooling",
@@ -107,8 +107,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 128,
-      "fingerprint": "6d4ef4bee4fde4566ec0b1c8c89b8a03b33eb2672c6097678bc4a0100f57014c"
+      "file_count": 129,
+      "fingerprint": "621e4d6c7e551f7c76c0336037b8dcad25fcdbec9df4a3292825351d0bb68d1b"
     },
     {
       "id": "frontend_v2",
@@ -116,7 +116,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 268,
-      "fingerprint": "aef991ae9863eb216ea7bbaedc2ef5c6924217821982485b1b60e4d694b8a456"
+      "fingerprint": "fb93b5065d38d3f3113be09dc163f8698ad19bedb41dbaa52be54bca872dcbbd"
     },
     {
       "id": "mobile",
@@ -140,7 +140,7 @@
         "packages/**"
       ],
       "file_count": 19,
-      "fingerprint": "c19afbbab1dc35fb15d36bbd641489f09484ea48cd5f9e08c389b65ed413753f"
+      "fingerprint": "f85a8f7654f9d07e8942b082ddf43ee4bd3f6a13861c507e52a51d16b751303f"
     }
   ]
 }

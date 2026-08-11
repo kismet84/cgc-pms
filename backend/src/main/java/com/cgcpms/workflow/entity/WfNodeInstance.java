@@ -32,6 +32,16 @@ public class WfNodeInstance extends BaseEntity {
 
     private String approveMode;
 
+    private String nodeType;
+
+    private String approverConfig;
+
+    private Integer allowTransfer;
+
+    private Integer allowAddSign;
+
+    private Integer timeoutHours;
+
     private String nodeStatus;
 
     private Integer roundNo;

@@ -5,11 +5,25 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WorkflowWorkbenchPage from '@/pages/workbench/WorkflowWorkbenchPage.vue'
 import {
+  loadBudget,
+  loadCostControl,
+  loadCostTarget,
+  loadMeasurement,
+  submitBudget,
+  submitCostCorrective,
+  submitCostTarget,
+  submitMeasurement,
+} from '@/services/commercial'
+import { submitBidTransferRequest, submitFinanceAllocationRequest } from '@/services/cost-subject'
+import { submitQualityConsequence, submitQualityRectification } from '@/services/quality'
+import { submitPurchaseOrder, submitPurchaseRequest, submitReceipt } from '@/services/supply-chain'
+import {
   approveWorkflowTask,
   loadWorkflowActionUsers,
   loadWorkflowBusinessTypes,
   loadWorkflowInstance,
   loadWorkflowList,
+  resubmitWorkflowInstance,
 } from '@/services/workflow'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -25,6 +39,35 @@ vi.mock('@/services/workflow', () => ({
   resubmitWorkflowInstance: vi.fn(),
   transferWorkflowTask: vi.fn(),
   addSignWorkflowTask: vi.fn(),
+}))
+
+vi.mock('@/services/cost-subject', () => ({
+  submitBidTransferRequest: vi.fn(),
+  submitFinanceAllocationRequest: vi.fn(),
+}))
+
+vi.mock('@/services/quality', () => ({
+  submitQualityRectification: vi.fn(),
+  submitQualityConsequence: vi.fn(),
+}))
+
+vi.mock('@/services/supply-chain', () => ({
+  approvePurchaseRequest: vi.fn(),
+  loadPurchaseRequestApprovalItems: vi.fn().mockResolvedValue([]),
+  submitPurchaseRequest: vi.fn(),
+  submitPurchaseOrder: vi.fn(),
+  submitReceipt: vi.fn(),
+}))
+
+vi.mock('@/services/commercial', () => ({
+  loadCostTarget: vi.fn(),
+  submitCostTarget: vi.fn(),
+  loadCostControl: vi.fn(),
+  submitCostCorrective: vi.fn(),
+  loadBudget: vi.fn(),
+  submitBudget: vi.fn(),
+  loadMeasurement: vi.fn(),
+  submitMeasurement: vi.fn(),
 }))
 
 const detail: WorkflowInstance = {
@@ -77,11 +120,16 @@ const detail: WorkflowInstance = {
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  vi.mocked(loadWorkflowList).mockReset()
-  vi.mocked(loadWorkflowBusinessTypes).mockReset().mockResolvedValue(['PAYMENT'])
-  vi.mocked(loadWorkflowInstance).mockReset().mockResolvedValue(detail)
-  vi.mocked(loadWorkflowActionUsers).mockReset().mockResolvedValue([])
-  vi.mocked(approveWorkflowTask).mockReset()
+  vi.resetAllMocks()
+  vi.mocked(loadWorkflowBusinessTypes).mockResolvedValue(['PAYMENT'])
+  vi.mocked(loadWorkflowInstance).mockResolvedValue(detail)
+  vi.mocked(loadWorkflowActionUsers).mockResolvedValue([])
+  vi.mocked(loadCostTarget).mockResolvedValue({ version: 3 } as never)
+  vi.mocked(loadCostControl).mockResolvedValue({
+    correctiveActions: [{ id: '9001', version: 3 }],
+  } as never)
+  vi.mocked(loadBudget).mockResolvedValue({ version: 3 } as never)
+  vi.mocked(loadMeasurement).mockResolvedValue({ version: 3 } as never)
   document.body.innerHTML = ''
 })
 
@@ -90,6 +138,124 @@ afterEach(() => {
 })
 
 describe('WorkflowWorkbenchPage', () => {
+  it('routes every protected resubmit through its dedicated business endpoint', async () => {
+    const scenarios = [
+      [
+        'BID_COST_TARGET_TRANSFER',
+        'cost:subject:transfer:submit',
+        submitBidTransferRequest,
+        ['9001'],
+      ],
+      [
+        'FINANCE_COST_ALLOCATION',
+        'cost:subject:allocation:submit',
+        submitFinanceAllocationRequest,
+        ['9001'],
+      ],
+      ['QS_RECTIFICATION', 'quality:rectification:submit', submitQualityRectification, ['9001']],
+      ['QS_CONSEQUENCE', 'quality:consequence:submit', submitQualityConsequence, ['9001']],
+      ['PURCHASE_REQUEST', 'purchase:request:submit', submitPurchaseRequest, ['9001']],
+      ['PURCHASE_ORDER', 'purchase:order:submit', submitPurchaseOrder, ['9001']],
+      ['MATERIAL_RECEIPT', 'receipt:submit', submitReceipt, ['9001']],
+      ['COST_TARGET', 'cost:target:submit', submitCostTarget, ['9001', 3]],
+      ['COST_CORRECTIVE_ACTION', 'cost:corrective:submit', submitCostCorrective, ['9001', 3]],
+      ['PROJECT_BUDGET', 'budget:submit', submitBudget, ['9001', 3]],
+      ['PRODUCTION_MEASUREMENT', 'measurement:submit', submitMeasurement, ['9001', 3]],
+    ] as const
+
+    for (const [businessType, permission, handler, expectedArgs] of scenarios) {
+      setActivePinia(createPinia())
+      vi.mocked(loadWorkflowInstance).mockResolvedValue({
+        ...detail,
+        businessType,
+        projectId: '3001',
+        instanceStatus: 'REJECTED',
+        availableActions: ['resubmit'],
+      })
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: '/approval/instances/:instanceId',
+            component: WorkflowWorkbenchPage,
+            meta: { workflowTab: 'todo' },
+          },
+          { path: '/approval/todo', component: { template: '<div />' } },
+        ],
+      })
+      await router.push('/approval/instances/81')
+      await router.isReady()
+      const session = useSessionStore()
+      session.userInfo = {
+        userId: '8',
+        username: 'initiator',
+        roles: ['USER'],
+        permissions: ['workflow:instance:query', 'workflow:resubmit', permission],
+      }
+      session.status = 'authenticated'
+      const wrapper = mount(WorkflowWorkbenchPage, {
+        attachTo: document.body,
+        global: { plugins: [router] },
+      })
+      await flushPromises()
+
+      const resubmit = [...document.body.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === '重新提交',
+      ) as HTMLButtonElement
+      resubmit.click()
+      await flushPromises()
+      const confirm = [...document.body.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === '确认提交',
+      ) as HTMLButtonElement
+      confirm.click()
+      await flushPromises()
+
+      expect(handler).toHaveBeenCalledWith(...expectedArgs)
+      expect(resubmitWorkflowInstance).not.toHaveBeenCalled()
+      wrapper.unmount()
+      document.body.innerHTML = ''
+      vi.clearAllMocks()
+    }
+  })
+
+  it('hides protected resubmit without its business submit permission', async () => {
+    vi.mocked(loadWorkflowInstance).mockResolvedValue({
+      ...detail,
+      businessType: 'QS_RECTIFICATION',
+      instanceStatus: 'REJECTED',
+      availableActions: ['resubmit'],
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: '/approval/instances/:instanceId',
+          component: WorkflowWorkbenchPage,
+          meta: { workflowTab: 'todo' },
+        },
+        { path: '/approval/todo', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/approval/instances/81')
+    await router.isReady()
+    const session = useSessionStore()
+    session.userInfo = {
+      userId: '8',
+      username: 'initiator',
+      roles: ['USER'],
+      permissions: ['workflow:instance:query', 'workflow:resubmit'],
+    }
+    session.status = 'authenticated'
+    const wrapper = mount(WorkflowWorkbenchPage, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).not.toContain('重新提交')
+    wrapper.unmount()
+  })
+
   it('hides redundant labels, opens detail from the business code, and keeps pagination', async () => {
     vi.mocked(loadWorkflowList).mockResolvedValue({
       records: [detail.nodes[0]!.tasks[0]!],

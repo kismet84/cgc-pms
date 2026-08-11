@@ -36,7 +36,7 @@ describe('V2 navigation contract', () => {
     expect(visibleNavigation(['USER'], []).map((domain) => domain.label)).toEqual(['工作台'])
     expect(
       visibleNavigation(['USER'], [])[0]?.workspaces.map((workspace) => workspace.label),
-    ).toEqual(['我的工作', '报表中心'])
+    ).toEqual(['我的工作'])
   })
 
   it('uses exact permission codes for routes and keeps object paths in their workspace', () => {
@@ -50,6 +50,7 @@ describe('V2 navigation contract', () => {
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
     expect(permissionForPath('/project/files')).toBe('project:file:query')
     expect(permissionForPath('/communication')).toBe('communication:view')
+    expect(permissionForPath('/dashboard/reports')).toBe('report:catalog:query')
     expect(findWorkspace('/communication')?.workspace.label).toBe('站内通讯')
     expect(
       visibleNavigation(['USER'], ['communication:view'])
@@ -111,6 +112,19 @@ describe('V2 navigation contract', () => {
         .find((domain) => domain.id === 'master-data')
         ?.workspaces.map((item) => item.label),
     ).toEqual(['客户管理', '组织架构', '物资数据', '成本科目'])
+  })
+
+  it('gates reports and keeps employee self-service tabs visible', () => {
+    const paths = (permissions: string[]) =>
+      visibleNavigation(['USER'], permissions).flatMap((domain) =>
+        domain.workspaces.flatMap((workspace) => workspace.tabs.map((tab) => tab.path)),
+      )
+
+    expect(paths([])).not.toContain('/dashboard/reports')
+    expect(paths(['report:catalog:query'])).toContain('/dashboard/reports')
+    expect(paths(['site:daily:self'])).toContain('/site/daily-log')
+    expect(paths(['purchase:request:self'])).toContain('/inventory/purchase-request')
+    expect(paths(['requisition:self'])).toContain('/inventory/material-requisition')
   })
 
   it('uses the API-aligned admin gate for workflow configuration navigation', () => {

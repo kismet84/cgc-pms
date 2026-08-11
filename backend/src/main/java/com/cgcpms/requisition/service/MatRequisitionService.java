@@ -17,7 +17,10 @@ import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.security.BusinessAmountAccess;
 import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.entity.MatRequisitionItem;
@@ -29,6 +32,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,7 +42,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 领料申请服务 — CRUD / 提交审批 / 明细批量操作。
@@ -58,6 +66,7 @@ public class MatRequisitionService {
     private final CtContractMapper contractMapper;
     private final MatWarehouseMapper warehouseMapper;
     private final MdMaterialMapper materialMapper;
+    private final MdPartnerMapper partnerMapper;
     private final MatStockService stockService;
     private final CostGenerationService costGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
@@ -93,6 +102,7 @@ public class MatRequisitionService {
         if (dateFrom != null) wrapper.ge(MatRequisition::getRequisitionDate, dateFrom);
         if (dateTo != null) wrapper.le(MatRequisition::getRequisitionDate, dateTo);
         wrapper.eq(MatRequisition::getTenantId, UserContext.getCurrentTenantId());
+        if (selfOnly("requisition:query")) wrapper.eq(MatRequisition::getRequisitionerId, UserContext.getCurrentUserId());
         wrapper.orderByDesc(MatRequisition::getCreatedTime);
 
         Page<MatRequisition> page = requisitionMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -110,6 +120,7 @@ public class MatRequisitionService {
         MatRequisition r = requisitionMapper.selectById(id);
         if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(r, "requisition:query");
         checkProjectAccess(r.getProjectId(), "查看领料申请");
         return assembler.assemble(r);
     }
@@ -122,6 +133,7 @@ public class MatRequisitionService {
         MatRequisition r = requisitionMapper.selectById(requisitionId);
         if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(r, "requisition:query");
         checkProjectAccess(r.getProjectId(), "查看领料申请明细");
 
         List<MatRequisitionItem> items = requisitionItemMapper.selectList(
@@ -144,6 +156,7 @@ public class MatRequisitionService {
         requisition.setStockOutFlag(0);
         requisition.setTenantId(UserContext.getCurrentTenantId());
         requisition.setTotalAmount(BigDecimal.ZERO.setScale(2));
+        if (selfOnly("requisition:add")) requisition.setRequisitionerId(UserContext.getCurrentUserId());
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             requisition.setRequisitionCode(codeGenerationService.nextCode(
@@ -169,6 +182,7 @@ public class MatRequisitionService {
         MatRequisition existing = requisitionMapper.selectById(requisition.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(existing, "requisition:edit");
         checkProjectAccess(existing.getProjectId(), "编辑领料申请");
 
         // 驳回后允许修改，修改即回到草稿等待重新提交
@@ -180,6 +194,7 @@ public class MatRequisitionService {
         requisition.setRequisitionCode(existing.getRequisitionCode());
         requisition.setStockOutFlag(existing.getStockOutFlag());
         requisition.setTotalAmount(existing.getTotalAmount());
+        if (selfOnly("requisition:edit")) requisition.setRequisitionerId(existing.getRequisitionerId());
         checkProjectAccess(requisition.getProjectId(), "编辑领料申请");
         validateRelations(requisition);
 
@@ -195,6 +210,7 @@ public class MatRequisitionService {
         MatRequisition existing = requisitionMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(existing, "requisition:delete");
         checkProjectAccess(existing.getProjectId(), "删除领料申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
@@ -218,6 +234,7 @@ public class MatRequisitionService {
         MatRequisition requisition = requisitionMapper.selectById(requisitionId);
         if (requisition == null || !requisition.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(requisition, "requisition:submit");
         checkProjectAccess(requisition.getProjectId(), "提交领料审批");
 
         // 只允许草稿状态提交
@@ -274,9 +291,14 @@ public class MatRequisitionService {
 
     @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long requisitionId, List<MatRequisitionItem> items) {
+        if (!BusinessAmountAccess.canView() && items != null && items.stream().anyMatch(item ->
+                item.getUnitPrice() != null || item.getAmount() != null)) {
+            throw new BusinessException("AMOUNT_FIELD_FORBIDDEN", "当前账号不得提交领料金额字段");
+        }
         MatRequisition requisition = requisitionMapper.selectById(requisitionId);
         if (requisition == null || !requisition.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        requireOwner(requisition, "requisition:edit");
         checkProjectAccess(requisition.getProjectId(), "编辑领料申请明细");
 
         if (!"DRAFT".equals(requisition.getApprovalStatus()))
@@ -391,6 +413,69 @@ public class MatRequisitionService {
                 .set(MatRequisition::getStockOutFlag, 1)
                 .set(MatRequisition::getStockOutBy, UserContext.getCurrentUserId())
                 .set(MatRequisition::getStockOutAt, LocalDateTime.now()));
+    }
+
+    public Map<String, Object> formOptions(Long projectId) {
+        checkProjectAccess(projectId, "读取领料申请表单选项");
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<MatWarehouse> warehouseRows = warehouseMapper.selectList(new LambdaQueryWrapper<MatWarehouse>()
+                .eq(MatWarehouse::getTenantId, tenantId).eq(MatWarehouse::getProjectId, projectId)
+                .eq(MatWarehouse::getStatus, "ENABLE").orderByAsc(MatWarehouse::getWarehouseCode));
+        List<MdMaterial> materialRows = materialMapper.selectList(new LambdaQueryWrapper<MdMaterial>()
+                .eq(MdMaterial::getTenantId, tenantId).eq(MdMaterial::getStatus, "ENABLE")
+                .orderByAsc(MdMaterial::getMaterialCode));
+        List<CtContract> contractRows = contractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId).eq(CtContract::getProjectId, projectId)
+                .eq(CtContract::getContractStatus, ContractStatusConstants.STATUS_PERFORMING)
+                .orderByAsc(CtContract::getContractCode));
+        Set<Long> partnerIds = contractRows.stream().map(CtContract::getPartyBId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        List<MdPartner> partnerRows = partnerIds.isEmpty() ? List.of()
+                : partnerMapper.selectList(new LambdaQueryWrapper<MdPartner>()
+                .eq(MdPartner::getTenantId, tenantId).in(MdPartner::getId, partnerIds)
+                .eq(MdPartner::getStatus, "ENABLE").orderByAsc(MdPartner::getPartnerCode));
+
+        return Map.of(
+                "warehouses", warehouseRows.stream().map(row -> option(
+                        "id", row.getId(), "warehouseCode", row.getWarehouseCode(),
+                        "warehouseName", row.getWarehouseName(), "projectId", row.getProjectId())).toList(),
+                "materials", materialRows.stream().map(row -> option(
+                        "id", row.getId(), "materialCode", row.getMaterialCode(),
+                        "materialName", row.getMaterialName(), "specification", row.getSpecification(),
+                        "unit", row.getUnit())).toList(),
+                "partners", partnerRows.stream().map(row -> option(
+                        "id", row.getId(), "partnerCode", row.getPartnerCode(),
+                        "partnerName", row.getPartnerName())).toList(),
+                "contracts", contractRows.stream().map(row -> option(
+                        "id", row.getId(), "contractCode", row.getContractCode(),
+                        "contractName", row.getContractName(), "projectId", row.getProjectId())).toList());
+    }
+
+    private Map<String, Object> option(Object... values) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (int index = 0; index < values.length; index += 2) {
+            result.put(String.valueOf(values[index]), values[index + 1]);
+        }
+        return result;
+    }
+
+    private void requireOwner(MatRequisition requisition, String fullAuthority) {
+        if (selfOnly(fullAuthority)
+                && !Objects.equals(requisition.getRequisitionerId(), UserContext.getCurrentUserId())) {
+            throw new BusinessException("REQUISITION_NOT_FOUND", "领料申请不存在");
+        }
+    }
+
+    private boolean selfOnly(String fullAuthority) {
+        return !UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN")
+                && hasAuthority("requisition:self") && !hasAuthority(fullAuthority);
+    }
+
+    private boolean hasAuthority(String authority) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                .anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     private void validateRelations(MatRequisition requisition) {

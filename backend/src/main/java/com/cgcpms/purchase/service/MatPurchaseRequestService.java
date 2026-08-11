@@ -15,6 +15,7 @@ import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.security.BusinessAmountAccess;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.procurement.service.ProcurementIntegrityService;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
@@ -32,12 +33,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -83,6 +86,7 @@ public class MatPurchaseRequestService {
         if (StringUtils.hasText(status)) wrapper.eq(MatPurchaseRequest::getStatus, status);
         if (StringUtils.hasText(requestCode)) wrapper.like(MatPurchaseRequest::getRequestCode, requestCode);
         wrapper.eq(MatPurchaseRequest::getTenantId, UserContext.getCurrentTenantId());
+        if (selfOnly("purchase:request:list")) wrapper.eq(MatPurchaseRequest::getCreatedBy, UserContext.getCurrentUserId());
         wrapper.orderByDesc(MatPurchaseRequest::getCreatedTime);
 
         Page<MatPurchaseRequest> page = requestMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
@@ -118,6 +122,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest r = requestMapper.selectById(id);
         if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(r, "purchase:request:list");
         projectAccessChecker.checkAccess(r.getProjectId(), "查看采购申请");
         return toVO(r, requestTotals(r.getTenantId(), Set.of(r.getId())).getOrDefault(r.getId(), BigDecimal.ZERO));
     }
@@ -130,6 +135,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(request, "purchase:request:list");
         projectAccessChecker.checkAccess(request.getProjectId(), "查看采购申请明细");
 
         List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
@@ -159,6 +165,7 @@ public class MatPurchaseRequestService {
         request.setApprovalStatus("DRAFT");
         request.setStatus("DRAFT");
         request.setTenantId(tenantId);
+        if (selfOnly("purchase:request:add")) request.setCreatedBy(UserContext.getCurrentUserId());
 
         for (int attempt = 0; attempt < 3; attempt++) {
             request.setRequestCode(codeGenerationService.nextCode(
@@ -180,6 +187,10 @@ public class MatPurchaseRequestService {
         if (items == null || items.isEmpty() || items.size() > 200) {
             throw new BusinessException("PURCHASE_REQUEST_ITEMS_INVALID", "采购申请明细必须为1到200条");
         }
+        if (!BusinessAmountAccess.canView() && items.stream().anyMatch(item ->
+                item.getEstimatedUnitPrice() != null || item.getEstimatedAmount() != null)) {
+            throw new BusinessException("AMOUNT_FIELD_FORBIDDEN", "当前账号不得提交采购申请金额字段");
+        }
         Long requestId = create(request);
         saveItemsBatch(requestId, items);
         return requestId;
@@ -194,6 +205,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest existing = requestMapper.selectById(request.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(existing, "purchase:request:edit");
         projectAccessChecker.checkAccess(existing.getProjectId(), "编辑采购申请");
 
         // Only DRAFT can be updated
@@ -224,6 +236,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(request, "purchase:request:submit");
 
         // 只允许草稿状态提交
         if (!"DRAFT".equals(request.getApprovalStatus()))
@@ -280,6 +293,7 @@ public class MatPurchaseRequestService {
                 || !"PURCHASE_REQUEST".equals(instance.getBusinessType())) {
             throw new BusinessException("PURCHASE_REQUEST_RESUBMIT_MISMATCH", "采购申请与审批实例不匹配");
         }
+        requireOwner(request, "purchase:request:submit");
         projectAccessChecker.checkAccess(request.getProjectId(), "重新提交采购申请审批");
         List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
                 new LambdaQueryWrapper<MatPurchaseRequestItem>()
@@ -307,6 +321,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest existing = requestMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(existing, "purchase:request:delete");
         projectAccessChecker.checkAccess(existing.getProjectId(), "删除采购申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
@@ -332,6 +347,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        requireOwner(request, "purchase:request:edit");
 
         if (!List.of("DRAFT", "REJECTED").contains(request.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可编辑明细");
@@ -456,6 +472,43 @@ public class MatPurchaseRequestService {
         if (projectId == null) {
             throw new BusinessException("PROJECT_REQUIRED", "项目不能为空");
         }
+    }
+
+    public Map<String, Object> formOptions(Long projectId) {
+        validateProjectRequired(projectId);
+        projectAccessChecker.checkAccess(projectId, "读取采购申请表单选项");
+        List<Map<String, Object>> materials = mdMaterialMapper.selectList(new LambdaQueryWrapper<MdMaterial>()
+                        .eq(MdMaterial::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(MdMaterial::getStatus, "ENABLE")
+                        .orderByAsc(MdMaterial::getMaterialCode))
+                .stream().map(material -> {
+                    Map<String, Object> option = new LinkedHashMap<>();
+                    option.put("id", material.getId());
+                    option.put("materialCode", material.getMaterialCode());
+                    option.put("materialName", material.getMaterialName());
+                    option.put("specification", material.getSpecification());
+                    option.put("unit", material.getUnit());
+                    return option;
+                }).toList();
+        return Map.of("materials", materials);
+    }
+
+    private void requireOwner(MatPurchaseRequest request, String fullAuthority) {
+        if (selfOnly(fullAuthority) && !Objects.equals(request.getCreatedBy(), UserContext.getCurrentUserId())) {
+            throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        }
+    }
+
+    private boolean selfOnly(String fullAuthority) {
+        return !UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN")
+                && hasAuthority("purchase:request:self") && !hasAuthority(fullAuthority);
+    }
+
+    private boolean hasAuthority(String authority) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                .anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     // ================================================================

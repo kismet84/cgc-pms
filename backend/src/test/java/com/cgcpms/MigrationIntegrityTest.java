@@ -560,6 +560,29 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void mainline89RoleWorkflowAmountContractIsDualTrack() throws IOException {
+        Path mysql = ACTIVE_MIGRATION_DIR.resolve("V293__mainline_89_role_workflow_amount_contract.sql");
+        Path h2 = ACTIVE_H2_MIGRATION_DIR.resolve("V293__mainline_89_role_workflow_amount_contract.sql");
+        assertTrue(Files.exists(mysql));
+        assertTrue(Files.exists(h2));
+
+        for (String sql : List.of(normalizeSql(readString(mysql)), normalizeSql(readString(h2)))) {
+            for (String role : List.of("company_owner", "company_finance", "project_manager",
+                    "project_accountant", "technical_lead", "safety_lead", "construction_lead",
+                    "procurement_lead", "employee", "super_admin")) {
+                assertTrue(sql.contains(role), role);
+            }
+            for (String businessType : List.of("bid_cost_target_transfer", "finance_cost_allocation",
+                    "qs_rectification", "qs_consequence")) {
+                assertTrue(sql.contains(businessType), businessType);
+            }
+            assertTrue(sql.contains("security_policy_json"));
+            assertTrue(sql.contains("business:amount:view"));
+            assertTrue(sql.contains("workflow:template:manage"));
+        }
+    }
+
     private static void assertP01PermissionFixPack(String sql, boolean mysql) {
         String normalizedSql = normalizeSql(sql);
         Set<String> bindings = roleMenuBindings(normalizedSql);

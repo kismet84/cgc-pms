@@ -102,6 +102,16 @@ class CostSummaryServiceTest {
             projectMapper.updateById(project);
         }
         testProjectId = 80001L;
+        jdbc.update("""
+                INSERT INTO pm_project_member
+                    (id, tenant_id, project_id, user_id, role_code, status, created_by, created_at, updated_at, deleted_flag)
+                SELECT 8000191, ?, ?, ?, 'PROJECT_MANAGER', 'ACTIVE', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM pm_project_member
+                    WHERE tenant_id = ? AND project_id = ? AND user_id = ? AND status = 'ACTIVE' AND deleted_flag = 0
+                )
+                """, TENANT_ID, testProjectId, USER_PROJECT_MANAGER, USER_ADMIN,
+                TENANT_ID, testProjectId, USER_PROJECT_MANAGER);
     }
 
     @AfterEach

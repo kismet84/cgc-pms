@@ -42,6 +42,8 @@ export interface AssignmentRuleRecord {
   sourceType: string
   businessCategory: string
   projectId?: string
+  projectCode?: string | null
+  projectName?: string | null
   costSubjectId: string
   subjectCode: string
   subjectName: string
@@ -114,23 +116,61 @@ export interface ProjectScopeCommand {
   remark: string
 }
 
-export interface BidTransferCommand {
+export interface BidTransferRequestRecord {
+  id: string
+  requestCode: string
+  bidCostId: string
+  bidCode?: string | null
+  projectId: string
+  projectCode?: string | null
+  projectName?: string | null
+  targetId: string
+  targetVersionNo?: string | null
+  targetVersionName?: string | null
+  mappingVersionId: string
+  totalAmount: string
+  status: string
+  approvalInstanceId?: string | null
+  finalTransferId?: string | null
+  createdAt?: string | null
+}
+
+export interface BidTransferRequestCommand {
   bidCostId: string
   projectId: string
   targetId: string
   mappingVersionId: string
-  approvalInstanceId: string
   idempotencyKey: string
   remark: string
 }
 
-export interface FinanceAllocationCommand {
+export interface FinanceAllocationRequestRecord {
+  id: string
+  requestCode: string
+  projectId: string
+  projectCode?: string | null
+  projectName?: string | null
+  sourceType: string
+  sourceId: string
+  sourceCode?: string | null
+  sourceAmount: string
+  allocationBasis: string
+  accountingPeriod: string
+  costSubjectId: string
+  costSubjectCode?: string | null
+  costSubjectName?: string | null
+  status: string
+  approvalInstanceId?: string | null
+  finalBatchId?: string | null
+  createdAt?: string | null
+}
+
+export interface FinanceAllocationRequestCommand {
   sourceType: string
   sourceId: string
   allocationBasis: string
   accountingPeriod: string
   costSubjectId: string
-  approvalInstanceId: string
   idempotencyKey: string
   remark: string
   lines: Array<{ projectId: string; basisValue: string }>
@@ -240,11 +280,26 @@ export function loadBidTransfers(signal?: AbortSignal): Promise<CostSubjectAudit
   )
 }
 
-export function createBidTransfer(command: BidTransferCommand): Promise<string | number> {
-  return apiRequest<string | number, BidTransferCommand>('/cost-subject-v2/bid-transfers', {
-    method: 'POST',
-    body: command,
-  })
+export function loadBidTransferRequests(signal?: AbortSignal): Promise<BidTransferRequestRecord[]> {
+  return apiRequest<Record<string, unknown>[]>('/cost-subject-v2/bid-transfer-requests', {
+    signal,
+  }).then((rows) => rows.map((row) => normalizeAuditRow(row) as BidTransferRequestRecord))
+}
+
+export function createBidTransferRequest(
+  command: BidTransferRequestCommand,
+): Promise<BidTransferRequestRecord> {
+  return apiRequest<Record<string, unknown>, BidTransferRequestCommand>(
+    '/cost-subject-v2/bid-transfer-requests',
+    { method: 'POST', body: command },
+  ).then((row) => normalizeAuditRow(row) as BidTransferRequestRecord)
+}
+
+export function submitBidTransferRequest(id: string): Promise<BidTransferRequestRecord> {
+  return apiRequest<Record<string, unknown>>(
+    `/cost-subject-v2/bid-transfer-requests/${requiredId(id)}/submit`,
+    { method: 'POST' },
+  ).then((row) => normalizeAuditRow(row) as BidTransferRequestRecord)
 }
 
 export function reverseBidTransfer(
@@ -269,13 +324,30 @@ export function loadFinanceAllocations(signal?: AbortSignal): Promise<CostSubjec
   }).then((rows) => rows.map(normalizeAuditRow))
 }
 
-export function createFinanceAllocation(
-  command: FinanceAllocationCommand,
-): Promise<string | number> {
-  return apiRequest<string | number, FinanceAllocationCommand>(
-    '/cost-subject-v2/finance-allocations',
+export function loadFinanceAllocationRequests(
+  signal?: AbortSignal,
+): Promise<FinanceAllocationRequestRecord[]> {
+  return apiRequest<Record<string, unknown>[]>('/cost-subject-v2/finance-allocation-requests', {
+    signal,
+  }).then((rows) => rows.map((row) => normalizeAuditRow(row) as FinanceAllocationRequestRecord))
+}
+
+export function createFinanceAllocationRequest(
+  command: FinanceAllocationRequestCommand,
+): Promise<FinanceAllocationRequestRecord> {
+  return apiRequest<Record<string, unknown>, FinanceAllocationRequestCommand>(
+    '/cost-subject-v2/finance-allocation-requests',
     { method: 'POST', body: command },
-  )
+  ).then((row) => normalizeAuditRow(row) as FinanceAllocationRequestRecord)
+}
+
+export function submitFinanceAllocationRequest(
+  id: string,
+): Promise<FinanceAllocationRequestRecord> {
+  return apiRequest<Record<string, unknown>>(
+    `/cost-subject-v2/finance-allocation-requests/${requiredId(id)}/submit`,
+    { method: 'POST' },
+  ).then((row) => normalizeAuditRow(row) as FinanceAllocationRequestRecord)
 }
 
 export function reverseFinanceAllocation(

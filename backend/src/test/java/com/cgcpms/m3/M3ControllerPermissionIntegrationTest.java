@@ -56,7 +56,8 @@ class M3ControllerPermissionIntegrationTest {
     void queryOnlyIdentityCannotInvokeAnyM3MutationEndpoint() throws Exception {
         Cookie cookie = new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, jwtUtils.generateToken(
                 99199999L, "m3-query-only", 0L, List.of("M3_QUERY"),
-                List.of("project:query", "schedule:query", "site:daily:query", "quality:safety:query", "technical:query", "closeout:query")));
+                List.of("project:query", "schedule:query", "site:daily:query", "quality:safety:query", "technical:query", "closeout:query",
+                        "business:amount:view")));
 
         for (Endpoint endpoint : mutationEndpoints()) {
             int status = mockMvc.perform(request(endpoint.method(), endpoint.path())

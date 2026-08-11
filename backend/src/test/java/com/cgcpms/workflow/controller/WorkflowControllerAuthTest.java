@@ -53,7 +53,7 @@ class WorkflowControllerAuthTest {
     @BeforeEach
     void setUp() {
         controller = new WorkflowController(workflowEngine, workflowQueryService);
-        permissionEngine = new WorkflowEngine(null, null, null, null, null, null, null, null);
+        permissionEngine = new WorkflowEngine(null, null, null, null, null, null, null);
         // clear any lingering context from other tests
         SecurityContextHolder.clearContext();
     }
@@ -126,6 +126,17 @@ class WorkflowControllerAuthTest {
 
             assertDoesNotThrow(() -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
                     "具有 contract:submit 权限的用户应通过");
+        }
+
+        @Test
+        @DisplayName("通用HTTP提交失败关闭，防止客户端金额影响审批路由")
+        void genericHttpSubmitRequiresDedicatedBusinessEndpoint() {
+            setAuthentication("contract:submit");
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> controller.submit(validRequest()));
+
+            assertEquals("WORKFLOW_DEDICATED_SUBMIT_REQUIRED", ex.getCode());
         }
 
         @Test

@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import type {
-  ContractRecord,
-  MaterialRecord,
   MaterialReturnRecord,
-  PartnerRecord,
   RequisitionCommand,
   RequisitionItemRecord,
   RequisitionRecord,
   RequisitionTraceRecord,
-  WarehouseRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
@@ -29,19 +25,18 @@ import {
   deleteRequisition,
   loadMaterialReturn,
   loadMaterialReturnItems,
-  loadMaterials,
   loadRequisition,
+  loadRequisitionFormOptions,
   loadRequisitionItems,
   loadRequisitions,
   loadRequisitionTrace,
-  loadWarehouses,
   reverseMaterialReturn,
   saveRequisitionItems,
   stockOutRequisition,
   submitRequisition,
   updateRequisition,
+  type RequisitionFormOptions,
 } from '@/services/supply-chain'
-import { loadContractPage, loadPartners } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -65,10 +60,10 @@ const items = ref<RequisitionItemRecord[]>([])
 const trace = ref<RequisitionTraceRecord | null>(null)
 const materialReturn = ref<MaterialReturnRecord | null>(null)
 const returnItems = ref<Awaited<ReturnType<typeof loadMaterialReturnItems>>>([])
-const warehouses = ref<WarehouseRecord[]>([])
-const materials = ref<MaterialRecord[]>([])
-const partners = ref<PartnerRecord[]>([])
-const contracts = ref<ContractRecord[]>([])
+const warehouses = ref<RequisitionFormOptions['warehouses']>([])
+const materials = ref<RequisitionFormOptions['materials']>([])
+const partners = ref<RequisitionFormOptions['partners']>([])
+const contracts = ref<RequisitionFormOptions['contracts']>([])
 const editorItems = ref<EditorItem[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -92,10 +87,18 @@ let detailGeneration = 0
 
 const projectId = computed(() => workspace.selectedProjectId || '')
 const reportPeriod = computed(() => reportPeriodBounds(workspace.selectedReportPeriod))
-const canAdd = computed(() => hasPermission('requisition:add') && hasPermission('requisition:edit'))
-const canEdit = computed(() => hasPermission('requisition:edit'))
-const canDelete = computed(() => hasPermission('requisition:delete'))
-const canSubmit = computed(() => hasPermission('requisition:submit'))
+const canUseRequisitionSelf = computed(() => session.hasPermission('requisition:self'))
+const requisitionSelfOnly = computed(
+  () => canUseRequisitionSelf.value && !hasPermission('requisition:edit'),
+)
+const canAdd = computed(
+  () =>
+    canUseRequisitionSelf.value ||
+    (hasPermission('requisition:add') && hasPermission('requisition:edit')),
+)
+const canEdit = computed(() => canUseRequisitionSelf.value || hasPermission('requisition:edit'))
+const canDelete = computed(() => canUseRequisitionSelf.value || hasPermission('requisition:delete'))
+const canSubmit = computed(() => canUseRequisitionSelf.value || hasPermission('requisition:submit'))
 const canStockOut = computed(() => hasPermission('requisition:stock-out'))
 const canReturn = computed(() => hasPermission('requisition:return'))
 const canTrace = computed(() => hasPermission('procurement:trace:query'))
@@ -154,7 +157,7 @@ const warehouseOptions = computed(() =>
 const materialOptions = computed(() =>
   materials.value.map((item) => ({
     value: item.id,
-    label: [item.materialCode, item.materialName, item.specification].filter(Boolean).join(' · '),
+    label: [item.materialCode, item.materialName].filter(Boolean).join(' · '),
   })),
 )
 const partnerOptions = computed(() => [
@@ -381,30 +384,18 @@ function changePage(next: number): void {
 }
 
 async function loadEditorCandidates(candidateProjectId: string): Promise<void> {
+  warehouses.value = []
+  materials.value = []
+  partners.value = []
+  contracts.value = []
+  if (!candidateProjectId) return
   busy.value = true
   try {
-    const [warehousePage, materialPage, partnerPage, contractPage] = await Promise.all([
-      loadWarehouses({
-        pageNo: 1,
-        pageSize: 200,
-        projectId: candidateProjectId || undefined,
-        status: 'ENABLE',
-      }),
-      loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' }),
-      loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' }),
-      candidateProjectId
-        ? loadContractPage({
-            pageNo: 1,
-            pageSize: 200,
-            projectId: candidateProjectId,
-            contractStatus: 'PERFORMING',
-          })
-        : Promise.resolve({ records: [], total: 0, pageNo: 1, pageSize: 200 }),
-    ])
-    warehouses.value = warehousePage.records
-    materials.value = materialPage.records
-    partners.value = partnerPage.records
-    contracts.value = contractPage.records
+    const options = await loadRequisitionFormOptions(candidateProjectId)
+    warehouses.value = options.warehouses
+    materials.value = options.materials
+    partners.value = options.partners
+    contracts.value = options.contracts
   } catch (error) {
     errorMessage.value = errorText(error, '领料候选读取失败')
     showToast('error', '领料候选读取失败', errorMessage.value)
@@ -505,9 +496,10 @@ async function saveEditor(submitAfter = false): Promise<void> {
           throw new TypeError(`第${index + 1}条明细物料不能为空`)
         })(),
       quantity: positiveDecimal(item.quantity, `第${index + 1}条领料数量`),
-      unitPrice: item.unitPrice.trim()
-        ? nonNegativeDecimal(item.unitPrice, `第${index + 1}条单价`)
-        : undefined,
+      unitPrice:
+        !requisitionSelfOnly.value && item.unitPrice.trim()
+          ? nonNegativeDecimal(item.unitPrice, `第${index + 1}条单价`)
+          : undefined,
       useLocation: item.useLocation.trim() || undefined,
       remark: item.remark.trim() || undefined,
     }))
@@ -849,7 +841,13 @@ onBeforeUnmount(() => {
         <div class="requisition-page__line-head">
           <div>
             <h3>物料明细</h3>
-            <p>最多 200 条；金额保存后自动计算。</p>
+            <p>
+              {{
+                requisitionSelfOnly
+                  ? '最多 200 条；价格由后续有权角色或服务端补充。'
+                  : '最多 200 条；金额保存后自动计算。'
+              }}
+            </p>
           </div>
           <V2Button
             type="button"
@@ -876,7 +874,12 @@ onBeforeUnmount(() => {
               @update:model-value="(value) => changeMaterial(row, value)"
             />
             <V2Input v-model="row.quantity" label="领用数量" :decimal-scale="2" required />
-            <V2Input v-model="row.unitPrice" label="参考单价" :decimal-scale="2" />
+            <V2Input
+              v-if="!requisitionSelfOnly"
+              v-model="row.unitPrice"
+              label="参考单价"
+              :decimal-scale="2"
+            />
             <V2Input v-model="row.useLocation" label="使用部位" />
             <V2Input v-model="row.remark" label="明细备注" />
             <V2Button
