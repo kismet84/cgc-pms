@@ -712,7 +712,7 @@ class CostTargetControllerTest {
                 "SELECT project_manager_id FROM pm_project WHERE id=?", Long.class, PROJECT_ID));
         Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM pm_project_member
-                WHERE project_id=? AND user_id=? AND role_code='PM' AND status='ACTIVE' AND deleted_flag=0
+                WHERE project_id=? AND user_id=? AND role_code='PROJECT_MANAGER' AND status='ACTIVE' AND deleted_flag=0
                 """, Integer.class, PROJECT_ID, OUTSIDER_USER_ID));
     }
 

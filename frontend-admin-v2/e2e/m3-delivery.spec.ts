@@ -352,7 +352,7 @@ test.describe('M3 live delivery workspace', () => {
     ).toBe(403)
     expect(mutatingRequests).toEqual([])
 
-    await login(page, 'demo.production')
+    await login(page, 'ui26.staff01')
     await page.goto(`/site/daily-log?projectId=${controlledProjectId}`)
     await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建日报' })).toHaveCount(0)

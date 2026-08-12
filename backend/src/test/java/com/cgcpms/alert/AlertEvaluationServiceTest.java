@@ -1256,10 +1256,10 @@ class AlertEvaluationServiceTest {
     @Transactional
     @DisplayName("TA11k: subscription — fail-close 角色默认关闭且不能被用户打开")
     void testSubscription_FailCloseCannotEnable() {
-        TestUserContext.setUser(TENANT_ID, USER_CHIEF_ENGINEER, "chief", List.of("CHIEF_ENGINEER"));
+        TestUserContext.setUser(TENANT_ID, USER_CHIEF_ENGINEER, "unmapped", List.of("UNMAPPED_ROLE"));
 
         alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_CHIEF_ENGINEER,
-                List.of("CHIEF_ENGINEER"), java.util.Map.of(
+                List.of("UNMAPPED_ROLE"), java.util.Map.of(
                         "enabled", true,
                         "channels", List.of("IN_APP"),
                         "domains", List.of("CONTRACT"),
@@ -1268,7 +1268,7 @@ class AlertEvaluationServiceTest {
                 ));
 
         var result = alertSubscriptionService.getCurrentUserSubscription(TENANT_ID, USER_CHIEF_ENGINEER,
-                List.of("CHIEF_ENGINEER"));
+                List.of("UNMAPPED_ROLE"));
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> effective = (java.util.Map<String, Object>) result.get("effectiveSubscription");
         assertEquals(false, effective.get("enabled"));

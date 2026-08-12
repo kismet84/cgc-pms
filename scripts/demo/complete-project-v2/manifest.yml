@@ -49,7 +49,7 @@ stages:
     scope: [partner-completeness, project-dictionary-coverage, contract-dictionary-coverage, workflow-state-coverage, quality-contract-trace]
   - id: role-test-accounts
     source: sql/150-role-test-accounts.sql
-    scope: [dev-login-users, dashboard-role-permissions]
+    scope: [canonical-dev-login-users, legacy-user-cleanup, dashboard-role-permissions]
   - id: role-dashboard-data
     source: sql/160-role-dashboard-data.sql
     scope: [project-manager, business-manager, purchase-manager, production-manager, chief-engineer]
@@ -64,7 +64,7 @@ stages:
     scope: [internal-business-code, historical-normalization, payment-record-code]
   - id: role-workflow-status-data
     source: sql/200-role-workflow-status-data.sql
-    scope: [workflow-status, role-action-permission]
+    scope: [workflow-status, canonical-role-matrix]
   - id: m3-domain-permission-data
     source: sql/210-m3-domain-permission-data.sql
     scope: [delivery-query-permission, quality-split-permission, quality-stage-evidence, technical-split-permission, technical-stage-evidence, responsible-project-membership, closeout-split-permission, closeout-stage-evidence, defect-action-stages, legal-ready-to-close, legal-closed-chain]

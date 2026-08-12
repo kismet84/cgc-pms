@@ -15,6 +15,7 @@ import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -182,6 +183,32 @@ class ApproverResolverTest {
         assertEquals(List.of(1L), resolver.resolve(
                 "{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"PROJECT_MANAGER\"}",
                 7L, 10001L, new WorkflowSecurityPolicy(false, 1, true, false)));
+    }
+
+    @Test
+    @DisplayName("PROJECT_ROLE拒绝未知或公司级角色")
+    void projectRoleResolverRejectsNonProjectRole() {
+        ApproverResolver resolver = resolver();
+
+        for (String roleCode : List.of("UNKNOWN_LEGACY_ROLE", SystemRoleContract.COMPANY_OWNER,
+                SystemRoleContract.COMPANY_FINANCE)) {
+            BusinessException exception = assertThrows(BusinessException.class, () -> resolver.resolve(
+                    "{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"" + roleCode + "\"}",
+                    7L, 10001L, new WorkflowSecurityPolicy(false, 1, true, false)));
+            assertEquals("PROJECT_ROLE_INVALID", exception.getCode());
+        }
+    }
+
+    @Test
+    @DisplayName("七类历史项目角色均映射到项目范围系统角色")
+    void legacyProjectRolesMapToCanonicalProjectRoles() {
+        assertEquals(SystemRoleContract.PROJECT_MANAGER, SystemRoleContract.canonicalRoleCode("PM"));
+        assertEquals(SystemRoleContract.PROJECT_ACCOUNTANT, SystemRoleContract.canonicalRoleCode("CM"));
+        assertEquals(SystemRoleContract.PROJECT_ACCOUNTANT, SystemRoleContract.canonicalRoleCode("CSTM"));
+        assertEquals(SystemRoleContract.PROJECT_ACCOUNTANT, SystemRoleContract.canonicalRoleCode("FIN"));
+        assertEquals(SystemRoleContract.PROCUREMENT_LEAD, SystemRoleContract.canonicalRoleCode("MAT"));
+        assertEquals(SystemRoleContract.CONSTRUCTION_LEAD, SystemRoleContract.canonicalRoleCode("SUBC"));
+        assertEquals(SystemRoleContract.EMPLOYEE, SystemRoleContract.canonicalRoleCode("OTH"));
     }
 
     private ApproverResolver resolver() {

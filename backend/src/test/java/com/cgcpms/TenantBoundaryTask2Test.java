@@ -340,7 +340,7 @@ class TenantBoundaryTask2Test {
 
         PmProjectMember member = new PmProjectMember();
         member.setUserId(USER_A);
-        member.setRoleCode("VIEWER");
+        member.setRoleCode("EMPLOYEE");
         member.setStatus("ACTIVE");
         // Client tries to inject tenant B
         member.setTenantId(TENANT_B);

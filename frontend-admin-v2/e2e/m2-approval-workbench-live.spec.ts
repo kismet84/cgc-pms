@@ -5,13 +5,13 @@ import { expect, test } from './live-test'
 const runLiveApproval = process.env.V2_LIVE_APPROVAL === '1'
 const controlledInstanceId = '520000000000009541'
 const roleAccounts = [
-  'demo.manager',
-  'demo.business',
-  'demo.cost',
-  'demo.purchase',
-  'demo.production',
-  'demo.chief',
-  'demo.finance',
+  'ui26.pm01',
+  'ui26.bm01',
+  'ui26.cost01',
+  'ui26.pur01',
+  'ui26.prod01',
+  'ui26.chief01',
+  'ui26.fin01',
   'admin',
 ] as const
 const instanceStatuses = ['RUNNING', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'VOIDED'] as const
@@ -236,7 +236,7 @@ test.describe('M2 live approval workbench', () => {
     const switched = page.waitForResponse((item) =>
       item.url().includes('/api/auth/dev-login?username=ui26.cost01'),
     )
-    await sidebar.getByRole('button', { name: /成本经理/ }).click()
+    await sidebar.getByRole('button', { name: /项目会计/ }).click()
     expect((await switched).ok()).toBe(true)
     await expect(page).toHaveURL(/\/approval\/todo/)
     await expect(page.getByRole('banner').getByText('许承泽', { exact: true })).toBeVisible()
@@ -303,7 +303,7 @@ test.describe('M2 live approval workbench', () => {
   })
 
   test('process management remains admin-only for ordinary workflow users', async ({ page }) => {
-    expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
+    expect((await page.goto('/api/auth/dev-login?username=ui26.pm01'))?.ok()).toBe(true)
     await rewritePermissions(page, (permissions) => [...permissions, 'workflow:process:query'])
     await page.goto('/approval/process')
     await expect(page).toHaveURL(/\/forbidden\?from=/)

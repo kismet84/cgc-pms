@@ -80,9 +80,25 @@ if (-not $systemFixture.Contains('ON DUPLICATE KEY UPDATE', [StringComparison]::
     throw 'LIVE_EVIDENCE_USER_PREFERENCE_FIXTURE_NOT_REPEATABLE'
 }
 $roleFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/150-role-test-accounts.sql'))
-foreach ($roleAccount in @('pm','bm','cost','pur','prod','chief','fin','mgmt','staff','gm','mat')) {
-    if ([regex]::Matches($roleFixture, "'ui26\.$roleAccount" + "01'").Count -lt 2) {
-        throw "LIVE_EVIDENCE_ROLE_SWITCHER_FIXTURE_INCOMPLETE:$roleAccount"
+foreach ($mapping in @(
+    @('ui26.gm01', 'COMPANY_OWNER'),
+    @('ui26.fin01', 'COMPANY_FINANCE'),
+    @('ui26.pm01', 'PROJECT_MANAGER'),
+    @('ui26.cost01', 'PROJECT_ACCOUNTANT'),
+    @('ui26.chief01', 'TECHNICAL_LEAD'),
+    @('ui26.bm01', 'SAFETY_LEAD'),
+    @('ui26.prod01', 'CONSTRUCTION_LEAD'),
+    @('ui26.pur01', 'PROCUREMENT_LEAD'),
+    @('ui26.staff01', 'EMPLOYEE')
+)) {
+    if (-not $roleFixture.Contains("username='$($mapping[0])'", [StringComparison]::Ordinal) `
+        -or -not $roleFixture.Contains("role_code='$($mapping[1])'", [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_ROLE_SWITCHER_MAPPING_MISSING:$($mapping[0]):$($mapping[1])"
+    }
+}
+foreach ($legacyUsername in @('demo.business', 'demo.cost', 'demo.purchase', 'demo.production', 'demo.chief', 'demo.finance')) {
+    if (-not $roleFixture.Contains($legacyUsername, [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_LEGACY_ROLE_ACCOUNT_CLEANUP_MISSING:$legacyUsername"
     }
 }
 $businessCodeFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/190-standardize-business-codes.sql'))
@@ -128,8 +144,8 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
 }
 $loadSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'load.ps1'))
 $fixtureVersions = @(
-    "Id = 'ROLE_TEST_ACCOUNTS'; Version = 6",
-    "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 4",
+    "Id = 'ROLE_TEST_ACCOUNTS'; Version = 7",
+    "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 5",
     "Id = 'SETTLEMENT_SOURCE_DATA'; Version = 7"
 )
 foreach ($fixtureVersion in $fixtureVersions) {
@@ -142,19 +158,22 @@ if (-not $loadSource.Contains("Id = 'ROLE_DASHBOARD_DATA'; Version = 4; AlwaysAp
 }
 $roleFixtureSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/150-role-test-accounts.sql'))
 foreach ($canonicalBinding in @(
-    "username='demo.business' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROJECT_ACCOUNTANT'",
-    "username='demo.purchase' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROCUREMENT_LEAD'",
-    "username='demo.production' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='CONSTRUCTION_LEAD'",
-    "username='demo.chief' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='TECHNICAL_LEAD'",
-    "username='demo.finance' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMPANY_FINANCE'",
+    "username='ui26.gm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMPANY_OWNER'",
+    "username='ui26.fin01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMPANY_FINANCE'",
+    "username='ui26.fin01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='SUPER_ADMIN'",
+    "username='ui26.pm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROJECT_MANAGER'",
+    "username='ui26.cost01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROJECT_ACCOUNTANT'",
+    "username='ui26.chief01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='TECHNICAL_LEAD'",
     "username='ui26.bm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='SAFETY_LEAD'",
+    "username='ui26.prod01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='CONSTRUCTION_LEAD'",
+    "username='ui26.pur01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='PROCUREMENT_LEAD'",
     "username='ui26.staff01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='EMPLOYEE'"
 )) {
     if (-not $roleFixtureSource.Contains($canonicalBinding, [StringComparison]::Ordinal)) {
         throw "LIVE_EVIDENCE_CANONICAL_ROLE_FIXTURE_MISSING:$canonicalBinding"
     }
 }
-if (-not $roleFixtureSource.Contains("520000000000008657,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.staff01'", [StringComparison]::Ordinal)) {
+if (-not $roleFixtureSource.Contains("520000000000008655,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.staff01'", [StringComparison]::Ordinal)) {
     throw 'LIVE_EVIDENCE_DAILY_SELF_PROJECT_MEMBER_MISSING'
 }
 if ($roleFixtureSource.Contains('INSERT IGNORE INTO sys_role_menu', [StringComparison]::Ordinal) `

@@ -378,6 +378,51 @@ describe('M7 workflow process page', () => {
     ])
   })
 
+  it('offers seven canonical project roles and preserves a legacy role only on edit', async () => {
+    vi.mocked(processService.loadWorkflowTemplate).mockImplementation(async (id) => {
+      if (id !== '10') return id === '11' ? projectDetail : scheduleDetail
+      return {
+        ...detail,
+        nodes: [
+          {
+            ...detail.nodes[0]!,
+            approverConfig: '{"type":"PROJECT_ROLE","roleCode":"PM"}',
+          },
+        ],
+      }
+    })
+    mount(WorkflowProcessPage, { attachTo: document.body })
+    await flushPromises()
+
+    button('新增节点').click()
+    await flushPromises()
+    const approverType = selectByLabel('审批人类型')
+    approverType.value = 'PROJECT_ROLE'
+    approverType.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+    expect([...selectByLabel('项目角色').options].map((option) => option.value)).toEqual([
+      '',
+      'PROJECT_MANAGER',
+      'PROJECT_ACCOUNTANT',
+      'TECHNICAL_LEAD',
+      'SAFETY_LEAD',
+      'CONSTRUCTION_LEAD',
+      'PROCUREMENT_LEAD',
+      'EMPLOYEE',
+    ])
+    button('取消').click()
+    await flushPromises()
+
+    button('编辑').click()
+    await flushPromises()
+    const historical = [...selectByLabel('项目角色').options].find(
+      (option) => option.value === 'PM',
+    )
+    expect(selectByLabel('项目角色').value).toBe('PM')
+    expect(historical?.disabled).toBe(true)
+    expect(historical?.textContent).toContain('历史角色，只读')
+  })
+
   it('filters role and position approvers in computed candidates instead of discarding history', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/pages/system/WorkflowProcessPage.vue'),

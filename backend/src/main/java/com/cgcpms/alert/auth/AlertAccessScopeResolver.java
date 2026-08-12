@@ -9,6 +9,7 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -24,24 +25,35 @@ public class AlertAccessScopeResolver {
             "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE",
             "FINANCE", "FINANCE_OPERATIONS", "QUALITY_SAFETY");
 
-    private static final Map<String, Set<String>> ROLE_DOMAINS = Map.of(
-            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "QUALITY_SAFETY"),
-            "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
-            "COST_MANAGER", Set.of("COST"),
-            "PURCHASE_MANAGER", Set.of("PURCHASE"),
-            "PRODUCTION_MANAGER", Set.of("PURCHASE", "QUALITY_SAFETY"),
-            "CHIEF_ENGINEER", Set.of("QUALITY_SAFETY"),
-            "FINANCE", Set.of("PAYMENT", "FINANCE_OPERATIONS")
+    private static final Map<String, Set<String>> ROLE_DOMAINS = Map.ofEntries(
+            Map.entry(SystemRoleContract.COMPANY_OWNER, ALL_ALERT_DOMAINS),
+            Map.entry(SystemRoleContract.COMPANY_FINANCE, Set.of("PAYMENT", "FINANCE_OPERATIONS")),
+            Map.entry(SystemRoleContract.PROJECT_MANAGER,
+                    Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.PROJECT_ACCOUNTANT,
+                    Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION")),
+            Map.entry(SystemRoleContract.TECHNICAL_LEAD, Set.of("VARIATION", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.SAFETY_LEAD, Set.of("QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.CONSTRUCTION_LEAD, Set.of("PURCHASE", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.PROCUREMENT_LEAD, Set.of("PURCHASE")),
+            Map.entry(SystemRoleContract.EMPLOYEE, Set.of())
     );
 
     private static final Set<String> ALL_SUBSCRIPTION_DOMAINS = Set.of(
-            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
+            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE", "QUALITY_SAFETY");
 
-    private static final Map<String, Set<String>> SUBSCRIPTION_ROLE_DOMAINS = Map.of(
-            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE"),
-            "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
-            "PURCHASE_MANAGER", Set.of("PURCHASE"),
-            "FINANCE", Set.of("PAYMENT")
+    private static final Map<String, Set<String>> SUBSCRIPTION_ROLE_DOMAINS = Map.ofEntries(
+            Map.entry(SystemRoleContract.COMPANY_OWNER, ALL_SUBSCRIPTION_DOMAINS),
+            Map.entry(SystemRoleContract.COMPANY_FINANCE, Set.of("PAYMENT", "FINANCE")),
+            Map.entry(SystemRoleContract.PROJECT_MANAGER,
+                    Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.PROJECT_ACCOUNTANT,
+                    Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION")),
+            Map.entry(SystemRoleContract.TECHNICAL_LEAD, Set.of("VARIATION", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.SAFETY_LEAD, Set.of("QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.CONSTRUCTION_LEAD, Set.of("PURCHASE", "QUALITY_SAFETY")),
+            Map.entry(SystemRoleContract.PROCUREMENT_LEAD, Set.of("PURCHASE")),
+            Map.entry(SystemRoleContract.EMPLOYEE, Set.of())
     );
 
     private final PmProjectMapper projectMapper;
@@ -194,6 +206,6 @@ public class AlertAccessScopeResolver {
         if (!StringUtils.hasText(role)) {
             return "";
         }
-        return "PM".equalsIgnoreCase(role.trim()) ? "PROJECT_MANAGER" : role.trim().toUpperCase(Locale.ROOT);
+        return SystemRoleContract.canonicalRoleCode(role.trim().toUpperCase(Locale.ROOT));
     }
 }

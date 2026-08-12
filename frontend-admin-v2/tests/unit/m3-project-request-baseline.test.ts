@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ProjectPage from '@/pages/projects/ProjectPage.vue'
+import { PROJECT_ROLE_OPTIONS, projectRoleLabel, projectRoleOptions } from '@/pages/projects/model'
 import {
   loadProject,
   loadProjectMembers,
@@ -31,6 +32,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('M3 project request baseline', () => {
+  it('uses seven project-scoped system roles and keeps historical values read-only', () => {
+    expect(PROJECT_ROLE_OPTIONS.map((option) => option.value)).toEqual([
+      'PROJECT_MANAGER',
+      'PROJECT_ACCOUNTANT',
+      'TECHNICAL_LEAD',
+      'SAFETY_LEAD',
+      'CONSTRUCTION_LEAD',
+      'PROCUREMENT_LEAD',
+      'EMPLOYEE',
+    ])
+    expect(projectRoleLabel('PM')).toBe('项目经理')
+    expect(projectRoleOptions('PM').at(-1)).toEqual({
+      value: 'PM',
+      label: '项目经理（历史角色，只读）',
+      disabled: true,
+    })
+  })
+
   it('applies both project selects through the route before loading', () => {
     const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
     expect(source).toContain(`@update:model-value="applySelectFilter('projectType', $event)"`)
@@ -300,6 +319,20 @@ describe('M3 project request baseline', () => {
         (option) => option.value,
       ),
     ).toEqual(['', 'U2'])
+    expect(
+      [...document.querySelectorAll<HTMLSelectElement>('select[aria-label="项目角色"] option')].map(
+        (option) => option.value,
+      ),
+    ).toEqual([
+      '',
+      'PROJECT_MANAGER',
+      'PROJECT_ACCOUNTANT',
+      'TECHNICAL_LEAD',
+      'SAFETY_LEAD',
+      'CONSTRUCTION_LEAD',
+      'PROCUREMENT_LEAD',
+      'EMPLOYEE',
+    ])
     wrapper.unmount()
   })
 

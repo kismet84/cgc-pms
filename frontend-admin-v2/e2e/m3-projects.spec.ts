@@ -159,7 +159,7 @@ test.describe('M3 live project object', () => {
           tenantId: '0',
           projectId: '520000000000009002',
           userId: '1',
-          roleCode: 'OTH',
+          roleCode: 'EMPLOYEE',
         }),
       })
       return { status: response.status, body: await response.json() }
@@ -175,7 +175,7 @@ test.describe('M3 live project object', () => {
     await anonymous.close()
 
     const denied = await browser.newPage()
-    await login(denied, 'demo.business')
+    await login(denied, 'ui26.bm01')
     await rewritePermissions(denied, [])
     await denied.goto('/project/list')
     await expect(denied).toHaveURL(/\/forbidden/)
