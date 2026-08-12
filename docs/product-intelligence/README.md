@@ -4,7 +4,7 @@
 
 ## 当前入口
 
-- [项目地图（含第92条本地 G0～G5 证据 `dc3dad3d9240`、第91条已交付证据与已合并的第86条主线）](project-map.md)
+- [项目地图（含第92条本地 G0～G5 证据 `34e6c40e7435` 与远端重证边界、第91条已交付证据与已合并的第86条主线）](project-map.md)
 - [V1.6 竞品情报与产品演进建议](competitor-analysis.md)
 - [V1.6 迭代决策](evolution-decision.md)
 
