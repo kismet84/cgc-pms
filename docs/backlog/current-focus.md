@@ -1,5 +1,14 @@
 # Current Focus
 
+## 2026-08-12 第92条主线：审计遗留可靠性、安全与验证治理整改本地收口
+
+- 目标：关闭 JVM/1G 容器冲突、备份伪完整、RBAC 关联表租户兜底、closeout 无界详情、MySQL 门禁、供应链、镜像默认值、覆盖率、CORS/CSRF 与 Codemap 语义缺口。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / PROTECTED_GIT_DELIVERY_PENDING`；可执行实现证据 SHA `4ea8f16fef83fc5ad48bfa47d5d3a2510d3ba007`；唯一状态源为[`第92条计划`](../plans/第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)。
+- 结果：13 项中 11 项本轮修复复验，F04/F08 有据关闭；JVM 65% 堆、同批原子备份、窄 RBAC tenant guard、closeout 九域≤100、weekly 重扫、固定 digest、JaCoCo 包级门与同站 XSRF 已落地。
+- 证据：后端 2735、前端 568、MySQL `1/24/1`、contract 98、live 80、浏览器技术/收尾 DOM 与 console、workflow required job=16、Codemap 通过。最终恢复复跑遇 Docker engine 500，复用无 diff 的已通过恢复证据；远端 exact-SHA reliability job 是合并硬门。
+- 边界：仅本地 dev/test/demo 与受保护 Git；不建设非本地监控/灾备，不给生产或上线裁决。详见[`质量报告`](../quality/2026-08-12-issue-092-审计遗留可靠性安全与验证治理整改.md)。
+- 零悬空：修复复验 11、有据关闭 2、正式承接 0、未收口 0；新增后续项 0、关闭后续项 0、净变化 `0`；正式 Issue 不变。
+
 ## 2026-08-12 第91条主线：架构边界与查询性能已合并并完成 post-merge
 
 - 目标：保持业务结果、权限、金额、租户和状态语义，关闭请求放大、查询 N+1、无界通讯历史、跨域 Dashboard 膨胀、采购页面职责混杂和 assembler 反射问题。
