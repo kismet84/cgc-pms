@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-12T10:34:57.015Z",
+  "generation_time": "2026-08-12T10:43:25.304Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -71,7 +71,7 @@
         "backend/**"
       ],
       "file_count": 1853,
-      "fingerprint": "24f1a6b10b1c984cf17966b5fe9c08cab5c71d2ade7a0970726793d4d68813f4"
+      "fingerprint": "03f22ea029911d37547cdf67a1f331b56911921247e7c09c3155bc3fb8d6f8c4"
     },
     {
       "id": "delivery_tooling",
@@ -134,13 +134,13 @@
       "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
   ],
-  "generation_base_commit": "0afbc164d965d2bc440191cb52ebe9ead45ac6cf",
+  "generation_base_commit": "29c567756c520360066ef37dfd60464e45a4fc4c",
   "input_scope_dirty": false,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "c2e33fa7ba32dd82fd330aff62fd42e351b38401",
+    "previous_generation_base_commit": "0afbc164d965d2bc440191cb52ebe9ead45ac6cf",
     "stale_modules": [
-      "delivery_tooling"
+      "backend"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
