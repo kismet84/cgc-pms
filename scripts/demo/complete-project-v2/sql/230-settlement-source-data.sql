@@ -96,23 +96,24 @@ UPDATE sys_menu
 SET parent_id=945,order_num=4,status='ENABLE',visible=0,updated_by=@demo_user,updated_at=NOW()
 WHERE tenant_id=0 AND id=607 AND perms='settlement:submit' AND deleted_flag=0;
 
-INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
-  (520000000000014101,0,1,945),
-  (520000000000014102,0,1,520000000000014001),
-  (520000000000014103,0,1,520000000000014002),
-  (520000000000014104,0,1,520000000000014003),
-  (520000000000014105,0,1,607),
-  (520000000000014106,0,4,945),
-  (520000000000014107,0,4,520000000000014001),
-  (520000000000014108,0,4,520000000000014002),
-  (520000000000014109,0,4,520000000000014003),
-  (520000000000014110,0,4,607);
+-- These buttons are created after V293, so grant them to the two canonical settlement roles only.
+DELETE FROM sys_role_menu
+WHERE tenant_id=0 AND id BETWEEN 520000000000014101 AND 520000000000014116;
+INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id)
+SELECT 520000000000014100+ROW_NUMBER() OVER (ORDER BY r.role_code,m.id),0,r.id,m.id
+FROM sys_role r
+JOIN sys_menu m ON m.tenant_id=r.tenant_id
+  AND m.id IN (945,607,520000000000014001,520000000000014002,520000000000014003)
+  AND m.status='ENABLE' AND m.deleted_flag=0
+WHERE r.tenant_id=0 AND r.role_code IN ('COMPANY_FINANCE','PROJECT_MANAGER')
+  AND r.status='ENABLE' AND r.deleted_flag=0;
 
 UPDATE wf_template_node n
 JOIN wf_template t ON t.id=n.template_id AND t.tenant_id=n.tenant_id
-JOIN sys_user u ON u.tenant_id=t.tenant_id AND u.username='admin'
-  AND u.status='ENABLE' AND u.deleted_flag=0
-SET n.approver_config=JSON_OBJECT('type','USER','userId',u.id),
-    n.updated_by=@demo_user,n.updated_at=NOW()
-WHERE t.tenant_id=0 AND t.business_type='SETTLEMENT'
-  AND t.enabled=1 AND t.deleted_flag=0 AND n.deleted_flag=0;
+SET n.node_type='APPROVAL',n.approve_mode='OR_SIGN',
+    n.approver_config=JSON_OBJECT('type','ROLE','roleCode',
+      CASE n.node_order WHEN 1 THEN 'PROJECT_MANAGER' WHEN 2 THEN 'COMPANY_FINANCE' END),
+    n.allow_transfer=1,n.allow_add_sign=1,n.timeout_hours=48,
+    n.updated_by=@demo_user,n.updated_at=NOW(),n.remark='MAINLINE-89'
+WHERE t.tenant_id=0 AND t.template_code='M89-SETTLEMENT' AND t.business_type='SETTLEMENT'
+  AND t.enabled=1 AND t.deleted_flag=0 AND n.deleted_flag=0 AND n.node_order IN (1,2);
