@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 BATCH_RUNNER="${REPO_ROOT}/scripts/backup-batch.sh"
 BACKUP_VERIFY="${REPO_ROOT}/scripts/backup-verify.sh"
 MYSQL_BACKUP="${REPO_ROOT}/scripts/backup-mysql-full.sh"
+RESTORE_DRILL="${REPO_ROOT}/scripts/ci/test-backup-restore-drill.ps1"
 
 fail() {
   echo "[FAIL] $*" >&2
@@ -15,6 +16,7 @@ fail() {
 
 [[ -f "${BATCH_RUNNER}" ]] || fail "batch backup entry is missing: scripts/backup-batch.sh"
 [[ -f "${BACKUP_VERIFY}" ]] || fail "backup verifier is missing: scripts/backup-verify.sh"
+[[ -f "${RESTORE_DRILL}" ]] || fail "restore drill is missing: scripts/ci/test-backup-restore-drill.ps1"
 
 REAL_GZIP="$(command -v gzip || true)"
 [[ -n "${REAL_GZIP}" ]] || fail 'real gzip is required for the backup contract test'
@@ -61,7 +63,11 @@ if [[ "${1:-}" == '--version' ]]; then
   printf '%s\n' 'mc version RELEASE.contract'
   exit 0
 fi
-if [[ "${1:-}" == '--config-dir' ]]; then shift 2; fi
+if [[ "${1:-}" == '--config-dir' ]]; then
+  config_dir="${2:?missing config directory}"
+  mkdir -p "${config_dir}/share" "${config_dir}/certs/CAs"
+  shift 2
+fi
 command="${1:-}"
 if [[ "${command}" == 'alias' && "${FAKE_MC_MODE:-ok}" == 'alias-fail' ]]; then
   echo 'simulated MinIO alias failure' >&2
@@ -308,6 +314,10 @@ if grep -q -- '--password=' "${MYSQL_BACKUP}"; then
   fail 'MySQL secret must not be passed in process arguments'
 fi
 grep -q 'docker exec -e MYSQL_PWD' "${MYSQL_BACKUP}" || fail 'MySQL password must use inherited environment forwarding'
+grep -Fq 'M92_MC_DOCKER_USER="$(id -u):$(id -g)"' "${RESTORE_DRILL}" || \
+  fail 'Linux restore drill must resolve host uid and gid'
+grep -Fq 'docker_user_args=(--user "$M92_MC_DOCKER_USER")' "${RESTORE_DRILL}" || \
+  fail 'containerized mc must preserve host ownership for atomic cleanup'
 
 if find "${TEST_ROOT}" -type d -name '.mc-config.*.partial' -print -quit | grep -q .; then
   fail 'task-owned mc configuration containing credentials survived execution'

@@ -117,8 +117,15 @@ set -euo pipefail
 cd "$M92_REPO_ROOT"
 if command -v cygpath >/dev/null 2>&1; then M92_BACKUP_ROOT="$(cygpath -u "$M92_BACKUP_ROOT")"; fi
 export M92_BACKUP_ROOT
+M92_MC_DOCKER_USER=''
+if [[ "$(uname -s)" == 'Linux' ]]; then
+  M92_MC_DOCKER_USER="$(id -u):$(id -g)"
+  [[ "$M92_MC_DOCKER_USER" =~ ^[0-9]+:[0-9]+$ ]]
+fi
+export M92_MC_DOCKER_USER
 mc() {
   local rewritten=()
+  local docker_user_args=()
   local argument
   for argument in "$@"; do
     case "$argument" in
@@ -126,7 +133,12 @@ mc() {
       *) rewritten+=("$argument") ;;
     esac
   done
-  MSYS_NO_PATHCONV=1 docker exec -i "$M92_MINIO_CONTAINER" mc "${rewritten[@]}"
+  # Linux bind mounts preserve numeric ownership. Match the runner there so mc
+  # cannot leave root-owned paths that host-side atomic cleanup cannot remove.
+  if [[ -n "$M92_MC_DOCKER_USER" ]]; then
+    docker_user_args=(--user "$M92_MC_DOCKER_USER")
+  fi
+  MSYS_NO_PATHCONV=1 docker exec -i "${docker_user_args[@]}" "$M92_MINIO_CONTAINER" mc "${rewritten[@]}"
 }
 export -f mc
 bash scripts/backup-batch.sh "$M92_BACKUP_ROOT"
