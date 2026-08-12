@@ -2,41 +2,38 @@ package com.cgcpms.auth.config;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import java.util.Map;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("local")
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 @DisplayName("CORS 预检测试")
 class CorsConfigTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
     @Test
-    @DisplayName("OPTIONS /api/auth/login preflight returns specific allowed headers")
-    void corsPreflightReturnsSpecificHeaders() throws Exception {
-        mockMvc.perform(options("/api/auth/login")
-                        .contextPath("/api")
-                        .header("Origin", "http://localhost:5173")
-                        .header("Access-Control-Request-Method", "POST")
-                        .header("Access-Control-Request-Headers", "Authorization, Content-Type, X-Refresh-Token"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
-                .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
-                .andExpect(header().string("Access-Control-Allow-Headers",
-                        containsString("Authorization")))
-                .andExpect(header().string("Access-Control-Allow-Headers",
-                        containsString("Content-Type")))
-                .andExpect(header().string("Access-Control-Allow-Headers",
-                        containsString("X-Refresh-Token")));
+    @DisplayName("凭据 CORS 允许 CSRF 头且拒绝未知 origin")
+    void credentialedCorsAllowsXsrfHeaderAndRejectsUnknownOrigin() {
+        var configurer = new CorsConfig();
+        ReflectionTestUtils.setField(configurer, "allowedOrigins", new String[]{" http://localhost:5173 "});
+        configurer.validateOrigins();
+        var registry = new ExposedCorsRegistry();
+        configurer.addCorsMappings(registry);
+
+        CorsConfiguration cors = registry.configurations().get("/**");
+        assertEquals("http://localhost:5173", cors.checkOrigin("http://localhost:5173"));
+        assertNull(cors.checkOrigin("https://unknown.example"));
+        assertTrue(Boolean.TRUE.equals(cors.getAllowCredentials()));
+        assertTrue(cors.getAllowedHeaders().contains("X-XSRF-TOKEN"));
+    }
+
+    private static final class ExposedCorsRegistry extends CorsRegistry {
+        private Map<String, CorsConfiguration> configurations() {
+            return getCorsConfigurations();
+        }
     }
 }

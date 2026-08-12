@@ -3,6 +3,8 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.project.entity.PmProjectMember;
@@ -17,6 +19,7 @@ import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +32,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -49,6 +53,39 @@ class ApproverResolverTest {
     private PmProjectMemberMapper pmProjectMemberMapper;
     @Mock
     private JdbcTemplate jdbcTemplate;
+
+    @AfterEach
+    void clearContext() {
+        UserContext.clear();
+    }
+
+    @Test
+    @DisplayName("显式租户在审批解析期间绑定并在结束后恢复")
+    void explicitTenantIsScopedForResolutionAndRestored() {
+        ApproverResolver resolver = resolver();
+        when(sysUserMapper.selectOne(any())).thenAnswer(invocation -> {
+            assertEquals(7L, UserContext.getCurrentTenantId());
+            return user(1L);
+        });
+
+        assertEquals(List.of(1L), resolver.resolve(
+                "{\"type\":\"USER\",\"userId\":1}", 7L, null,
+                new WorkflowSecurityPolicy(false, 1, false, false)));
+        assertNull(UserContext.getCurrentTenantId());
+    }
+
+    @Test
+    @DisplayName("审批解析拒绝覆盖不一致的现有租户上下文")
+    void mismatchedExistingTenantContextIsRejected() {
+        TestUserContext.setAdmin(8L, 2L);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> resolver().resolve(
+                "{\"type\":\"USER\",\"userId\":1}", 7L, null,
+                new WorkflowSecurityPolicy(false, 1, false, false)));
+
+        assertEquals("TENANT_CONTEXT_MISMATCH", exception.getCode());
+        assertEquals(8L, UserContext.getCurrentTenantId());
+    }
 
     @Test
     @DisplayName("PROJECT_ROLE审批人查询显式包含tenant条件")

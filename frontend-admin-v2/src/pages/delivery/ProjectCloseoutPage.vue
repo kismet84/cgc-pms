@@ -104,6 +104,8 @@ const scopedOverviews = ref<CloseoutWorkspaceRow[]>([])
 const scopedOverviewTotal = ref(0)
 const pageSize = 10
 const pageNo = ref(1)
+const detailPageSize = 100
+const detailPageNo = ref(1)
 const trace = ref<CloseoutTrace | null>(null)
 const traceFiles = ref<EvidenceGroup[]>([])
 const pendingEvidence = ref<PendingEvidence | null>(null)
@@ -118,6 +120,9 @@ const today = () => localDateInputValue()
 const factLabel = (value: unknown) => deliveryLabel(typeof value === 'string' ? value : undefined)
 const projectId = computed(() => workspace.selectedProjectId || '')
 const closeout = computed(() => overview.value?.closeout ?? null)
+const detailTotal = computed(() =>
+  Math.max(0, ...Object.values(overview.value?.detailTotals ?? {}).map((value) => Number(value))),
+)
 const canWrite = computed(() => Boolean(projectId.value))
 const canInitiate = computed(() => canWrite.value && can('closeout:initiate'))
 const canQuery = computed(() => can('closeout:query'))
@@ -458,7 +463,10 @@ async function loadProject(preserveNotice = false): Promise<void> {
   if (!preserveNotice) clearNotice()
   try {
     if (projectId.value) {
-      const loaded = await loadCloseoutOverview(projectId.value, controller.signal)
+      const loaded = await loadCloseoutOverview(projectId.value, controller.signal, {
+        detailPageNo: detailPageNo.value,
+        detailPageSize,
+      })
       if (requestGeneration === generation) overview.value = loaded
     } else {
       const loaded = await loadCloseoutPage({ pageNo: pageNo.value, pageSize }, controller.signal)
@@ -654,11 +662,18 @@ const saveDialog = () =>
     }
   }, '竣工收尾步骤已提交')
 
+function changeDetailPage(value: number): void {
+  if (value === detailPageNo.value) return
+  detailPageNo.value = value
+  void loadProject()
+}
+
 watch(
   projectId,
   () => {
     const pageChanged = pageNo.value !== 1
     pageNo.value = 1
+    detailPageNo.value = 1
     if (projectId.value || !pageChanged) void loadProject()
   },
   { immediate: true },
@@ -1219,6 +1234,15 @@ onBeforeUnmount(() => {
             <p v-else>暂无档案移交事实。</p>
           </section>
         </div>
+        <template v-if="detailTotal > detailPageSize" #footer>
+          <V2Pagination
+            :page-no="detailPageNo"
+            :page-size="detailPageSize"
+            :total="detailTotal"
+            label="收尾阶段明细分页"
+            @update:page-no="changeDetailPage"
+          />
+        </template>
       </V2Card>
     </template>
 

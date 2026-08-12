@@ -128,14 +128,18 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     @Select("""
             SELECT DISTINCT u.id
             FROM sys_user u
-            JOIN sys_user_role ur ON ur.user_id = u.id
-            JOIN sys_role r ON r.id = ur.role_id
+            JOIN sys_user_role ur
+              ON ur.tenant_id = u.tenant_id
+             AND ur.user_id = u.id
+            JOIN sys_role r
+              ON r.tenant_id = ur.tenant_id
+             AND r.id = ur.role_id
             WHERE u.tenant_id = #{tenantId}
               AND u.status = 'ENABLE'
               AND u.deleted_flag = 0
               AND r.status = 'ENABLE'
               AND r.deleted_flag = 0
-              AND (r.tenant_id = 0 OR r.tenant_id = #{tenantId})
+              AND r.tenant_id = #{tenantId}
               AND UPPER(r.role_code) IN ('ADMIN', 'SUPER_ADMIN')
             ORDER BY u.id
             """)

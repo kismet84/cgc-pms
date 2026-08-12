@@ -8,3 +8,19 @@ updates:
       github-actions:
         patterns:
           - '*'
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      backend-maven:
+        patterns:
+          - '*'
+  - package-ecosystem: npm
+    directory: /frontend-admin-v2
+    schedule:
+      interval: weekly
+    groups:
+      frontend-npm:
+        patterns:
+          - '*'

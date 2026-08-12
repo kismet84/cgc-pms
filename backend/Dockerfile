@@ -22,8 +22,10 @@ FROM eclipse-temurin:21-jre@sha256:194b590649efee5555de080c634905a30c2885190210e
 # Non-root user
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app appuser
 
-# Log directory for file-based logging (logback-spring.xml)
-RUN mkdir -p /var/log/cgc-pms && chown -R appuser:appgroup /var/log/cgc-pms
+# Runtime-owned persistent paths. Compose mounts heapdumps separately so OOM
+# evidence survives container replacement without landing in the image layer.
+RUN mkdir -p /var/log/cgc-pms /var/lib/cgc-pms/heapdumps \
+    && chown -R appuser:appgroup /var/log/cgc-pms /var/lib/cgc-pms
 
 # Install curl for HEALTHCHECK
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
@@ -32,14 +34,13 @@ WORKDIR /app
 
 # ---------------------------------------------------------------------------
 # JVM tuning for production
-# -Xms512m                       initial heap 512 MB
-# -Xmx1g                         max heap 1 GB
+# -XX:InitialRAMPercentage=25.0  initial heap from the cgroup budget
+# -XX:MaxRAMPercentage=65.0      reserve at least 35% for non-heap/native memory
 # -XX:+HeapDumpOnOutOfMemoryError dump heap on OOM
-# -XX:HeapDumpPath=/tmp          heap dump location
+# -XX:HeapDumpPath=/var/lib/cgc-pms/heapdumps persistent Compose volume
 # -XX:+UseContainerSupport       respect cgroup limits (default in 21)
-# -XX:MaxRAMPercentage=75.0      adaptive heap in containers
 # ---------------------------------------------------------------------------
-ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=65.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/lib/cgc-pms/heapdumps"
 
 # ---------------------------------------------------------------------------
 # Spring profile (override via docker-compose or k8s for prod)
@@ -53,13 +54,13 @@ ENV SPRING_PROFILES_ACTIVE=prod
 # =============================================================================
 
 # =============================================================================
-# Database — MySQL 8.0 (Docker service name 'mysql' on internal network)
-# All secrets (DB_PASSWORD, etc.) MUST be provided via docker-compose environment.
-# Defaults below are intentionally absent — missing vars will cause startup failure.
+# Database — MySQL 8.0. URL and credentials MUST be provided by deployment
+# configuration. The image intentionally has no datasource fallback so prod
+# validation cannot be bypassed by an unsafe image default.
 # =============================================================================
-ENV SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
-# DB_USERNAME — injected by docker-compose from MYSQL_USER
-# DB_PASSWORD — injected by docker-compose from MYSQL_PASSWORD
+# SPRING_DATASOURCE_URL — injected by deployment configuration
+# DB_USERNAME — injected by deployment configuration
+# DB_PASSWORD — injected by deployment configuration
 
 # =============================================================================
 # Redis — override localhost with Docker service name

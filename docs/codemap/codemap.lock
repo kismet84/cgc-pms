@@ -1,7 +1,5 @@
 {
-  "current_commit": "6322785c08377fbb0cf190c835898f6aa2cb03ba",
-  "working_tree_dirty": true,
-  "generation_time": "2026-08-11T22:36:25.879Z",
+  "generation_time": "2026-08-12T09:06:27.196Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -53,16 +51,9 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 3932,
-  "repository_file_count": 3932,
-  "included_file_count": 2668,
+  "repository_file_count": 3944,
+  "included_file_count": 2680,
   "excluded_file_count": 1264,
-  "comparison": {
-    "previous_lock_found": true,
-    "stale_modules": [
-      "documentation"
-    ],
-    "reason": "Current tracked and untracked repository snapshot regenerated before module changes."
-  },
   "modules": [
     {
       "id": "agent_platform",
@@ -79,8 +70,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1849,
-      "fingerprint": "4af2122444ecdf75cc4f037a63f74fff23b946166a36e034eecca6a3d3183e95"
+      "file_count": 1853,
+      "fingerprint": "d8d9b58a21075fe1ada5aad1b47c514a30e6a3cde2293f42ae632d63c03235e9"
     },
     {
       "id": "delivery_tooling",
@@ -91,8 +82,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 275,
-      "fingerprint": "4da83fb9f3b76e0e3cfbb165c1a1f9281a812642907df96d74d147b66a332240"
+      "file_count": 282,
+      "fingerprint": "a68ff286398ad0680e8461860a2403070f328a12a464b0f2522335c7b3e700cd"
     },
     {
       "id": "desktop_launcher",
@@ -107,8 +98,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 135,
-      "fingerprint": "30ded20842b4df798a2d3dea9ca3a5155630fe94add02f7f4397bcdbe1cd97ad"
+      "file_count": 136,
+      "fingerprint": "7258e4ae4130a6715db9283966c486dec2a5f77781eb85f8f3a967fb7d45f575"
     },
     {
       "id": "frontend_v2",
@@ -116,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 280,
-      "fingerprint": "a1fcf65137ac49d8ff25dd12c979d2df1318f32c167b84164d1914c594ac34b8"
+      "fingerprint": "961d15664c7c2651135adc50f2c36b5629d45406142c39c3a8803bd8e4801d9c"
     },
     {
       "id": "mobile",
@@ -132,7 +123,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "934ee4d08ba1dc1a9863c7479691eb820b2bb07f09a59de13175b246eba008ab"
+      "fingerprint": "ff5826653ca39404f31bb2c5e72a4e075683143f923a2b2f8c2bf9f50610bb85"
     },
     {
       "id": "shared_packages",
@@ -140,7 +131,15 @@
         "packages/**"
       ],
       "file_count": 19,
-      "fingerprint": "b714e48ff3a59539bca5e4c4bc2dda708454a9d885dd1204013af5d8c36079b7"
+      "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
-  ]
+  ],
+  "generation_base_commit": "94fc8bfeb51f68dcc12a028a439515f4c5cd6c32",
+  "input_scope_dirty": true,
+  "comparison_to_previous_generation": {
+    "previous_lock_found": true,
+    "previous_generation_base_commit": "94fc8bfeb51f68dcc12a028a439515f4c5cd6c32",
+    "stale_modules": [],
+    "reason": "Generation inputs match the previous code map snapshot."
+  }
 }

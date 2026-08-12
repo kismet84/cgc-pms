@@ -18,9 +18,19 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
-export function loadCloseoutOverview(projectId: string, signal?: AbortSignal) {
+export function loadCloseoutOverview(
+  projectId: string,
+  signal?: AbortSignal,
+  detailQuery?: { detailPageNo: number; detailPageSize: number },
+) {
+  const params = new URLSearchParams()
+  if (detailQuery) {
+    params.set('detailPageNo', String(detailQuery.detailPageNo))
+    params.set('detailPageSize', String(detailQuery.detailPageSize))
+  }
+  const detailSuffix = params.size ? `&${params.toString()}` : ''
   return apiRequest<Record<string, unknown>>(
-    `${CLOSEOUT_API.overview}?projectId=${encoded(projectId)}`,
+    `${CLOSEOUT_API.overview}?projectId=${encoded(projectId)}${detailSuffix}`,
     { signal },
   ).then((row) => normalize(row) as unknown as CloseoutOverview)
 }

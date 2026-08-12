@@ -199,6 +199,19 @@ export interface CollectionAllocationRecord {
 
 export interface CloseoutOverview {
   closeout?: ProjectCloseoutRecord | null;
+  detailPageNo: number;
+  detailPageSize: number;
+  detailTotals: {
+    sectionAcceptances: number;
+    finalAcceptances: number;
+    settlements: number;
+    receivables: number;
+    warranties: number;
+    defects: number;
+    archiveTransfers: number;
+    wbsTasks: number;
+    qualityInspections: number;
+  };
   sectionAcceptances: CloseoutSectionAcceptance[];
   finalAcceptances: CloseoutFinalAcceptance[];
   settlements: CloseoutSettlement[];

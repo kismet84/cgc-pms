@@ -12,7 +12,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,13 +23,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class ProjectCloseoutWorkspacePaginationTest {
+    private static final List<String> DETAIL_KEYS = List.of(
+            "sectionAcceptances", "finalAcceptances", "settlements", "receivables", "warranties",
+            "defects", "archiveTransfers", "wbsTasks", "qualityInspections");
     private CountingJdbcTemplate jdbc;
     private ProjectCloseoutService service;
 
     @BeforeEach
     void setUp() {
         var dataSource = new DriverManagerDataSource(
-                "jdbc:h2:mem:closeout_workspace;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+                "jdbc:h2:mem:closeout_workspace_" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new CountingJdbcTemplate(dataSource);
         createSchema(jdbc);
         ProjectAccessChecker accessChecker = mock(ProjectAccessChecker.class);
@@ -84,6 +90,49 @@ class ProjectCloseoutWorkspacePaginationTest {
         assertEquals(1, jdbc.queries());
     }
 
+    @Test
+    void overviewDetailsAreBoundedCountedAndStableAcrossPages() throws Exception {
+        var boundedJdbc = new BoundedOverviewJdbcTemplate();
+        ProjectAccessChecker accessChecker = mock(ProjectAccessChecker.class);
+        var boundedService = new ProjectCloseoutService(
+                boundedJdbc,
+                mock(BusinessCodeGenerator.class),
+                mock(WorkflowEngine.class),
+                accessChecker,
+                mock(ProjectCloseGateService.class));
+
+        Map<String, Object> first = overview(boundedService, 1, 1000);
+        assertEquals(1, first.get("detailPageNo"));
+        assertEquals(100, first.get("detailPageSize"));
+        assertTrue(first.get("detailTotals") instanceof Map<?, ?>);
+        for (String key : DETAIL_KEYS) {
+            assertTrue(first.containsKey(key), "missing detail page: " + key);
+        }
+        assertTrue(boundedJdbc.detailSql().stream()
+                .allMatch(sql -> sql.matches("(?is).*\\bLIMIT\\s+\\?\\s+OFFSET\\s+\\?.*")));
+
+        Map<String, Object> pageOne = overview(boundedService, 1, 1);
+        Map<String, Object> pageTwo = overview(boundedService, 2, 1);
+        for (String key : DETAIL_KEYS) {
+            assertTrue(pageOne.get(key) instanceof List<?>);
+            assertTrue(pageTwo.get(key) instanceof List<?>);
+            assertTrue(disjointIds((List<?>) pageOne.get(key), (List<?>) pageTwo.get(key)),
+                    "detail pages overlap: " + key);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> overview(ProjectCloseoutService target, int pageNo, int pageSize) throws Exception {
+        return (Map<String, Object>) target.getClass()
+                .getMethod("overview", Long.class, int.class, int.class)
+                .invoke(target, 1L, pageNo, pageSize);
+    }
+
+    private boolean disjointIds(List<?> first, List<?> second) {
+        var ids = new HashSet<>(first.stream().map(row -> ((Map<?, ?>) row).get("id")).toList());
+        return second.stream().map(row -> ((Map<?, ?>) row).get("id")).noneMatch(ids::contains);
+    }
+
     private void insertProjects(int count, long tenantId) {
         for (int id = 1; id <= count; id++) insertProject(id, tenantId);
     }
@@ -137,6 +186,37 @@ class ProjectCloseoutWorkspacePaginationTest {
 
         private int queries() {
             return queries;
+        }
+    }
+
+    private static final class BoundedOverviewJdbcTemplate extends JdbcTemplate {
+        private final List<String> detailSql = new java.util.ArrayList<>();
+
+        @Override
+        public List<Map<String, Object>> queryForList(String sql, Object... args) {
+            if (sql.contains("FROM project_closeout c")) {
+                return List.of(Map.of("id", 1001L, "projectId", 1L));
+            }
+            detailSql.add(sql);
+            long offset = args.length == 0 || !(args[args.length - 1] instanceof Number number)
+                    ? 0 : number.longValue();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", offset + detailSql.size());
+            return List.of(row);
+        }
+
+        @Override
+        public Map<String, Object> queryForMap(String sql, Object... args) {
+            if (sql.contains("sectionAcceptances")) {
+                Map<String, Object> totals = new LinkedHashMap<>();
+                DETAIL_KEYS.forEach(key -> totals.put(key, 2L));
+                return totals;
+            }
+            return Map.of("totalTasks", 1L, "incompleteTasks", 0L);
+        }
+
+        private List<String> detailSql() {
+            return detailSql;
         }
     }
 }
