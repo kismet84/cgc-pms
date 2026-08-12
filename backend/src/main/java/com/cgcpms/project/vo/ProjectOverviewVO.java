@@ -44,7 +44,7 @@ public class ProjectOverviewVO {
         /** User's real name from sys_user (batch-loaded). */
         private String userName;
 
-        /** Role code: PM / CM / CSTM / FIN / SUBC / MAT / etc. */
+        /** Seven project-scoped system role codes; historical records may retain legacy codes. */
         private String roleCode;
     }
 }

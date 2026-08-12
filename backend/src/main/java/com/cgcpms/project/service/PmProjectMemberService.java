@@ -11,6 +11,7 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.project.vo.PmProjectMemberVO;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
+
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -77,6 +80,7 @@ public class PmProjectMemberService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long projectId, PmProjectMember member) {
         verifyProjectOwnership(projectId);
+        validateRoleCode(member.getRoleCode(), null);
 
         // Set tenant and project from context/path — ignore any client-supplied values
         member.setTenantId(UserContext.getCurrentTenantId());
@@ -116,11 +120,13 @@ public class PmProjectMemberService {
         if (!existing.getProjectId().equals(projectId)) {
             throw new BusinessException("MEMBER_NOT_FOUND", "项目成员不存在");
         }
+        validateRoleCode(member.getRoleCode(), existing.getRoleCode());
 
         // Preserve immutable fields
         member.setId(id);
         member.setTenantId(existing.getTenantId());
         member.setProjectId(existing.getProjectId());
+        member.setUserId(existing.getUserId());
         memberMapper.updateById(member);
     }
 
@@ -139,6 +145,13 @@ public class PmProjectMemberService {
             throw new BusinessException("MEMBER_NOT_FOUND", "项目成员不存在");
         }
         memberMapper.deleteById(id);
+    }
+
+    private void validateRoleCode(String roleCode, String existingRoleCode) {
+        if (roleCode != null && SystemRoleContract.PROJECT_SCOPED_ROLE_CODES.contains(roleCode)) return;
+        if (roleCode != null && SystemRoleContract.LEGACY_PROJECT_ROLE_CODES.contains(roleCode)
+                && Objects.equals(existingRoleCode, roleCode)) return;
+        throw new BusinessException("PROJECT_MEMBER_ROLE_INVALID", "项目角色必须使用七类项目范围系统角色");
     }
 
     private PmProjectMemberVO toVO(PmProjectMember m) {

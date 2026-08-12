@@ -62,7 +62,7 @@ describe('M3 project object service', () => {
   })
 
   it('keeps member operations separate and encodes both ids', async () => {
-    const command = { userId: '9', roleCode: 'PM' }
+    const command = { userId: '9', roleCode: 'PROJECT_MANAGER' }
     await addProjectMember('P/1', command)
     await updateProjectMember('P/1', 'M/2', command)
     await deleteProjectMember('P/1', 'M/2')
@@ -112,9 +112,11 @@ describe('M3 project object model', () => {
         targetCost: '  ',
       }),
     ).toEqual({ projectName: 'A', projectType: 'BUILDING' })
-    expect(cleanMemberCommand({ userId: ' 9 ', roleCode: ' PM ', positionName: ' ' })).toEqual({
+    expect(
+      cleanMemberCommand({ userId: ' 9 ', roleCode: ' PROJECT_MANAGER ', positionName: ' ' }),
+    ).toEqual({
       userId: '9',
-      roleCode: 'PM',
+      roleCode: 'PROJECT_MANAGER',
     })
   })
 

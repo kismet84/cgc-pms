@@ -7,6 +7,7 @@ import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,19 +91,68 @@ class AlertAccessScopeResolverTest {
     }
 
     @Test
-    void dashboardRolesResolveTheirBusinessAlertDomains() {
+    void legacyDashboardRolesResolveCanonicalBusinessAlertDomains() {
         AlertAccessScopeResolver resolver = new AlertAccessScopeResolver(
                 projectMapper, projectMemberMapper, recipientResolver);
 
-        assertEquals(Set.of("COST"), resolver.allowedDomainsForRoles(List.of("COST_MANAGER")));
+        assertEquals(Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION"),
+                resolver.allowedDomainsForRoles(List.of("COST_MANAGER")));
         assertEquals(Set.of("PURCHASE", "QUALITY_SAFETY"),
                 resolver.allowedDomainsForRoles(List.of("PRODUCTION_MANAGER")));
-        assertEquals(Set.of("QUALITY_SAFETY"),
+        assertEquals(Set.of("VARIATION", "QUALITY_SAFETY"),
                 resolver.allowedDomainsForRoles(List.of("CHIEF_ENGINEER")));
         assertEquals(Set.of("PAYMENT", "FINANCE_OPERATIONS"),
                 resolver.allowedDomainsForRoles(List.of("FINANCE")));
         assertTrue(resolver.allowedDomainsForRoles(List.of("SUPER_ADMIN"))
                 .containsAll(Set.of("FINANCE_OPERATIONS", "QUALITY_SAFETY")));
+    }
+
+    @Test
+    void sevenProjectRolesResolveCanonicalAlertAndSubscriptionDomains() {
+        AlertAccessScopeResolver resolver = new AlertAccessScopeResolver(
+                projectMapper, projectMemberMapper, recipientResolver);
+
+        assertEquals(Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION"),
+                resolver.allowedDomainsForRoles(List.of(SystemRoleContract.PROJECT_ACCOUNTANT)));
+        assertEquals(Set.of("VARIATION", "QUALITY_SAFETY"),
+                resolver.allowedDomainsForRoles(List.of(SystemRoleContract.TECHNICAL_LEAD)));
+        assertEquals(Set.of("QUALITY_SAFETY"),
+                resolver.allowedDomainsForRoles(List.of(SystemRoleContract.SAFETY_LEAD)));
+        assertEquals(Set.of("PURCHASE", "QUALITY_SAFETY"),
+                resolver.allowedDomainsForRoles(List.of(SystemRoleContract.CONSTRUCTION_LEAD)));
+        assertEquals(Set.of("PURCHASE"),
+                resolver.allowedDomainsForRoles(List.of(SystemRoleContract.PROCUREMENT_LEAD)));
+        assertEquals(Set.of(), resolver.allowedDomainsForRoles(List.of(SystemRoleContract.EMPLOYEE)));
+
+        assertEquals(Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION"),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.PROJECT_ACCOUNTANT)));
+        assertEquals(Set.of("VARIATION", "QUALITY_SAFETY"),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.TECHNICAL_LEAD)));
+        assertEquals(Set.of("QUALITY_SAFETY"),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.SAFETY_LEAD)));
+        assertEquals(Set.of("PURCHASE", "QUALITY_SAFETY"),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.CONSTRUCTION_LEAD)));
+        assertEquals(Set.of("PURCHASE"),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.PROCUREMENT_LEAD)));
+        assertEquals(Set.of(),
+                resolver.allowedSubscriptionDomainsForRoles(List.of(SystemRoleContract.EMPLOYEE)));
+    }
+
+    @Test
+    void legacyProjectRoleAliasesKeepCanonicalAlertDomains() {
+        AlertAccessScopeResolver resolver = new AlertAccessScopeResolver(
+                projectMapper, projectMemberMapper, recipientResolver);
+
+        assertEquals(resolver.allowedDomainsForRoles(List.of(SystemRoleContract.PROJECT_MANAGER)),
+                resolver.allowedDomainsForRoles(List.of("PM")));
+        assertEquals(resolver.allowedDomainsForRoles(List.of(SystemRoleContract.PROJECT_ACCOUNTANT)),
+                resolver.allowedDomainsForRoles(List.of("CM", "CSTM", "FIN")));
+        assertEquals(resolver.allowedDomainsForRoles(List.of(SystemRoleContract.CONSTRUCTION_LEAD)),
+                resolver.allowedDomainsForRoles(List.of("SUBC")));
+        assertEquals(resolver.allowedDomainsForRoles(List.of(SystemRoleContract.PROCUREMENT_LEAD)),
+                resolver.allowedDomainsForRoles(List.of("MAT")));
+        assertEquals(resolver.allowedDomainsForRoles(List.of(SystemRoleContract.EMPLOYEE)),
+                resolver.allowedDomainsForRoles(List.of("OTH")));
     }
 
     private AlertLog financeAlert(Long tenantId) {

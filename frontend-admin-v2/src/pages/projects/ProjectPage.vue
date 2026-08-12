@@ -56,8 +56,9 @@ import {
   cleanProjectCommand,
   emptyProjectCommand,
   isSuperAdmin,
+  projectRoleLabel,
+  projectRoleOptions,
   projectCommand,
-  PROJECT_ROLE_OPTIONS,
 } from './model'
 import ProjectForm from './ProjectForm.vue'
 
@@ -146,14 +147,16 @@ const statusOptions = computed(() =>
     .filter((item) => ['ACTIVE', 'ENABLE'].includes(item.status))
     .map((item) => ({ value: item.dictValue, label: item.dictLabel })),
 )
-const roleLabel = (value: string) =>
-  PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ?? value
+const roleLabel = projectRoleLabel
 const memberName = (userId: string) =>
   userOptions.value.find((item) => item.value === userId)?.label ?? '成员姓名缺失'
 const availableMemberUserOptions = computed(() => {
   const existingUserIds = new Set(members.value.map((member) => member.userId))
   return userOptions.value.filter((option) => !existingUserIds.has(option.value))
 })
+const memberRoleOptions = computed(() =>
+  projectRoleOptions(editingMemberId.value ? memberForm.roleCode : ''),
+)
 const memberStatusLabel = (status: string) =>
   ({ ACTIVE: '在岗', INACTIVE: '离岗', ENABLE: '启用', DISABLE: '停用' })[status] ?? '状态缺失'
 const dictLabel = (items: DictionaryItem[], value: string) =>
@@ -1256,7 +1259,7 @@ onBeforeUnmount(() => {
         /><V2Select
           v-model="memberForm.roleCode"
           label="项目角色"
-          :options="PROJECT_ROLE_OPTIONS"
+          :options="memberRoleOptions"
           required
         /><V2Input v-model="memberForm.positionName" label="岗位名称" /><label
           >开始日期<input v-model="memberForm.startDate" type="date" /></label

@@ -31,7 +31,7 @@ class PmProjectMemberControllerValidationTest {
 
         mvc.perform(post("/projects/21/members")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"31\",\"roleCode\":\"OTH\"}"))
+                        .content("{\"userId\":\"31\",\"roleCode\":\"EMPLOYEE\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(41));
 
@@ -47,7 +47,7 @@ class PmProjectMemberControllerValidationTest {
 
         mvc(service).perform(post("/projects/21/members")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"roleCode\":\"OTH\"}"))
+                        .content("{\"roleCode\":\"EMPLOYEE\"}"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(service);

@@ -601,7 +601,7 @@ public class CostTargetService {
         }
         int restored = jdbc.update("""
                 UPDATE pm_project_member
-                SET role_code='PM', position_name='项目经理', start_date=COALESCE(start_date,CURRENT_DATE),
+                SET role_code='PROJECT_MANAGER', position_name='项目经理', start_date=COALESCE(start_date,CURRENT_DATE),
                     end_date=NULL, status='ACTIVE', updated_by=?, updated_at=CURRENT_TIMESTAMP, deleted_flag=0
                 WHERE tenant_id=? AND project_id=? AND user_id=?
                 """, operatorId, tenantId, projectId, projectManagerId);
@@ -610,13 +610,13 @@ public class CostTargetService {
                     INSERT INTO pm_project_member
                       (id,tenant_id,project_id,user_id,role_code,position_name,start_date,status,
                        created_by,created_at,updated_by,updated_at,deleted_flag)
-                    VALUES (?, ?, ?, ?, 'PM', '项目经理', CURRENT_DATE, 'ACTIVE',
+                    VALUES (?, ?, ?, ?, 'PROJECT_MANAGER', '项目经理', CURRENT_DATE, 'ACTIVE',
                             ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, 0)
                     """, IdWorker.getId(), tenantId, projectId, projectManagerId, operatorId, operatorId);
         }
         Integer memberCount = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM pm_project_member
-                WHERE tenant_id=? AND project_id=? AND user_id=? AND role_code='PM'
+                WHERE tenant_id=? AND project_id=? AND user_id=? AND role_code='PROJECT_MANAGER'
                   AND status='ACTIVE' AND deleted_flag=0
                 """, Integer.class, tenantId, projectId, projectManagerId);
         if (memberCount == null || memberCount != 1) {

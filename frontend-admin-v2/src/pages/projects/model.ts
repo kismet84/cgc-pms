@@ -5,14 +5,46 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 
 export const PROJECT_ROLE_OPTIONS = [
-  ['PM', '项目经理'],
-  ['CM', '商务经理'],
-  ['CSTM', '成本经理'],
-  ['MAT', '材料员'],
-  ['SUBC', '分包经理'],
-  ['FIN', '财务'],
-  ['OTH', '其他'],
-].map(([value, label]) => ({ value: value!, label: label! }))
+  { value: 'PROJECT_MANAGER', label: '项目经理' },
+  { value: 'PROJECT_ACCOUNTANT', label: '项目会计' },
+  { value: 'TECHNICAL_LEAD', label: '技术负责人' },
+  { value: 'SAFETY_LEAD', label: '安全负责人' },
+  { value: 'CONSTRUCTION_LEAD', label: '施工负责人' },
+  { value: 'PROCUREMENT_LEAD', label: '采购负责人' },
+  { value: 'EMPLOYEE', label: '员工' },
+]
+
+const HISTORICAL_PROJECT_ROLE_LABELS: Record<string, string> = {
+  PM: '项目经理',
+  CM: '商务经理',
+  CSTM: '成本经理',
+  MAT: '材料员',
+  SUBC: '分包经理',
+  FIN: '财务',
+  OTH: '其他',
+}
+
+export function projectRoleLabel(value: string): string {
+  return (
+    PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ??
+    HISTORICAL_PROJECT_ROLE_LABELS[value] ??
+    value
+  )
+}
+
+export function projectRoleOptions(currentValue = '') {
+  if (!currentValue || PROJECT_ROLE_OPTIONS.some((item) => item.value === currentValue)) {
+    return PROJECT_ROLE_OPTIONS
+  }
+  return [
+    ...PROJECT_ROLE_OPTIONS,
+    {
+      value: currentValue,
+      label: `${projectRoleLabel(currentValue)}（历史角色，只读）`,
+      disabled: true,
+    },
+  ]
+}
 
 export function emptyProjectCommand(): ProjectUpsertCommand {
   return {

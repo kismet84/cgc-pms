@@ -35,7 +35,7 @@ import java.util.Set;
  *   <li>USER         — {"type":"USER","userId":123}</li>
  *   <li>ROLE         — {"type":"ROLE","roleId":456} or {"type":"ROLE","roleCode":"FINANCE"}</li>
  *   <li>POSITION     — {"type":"POSITION","positionId":789}</li>
- *   <li>PROJECT_ROLE — {"type":"PROJECT_ROLE","roleCode":"PM"}</li>
+ *   <li>PROJECT_ROLE — {"type":"PROJECT_ROLE","roleCode":"PROJECT_MANAGER"}</li>
  * </ul>
  */
 @Slf4j
@@ -206,6 +206,9 @@ public class ApproverResolver {
             throw new BusinessException("NO_PROJECT", "PROJECT_ROLE类型需要关联项目");
         }
         String expectedRoleCode = SystemRoleContract.canonicalRoleCode(config.get("roleCode").asText());
+        if (!SystemRoleContract.PROJECT_SCOPED_ROLE_CODES.contains(expectedRoleCode)) {
+            throw new BusinessException("PROJECT_ROLE_INVALID", "项目角色必须使用七类项目范围系统角色");
+        }
         List<Long> memberIds = pmProjectMemberMapper.selectList(
                         new LambdaQueryWrapper<PmProjectMember>()
                                 .eq(tenantId != null, PmProjectMember::getTenantId, tenantId)

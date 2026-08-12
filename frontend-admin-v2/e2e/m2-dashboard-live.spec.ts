@@ -27,7 +27,7 @@ test.describe('M2 live eight-role dashboard', () => {
   }) => {
     const projectId = '520000000000009002'
     const period = '2026-07'
-    expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
+    expect((await page.goto('/api/auth/dev-login?username=ui26.pm01'))?.ok()).toBe(true)
     await page.goto('/project/list')
     await selectOption(page.locator('#global-project'), projectId)
     await expect(page.locator('#global-report-period')).toBeEnabled()
@@ -126,7 +126,7 @@ test.describe('M2 live eight-role dashboard', () => {
   test('cost trend follows project and card range selections without duplicate KPI summary', async ({
     page,
   }) => {
-    const login = await page.goto('/api/auth/dev-login?username=demo.cost')
+    const login = await page.goto('/api/auth/dev-login?username=ui26.cost01')
     expect(login?.ok()).toBe(true)
     await page.goto('/dashboard?role=cost')
 
@@ -158,7 +158,7 @@ test.describe('M2 live eight-role dashboard', () => {
 
   test('cost manager expands the canonical two-level cost breakdown', async ({ page }) => {
     const projectId = '520000000000009002'
-    expect((await page.goto('/api/auth/dev-login?username=demo.cost'))?.ok()).toBe(true)
+    expect((await page.goto('/api/auth/dev-login?username=ui26.cost01'))?.ok()).toBe(true)
     const breakdownResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return url.pathname === `/api/dashboard/project/${projectId}/cost-breakdown`
@@ -194,7 +194,7 @@ test.describe('M2 live eight-role dashboard', () => {
   test('finance view exposes project payment trend and closed-loop indicators', async ({
     page,
   }) => {
-    const login = await page.goto('/api/auth/dev-login?username=demo.finance')
+    const login = await page.goto('/api/auth/dev-login?username=ui26.fin01')
     expect(login?.ok()).toBe(true)
     await page.goto('/dashboard?role=finance')
 
@@ -279,7 +279,7 @@ test.describe('M2 live eight-role dashboard', () => {
   test('business manager defaults to all and can switch between aggregate and specific context', async ({
     page,
   }) => {
-    const login = await page.goto('/api/auth/dev-login?username=demo.business')
+    const login = await page.goto('/api/auth/dev-login?username=ui26.bm01')
     expect(login?.ok()).toBe(true)
 
     const aggregateResponse = page.waitForResponse((response) => {
@@ -332,7 +332,7 @@ test.describe('M2 live eight-role dashboard', () => {
     const projectId = '520000000000009002'
     const cases = [
       {
-        username: 'demo.manager',
+        username: 'ui26.pm01',
         path: 'project-manager',
         assert: (data: Record<string, unknown>) => {
           expect(Number(data.pendingTaskCount)).toBe(2)
@@ -341,7 +341,7 @@ test.describe('M2 live eight-role dashboard', () => {
         },
       },
       {
-        username: 'demo.business',
+        username: 'ui26.bm01',
         path: 'business-manager',
         assert: (data: Record<string, unknown>) => {
           expect(data.contractChangeAmount).toBe('90000.00')
@@ -350,7 +350,7 @@ test.describe('M2 live eight-role dashboard', () => {
         },
       },
       {
-        username: 'demo.purchase',
+        username: 'ui26.pur01',
         path: 'purchase-manager',
         assert: (data: Record<string, unknown>) => {
           expect(Number(data.pendingRequestCount)).toBe(1)
@@ -361,7 +361,7 @@ test.describe('M2 live eight-role dashboard', () => {
         },
       },
       {
-        username: 'demo.production',
+        username: 'ui26.prod01',
         path: 'production-manager',
         assert: (data: Record<string, unknown>) => {
           expect(Number(data.receiptCount)).toBe(1)
@@ -371,7 +371,7 @@ test.describe('M2 live eight-role dashboard', () => {
         },
       },
       {
-        username: 'demo.chief',
+        username: 'ui26.chief01',
         path: 'chief-engineer',
         assert: (data: Record<string, unknown>) => {
           expect(Number(data.pendingReviewCount)).toBe(1)
@@ -400,7 +400,7 @@ test.describe('M2 live eight-role dashboard', () => {
       await activityList.evaluate((element) => element.scrollHeight <= element.clientHeight),
     ).toBe(true)
 
-    expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
+    expect((await page.goto('/api/auth/dev-login?username=ui26.pm01'))?.ok()).toBe(true)
     await page.goto('/dashboard?role=pm')
     const riskFilter = page.getByRole('combobox', { name: '预警级别' })
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
@@ -415,13 +415,13 @@ test.describe('M2 live eight-role dashboard', () => {
   }) => {
     const projectId = '520000000000009002'
     const roleCases = [
-      { role: 'pm', username: 'demo.manager' },
-      { role: 'bm', username: 'demo.business' },
-      { role: 'cost', username: 'demo.cost' },
-      { role: 'purchase', username: 'demo.purchase' },
-      { role: 'production', username: 'demo.production' },
-      { role: 'chiefEngineer', username: 'demo.chief' },
-      { role: 'finance', username: 'demo.finance' },
+      { role: 'pm', username: 'ui26.pm01' },
+      { role: 'bm', username: 'ui26.bm01' },
+      { role: 'cost', username: 'ui26.cost01' },
+      { role: 'purchase', username: 'ui26.pur01' },
+      { role: 'production', username: 'ui26.prod01' },
+      { role: 'chiefEngineer', username: 'ui26.chief01' },
+      { role: 'finance', username: 'ui26.fin01' },
       { role: 'mgmt', username: 'admin' },
     ] as const
     const riskLabel = (severity: string) => {

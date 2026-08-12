@@ -93,24 +93,37 @@ const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
 const showDemoRoleSwitcher = import.meta.env.DEV
-const demoRoleGroups = [
-  { role: 'pm', prefix: 'pm', label: '项目经理' },
-  { role: 'bm', prefix: 'bm', label: '商务经理' },
-  { role: 'cost', prefix: 'cost', label: '成本经理' },
-  { role: 'purchase', prefix: 'pur', label: '采购经理' },
-  { role: 'production', prefix: 'prod', label: '生产经理' },
-  { role: 'chiefEngineer', prefix: 'chief', label: '总工程师' },
-  { role: 'finance', prefix: 'fin', label: '财务经理' },
-  { role: 'mgmt', prefix: 'mgmt', label: '管理层' },
-  { role: 'staff', prefix: 'staff', label: '普通员工' },
-  { role: 'legacyMgmt', prefix: 'gm', label: '管理层支持' },
-  { role: 'material', prefix: 'mat', label: '物资支持' },
+const demoRoleAccounts = [
+  { persona: 'COMPANY_OWNER', role: 'mgmt', username: 'ui26.gm01', label: '公司老板' },
+  { persona: 'COMPANY_FINANCE', role: 'finance', username: 'ui26.fin01', label: '公司财务' },
+  { persona: 'PROJECT_MANAGER', role: 'pm', username: 'ui26.pm01', label: '项目经理' },
+  {
+    persona: 'PROJECT_ACCOUNTANT',
+    role: 'cost',
+    username: 'ui26.cost01',
+    label: '项目会计',
+  },
+  {
+    persona: 'TECHNICAL_LEAD',
+    role: 'chiefEngineer',
+    username: 'ui26.chief01',
+    label: '技术负责人',
+  },
+  { persona: 'SAFETY_LEAD', role: 'pm', username: 'ui26.bm01', label: '安全负责人' },
+  {
+    persona: 'CONSTRUCTION_LEAD',
+    role: 'production',
+    username: 'ui26.prod01',
+    label: '施工负责人',
+  },
+  {
+    persona: 'PROCUREMENT_LEAD',
+    role: 'purchase',
+    username: 'ui26.pur01',
+    label: '采购负责人',
+  },
+  { persona: 'EMPLOYEE', role: 'pm', username: 'ui26.staff01', label: '员工' },
 ] as const
-const demoRoleAccounts = demoRoleGroups.map((group) => ({
-  role: group.role,
-  username: `ui26.${group.prefix}01`,
-  label: group.label,
-}))
 
 watch(
   [() => route.fullPath, navigation],
@@ -436,8 +449,13 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
       throw new Error(payload.message || payload.code || '演示角色切换失败')
     }
     const query = { ...route.query }
-    if (route.path === '/dashboard') query.role = account.role
-    else delete query.role
+    if (route.path === '/dashboard') {
+      query.persona = account.persona
+      query.role = account.role
+    } else {
+      delete query.persona
+      delete query.role
+    }
     const target = router.resolve({ path: route.path, query }).href
     window.location.assign(target)
   } catch (error) {

@@ -8,6 +8,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.system.role.SystemRoleContract;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.cgcpms.workflow.dto.WorkflowTemplateNodeReorderRequest;
@@ -102,7 +103,7 @@ public class WorkflowTemplateService {
     public WfTemplateNodeVO createNode(Long templateId, WorkflowTemplateNodeRequest request) {
         WfTemplate template = getTemplateForUpdate(templateId);
         String before = snapshot(templateId);
-        validateNodeRequest(request);
+        validateNodeRequest(request, null);
         List<WfTemplateNode> existingNodes = listNodes(templateId);
         int targetOrder = request.getNodeOrder() == null ? existingNodes.size() + 1 : request.getNodeOrder();
         shiftNodesForInsert(templateId, targetOrder);
@@ -117,8 +118,8 @@ public class WorkflowTemplateService {
     public void updateNode(Long templateId, Long nodeId, WorkflowTemplateNodeRequest request) {
         getTemplateForUpdate(templateId);
         String before = snapshot(templateId);
-        validateNodeRequest(request);
         WfTemplateNode node = getNodeOrThrow(templateId, nodeId);
+        validateNodeRequest(request, node.getApproverConfig());
         if (request.getNodeCode() != null && !request.getNodeCode().isBlank()) {
             ensureNodeCodeUnique(templateId, nodeId, request.getNodeCode().trim());
             node.setNodeCode(request.getNodeCode().trim());
@@ -235,14 +236,14 @@ public class WorkflowTemplateService {
     //  Private helpers — Validation
     // ═══════════════════════════════════════════════════════════
 
-    private void validateNodeRequest(WorkflowTemplateNodeRequest request) {
+    private void validateNodeRequest(WorkflowTemplateNodeRequest request, String existingApproverConfig) {
         String mode = request.getApproveMode();
         if (mode != null && !mode.isBlank()
                 && !WorkflowConstants.MODE_SEQUENTIAL.equals(mode)
                 && !WorkflowConstants.MODE_COUNTERSIGN.equals(mode)
                 && !WorkflowConstants.MODE_OR_SIGN.equals(mode))
             throw new BusinessException("TEMPLATE_NODE_MODE_INVALID", "审批模式不支持");
-        validateApproverConfig(request.getApproverConfig());
+        validateApproverConfig(request.getApproverConfig(), existingApproverConfig);
         rejectUnsupportedConfig(request.getPassRuleJson(), "passRuleJson");
         rejectUnsupportedConfig(request.getRejectRuleJson(), "rejectRuleJson");
         rejectUnsupportedConfig(request.getConditionRule(), "conditionRule");
@@ -279,7 +280,7 @@ public class WorkflowTemplateService {
         return policy.toCanonicalJson(objectMapper);
     }
 
-    private void validateApproverConfig(String json) {
+    private void validateApproverConfig(String json, String existingJson) {
         if (json == null || json.isBlank()) return;
         final com.fasterxml.jackson.databind.JsonNode node;
         try { node = objectMapper.readTree(json); }
@@ -298,12 +299,34 @@ public class WorkflowTemplateService {
         if (!node.hasNonNull(required) || node.get(required).asText().isBlank()) {
             throw new BusinessException("INVALID_APPROVER_CONFIG", type + " 类型配置缺少 " + required);
         }
+        if ("PROJECT_ROLE".equals(type)) {
+            String roleCode = node.get(required).asText();
+            if (!SystemRoleContract.PROJECT_SCOPED_ROLE_CODES.contains(roleCode)
+                    && !(SystemRoleContract.LEGACY_PROJECT_ROLE_CODES.contains(roleCode)
+                    && isUnchangedHistoricalProjectRole(existingJson, roleCode))) {
+                throw new BusinessException("PROJECT_ROLE_INVALID", "项目角色必须使用七类项目范围系统角色");
+            }
+        }
         Set<String> allowed = Set.of("type", required);
         node.fieldNames().forEachRemaining(field -> {
             if (!allowed.contains(field)) {
                 throw new BusinessException("INVALID_APPROVER_CONFIG", "审批人配置包含未执行字段: " + field);
             }
         });
+    }
+
+    private boolean isUnchangedHistoricalProjectRole(String json, String roleCode) {
+        if (json == null || json.isBlank()) return false;
+        try {
+            com.fasterxml.jackson.databind.JsonNode existing = objectMapper.readTree(json);
+            return existing.isObject()
+                    && existing.hasNonNull("type")
+                    && "PROJECT_ROLE".equalsIgnoreCase(existing.get("type").asText())
+                    && existing.hasNonNull("roleCode")
+                    && roleCode.equals(existing.get("roleCode").asText());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private String snapshot(Long templateId) {

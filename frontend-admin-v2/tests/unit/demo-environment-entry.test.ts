@@ -28,12 +28,26 @@ describe('V2 示例环境入口', () => {
 
   it('将账号切换明确呈现为演示角色', () => {
     expect(appShell).toContain('const showDemoRoleSwitcher = import.meta.env.DEV')
-    expect(appShell).toContain("{ role: 'pm', prefix: 'pm', label: '项目经理' }")
-    expect(appShell).toContain("{ role: 'purchase', prefix: 'pur', label: '采购经理' }")
-    expect(appShell).toContain("{ role: 'finance', prefix: 'fin', label: '财务经理' }")
-    expect(appShell).toContain('const demoRoleAccounts = demoRoleGroups.map((group)')
-    expect(appShell).toContain('`ui26.${group.prefix}01`')
-    expect(appShell).not.toContain('[1, 2, 3].map((index)')
+    for (const [persona, username, label] of [
+      ['COMPANY_OWNER', 'ui26.gm01', '公司老板'],
+      ['COMPANY_FINANCE', 'ui26.fin01', '公司财务'],
+      ['PROJECT_MANAGER', 'ui26.pm01', '项目经理'],
+      ['PROJECT_ACCOUNTANT', 'ui26.cost01', '项目会计'],
+      ['TECHNICAL_LEAD', 'ui26.chief01', '技术负责人'],
+      ['SAFETY_LEAD', 'ui26.bm01', '安全负责人'],
+      ['CONSTRUCTION_LEAD', 'ui26.prod01', '施工负责人'],
+      ['PROCUREMENT_LEAD', 'ui26.pur01', '采购负责人'],
+      ['EMPLOYEE', 'ui26.staff01', '员工'],
+    ]) {
+      expect(appShell).toContain(`persona: '${persona}'`)
+      expect(appShell).toContain(`username: '${username}'`)
+      expect(appShell).toContain(`label: '${label}'`)
+    }
+    expect(appShell).not.toContain('demoRoleGroups')
+    expect(appShell).not.toContain('ui26.mgmt01')
+    expect(appShell).not.toContain('ui26.mat01')
+    expect(appShell).toContain('query.persona = account.persona')
+    expect(appShell).toContain('query.role = account.role')
     expect(appShell).toContain('aria-label="切换演示角色"')
     expect(appShell).toContain('<strong>演示角色</strong>')
     expect(appShell).not.toContain('角色测试账号')

@@ -208,8 +208,8 @@ class ProjectOverviewServiceTest {
         for (int i = 0; i < 2; i++) {
             PmProjectMember member = new PmProjectMember();
             member.setUserId(i == 0 ? TEST_USER_1 : TEST_USER_2);
-            member.setRoleCode(i == 0 ? "PM" : "CM");
-            member.setPositionName(i == 0 ? "项目经理" : "商务经理");
+            member.setRoleCode(i == 0 ? "PROJECT_MANAGER" : "PROJECT_ACCOUNTANT");
+            member.setPositionName(i == 0 ? "项目经理" : "项目会计");
             memberService.create(testProjectId, member);
         }
 
@@ -239,17 +239,17 @@ class ProjectOverviewServiceTest {
 
         // Member 1
         ProjectOverviewVO.MemberBriefVO m1 = vo.getMembers().stream()
-                .filter(m -> "PM".equals(m.getRoleCode()))
+                .filter(m -> "PROJECT_MANAGER".equals(m.getRoleCode()))
                 .findFirst().orElse(null);
-        assertNotNull(m1, "应有PM角色成员");
+        assertNotNull(m1, "应有项目经理角色成员");
         assertEquals(String.valueOf(TEST_USER_1), m1.getUserId());
         assertEquals("张三", m1.getUserName(), "用户名应通过batch查询填充");
 
         // Member 2
         ProjectOverviewVO.MemberBriefVO m2 = vo.getMembers().stream()
-                .filter(m -> "CM".equals(m.getRoleCode()))
+                .filter(m -> "PROJECT_ACCOUNTANT".equals(m.getRoleCode()))
                 .findFirst().orElse(null);
-        assertNotNull(m2, "应有CM角色成员");
+        assertNotNull(m2, "应有项目会计角色成员");
         assertEquals(String.valueOf(TEST_USER_2), m2.getUserId());
         assertEquals("李四", m2.getUserName());
 

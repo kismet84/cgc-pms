@@ -1,23 +1,23 @@
 -- CGC-COMPLETE-PROJECT v2 / DEV-ONLY ROLE WORKFLOW STATUS MATRIX
--- Eight test accounts x five canonical workflow instance statuses.
+-- Eight canonical test accounts x five workflow instance statuses.
 SET @demo_project := 520000000000009002;
 
 DROP TEMPORARY TABLE IF EXISTS demo_workflow_roles;
 CREATE TEMPORARY TABLE demo_workflow_roles AS
 SELECT id AS user_id, username, real_name,
        CASE username
-         WHEN 'demo.manager' THEN 1
-         WHEN 'demo.business' THEN 2
-         WHEN 'demo.cost' THEN 3
-         WHEN 'demo.purchase' THEN 4
-         WHEN 'demo.production' THEN 5
-         WHEN 'demo.chief' THEN 6
-         WHEN 'demo.finance' THEN 7
+         WHEN 'ui26.pm01' THEN 1
+         WHEN 'ui26.bm01' THEN 2
+         WHEN 'ui26.cost01' THEN 3
+         WHEN 'ui26.pur01' THEN 4
+         WHEN 'ui26.prod01' THEN 5
+         WHEN 'ui26.chief01' THEN 6
+         WHEN 'ui26.fin01' THEN 7
          WHEN 'admin' THEN 8
        END AS role_no
 FROM sys_user
 WHERE tenant_id=0
-  AND username IN ('demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance','admin')
+  AND username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01','admin')
   AND status='ENABLE' AND deleted_flag=0;
 
 DROP TEMPORARY TABLE IF EXISTS demo_workflow_role_guard;
@@ -137,8 +137,8 @@ INSERT INTO wf_record
   (id,tenant_id,instance_id,node_instance_id,task_id,round_no,business_type,business_id,node_code,node_name,action_type,action_name,
    operator_id,operator_name,comment,record_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 SELECT record_id,0,instance_id,node_instance_id,task_id,1,business_type,instance_id,node_code,node_name,
-       CASE instance_status WHEN 'APPROVED' THEN 'APPROVE' WHEN 'REJECTED' THEN 'REJECT' WHEN 'VOIDED' THEN 'TRANSFER' ELSE 'ADD_SIGN' END,
-       CASE instance_status WHEN 'APPROVED' THEN '同意' WHEN 'REJECTED' THEN '驳回' WHEN 'VOIDED' THEN '转办' ELSE '加签' END,
+       CASE instance_status WHEN 'APPROVED' THEN 'APPROVE' WHEN 'REJECTED' THEN 'REJECT' ELSE 'WITHDRAW' END,
+       CASE instance_status WHEN 'APPROVED' THEN '同意' WHEN 'REJECTED' THEN '驳回' ELSE '撤回' END,
        user_id,real_name,CONCAT(status_label,'状态前的有效操作'),'EFFECTIVE',user_id,
        DATE_ADD('2026-07-20 08:10:00',INTERVAL sequence_no MINUTE),user_id,
        DATE_ADD('2026-07-20 08:20:00',INTERVAL sequence_no MINUTE),0,'M2八角色审批状态矩阵记录'

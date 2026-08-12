@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-12T13:37:06.214Z",
+  "generation_time": "2026-08-12T18:21:42.659Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -71,7 +71,7 @@
         "backend/**"
       ],
       "file_count": 1853,
-      "fingerprint": "03f22ea029911d37547cdf67a1f331b56911921247e7c09c3155bc3fb8d6f8c4"
+      "fingerprint": "d6a22fd101de792265a3d95a1294a1aafec7822db56046a950d73d2bf44ce807"
     },
     {
       "id": "delivery_tooling",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "f83af671b0e40ccb27e078f0f33dc65873ff796dbf3c1cc2b7be8ca65bd1f298"
+      "fingerprint": "ac7eacec5b5658ea44afa157f439c6c5aaea9902ad8face249de6708b368aecf"
     },
     {
       "id": "desktop_launcher",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 137,
-      "fingerprint": "726ef4b1815610ae4db16189fdb880e7872ccda339d9534615c0a2991b619a96"
+      "fingerprint": "e4e268ab593228baeedfe89d63bfdbe33525249f1eff86d7c33b02e9c4e49de1"
     },
     {
       "id": "frontend_v2",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 280,
-      "fingerprint": "e9805c4230e812db6ab363151dd46b74704796f4fdc8f7c8e5cde33c6ff38980"
+      "fingerprint": "94fe2d3c6e1533df25ca699932910f9e7f757d39f432ac4702d7fe38a2dda529"
     },
     {
       "id": "mobile",
@@ -134,13 +134,16 @@
       "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
   ],
-  "generation_base_commit": "3d6204e35adf2d34021f72d3d85daa48ac7e8d97",
-  "input_scope_dirty": false,
+  "generation_base_commit": "e8b6c11cb376afdca7779d88c5ec739d14fd587c",
+  "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "3a80d4a5cc79357ad0396bfdadbd1eb458086c78",
+    "previous_generation_base_commit": "3d6204e35adf2d34021f72d3d85daa48ac7e8d97",
     "stale_modules": [
-      "documentation"
+      "backend",
+      "delivery_tooling",
+      "documentation",
+      "frontend_v2"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

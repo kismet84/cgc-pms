@@ -3,30 +3,22 @@ import { expect, test, type Page } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
 import { installShellPreferencesMock } from './shell-session'
 
-type Identity = 'business' | 'readonly' | 'denied'
+type Identity = 'technical' | 'readonly' | 'denied'
 
 const users = {
-  business: {
+  technical: {
     tenantId: '0',
     userId: '1',
-    username: 'demo.business',
-    realName: '商务经理',
-    roles: ['COMMERCIAL_MANAGER'],
+    username: 'ui26.chief01',
+    realName: '技术负责人',
+    roles: ['TECHNICAL_LEAD'],
     permissions: [
       'variation:order:query',
       'variation:order:add',
       'variation:order:edit',
-      'variation:order:item:edit',
       'variation:order:delete',
       'variation:order:submit',
-      'variation:owner:submit',
-      'variation:owner:review',
-      'variation:trace',
       'bid:query',
-      'bid:add',
-      'bid:edit',
-      'bid:delete',
-      'bid:status',
     ],
   },
   readonly: {
@@ -81,7 +73,7 @@ const bid = {
   updatedAt: '2026-07-22 10:00:00',
 }
 
-async function installCommercialMock(page: Page, readIdentity: () => Identity): Promise<void> {
+async function installTechnicalMock(page: Page, readIdentity: () => Identity): Promise<void> {
   await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     route.fulfill({
@@ -165,8 +157,8 @@ test.describe('M4 variation and bid routes', () => {
     page,
   }) => {
     test.setTimeout(60_000)
-    const identity: Identity = 'business'
-    await installCommercialMock(page, () => identity)
+    const identity: Identity = 'technical'
+    await installTechnicalMock(page, () => identity)
     const runtimeErrors = captureRuntimeErrors(page)
 
     await page.goto('/variation?projectId=P1#claim')
@@ -214,6 +206,7 @@ test.describe('M4 variation and bid routes', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/bid-cost')
+    await expect(page.getByRole('button', { name: '新建投标记录' })).toHaveCount(0)
     await page.getByRole('button', { name: 'BID-071' }).click()
     await expect(page).toHaveURL(/\/engineering-tender\/records\/71\?tab=basic$/)
     await expect(page.getByRole('tab', { name: /基本信息/ })).toBeVisible()
@@ -226,7 +219,7 @@ test.describe('M4 variation and bid routes', () => {
     browser,
   }) => {
     let identity: Identity = 'readonly'
-    await installCommercialMock(page, () => identity)
+    await installTechnicalMock(page, () => identity)
 
     await page.goto('/variation/order')
     await expect(page.getByRole('button', { name: '新建变更' })).toHaveCount(0)
@@ -234,7 +227,7 @@ test.describe('M4 variation and bid routes', () => {
 
     const denied = await browser.newPage()
     identity = 'denied'
-    await installCommercialMock(denied, () => identity)
+    await installTechnicalMock(denied, () => identity)
     await denied.goto('/variation/order')
     await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()

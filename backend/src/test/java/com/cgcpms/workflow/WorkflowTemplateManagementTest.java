@@ -245,6 +245,42 @@ class WorkflowTemplateManagementTest {
     }
 
     @Test
+    @DisplayName("项目角色配置仅允许七类项目范围系统角色")
+    void projectRoleConfigAcceptsCanonicalAndRejectsLegacyCode() {
+        WorkflowTemplateNodeRequest request = nodeRequest(
+                "技术负责人审批", "{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"TECHNICAL_LEAD\"}");
+
+        String nodeId = workflowTemplateService.createNode(TEMPLATE_ID, request).getId();
+        assertEquals("{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"TECHNICAL_LEAD\"}",
+                nodeMapper.selectById(Long.valueOf(nodeId)).getApproverConfig());
+
+        request.setApproverConfig("{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"PM\"}");
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTemplateService.createNode(TEMPLATE_ID, request));
+        assertEquals("PROJECT_ROLE_INVALID", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("历史项目角色仅允许原值不变或迁移到七类角色")
+    void projectRoleConfigPreservesUnchangedHistoricalValue() {
+        WfTemplateNode legacy = nodeMapper.selectById(NODE_1_ID);
+        legacy.setApproverConfig("{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"PM\"}");
+        nodeMapper.updateById(legacy);
+
+        WorkflowTemplateNodeRequest request = nodeRequest(
+                "历史项目经理审批", "{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"PM\"}");
+        assertDoesNotThrow(() -> workflowTemplateService.updateNode(TEMPLATE_ID, NODE_1_ID, request));
+
+        request.setApproverConfig("{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"CM\"}");
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTemplateService.updateNode(TEMPLATE_ID, NODE_1_ID, request));
+        assertEquals("PROJECT_ROLE_INVALID", ex.getCode());
+
+        request.setApproverConfig("{\"type\":\"PROJECT_ROLE\",\"roleCode\":\"PROJECT_MANAGER\"}");
+        assertDoesNotThrow(() -> workflowTemplateService.updateNode(TEMPLATE_ID, NODE_1_ID, request));
+    }
+
+    @Test
     @DisplayName("节点排序等待同模板写锁")
     void reorderWaitsForTemplateWriteLock() throws Exception {
         WorkflowTemplateNodeReorderRequest request = new WorkflowTemplateNodeReorderRequest();
@@ -384,6 +420,17 @@ class WorkflowTemplateManagementTest {
         second.setAllowTransfer(1);
         second.setAllowAddSign(1);
         nodeMapper.insert(second);
+    }
+
+    private WorkflowTemplateNodeRequest nodeRequest(String name, String approverConfig) {
+        WorkflowTemplateNodeRequest request = new WorkflowTemplateNodeRequest();
+        request.setNodeName(name);
+        request.setNodeType("APPROVAL");
+        request.setApproveMode("SEQUENTIAL");
+        request.setApproverConfig(approverConfig);
+        request.setAllowTransfer(1);
+        request.setAllowAddSign(1);
+        return request;
     }
 
     private List<WfTemplateNode> selectNodes() {

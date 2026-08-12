@@ -32,6 +32,8 @@ public final class SystemRoleContract {
     public static final Set<String> PROJECT_SCOPED_ROLE_CODES = Set.of(
             PROJECT_MANAGER, PROJECT_ACCOUNTANT, TECHNICAL_LEAD, SAFETY_LEAD,
             CONSTRUCTION_LEAD, PROCUREMENT_LEAD, EMPLOYEE);
+    public static final Set<String> LEGACY_PROJECT_ROLE_CODES = Set.of(
+            "PM", "CM", "CSTM", "MAT", "SUBC", "FIN", "OTH");
 
     private SystemRoleContract() {
     }
@@ -51,11 +53,11 @@ public final class SystemRoleContract {
         return switch (roleCode) {
             case "FINANCE" -> COMPANY_FINANCE;
             case "GENERAL_MANAGER", "MANAGEMENT", "MANAGEMENT_EXECUTIVE" -> COMPANY_OWNER;
-            case "COST_MANAGER", "COMMERCIAL_MANAGER", "DEPARTMENT_MANAGER", "CSTM", "CM" -> PROJECT_ACCOUNTANT;
+            case "COST_MANAGER", "COMMERCIAL_MANAGER", "DEPARTMENT_MANAGER", "CSTM", "CM", "FIN" -> PROJECT_ACCOUNTANT;
             case "CHIEF_ENGINEER" -> TECHNICAL_LEAD;
-            case "PRODUCTION_MANAGER" -> CONSTRUCTION_LEAD;
-            case "PURCHASE_MANAGER", "MATERIAL_CLERK" -> PROCUREMENT_LEAD;
-            case "COMMON_USER" -> EMPLOYEE;
+            case "PRODUCTION_MANAGER", "SUBC" -> CONSTRUCTION_LEAD;
+            case "PURCHASE_MANAGER", "MATERIAL_CLERK", "MAT" -> PROCUREMENT_LEAD;
+            case "COMMON_USER", "OTH" -> EMPLOYEE;
             case "PM" -> PROJECT_MANAGER;
             default -> roleCode;
         };

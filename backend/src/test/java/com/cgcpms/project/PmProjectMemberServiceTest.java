@@ -66,7 +66,7 @@ class PmProjectMemberServiceTest {
         member.setTenantId(999L);
         member.setProjectId(888L);
         member.setUserId(31L);
-        member.setRoleCode("OTH");
+        member.setRoleCode("EMPLOYEE");
 
         service.create(21L, member);
 
@@ -103,7 +103,7 @@ class PmProjectMemberServiceTest {
     private PmProjectMember member(Long userId) {
         PmProjectMember member = new PmProjectMember();
         member.setUserId(userId);
-        member.setRoleCode("OTH");
+        member.setRoleCode("EMPLOYEE");
         return member;
     }
 }

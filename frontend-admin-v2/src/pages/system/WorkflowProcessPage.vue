@@ -36,6 +36,7 @@ import {
 } from '@/services/system-management'
 import { workflowBusinessTypeLabel } from '@/pages/workbench/model'
 import { workflowModule } from '@/pages/system/workflow-business-modules'
+import { projectRoleOptions } from '@/pages/projects/model'
 import { useSessionStore } from '@/stores/session'
 
 type ApproverType = 'USER' | 'ROLE' | 'POSITION' | 'PROJECT_ROLE'
@@ -104,14 +105,6 @@ const approverTypeOptions = [
   { value: 'POSITION', label: '组织岗位' },
   { value: 'PROJECT_ROLE', label: '项目角色' },
 ]
-const projectRoleOptions = [
-  { value: 'PM', label: '项目经理' },
-  { value: 'CM', label: '商务经理' },
-  { value: 'CSTM', label: '成本经理' },
-  { value: 'FIN', label: '财务负责人' },
-  { value: 'MAT', label: '物资负责人' },
-  { value: 'OTH', label: '其他项目成员' },
-]
 const approverOptions = computed(() => {
   if (nodeForm.approverType === 'USER') {
     return users.value
@@ -152,7 +145,7 @@ const approverOptions = computed(() => {
         disabled: item.status !== 'ENABLE',
       }))
   }
-  return projectRoleOptions
+  return projectRoleOptions(editingNode.value ? nodeForm.approverValue : '')
 })
 const approverLabel = computed(() => {
   if (nodeForm.approverType === 'USER') return '审批人员'

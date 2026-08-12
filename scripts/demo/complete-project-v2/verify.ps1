@@ -106,32 +106,51 @@ UNION ALL SELECT 'inventory_exception',COUNT(*) FROM mat_quality_disposition WHE
 UNION ALL SELECT 'material_return_reversal',COUNT(*) FROM mat_material_return WHERE tenant_id=0 AND id=520000000000008421 AND status='REVERSED' AND deleted_flag=0
 UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE tenant_id=0 AND template_code='M52-PAYMENT-PDF' AND enabled=1 AND deleted_flag=0
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
-UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
-UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
-UNION ALL SELECT 'ui_role_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01','ui26.mgmt01','ui26.staff01','ui26.gm01','ui26.mat01') AND status='ENABLE' AND deleted_flag=0
-UNION ALL SELECT 'ui_role_account_roles',COUNT(DISTINCT u.username) FROM sys_user u JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id WHERE u.tenant_id=0 AND u.username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01','ui26.mgmt01','ui26.staff01','ui26.gm01','ui26.mat01') AND u.status='ENABLE' AND u.deleted_flag=0 AND r.status='ENABLE' AND r.deleted_flag=0
+UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='ui26.pm01' AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'legacy_role_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND deleted_flag=0
+UNION ALL SELECT 'legacy_role_binding',COUNT(*) FROM sys_user_role ur JOIN sys_user u ON u.tenant_id=ur.tenant_id AND u.id=ur.user_id WHERE u.tenant_id=0 AND u.username IN ('demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+UNION ALL SELECT 'legacy_project_member',COUNT(*) FROM pm_project_member pm JOIN sys_user u ON u.tenant_id=pm.tenant_id AND u.id=pm.user_id WHERE u.tenant_id=0 AND u.username IN ('demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND pm.deleted_flag=0
+UNION ALL SELECT 'ui_role_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('ui26.gm01','ui26.fin01','ui26.pm01','ui26.cost01','ui26.chief01','ui26.bm01','ui26.prod01','ui26.pur01','ui26.staff01') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'retired_ui_role_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('ui26.mgmt01','ui26.mat01') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'ui_role_account_roles',COUNT(DISTINCT u.username) FROM sys_user u JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id WHERE u.tenant_id=0 AND u.username IN ('ui26.gm01','ui26.fin01','ui26.pm01','ui26.cost01','ui26.chief01','ui26.bm01','ui26.prod01','ui26.pur01','ui26.staff01') AND u.status='ENABLE' AND u.deleted_flag=0 AND r.status='ENABLE' AND r.deleted_flag=0
+UNION ALL SELECT 'canonical_role_mapping',COUNT(*) FROM (
+  SELECT u.username,GROUP_CONCAT(r.role_code ORDER BY r.role_code) role_codes
+  FROM sys_user u JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username IN ('ui26.gm01','ui26.fin01','ui26.pm01','ui26.cost01','ui26.chief01','ui26.bm01','ui26.prod01','ui26.pur01','ui26.staff01')
+    AND u.status='ENABLE' AND u.deleted_flag=0 GROUP BY u.username
+) mappings WHERE (username='ui26.gm01' AND role_codes='COMPANY_OWNER')
+  OR (username='ui26.fin01' AND role_codes='COMPANY_FINANCE,SUPER_ADMIN')
+  OR (username='ui26.pm01' AND role_codes='PROJECT_MANAGER')
+  OR (username='ui26.cost01' AND role_codes='PROJECT_ACCOUNTANT')
+  OR (username='ui26.chief01' AND role_codes='TECHNICAL_LEAD')
+  OR (username='ui26.bm01' AND role_codes='SAFETY_LEAD')
+  OR (username='ui26.prod01' AND role_codes='CONSTRUCTION_LEAD')
+  OR (username='ui26.pur01' AND role_codes='PROCUREMENT_LEAD')
+  OR (username='ui26.staff01' AND role_codes='EMPLOYEE')
 UNION ALL SELECT 'project_manager_contract_query',COUNT(*) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.pm01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms='contract:query' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'project_manager_variation_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.pm01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('variation:order:query','variation:order:add','variation:order:edit','variation:order:delete','variation:order:item:edit',
       'variation:order:submit','variation:owner:submit','variation:owner:review','variation:trace')
     AND m.status='ENABLE' AND m.deleted_flag=0
-UNION ALL SELECT 'business_variation_bid_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+UNION ALL SELECT 'technical_variation_bid_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.business' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.chief01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('variation:order:query','variation:order:add','variation:order:edit','variation:order:delete','variation:order:item:edit',
       'variation:order:submit','variation:owner:submit','variation:owner:review','variation:trace',
       'bid:query','bid:add','bid:edit','bid:delete','bid:status')
@@ -141,15 +160,15 @@ UNION ALL SELECT 'project_manager_cost_target_permissions',COUNT(DISTINCT m.perm
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.pm01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('cost:target:query','cost:target:add','cost:target:edit','cost:target:delete','cost:target:submit','cost:target:activate')
     AND m.status='ENABLE' AND m.deleted_flag=0
-UNION ALL SELECT 'cost_manager_cost_target_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+UNION ALL SELECT 'project_accountant_cost_target_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.cost01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('cost:target:query','cost:target:add','cost:target:edit','cost:target:delete','cost:target:submit','cost:target:activate')
     AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'project_manager_cost_summary_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
@@ -157,31 +176,31 @@ UNION ALL SELECT 'project_manager_cost_summary_permissions',COUNT(DISTINCT m.per
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.pm01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('cost:summary:view','cost:summary:refresh')
     AND m.status='ENABLE' AND m.deleted_flag=0
-UNION ALL SELECT 'cost_manager_cost_summary_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+UNION ALL SELECT 'project_accountant_cost_summary_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.cost01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('cost:summary:view','cost:summary:refresh')
     AND m.status='ENABLE' AND m.deleted_flag=0
-UNION ALL SELECT 'cost_manager_budget_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+UNION ALL SELECT 'project_accountant_budget_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.cost01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('budget:query','budget:add','budget:edit','budget:delete','budget:submit')
     AND m.status='ENABLE' AND m.deleted_flag=0
-UNION ALL SELECT 'production_measurement_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+UNION ALL SELECT 'construction_measurement_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.production' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.prod01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('measurement:query','measurement:maintain','measurement:submit','measurement:owner:submit','measurement:owner:review')
     AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'role_alert_permission',COUNT(DISTINCT u.username) FROM sys_user u
@@ -189,18 +208,18 @@ UNION ALL SELECT 'role_alert_permission',COUNT(DISTINCT u.username) FROM sys_use
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+  WHERE u.tenant_id=0 AND u.username IN ('admin','ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01')
     AND u.status='ENABLE' AND u.deleted_flag=0 AND m.perms='alert:view' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'role_alert_edit_permission',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+  WHERE u.tenant_id=0 AND u.username IN ('admin','ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01')
     AND u.status='ENABLE' AND u.deleted_flag=0 AND m.perms='alert:edit' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'role_alert_project_members',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
-  WHERE u.tenant_id=0 AND u.username IN ('demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+  WHERE u.tenant_id=0 AND u.username IN ('ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.staff01')
     AND pm.project_id=520000000000009002 AND pm.status='ACTIVE' AND pm.deleted_flag=0
 UNION ALL SELECT 'm3_daily_self_account',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
@@ -213,7 +232,7 @@ UNION ALL SELECT 'm3_daily_self_account',COUNT(DISTINCT u.username) FROM sys_use
 UNION ALL SELECT 'role_workflow_status_instances',COUNT(*) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0 AND remark='M2八角色审批状态矩阵'
 UNION ALL SELECT 'role_workflow_status_pairs',COUNT(DISTINCT CONCAT(initiator_id,':',instance_status)) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_todos',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND t.task_status='PENDING' AND i.instance_status='RUNNING' AND t.deleted_flag=0 AND i.deleted_flag=0
-UNION ALL SELECT 'role_workflow_status_done',COUNT(*) FROM wf_record WHERE tenant_id=0 AND id BETWEEN 520000000000009820 AND 520000000000009859 AND action_type IN ('APPROVE','REJECT','TRANSFER','ADD_SIGN') AND record_status='EFFECTIVE' AND deleted_flag=0
+UNION ALL SELECT 'role_workflow_status_done',COUNT(*) FROM wf_record WHERE tenant_id=0 AND id BETWEEN 520000000000009820 AND 520000000000009859 AND action_type IN ('APPROVE','REJECT','WITHDRAW') AND record_status='EFFECTIVE' AND deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_cc',COUNT(*) FROM wf_cc WHERE tenant_id=0 AND id BETWEEN 520000000000009860 AND 520000000000009899
 UNION ALL SELECT 'role_workflow_business_types',COUNT(DISTINCT business_type) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
 UNION ALL SELECT 'role_workflow_action_permissions',COUNT(DISTINCT CONCAT(u.username,':',m.perms)) FROM sys_user u
@@ -221,10 +240,21 @@ UNION ALL SELECT 'role_workflow_action_permissions',COUNT(DISTINCT CONCAT(u.user
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+  WHERE u.tenant_id=0 AND u.username IN ('admin','ui26.pm01','ui26.bm01','ui26.cost01','ui26.pur01','ui26.prod01','ui26.chief01','ui26.fin01')
     AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms IN ('workflow:approve','workflow:reject','workflow:transfer','workflow:add-sign','workflow:withdraw','workflow:resubmit')
     AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'role_workflow_unauthorized_records',COUNT(*) FROM wf_record wr
+  JOIN sys_user u ON u.tenant_id=wr.tenant_id AND u.id=wr.operator_id
+  WHERE wr.tenant_id=0 AND wr.id BETWEEN 520000000000009820 AND 520000000000009859
+    AND wr.deleted_flag=0 AND NOT EXISTS (
+      SELECT 1 FROM sys_user_role ur
+      JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+      JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id AND m.status='ENABLE' AND m.deleted_flag=0
+      WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+        AND m.perms=CASE wr.action_type WHEN 'APPROVE' THEN 'workflow:approve' WHEN 'REJECT' THEN 'workflow:reject'
+          WHEN 'TRANSFER' THEN 'workflow:transfer' WHEN 'ADD_SIGN' THEN 'workflow:add-sign' WHEN 'WITHDRAW' THEN 'workflow:withdraw'
+          WHEN 'RESUBMIT' THEN 'workflow:resubmit' END)
 UNION ALL SELECT 'role_workflow_orphans',(
   (SELECT COUNT(*) FROM wf_node_instance n LEFT JOIN wf_instance i ON i.id=n.instance_id AND i.tenant_id=n.tenant_id WHERE n.tenant_id=0 AND n.id BETWEEN 520000000000009740 AND 520000000000009779 AND (i.id IS NULL OR i.deleted_flag<>0))+
   (SELECT COUNT(*) FROM wf_task t LEFT JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id LEFT JOIN wf_node_instance n ON n.id=t.node_instance_id AND n.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND (i.id IS NULL OR n.id IS NULL))+
@@ -275,7 +305,7 @@ UNION ALL SELECT 'cost_breakdown_permission',COUNT(DISTINCT u.id) FROM sys_user 
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
-  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.username='ui26.cost01' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms='dashboard:cost-breakdown:view' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'invalid_business_code',SUM(invalid_count) FROM (
   SELECT COUNT(*) invalid_count FROM pm_project WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
@@ -306,13 +336,13 @@ UNION ALL SELECT 'role_test_scope',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
   WHERE u.tenant_id=0 AND u.deleted_flag=0 AND (
     (u.username='admin' AND r.role_code='SUPER_ADMIN' AND m.perms='dashboard:management:view') OR
-    (u.username='demo.manager' AND m.perms='dashboard:project-manager:view') OR
-    (u.username='demo.business' AND m.perms='dashboard:business-manager:view') OR
-    (u.username='demo.cost' AND m.perms='dashboard:cost-manager:view') OR
-    (u.username='demo.purchase' AND m.perms='dashboard:purchase-manager:view') OR
-    (u.username='demo.production' AND m.perms='dashboard:production-manager:view') OR
-    (u.username='demo.chief' AND m.perms='dashboard:chief-engineer:view') OR
-    (u.username='demo.finance' AND m.perms='dashboard:finance:view'))
+    (u.username='ui26.pm01' AND m.perms='dashboard:project-manager:view') OR
+    (u.username='ui26.bm01' AND m.perms='dashboard:business-manager:view') OR
+    (u.username='ui26.cost01' AND m.perms='dashboard:cost-manager:view') OR
+    (u.username='ui26.pur01' AND m.perms='dashboard:purchase-manager:view') OR
+    (u.username='ui26.prod01' AND m.perms='dashboard:production-manager:view') OR
+    (u.username='ui26.chief01' AND m.perms='dashboard:chief-engineer:view') OR
+    (u.username='ui26.fin01' AND m.perms='dashboard:finance:view'))
 UNION ALL SELECT 'requested_qty',COALESCE(SUM(quantity),0) FROM mat_purchase_request_item WHERE request_id=520000000000001101 AND deleted_flag=0
 UNION ALL SELECT 'ordered_qty',COALESCE(SUM(quantity),0) FROM mat_purchase_order_item WHERE order_id=520000000000001201 AND deleted_flag=0
 UNION ALL SELECT 'received_qty',COALESCE(SUM(qualified_quantity),0) FROM mat_receipt_item WHERE receipt_id=520000000000001301 AND deleted_flag=0
@@ -671,14 +701,19 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.settlement_company_finance_permission -eq 5 -and $metrics.settlement_canonical_menu_grants -eq 10 `
     -and $metrics.settlement_fixture_grant_overflow -eq 0 `
     -and $metrics.settlement_workflow_approver_invalid -eq 0 `
-    -and $metrics.role_test_account -eq 8 -and $metrics.ui_role_account -eq 11 -and $metrics.ui_role_account_roles -eq 11 `
+    -and $metrics.role_test_account -eq 8 -and $metrics.legacy_role_account -eq 0 `
+    -and $metrics.legacy_role_binding -eq 0 -and $metrics.legacy_project_member -eq 0 `
+    -and $metrics.ui_role_account -eq 9 -and $metrics.retired_ui_role_account -eq 0 `
+    -and $metrics.ui_role_account_roles -eq 9 `
+    -and $metrics.canonical_role_mapping -eq 9 `
     -and $metrics.project_manager_contract_query -eq 1 `
-    -and $metrics.project_manager_variation_permissions -eq 1 -and $metrics.business_variation_bid_permissions -eq 2 `
-    -and $metrics.project_manager_cost_target_permissions -eq 1 -and $metrics.cost_manager_cost_target_permissions -eq 1 `
-    -and $metrics.project_manager_cost_summary_permissions -eq 1 -and $metrics.cost_manager_cost_summary_permissions -eq 1 `
-    -and $metrics.cost_manager_budget_permissions -eq 1 -and $metrics.production_measurement_permissions -eq 1 `
+    -and $metrics.project_manager_variation_permissions -eq 1 -and $metrics.technical_variation_bid_permissions -eq 6 `
+    -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.project_accountant_cost_target_permissions -eq 1 `
+    -and $metrics.project_manager_cost_summary_permissions -eq 1 -and $metrics.project_accountant_cost_summary_permissions -eq 1 `
+    -and $metrics.project_accountant_budget_permissions -eq 1 -and $metrics.construction_measurement_permissions -eq 1 `
     -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 2 `
     -and $metrics.role_alert_project_members -eq 7 `
+    -and $metrics.m3_daily_self_account -eq 1 `
     -and $metrics.m3_daily_self_account -eq 1 `
     -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
@@ -703,6 +738,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.role_workflow_status_todos -eq 8 -and $metrics.role_workflow_status_done -eq 40 `
     -and $metrics.role_workflow_status_cc -eq 40 -and $metrics.role_workflow_business_types -eq 25 `
     -and $metrics.role_workflow_action_permissions -eq 36 `
+    -and $metrics.role_workflow_unauthorized_records -eq 0 `
     -and $metrics.role_workflow_orphans -eq 0 `
     -and $metrics.invalid_business_code -eq 0 `
     -and $metrics.m3_delivery_accounts -eq 1 -and $metrics.m3_delivery_query_permissions -eq 2 `
