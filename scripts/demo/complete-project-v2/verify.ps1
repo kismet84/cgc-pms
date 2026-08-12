@@ -475,6 +475,12 @@ UNION ALL SELECT 'm3_project_member_action_overgrant',COUNT(DISTINCT m.perms) FR
     AND m.perms IN ('project:member:add','project:member:edit','project:member:delete')
 UNION ALL SELECT 'm3_project_member_membership',COUNT(*) FROM pm_project_member
   WHERE tenant_id=0 AND project_id=520000000000009002 AND user_id=520000000000013008 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_query_only_role_leak',COUNT(*) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
+  WHERE u.tenant_id=0 AND u.status='ENABLE' AND u.deleted_flag=0
+    AND ((u.username='demo.schedule.query' AND r.role_code<>'M3_SCHEDULE_QUERY')
+      OR (u.username='demo.member-readonly' AND r.role_code<>'M3_PROJECT_MEMBER_QUERY'))
 UNION ALL SELECT 'm3_schedule_corrective_text_valid',COUNT(*) FROM project_corrective_action
   WHERE tenant_id=0 AND id=520000000000008166 AND deleted_flag=0
     AND reason='关键线路材料到场延迟。' AND action_plan='调整资源投入并按周复核关键线路。'
@@ -703,6 +709,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.m3_delivery_action_overgrant -eq 0 -and $metrics.m3_delivery_project_members -eq 1 `
     -and $metrics.m3_project_member_account -eq 1 -and $metrics.m3_project_member_query_permissions -eq 2 `
     -and $metrics.m3_project_member_action_overgrant -eq 0 -and $metrics.m3_project_member_membership -eq 1 `
+    -and $metrics.m3_query_only_role_leak -eq 0 `
     -and $metrics.m3_schedule_corrective_text_valid -eq 1 `
     -and $metrics.m3_quality_accounts -eq 6 -and $metrics.m3_quality_action_permissions -eq 5 `
     -and $metrics.m3_quality_action_overgrant -eq 0 -and $metrics.m3_quality_project_members -eq 6 `

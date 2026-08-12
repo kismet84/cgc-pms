@@ -98,6 +98,14 @@ foreach ($status in @('PREPARING', 'COMPLETION', 'WARRANTY')) {
         throw "LIVE_EVIDENCE_PROJECT_STATUS_FIXTURE_MISSING:$status"
     }
 }
+foreach ($queryOnlyAccount in @('demo.schedule.query', 'demo.member-readonly')) {
+    if (-not $m3Fixture.Contains("u.username='$queryOnlyAccount'", [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_QUERY_ONLY_ROLE_RESET_MISSING:$queryOnlyAccount"
+    }
+}
+if ([regex]::Matches($m3Fixture, 'DELETE ur FROM sys_user_role ur').Count -lt 2) {
+    throw 'LIVE_EVIDENCE_QUERY_ONLY_ROLE_RESET_INCOMPLETE'
+}
 $costFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/180-cost-breakdown-data.sql'))
 if (-not $costFixture.Contains('DELETE FROM cost_summary', [StringComparison]::Ordinal) `
     -or $costFixture.Contains("'2026-07-18',900030", [StringComparison]::Ordinal)) {
@@ -113,6 +121,8 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
     -or -not $verifySource.Contains('$metrics.role_workflow_action_permissions -eq 36', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains("'m3_daily_self_account'", [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.m3_daily_self_account -eq 1', [StringComparison]::Ordinal) `
+    -or -not $verifySource.Contains("'m3_query_only_role_leak'", [StringComparison]::Ordinal) `
+    -or -not $verifySource.Contains('$metrics.m3_query_only_role_leak -eq 0', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.cost_breakdown_children -eq 3', [StringComparison]::Ordinal)) {
     throw 'LIVE_EVIDENCE_VERIFIER_CONTRACT_INVALID'
 }
