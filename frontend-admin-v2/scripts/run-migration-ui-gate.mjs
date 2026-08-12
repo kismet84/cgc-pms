@@ -26,8 +26,7 @@ const reportDir = resolve('test-results')
 const reportPath = resolve(reportDir, 'contract-results.json')
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173'
 const webServerCommand =
-  process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ||
-  'pnpm dev --host 127.0.0.1 --port 4173 --strictPort'
+  process.env.PLAYWRIGHT_WEB_SERVER_COMMAND || 'pnpm dev --host 127.0.0.1 --port 4173 --strictPort'
 mkdirSync(reportDir, { recursive: true })
 rmSync(reportPath, { force: true })
 const result = spawnSync(
@@ -40,8 +39,7 @@ const result = spawnSync(
       ...process.env,
       PLAYWRIGHT_BASE_URL: baseUrl,
       PLAYWRIGHT_WEB_SERVER_COMMAND: webServerCommand,
-      PLAYWRIGHT_REUSE_EXISTING_SERVER:
-        process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER || 'false',
+      PLAYWRIGHT_REUSE_EXISTING_SERVER: process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER || 'false',
       PLAYWRIGHT_JSON_OUTPUT_NAME: reportPath,
     },
   },
