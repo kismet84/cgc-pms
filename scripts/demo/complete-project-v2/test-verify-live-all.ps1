@@ -102,6 +102,22 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
     throw 'LIVE_EVIDENCE_VERIFIER_CONTRACT_INVALID'
 }
 $loadSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'load.ps1'))
+$fixtureVersions = @(
+    "Id = 'ROLE_TEST_ACCOUNTS'; Version = 4",
+    "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 3",
+    "Id = 'SETTLEMENT_SOURCE_DATA'; Version = 5"
+)
+foreach ($fixtureVersion in $fixtureVersions) {
+    if (-not $loadSource.Contains($fixtureVersion, [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_FIXTURE_VERSION_INVALID:$fixtureVersion"
+    }
+}
+$roleFixtureSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/150-role-test-accounts.sql'))
+foreach ($projectManagerMenuId in @(921,21901,21902,21903,21904,605,1090,1091,1092,932,22101)) {
+    if (-not $roleFixtureSource.Contains(",0,2,$projectManagerMenuId)", [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_PROJECT_MANAGER_PERMISSION_FIXTURE_MISSING:$projectManagerMenuId"
+    }
+}
 $settlementStageIndex = $loadSource.IndexOf("Id = 'SETTLEMENT_SOURCE_DATA'", [StringComparison]::Ordinal)
 $standardizeStageIndex = $loadSource.IndexOf("Id = 'STANDARDIZE_BUSINESS_CODES'; Version = 4", [StringComparison]::Ordinal)
 if ($settlementStageIndex -lt 0 -or $standardizeStageIndex -le $settlementStageIndex) {

@@ -75,14 +75,14 @@ $stages = @(
     [pscustomobject]@{ Id = 'DOCUMENT_SYSTEM'; Files = @('scripts/demo/complete-project-v2/sql/120-document-system.sql') },
     [pscustomobject]@{ Id = 'FORM_FIELD_COMPLETION'; Files = @('scripts/demo/complete-project-v2/sql/130-form-field-completion.sql') },
     [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') },
-    [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Version = 3; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') },
+    [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') },
     [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
     [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Version = 3; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
-    [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },
+    [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 3; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },
     [pscustomobject]@{ Id = 'M3_DOMAIN_PERMISSION_DATA'; Version = 10; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql') },
     [pscustomobject]@{ Id = 'PROJECT_FIXTURE_CONSOLIDATION'; Version = 1; Files = @('scripts/demo/complete-project-v2/sql/220-project-fixture-consolidation.sql') },
-    [pscustomobject]@{ Id = 'SETTLEMENT_SOURCE_DATA'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/230-settlement-source-data.sql') },
+    [pscustomobject]@{ Id = 'SETTLEMENT_SOURCE_DATA'; Version = 5; Files = @('scripts/demo/complete-project-v2/sql/230-settlement-source-data.sql') },
     [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') }
 )
 

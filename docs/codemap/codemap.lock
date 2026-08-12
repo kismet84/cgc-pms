@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-12T09:06:27.196Z",
+  "generation_time": "2026-08-12T09:20:22.714Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,7 +50,7 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 3932,
+  "tracked_file_count": 3944,
   "repository_file_count": 3944,
   "included_file_count": 2680,
   "excluded_file_count": 1264,
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "a68ff286398ad0680e8461860a2403070f328a12a464b0f2522335c7b3e700cd"
+      "fingerprint": "d51bf89c0a662acf9839d32152342435a84fa342734f1c817a5d12c656d4ad3c"
     },
     {
       "id": "desktop_launcher",
@@ -134,12 +134,14 @@
       "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
   ],
-  "generation_base_commit": "94fc8bfeb51f68dcc12a028a439515f4c5cd6c32",
+  "generation_base_commit": "d430609d7a5e149f635f913f2d44784b94200bbf",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "94fc8bfeb51f68dcc12a028a439515f4c5cd6c32",
-    "stale_modules": [],
-    "reason": "Generation inputs match the previous code map snapshot."
+    "previous_generation_base_commit": "d430609d7a5e149f635f913f2d44784b94200bbf",
+    "stale_modules": [
+      "delivery_tooling"
+    ],
+    "reason": "Generation inputs changed since the previous code map snapshot."
   }
 }
