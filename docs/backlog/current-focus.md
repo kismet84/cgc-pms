@@ -1,11 +1,11 @@
 # Current Focus
 
-## 2026-08-12 第92条主线：审计遗留可靠性、安全与验证治理整改本地收口
+## 2026-08-12 第92条主线：审计遗留可靠性、安全与验证治理已合并并完成 post-merge
 
 - 目标：关闭 JVM/1G 容器冲突、备份伪完整、RBAC 关联表租户兜底、closeout 无界详情、MySQL 门禁、供应链、镜像默认值、覆盖率、CORS/CSRF 与 Codemap 语义缺口。
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / PROTECTED_GIT_DELIVERY_PENDING`；可执行实现证据 SHA `34e6c40e7435c65a47fe8d23ff653cb4a873741b`；唯一状态源为[`第92条计划`](../plans/第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)。
+- 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；源 HEAD `c7488482cb0f`，实现 PR #435，合并 SHA `04e45327dcaa`；唯一状态源为[`第92条计划`](../plans/第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)。
 - 结果：13 项中 11 项本轮修复复验，F04/F08 有据关闭；JVM 65% 堆、同批原子备份、窄 RBAC tenant guard、closeout 九域≤100、weekly 重扫、固定 digest、JaCoCo 包级门与同站 XSRF 已落地。
-- 证据：后端 2735、前端 568、MySQL `1/24/1`、自有前端服务 contract 98、live 80、浏览器技术/收尾 DOM 与 console、workflow required job=16、Codemap 通过。当前 SHA 真实恢复为 MySQL 1 行、MinIO 1 对象及引用/hash 守恒；首个 push run `31597079156` 的 Linux mc 属主红灯已最小修复，新的 exact-SHA reliability job 仍是 PR 前硬门。
+- 证据：后端 2735、前端 568、MySQL `1/24/1`、自有前端服务 contract 98、live 80、浏览器技术/收尾 DOM 与 console、workflow required job=16、Codemap 通过；真实恢复为 MySQL 1 行、MinIO 1 对象及引用/hash 守恒。Push run `31599845219`、PR run `31600592597`、post-merge run `31601538284` 与 verifier 全绿。
 - 边界：仅本地 dev/test/demo 与受保护 Git；不建设非本地监控/灾备，不给生产或上线裁决。详见[`质量报告`](../quality/2026-08-12-issue-092-审计遗留可靠性安全与验证治理整改.md)。
 - 零悬空：修复复验 11、有据关闭 2、正式承接 0、未收口 0；新增后续项 0、关闭后续项 0、净变化 `0`；正式 Issue 不变。
 
