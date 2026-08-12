@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-12T10:13:25.410Z",
+  "generation_time": "2026-08-12T10:25:58.363Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "85c63da72894d7893bf8ae15eb618c72bd96277459a96643edaba5a80be62da5"
+      "fingerprint": "39cb8aa845d79cc3c53791c9d38d3a309a7bcf329afc4d464b92c91cf39a3e45"
     },
     {
       "id": "desktop_launcher",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 280,
-      "fingerprint": "1b0858fa2f8247d5876f1df74f3d0e7a6a097bcdb109056befc703a0f7595697"
+      "fingerprint": "6063d122b87e7e84514ad75ab716a5b60ae664c3f918347d24921a3ec7a8af65"
     },
     {
       "id": "mobile",
@@ -134,13 +134,14 @@
       "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
   ],
-  "generation_base_commit": "9df225e0f16b7bc4c307acceda21214ee0f8e747",
+  "generation_base_commit": "c2e33fa7ba32dd82fd330aff62fd42e351b38401",
   "input_scope_dirty": false,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "7684237e8f5a359ae8b97f2cb3b6b69da71cadc5",
+    "previous_generation_base_commit": "9df225e0f16b7bc4c307acceda21214ee0f8e747",
     "stale_modules": [
-      "backend"
+      "delivery_tooling",
+      "frontend_v2"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
