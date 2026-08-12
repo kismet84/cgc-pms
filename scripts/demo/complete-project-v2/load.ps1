@@ -76,7 +76,7 @@ $stages = @(
     [pscustomobject]@{ Id = 'FORM_FIELD_COMPLETION'; Files = @('scripts/demo/complete-project-v2/sql/130-form-field-completion.sql') },
     [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') },
     [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') },
-    [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
+    [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Version = 4; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
     [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Version = 3; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
     [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 3; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },

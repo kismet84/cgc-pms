@@ -112,6 +112,9 @@ foreach ($fixtureVersion in $fixtureVersions) {
         throw "LIVE_EVIDENCE_FIXTURE_VERSION_INVALID:$fixtureVersion"
     }
 }
+if (-not $loadSource.Contains("Id = 'ROLE_DASHBOARD_DATA'; Version = 4; AlwaysApply = `$true", [StringComparison]::Ordinal)) {
+    throw 'LIVE_EVIDENCE_RELATIVE_DASHBOARD_FIXTURE_MUST_REPLAY'
+}
 $roleFixtureSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/150-role-test-accounts.sql'))
 foreach ($projectManagerMenuId in @(921,21901,21902,21903,21904,605,1090,1091,1092,932,22101)) {
     if (-not $roleFixtureSource.Contains(",0,2,$projectManagerMenuId)", [StringComparison]::Ordinal)) {
