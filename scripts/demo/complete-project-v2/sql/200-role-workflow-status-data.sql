@@ -25,17 +25,10 @@ CREATE TEMPORARY TABLE demo_workflow_role_guard (ok INT PRIMARY KEY);
 INSERT INTO demo_workflow_role_guard VALUES (1);
 INSERT INTO demo_workflow_role_guard SELECT 1 WHERE (SELECT COUNT(*) FROM demo_workflow_roles)<>8;
 
-INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id)
-SELECT 520000000000009900+ROW_NUMBER() OVER (ORDER BY role_id,menu_id),0,role_id,menu_id
-FROM (
-  SELECT DISTINCT ur.role_id,m.id AS menu_id
-  FROM demo_workflow_roles d
-  JOIN sys_user_role ur ON ur.tenant_id=0 AND ur.user_id=d.user_id
-  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.status='ENABLE' AND r.deleted_flag=0
-  JOIN sys_menu m ON m.tenant_id=0
-    AND m.perms IN ('workflow:approve','workflow:reject','workflow:transfer','workflow:add-sign','workflow:withdraw','workflow:resubmit')
-    AND m.status='ENABLE' AND m.deleted_flag=0
-) role_permissions;
+-- Earlier package versions granted every workflow action to every demo role.
+-- Mainline 89 owns the least-privilege role matrix; replay only removes those package-owned grants.
+DELETE FROM sys_role_menu
+WHERE tenant_id=0 AND id BETWEEN 520000000000009901 AND 520000000000009999;
 
 DROP TEMPORARY TABLE IF EXISTS demo_workflow_statuses;
 CREATE TEMPORARY TABLE demo_workflow_statuses (

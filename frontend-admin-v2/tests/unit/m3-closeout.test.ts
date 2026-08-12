@@ -107,6 +107,21 @@ describe('M3 closeout closed loop', () => {
     })
   })
 
+  it('sends one bounded detail page for the selected-project overview', async () => {
+    fetchMock.mockResolvedValueOnce(response({ detail_page_no: 2, detail_page_size: 25 }))
+    const controller = new AbortController()
+
+    await loadCloseoutOverview('project-9', controller.signal, {
+      detailPageNo: 2,
+      detailPageSize: 25,
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/project-closeouts/overview?projectId=project-9&detailPageNo=2&detailPageSize=25',
+    )
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
+  })
+
   it('keeps settlement and allocation money as strings and normalizes snake_case trace keys', async () => {
     fetchMock.mockResolvedValueOnce(
       response({

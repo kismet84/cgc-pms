@@ -19,7 +19,7 @@ services:
   # Other services depend on it so they won't start until preflight succeeds.
   # ===========================================================================
   preflight:
-    image: busybox:1.36
+    image: busybox:1.36@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
     container_name: cgc-pms-preflight
     restart: "no"
     command:
@@ -44,6 +44,11 @@ services:
         check_file() {
           if [ -f "$$1" ] && [ -s "$$1" ]; then pass "File $$1 exists and non-empty";
           else fail "File $$1 missing or empty (SSL certificate required)"; fi
+        }
+        check_digest() {
+          eval "val=\"\$$$1\""
+          if printf '%s' "$$val" | grep -Eq '^sha256:[0-9a-f]{64}$$'; then pass "$1 digest format OK";
+          else fail "$1 must be sha256 plus 64 lowercase hex characters"; fi
         }
         echo ""
         echo "--- Critical Secrets ---"
@@ -73,11 +78,11 @@ services:
         check_file "/etc/nginx/ssl/server.crt"
         check_file "/etc/nginx/ssl/server.key"
         echo ""
-        echo "--- Image Tags (must be pinned, not 'latest') ---"
-        check_not_empty "BACKEND_TAG"
-        check_not_empty "FRONTEND_TAG"
-        case "$$BACKEND_TAG" in latest) fail "BACKEND_TAG must not be 'latest'";; *) pass "BACKEND_TAG pinned to $$BACKEND_TAG";; esac
-        case "$$FRONTEND_TAG" in latest) fail "FRONTEND_TAG must not be 'latest'";; *) pass "FRONTEND_TAG pinned to $$FRONTEND_TAG";; esac
+        echo "--- Image Digests (immutable sha256) ---"
+        check_not_empty "BACKEND_DIGEST"
+        check_not_empty "FRONTEND_DIGEST"
+        check_digest "BACKEND_DIGEST"
+        check_digest "FRONTEND_DIGEST"
         echo ""
         echo "=== Preflight PASSED ==="
         exit 0
@@ -91,8 +96,8 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set in .env}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set in .env}
       - JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD:?JASYPT_ENCRYPTOR_PASSWORD must be set in .env}
-      - BACKEND_TAG=${BACKEND_TAG:?BACKEND_TAG must be set (e.g. git SHA)}
-      - FRONTEND_TAG=${FRONTEND_TAG:?FRONTEND_TAG must be set (e.g. git SHA)}
+      - BACKEND_DIGEST=${BACKEND_DIGEST:?BACKEND_DIGEST must be set (sha256:...)}
+      - FRONTEND_DIGEST=${FRONTEND_DIGEST:?FRONTEND_DIGEST must be set (sha256:...)}
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
     networks:
@@ -101,7 +106,7 @@ services:
   # MySQL 8.0 — database server
   # ===========================================================================
   mysql:
-    image: mysql:8.0
+    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
     container_name: cgc-pms-mysql
     restart: unless-stopped
     environment:
@@ -138,7 +143,7 @@ services:
   # Redis 7 — cache + session store + token blacklist
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     container_name: cgc-pms-redis
     restart: unless-stopped
     # NOTE: In production, Redis listens on the internal Docker network only.
@@ -166,7 +171,7 @@ services:
   # MinIO — S3-compatible object storage
   # ===========================================================================
   minio:
-    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z@sha256:9535594ad4122b7a78c6632788a989b96d9199b483d3bd71a5ceae73a922cdfa
     container_name: cgc-pms-minio
     restart: unless-stopped
     environment:
@@ -196,7 +201,7 @@ services:
   # ClamAV — real malware scanning, internal network only
   # ===========================================================================
   clamav:
-    image: clamav/clamav:1.4.3_base
+    image: clamav/clamav:1.4.3_base@sha256:629a3050df6a706aedb31859fbb8139e9aaf8f56b0ffefbf251b8358a7c9e76c
     container_name: cgc-pms-clamav
     restart: unless-stopped
     healthcheck:
@@ -216,9 +221,11 @@ services:
   # Backend — Spring Boot Java 21 REST API (:8080)
   # ===========================================================================
   backend:
-    image: ${REGISTRY_URL:-}cgc-pms-backend:${BACKEND_TAG:?BACKEND_TAG must be set}
+    image: ${REGISTRY_URL:-}cgc-pms-backend@${BACKEND_DIGEST:?BACKEND_DIGEST must be set}
     container_name: cgc-pms-backend
     restart: unless-stopped
+    # Compose local runtime and Swarm-compatible deploy metadata must agree.
+    mem_limit: 1G
     depends_on:
       preflight:
         condition: service_completed_successfully
@@ -270,6 +277,8 @@ services:
       CGCPMS_BOOTSTRAP_ADMIN_PASSWORD: ${CGCPMS_BOOTSTRAP_ADMIN_PASSWORD:-}
       # ---- CORS ----
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set in .env}
+    volumes:
+      - backend-heapdumps:/var/lib/cgc-pms/heapdumps
     # Backend port NOT exposed to host — only accessible via internal Docker network (frontend → backend proxy)
     # ports:
     #   - "8080:8080"
@@ -290,7 +299,7 @@ services:
   # Frontend — Nginx serving Vue 3 SPA + reverse proxy to backend (:80/:443)
   # ===========================================================================
   frontend:
-    image: ${REGISTRY_URL:-}cgc-pms-frontend:${FRONTEND_TAG:?FRONTEND_TAG must be set}
+    image: ${REGISTRY_URL:-}cgc-pms-frontend@${FRONTEND_DIGEST:?FRONTEND_DIGEST must be set}
     container_name: cgc-pms-frontend
     restart: unless-stopped
     depends_on:
@@ -332,3 +341,4 @@ volumes:
   mysql-data:
   redis-data:
   minio-data:
+  backend-heapdumps:

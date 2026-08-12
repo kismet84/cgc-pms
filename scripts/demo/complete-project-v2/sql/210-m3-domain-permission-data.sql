@@ -17,6 +17,12 @@ VALUES
   (520000000000013002,0,'demo.schedule.query',@demo_password_hash,'计划只读验收',NULL,'demo.schedule.query@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收')
 ON DUPLICATE KEY UPDATE real_name=VALUES(real_name),email=VALUES(email),org_id=VALUES(org_id),status='ENABLE',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
+-- V293 maps historical custom roles to EMPLOYEE. This task-owned identity must
+-- remain an exact query-only fixture when the package is replayed after V293.
+DELETE ur FROM sys_user_role ur
+JOIN sys_user u ON u.tenant_id=ur.tenant_id AND u.id=ur.user_id
+WHERE u.tenant_id=0 AND u.username='demo.schedule.query' AND u.deleted_flag=0;
+
 INSERT INTO sys_user_role (id,tenant_id,user_id,role_id) VALUES
   (520000000000013003,0,520000000000013002,520000000000013001)
 ON DUPLICATE KEY UPDATE role_id=VALUES(role_id);
@@ -43,6 +49,10 @@ INSERT INTO sys_user
 VALUES
   (520000000000013008,0,'demo.member-readonly',@demo_password_hash,'项目成员只读验收',NULL,'demo.member-readonly@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收')
 ON DUPLICATE KEY UPDATE real_name=VALUES(real_name),email=VALUES(email),org_id=VALUES(org_id),status='ENABLE',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
+
+DELETE ur FROM sys_user_role ur
+JOIN sys_user u ON u.tenant_id=ur.tenant_id AND u.id=ur.user_id
+WHERE u.tenant_id=0 AND u.username='demo.member-readonly' AND u.deleted_flag=0;
 
 INSERT INTO sys_user_role (id,tenant_id,user_id,role_id) VALUES
   (520000000000013009,0,520000000000013008,520000000000013007)

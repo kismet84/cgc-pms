@@ -12,6 +12,7 @@ $script:PrePrRequiredJobs = @(
   'backend-test',
   'backend-order-sensitive',
   'backend-dependency-scan',
+  'reliability-contracts',
   'backend-test-mysql',
   'frontend-lint',
   'type-check',

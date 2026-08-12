@@ -50,6 +50,22 @@ function Assert-ImmutableImageRefs([string]$Text,[string]$Name) {
   }
 }
 
+function Assert-ImmutableThirdPartyImageRefs([string]$Text,[string]$Name) {
+  foreach ($match in [regex]::Matches($Text,'(?m)^\s*image:\s*(?<ref>[^\s#]+)')) {
+    $ref = $match.Groups['ref'].Value
+    if (!$ref.Contains('cgc-pms-') -and $ref -notmatch '@sha256:[0-9a-f]{64}$') {
+      throw "$Name contains mutable third-party image: $ref"
+    }
+  }
+}
+
+function Assert-ImmutableDockerfileBaseRefs([string]$Text,[string]$Name) {
+  foreach ($match in [regex]::Matches($Text,'(?m)^FROM\s+(?<ref>[^\s]+)')) {
+    $ref = $match.Groups['ref'].Value
+    if ($ref -notmatch '@sha256:[0-9a-f]{64}$') { throw "$Name contains mutable base image: $ref" }
+  }
+}
+
 function Get-JobBlock([string]$Workflow,[string]$JobName) {
   $match = [regex]::Match($Workflow,"(?ms)^  $([regex]::Escape($JobName)):\r?\n(?<body>.*?)(?=^  [a-z0-9][a-z0-9-]*:\r?$|\z)")
   if (!$match.Success) { throw "workflow job block is missing: $JobName" }
@@ -124,6 +140,7 @@ function Assert-Rejected([scriptblock]$Action,[string]$Name) {
 
 $workflow = Read-RepoText '.github\workflows\ci.yml'
 $postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
+$supplyChainRescan = Read-RepoText '.github\workflows\supply-chain-rescan.yml'
 $postMergeVerifier = Read-RepoText 'scripts\ci\verify-post-merge-ci.ps1'
 $codeOwners = Read-RepoText '.github\CODEOWNERS'
 $backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
@@ -131,6 +148,8 @@ $frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
 $dependabot = Read-RepoText '.github\dependabot.yml'
 $dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
 $minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
+$prodCompose = Read-RepoText 'deploy\docker-compose.prod.yml'
+$frontendDockerfile = Read-RepoText 'frontend-admin-v2\Dockerfile'
 foreach ($mutableImageSample in @("services:`n  db:`n    image: postgres:latest", 'docker run --rm postgres:latest')) {
   $mutableImageRejected = $false
   try { Assert-ImmutableImageRefs $mutableImageSample 'contract self-check' } catch { $mutableImageRejected = $true }
@@ -138,9 +157,21 @@ foreach ($mutableImageSample in @("services:`n  db:`n    image: postgres:latest"
 }
 Assert-ImmutableActionRefs $workflow 'CI workflow'
 Assert-ImmutableActionRefs $postMergeWorkflow 'post-merge workflow'
+Assert-ImmutableActionRefs $supplyChainRescan 'supply-chain rescan workflow'
 Assert-ImmutableActionRefs $backendAction 'backend setup action'
 Assert-ImmutableActionRefs $frontendAction 'frontend setup action'
 Assert-ImmutableImageRefs "$workflow`n$dependencyScanScript`n$minioScript" 'CI execution inputs'
+Assert-ImmutableThirdPartyImageRefs $prodCompose 'production compose'
+Assert-ImmutableDockerfileBaseRefs $frontendDockerfile 'frontend Dockerfile'
+Assert-Contains $prodCompose @(
+  'cgc-pms-backend@${BACKEND_DIGEST:?BACKEND_DIGEST must be set}',
+  'cgc-pms-frontend@${FRONTEND_DIGEST:?FRONTEND_DIGEST must be set}',
+  "grep -Eq '^sha256:[0-9a-f]{64}`$`$'",'check_digest "BACKEND_DIGEST"','check_digest "FRONTEND_DIGEST"'
+) 'production application image digests'
+Assert-Contains $supplyChainRescan @(
+  'schedule:','cron:','workflow_dispatch:','permissions:','contents: read',
+  'bash ./scripts/ci/scan-backend-dependencies.sh','pnpm audit','${{ github.sha }}'
+) 'scheduled supply-chain rescan'
 Assert-Contains $workflow @(
   'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
   'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
@@ -162,7 +193,7 @@ Assert-SetEqual $actualJobs @($requiredJobs + 'build-summary') 'workflow jobs ve
 $summary = Get-JobBlock $workflow 'build-summary'
 $summaryNeeds = @([regex]::Matches($summary,'(?m)^      - ([a-z0-9][a-z0-9-]*)\r?$') | ForEach-Object { $_.Groups[1].Value })
 Assert-SetEqual $summaryNeeds $requiredJobs 'build-summary needs versus gate jobs'
-Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.sql-safety-scan.result','PR push evidence: ${{ needs.pr-push-evidence.result }}') 'build-summary'
+Assert-Contains $summary @('if: always()','## CI Build Summary','needs.backend-test.result','needs.reliability-contracts.result','needs.sql-safety-scan.result','PR push evidence: ${{ needs.pr-push-evidence.result }}') 'build-summary'
 
 $prPushEvidence = Get-JobBlock $workflow 'pr-push-evidence'
 $desktopLauncher = Get-JobBlock $workflow 'desktop-launcher'
@@ -170,6 +201,7 @@ $backendTest = Get-JobBlock $workflow 'backend-test'
 $backendOrder = Get-JobBlock $workflow 'backend-order-sensitive'
 $backendMySql = Get-JobBlock $workflow 'backend-test-mysql'
 $backendDependency = Get-JobBlock $workflow 'backend-dependency-scan'
+$reliabilityContracts = Get-JobBlock $workflow 'reliability-contracts'
 $frontendBuild = Get-JobBlock $workflow 'frontend-build'
 $frontendV2 = Get-JobBlock $workflow 'frontend-v2-gate'
 $supplyChain = Get-JobBlock $workflow 'supply-chain-security'
@@ -236,7 +268,8 @@ $timeoutMinutes = @{
   'backend-test' = 15
   'backend-order-sensitive' = 10
   'backend-dependency-scan' = 10
-  'backend-test-mysql' = 10
+  'reliability-contracts' = 15
+  'backend-test-mysql' = 20
   'frontend-lint' = 10
   'type-check' = 10
   'frontend-build' = 10
@@ -252,7 +285,7 @@ foreach ($entry in $timeoutMinutes.GetEnumerator()) {
   Assert-Contains (Get-JobBlock $workflow $entry.Key) @("timeout-minutes: $($entry.Value)") "$($entry.Key) timeout"
 }
 
-Assert-ActionStepInputs $workflow 'actions/checkout' 14 @(
+Assert-ActionStepInputs $workflow 'actions/checkout' 15 @(
   '(?m)^          persist-credentials: false\r?$'
 ) 'checkout'
 
@@ -296,15 +329,58 @@ Assert-Contains $backendOrder @(
   'Run historically order-sensitive classes under reverse class order',
   './mvnw -C -Ptest-order-independence -Djacoco.skip=true test'
 ) 'backend-order-sensitive'
+$mysqlMainSteps = @(Get-StepBlocks $backendMySql | Where-Object { $_.Contains('- name: Run MySQL migration, tenant scope, and concurrency tests') })
+$mysqlBaselineSteps = @(Get-StepBlocks $backendMySql | Where-Object { $_.Contains('- name: Run fresh MySQL baseline smoke test') })
+$mysqlUpgradeSteps = @(Get-StepBlocks $backendMySql | Where-Object { $_.Contains('- name: Run isolated MySQL baseline upgrade test') })
+if ($mysqlBaselineSteps.Count -ne 1 -or $mysqlMainSteps.Count -ne 1 -or $mysqlUpgradeSteps.Count -ne 1) {
+  throw 'backend-test-mysql must keep one fresh baseline, one main, and one isolated upgrade selector'
+}
+$mysqlBaselineStep = $mysqlBaselineSteps[0]
+$mysqlMainStep = $mysqlMainSteps[0]
+$mysqlUpgradeStep = $mysqlUpgradeSteps[0]
 Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
-  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest',
-  'CGCPMS_M52_MYSQL_BASELINE: "true"','CGCPMS_M70_MYSQL_CONCURRENCY: "true"',
-  'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: "true"'
+  'Prepare isolated MySQL upgrade schema','CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test',
+  'Verify isolated MySQL upgrade user scope','timeout-minutes: 20'
 ) 'backend-test-mysql'
+Assert-Contains $mysqlBaselineStep @(
+  '-Dtest=BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: "true"',
+  'jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}'
+) 'backend-test-mysql fresh baseline selector'
+if ($backendMySql.IndexOf($mysqlBaselineStep) -ge $backendMySql.IndexOf($mysqlMainStep)) {
+  throw 'fresh baseline smoke test must run before any main-schema integration fixtures'
+}
+Assert-Contains $mysqlMainStep @(
+  '-Dtest=FlywayMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest,CommunicationMySqlConcurrencyTest,CodeGenerationMySqlIntegrationTest,RbacTenantAssociationMySqlIsolationTest',
+  'CGCPMS_M70_MYSQL_CONCURRENCY: "true"',
+  'CGCPMS_M75_MYSQL_CONCURRENCY: "true"','CGCPMS_M81_MYSQL_CODE_GENERATION: "true"',
+  'CGCPMS_M92_MYSQL_TENANT_ASSOCIATION: "true"',
+  'CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: "true"',
+  'jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}'
+) 'backend-test-mysql main selector'
+foreach ($isolatedBaseline in @('BaselineMySqlSmokeTest','BaselineMySqlUpgradeTest')) {
+  if ($mysqlMainStep.Contains($isolatedBaseline)) {
+    throw "$isolatedBaseline must not share the main integration selector"
+  }
+}
+Assert-Contains $mysqlUpgradeStep @(
+  '-Dtest=BaselineMySqlUpgradeTest','CGCPMS_M52_MYSQL_UPGRADE: "true"',
+  'jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_UPGRADE_DATABASE }}'
+) 'backend-test-mysql upgrade selector'
+Assert-Contains $reliabilityContracts @(
+  './scripts/ci/test-runtime-deployment-contract.ps1',
+  'bash ./scripts/ci/test-backup-atomicity.sh',
+  './scripts/ci/test-backup-restore-drill.ps1',
+  'node scripts/codemap/test-generate-codemap.mjs',
+  'node scripts/codemap/generate-codemap.mjs --verify'
+) 'M92 reliability contracts'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
+foreach ($forbidden in @('test-runtime-deployment-contract.ps1','test-backup-restore-drill.ps1','test-backup-atomicity.sh')) {
+  if ($backendDependency.Contains($forbidden)) { throw "backend-dependency-scan contains reliability contract: $forbidden" }
+}
+Assert-Contains $backendTest @('./scripts/ci/test-coverage-contract.ps1') 'M92 coverage contract'
 Assert-Contains $frontendBuild @(
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
   'if-no-files-found: error','retention-days: 7'

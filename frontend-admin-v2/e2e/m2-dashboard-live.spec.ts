@@ -411,7 +411,7 @@ test.describe('M2 live eight-role dashboard', () => {
   })
 
   test('every role exposes scoped authoritative alerts without severity distortion', async ({
-    page,
+    context,
   }) => {
     const projectId = '520000000000009002'
     const roleCases = [
@@ -432,34 +432,39 @@ test.describe('M2 live eight-role dashboard', () => {
     }
 
     for (const roleCase of roleCases) {
-      expect((await page.goto(`/api/auth/dev-login?username=${roleCase.username}`))?.ok()).toBe(
-        true,
-      )
-      const alertResponse = page.waitForResponse((response) => {
-        const url = new URL(response.url())
-        return url.pathname === '/api/alerts' && url.searchParams.get('projectId') === projectId
-      })
-      await page.goto(`/dashboard?role=${roleCase.role}&projectId=${projectId}`)
-      const response = await alertResponse
-      expect(response.ok()).toBe(true)
-      const body = (await response.json()) as {
-        data: { records: Array<{ severity: string }> }
-      }
-      const riskBadges = page.locator('#risk-list .risk-level')
-      const pageSize = 10
-      const pageCount = Math.max(1, Math.ceil(body.data.records.length / pageSize))
-      for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-        const visibleRecords = body.data.records.slice(
-          pageIndex * pageSize,
-          (pageIndex + 1) * pageSize,
-        )
-        await expect(riskBadges).toHaveCount(visibleRecords.length)
-        expect(await riskBadges.allTextContents()).toEqual(
-          visibleRecords.map((record) => riskLabel(record.severity)),
-        )
-        if (pageIndex + 1 < pageCount) {
-          await page.getByRole('button', { name: '下一页', exact: true }).click()
+      const rolePage = await context.newPage()
+      try {
+        expect(
+          (await rolePage.goto(`/api/auth/dev-login?username=${roleCase.username}`))?.ok(),
+        ).toBe(true)
+        const alertResponse = rolePage.waitForResponse((response) => {
+          const url = new URL(response.url())
+          return url.pathname === '/api/alerts' && url.searchParams.get('projectId') === projectId
+        })
+        await rolePage.goto(`/dashboard?role=${roleCase.role}&projectId=${projectId}`)
+        const response = await alertResponse
+        expect(response.ok()).toBe(true)
+        const body = (await response.json()) as {
+          data: { records: Array<{ severity: string }> }
         }
+        const riskBadges = rolePage.locator('#risk-list .risk-level')
+        const pageSize = 10
+        const pageCount = Math.max(1, Math.ceil(body.data.records.length / pageSize))
+        for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+          const visibleRecords = body.data.records.slice(
+            pageIndex * pageSize,
+            (pageIndex + 1) * pageSize,
+          )
+          await expect(riskBadges).toHaveCount(visibleRecords.length)
+          expect(await riskBadges.allTextContents()).toEqual(
+            visibleRecords.map((record) => riskLabel(record.severity)),
+          )
+          if (pageIndex + 1 < pageCount) {
+            await rolePage.getByRole('button', { name: '下一页', exact: true }).click()
+          }
+        }
+      } finally {
+        await rolePage.close()
       }
     }
   })

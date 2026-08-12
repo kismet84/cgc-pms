@@ -63,6 +63,10 @@ describe('full V2 public context contract', () => {
       resolve(import.meta.dirname, '../../scripts/run-migration-ui-gate.mjs'),
       'utf-8',
     )
+    const playwrightConfig = readFileSync(
+      resolve(import.meta.dirname, '../../playwright.config.ts'),
+      'utf-8',
+    )
     const specGroups = readFileSync(
       resolve(import.meta.dirname, '../../scripts/e2e-spec-groups.mjs'),
       'utf-8',
@@ -95,5 +99,10 @@ describe('full V2 public context contract', () => {
     expect(liveEvidenceGate).toContain('LIVE_EVIDENCE_BACKEND_DATABASE_MISMATCH')
     expect(migrationGate).toContain('PLAYWRIGHT_MIGRATION_WORKERS')
     expect(migrationGate).toContain("'--workers', workers")
+    expect(migrationGate).toContain("'http://127.0.0.1:4173'")
+    expect(migrationGate).toContain("'pnpm dev --host 127.0.0.1 --port 4173 --strictPort'")
+    expect(migrationGate).toContain("process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER || 'false'")
+    expect(playwrightConfig).toContain('process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER')
+    expect(playwrightConfig).toContain('reuseExistingServer,')
   })
 })

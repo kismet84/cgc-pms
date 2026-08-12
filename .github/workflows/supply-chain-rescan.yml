@@ -1,0 +1,70 @@
+name: Supply Chain Rescan
+run-name: Supply Chain Rescan ${{ github.sha }}
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-dependency-rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-backend
+      - name: Scan backend dependencies
+        shell: bash
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          echo "commit=${GITHUB_SHA}" > "artifacts/backend-${GITHUB_SHA}.log"
+          bash ./scripts/ci/scan-backend-dependencies.sh 2>&1 | tee -a "artifacts/backend-${GITHUB_SHA}.log"
+      - name: Upload backend rescan result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: supply-chain-backend-${{ github.sha }}
+          path: artifacts/backend-${{ github.sha }}.log
+          if-no-files-found: error
+          retention-days: 30
+
+  frontend-dependency-rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          package_json_file: frontend-admin-v2/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend-admin-v2/pnpm-lock.yaml
+      - name: Install and audit frontend dependencies
+        shell: bash
+        working-directory: frontend-admin-v2
+        run: |
+          set -o pipefail
+          mkdir -p ../artifacts
+          echo "commit=${GITHUB_SHA}" > "../artifacts/frontend-${GITHUB_SHA}.log"
+          pnpm install --frozen-lockfile --ignore-scripts 2>&1 | tee -a "../artifacts/frontend-${GITHUB_SHA}.log"
+          pnpm audit --audit-level high --registry=https://registry.npmjs.org 2>&1 | tee -a "../artifacts/frontend-${GITHUB_SHA}.log"
+      - name: Upload frontend rescan result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: supply-chain-frontend-${{ github.sha }}
+          path: artifacts/frontend-${{ github.sha }}.log
+          if-no-files-found: error
+          retention-days: 30

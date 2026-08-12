@@ -259,7 +259,7 @@ class WorkflowCoreServiceTest {
         // Tenant 999 doesn't match USER_ADMIN's tenant (0)
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> approverResolver.resolve(config, 999L, null));
-        assertEquals("WORKFLOW_APPROVER_INVALID", ex.getCode());
+        assertEquals("TENANT_CONTEXT_MISMATCH", ex.getCode());
     }
 
     @Test

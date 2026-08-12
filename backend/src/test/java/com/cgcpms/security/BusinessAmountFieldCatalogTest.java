@@ -3,6 +3,7 @@ package com.cgcpms.security;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.closeout.controller.ProjectCloseoutController;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
@@ -17,6 +18,7 @@ import com.cgcpms.site.vo.SiteDailyDeliveryVO;
 import com.cgcpms.site.vo.SiteDailyLogVO;
 import com.cgcpms.site.vo.SiteDailyPlannedTaskVO;
 import com.cgcpms.site.vo.SiteDailyRequisitionVO;
+import com.cgcpms.tech.controller.TechnicalManagementController;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -191,6 +193,90 @@ class BusinessAmountFieldCatalogTest {
         assertEquals(0, new BigDecimal("0.40")
                 .compareTo(result.at("/data/writeOffRate").decimalValue()));
         assertTrue(result.at("/data/allocations/0/allocated_amount").isNull());
+    }
+
+    @Test
+    void redactsCloseoutOverviewAmountsThroughEndpointContract() throws NoSuchMethodException {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("detailPageNo", 1);
+        data.put("wbsReadiness", Map.of(
+                "totalTasks", 1L,
+                "incompleteTasks", new BigDecimal("0")));
+        data.put("settlements", List.of(Map.of(
+                "id", 11L,
+                "grossAmount", new BigDecimal("100.00"),
+                "retentionAmount", new BigDecimal("5.00"),
+                "netReceivableAmount", new BigDecimal("95.00"))));
+        data.put("receivables", List.of(Map.of(
+                "originalAmount", new BigDecimal("95.00"),
+                "collectedAmount", new BigDecimal("90.00"),
+                "outstandingAmount", new BigDecimal("5.00"))));
+        data.put("warranties", List.of(Map.of("warrantyAmount", new BigDecimal("5.00"))));
+        data.put("wbsTasks", List.of(Map.of(
+                "id", 21L,
+                "actualProgress", new BigDecimal("75.00"))));
+        MethodParameter returnType = new MethodParameter(ProjectCloseoutController.class
+                .getDeclaredMethod("overview", Long.class, int.class, int.class), -1);
+
+        JsonNode result = BusinessAmountFieldCatalog.redact(
+                objectMapper, returnType, ApiResponse.success(data));
+
+        assertEquals(1, result.at("/data/detailPageNo").intValue());
+        assertEquals(0, result.at("/data/wbsReadiness/incompleteTasks").decimalValue()
+                .compareTo(BigDecimal.ZERO));
+        assertEquals(1L, result.at("/data/wbsReadiness/totalTasks").longValue());
+        assertEquals(11L, result.at("/data/settlements/0/id").longValue());
+        assertTrue(result.at("/data/settlements/0/grossAmount").isNull());
+        assertTrue(result.at("/data/settlements/0/retentionAmount").isNull());
+        assertTrue(result.at("/data/settlements/0/netReceivableAmount").isNull());
+        assertTrue(result.at("/data/receivables/0/originalAmount").isNull());
+        assertTrue(result.at("/data/receivables/0/collectedAmount").isNull());
+        assertTrue(result.at("/data/receivables/0/outstandingAmount").isNull());
+        assertTrue(result.at("/data/warranties/0/warrantyAmount").isNull());
+        assertEquals(0, new BigDecimal("75.00")
+                .compareTo(result.at("/data/wbsTasks/0/actualProgress").decimalValue()));
+        assertEquals(21L, result.at("/data/wbsTasks/0/id").longValue());
+    }
+
+    @Test
+    void preservesTechnicalOverviewProgressAndQuantityThroughEndpointContract() throws NoSuchMethodException {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("constructionFacts", List.of(Map.of(
+                "progressId", 31L,
+                "currentProgress", new BigDecimal("62.50"),
+                "completedQuantity", new BigDecimal("18.75"))));
+        MethodParameter returnType = new MethodParameter(TechnicalManagementController.class
+                .getDeclaredMethod("overview", Long.class), -1);
+
+        JsonNode result = BusinessAmountFieldCatalog.redact(
+                objectMapper, returnType, ApiResponse.success(data));
+
+        assertEquals(31L, result.at("/data/constructionFacts/0/progressId").longValue());
+        assertEquals(0, new BigDecimal("62.50")
+                .compareTo(result.at("/data/constructionFacts/0/currentProgress").decimalValue()));
+        assertEquals(0, new BigDecimal("18.75")
+                .compareTo(result.at("/data/constructionFacts/0/completedQuantity").decimalValue()));
+
+        data.put("unreviewedDecimal", new BigDecimal("1.25"));
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> BusinessAmountFieldCatalog.redact(
+                        objectMapper, returnType, ApiResponse.success(data)));
+        assertEquals("AMOUNT_SCHEMA_UNCLASSIFIED", exception.getCode());
+    }
+
+    @Test
+    void redactsTechnicalTraceApprovalAmountThroughEndpointContract() throws NoSuchMethodException {
+        Map<String, Object> data = Map.of("schemeApprovals", List.of(Map.of(
+                "id", 41L,
+                "amount", new BigDecimal("125.00"))));
+        MethodParameter returnType = new MethodParameter(TechnicalManagementController.class
+                .getDeclaredMethod("trace", Long.class), -1);
+
+        JsonNode result = BusinessAmountFieldCatalog.redact(
+                objectMapper, returnType, ApiResponse.success(data));
+
+        assertEquals(41L, result.at("/data/schemeApprovals/0/id").longValue());
+        assertTrue(result.at("/data/schemeApprovals/0/amount").isNull());
     }
 
     @Test

@@ -1,50 +1,66 @@
-#!/bin/bash
-# CGC-PMS MySQL Full Backup Script
+#!/usr/bin/env bash
+# Create one verified MySQL archive inside the supplied directory.
 # Usage: ./backup-mysql-full.sh [backup_dir]
-# M-020: Created per backup recovery plan documentation
 
 set -euo pipefail
 
-# Scheduling (choose one):
-#   crontab:  0 2 * * * /opt/cgc-pms/scripts/backup-mysql-full.sh
-#   systemd:  See deploy/backup/cgc-pms-backup.service + .timer
-
 BACKUP_DIR="${1:-/opt/cgc-pms/backups/mysql}"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+TIMESTAMP="${BACKUP_TIMESTAMP:-$(date +%Y%m%d_%H%M%S)}"
 BACKUP_FILE="${BACKUP_DIR}/cgc_pms_full_${TIMESTAMP}.sql.gz"
+PARTIAL_FILE="${BACKUP_FILE}.partial"
+VALIDATION_SQL="${BACKUP_DIR}/.cgc_pms_full_${TIMESTAMP}.validation.sql.partial"
 MYSQL_HOST="${MYSQL_HOST:-mysql}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
-MYSQL_PASSWORD="${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set — source from deploy/.env}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set - source from deploy/.env}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-cgc_pms}"
 MYSQL_CONTAINER="${MYSQL_CONTAINER:-cgc-pms-mysql}"
 
+[[ "${TIMESTAMP}" =~ ^[0-9]{8}_[0-9]{6}$ ]] || {
+  echo "Invalid BACKUP_TIMESTAMP: ${TIMESTAMP}" >&2
+  exit 1
+}
+[[ "${MYSQL_DATABASE}" =~ ^[A-Za-z0-9_]+$ ]] || {
+  echo "Invalid MYSQL_DATABASE: ${MYSQL_DATABASE}" >&2
+  exit 1
+}
+
+cleanup() {
+  rm -f -- "${PARTIAL_FILE}" "${VALIDATION_SQL}"
+}
+trap cleanup EXIT
+
 mkdir -p "${BACKUP_DIR}"
+if [[ -e "${BACKUP_FILE}" || -e "${PARTIAL_FILE}" ]]; then
+  echo "Backup target already exists: ${BACKUP_FILE}" >&2
+  exit 1
+fi
 
 echo "[$(date)] Starting MySQL full backup..."
-
-docker exec "${MYSQL_CONTAINER}" \
+MYSQL_PWD="${MYSQL_PASSWORD}" docker exec -e MYSQL_PWD "${MYSQL_CONTAINER}" \
   mysqldump \
     --host="${MYSQL_HOST}" \
     --port="${MYSQL_PORT}" \
     --user="${MYSQL_USER}" \
-    --password="${MYSQL_PASSWORD}" \
     --single-transaction \
     --routines \
     --triggers \
     --events \
     --set-gtid-purged=OFF \
     "${MYSQL_DATABASE}" \
-  | gzip > "${BACKUP_FILE}"
+  | gzip > "${PARTIAL_FILE}"
 
-if [ $? -eq 0 ] && [ -s "${BACKUP_FILE}" ]; then
-    echo "[$(date)] Backup successful: ${BACKUP_FILE} ($(du -h ${BACKUP_FILE} | cut -f1))"
-else
-    echo "[$(date)] Backup FAILED!"
-    rm -f "${BACKUP_FILE}"
-    exit 1
-fi
+[[ -s "${PARTIAL_FILE}" ]] || { echo 'MySQL backup is empty' >&2; exit 1; }
+gzip -t "${PARTIAL_FILE}"
+gzip -dc "${PARTIAL_FILE}" > "${VALIDATION_SQL}"
+grep -qE '(CREATE TABLE|INSERT INTO|DROP TABLE|CREATE DATABASE)' "${VALIDATION_SQL}" || {
+  echo 'MySQL backup does not contain a valid SQL dump signature' >&2
+  exit 1
+}
 
-# Cleanup: keep last 7 daily backups
-find "${BACKUP_DIR}" -name "cgc_pms_full_*.sql.gz" -mtime +7 -delete
-echo "[$(date)] Cleaned up backups older than 7 days"
+mv -- "${PARTIAL_FILE}" "${BACKUP_FILE}"
+rm -f -- "${VALIDATION_SQL}"
+trap - EXIT
+
+echo "[$(date)] MySQL backup verified: ${BACKUP_FILE}"
+printf '%s\n' "${BACKUP_FILE}"

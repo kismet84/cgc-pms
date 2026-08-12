@@ -39,7 +39,7 @@ public class CorsConfig implements WebMvcConfigurer {
         registry.addMapping("/**")
                 .allowedOrigins(configuredOrigins)
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type", "X-Refresh-Token")
+                .allowedHeaders("Authorization", "Content-Type", "X-Refresh-Token", "X-XSRF-TOKEN")
                 .allowCredentials(true);
     }
 

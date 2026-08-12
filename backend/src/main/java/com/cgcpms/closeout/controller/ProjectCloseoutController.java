@@ -20,8 +20,11 @@ public class ProjectCloseoutController {
 
     @GetMapping("/overview")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('closeout:query')")
-    public ApiResponse<Map<String, Object>> overview(@RequestParam Long projectId) {
-        return ApiResponse.success(service.overview(projectId));
+    public ApiResponse<Map<String, Object>> overview(
+            @RequestParam Long projectId,
+            @RequestParam(defaultValue = "1") int detailPageNo,
+            @RequestParam(defaultValue = "100") int detailPageSize) {
+        return ApiResponse.success(service.overview(projectId, detailPageNo, detailPageSize));
     }
 
     @GetMapping("/page")

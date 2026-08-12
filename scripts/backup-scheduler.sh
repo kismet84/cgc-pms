@@ -1,96 +1,54 @@
-#!/bin/bash
-# CGC-PMS Daily Backup Scheduler
-# Usage: ./backup-scheduler.sh [mysql|minio|all]
-# M-020: Orchestrates daily backup via systemd timer or cron
-#
-# Scheduling options:
-#   systemd timer: see docs/standards/10-部署运维手册.md for setup instructions
-#   cron:         0 2 * * * /opt/cgc-pms/scripts/backup-scheduler.sh all >> /var/log/cgc-pms-backup.log 2>&1
+#!/usr/bin/env bash
+# CGC-PMS daily backup scheduler.
+# Usage: ./backup-scheduler.sh [all|mysql|minio]
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${LOG_FILE:-/var/log/cgc-pms-backup.log}"
+BACKUP_ROOT="${BACKUP_ROOT:-/opt/cgc-pms/backups}"
 TARGET="${1:-all}"
-FAILED=0
-
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
-}
-
-run_mysql_backup() {
-    log "=== Starting MySQL backup ==="
-    if [ -x "${SCRIPT_DIR}/backup-mysql-full.sh" ]; then
-        if "${SCRIPT_DIR}/backup-mysql-full.sh" >> "${LOG_FILE}" 2>&1; then
-            log "MySQL backup completed successfully"
-        else
-            local exit_code=$?
-            FAILED=1
-            log "MySQL backup FAILED (exit code: ${exit_code})"
-        fi
-    else
-        FAILED=1
-        log "WARN: backup-mysql-full.sh not found or not executable"
-    fi
-}
-
-run_minio_backup() {
-    log "=== Starting MinIO backup ==="
-    if [ -x "${SCRIPT_DIR}/backup-minio-mirror.sh" ]; then
-        if "${SCRIPT_DIR}/backup-minio-mirror.sh" >> "${LOG_FILE}" 2>&1; then
-            log "MinIO backup completed successfully"
-        else
-            local exit_code=$?
-            FAILED=1
-            log "MinIO backup FAILED (exit code: ${exit_code})"
-        fi
-    else
-        FAILED=1
-        log "WARN: backup-minio-mirror.sh not found or not executable"
-    fi
-}
-
-run_verify() {
-    log "=== Running backup verification ==="
-    if [ -x "${SCRIPT_DIR}/backup-verify.sh" ]; then
-        if "${SCRIPT_DIR}/backup-verify.sh" >> "${LOG_FILE}" 2>&1; then
-            log "Backup verification passed"
-        else
-            local exit_code=$?
-            FAILED=1
-            log "Backup verification FAILED (exit code: ${exit_code})"
-        fi
-    else
-        FAILED=1
-        log "WARN: backup-verify.sh not found or not executable"
-    fi
-}
 
 mkdir -p "$(dirname "${LOG_FILE}")"
 
-log "CGC-PMS Backup Scheduler started — target: ${TARGET}"
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
+}
 
+run_logged() {
+  local name="$1"
+  shift
+  log "=== Starting ${name} ==="
+  if "$@" >> "${LOG_FILE}" 2>&1; then
+    log "${name} completed successfully"
+  else
+    local exit_code=$?
+    log "${name} FAILED (exit code: ${exit_code})"
+    return "${exit_code}"
+  fi
+}
+
+log "CGC-PMS backup scheduler started - target: ${TARGET}"
 case "${TARGET}" in
-    mysql)
-        run_mysql_backup
-        ;;
-    minio)
-        run_minio_backup
-        ;;
-    all)
-        run_mysql_backup
-        run_minio_backup
-        run_verify
-        ;;
-    *)
-        log "ERROR: Unknown target '${TARGET}'. Use: mysql|minio|all"
-        exit 1
-        ;;
+  all)
+    # Only this path is scheduled: one verified batch becomes visible atomically.
+    run_logged 'atomic MySQL + MinIO backup batch' \
+      bash "${SCRIPT_DIR}/backup-batch.sh" "${BACKUP_ROOT}"
+    ;;
+  mysql)
+    # Manual component diagnostic. It is not a COMPLETE batch and has no retention.
+    run_logged 'standalone MySQL backup diagnostic' \
+      bash "${SCRIPT_DIR}/backup-mysql-full.sh" "${BACKUP_ROOT}/mysql-diagnostics"
+    ;;
+  minio)
+    # Manual component diagnostic. It is not a COMPLETE batch and has no retention.
+    run_logged 'standalone MinIO backup diagnostic' \
+      env BACKUP_DIR="${BACKUP_ROOT}/minio-diagnostics" bash "${SCRIPT_DIR}/backup-minio-mirror.sh"
+    ;;
+  *)
+    log "ERROR: Unknown target '${TARGET}'. Use: all|mysql|minio"
+    exit 1
+    ;;
 esac
 
-if [ "${FAILED}" -ne 0 ]; then
-    log "CGC-PMS Backup Scheduler finished with failures"
-    exit 1
-fi
-
-log "CGC-PMS Backup Scheduler finished"
+log 'CGC-PMS backup scheduler finished'

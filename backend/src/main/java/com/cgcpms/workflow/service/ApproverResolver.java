@@ -1,6 +1,7 @@
 package com.cgcpms.workflow.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.entity.OrgPosition;
 import com.cgcpms.org.mapper.OrgPositionMapper;
@@ -65,6 +66,30 @@ public class ApproverResolver {
 
     public List<Long> resolve(String approverConfig, Long tenantId, Long projectId,
                               WorkflowSecurityPolicy policy) {
+        if (tenantId == null) {
+            throw new BusinessException("TENANT_CONTEXT_REQUIRED", "缺少租户上下文");
+        }
+        UserContext.Snapshot previousContext = UserContext.capture();
+        Long currentTenantId = previousContext.tenantId();
+        if (currentTenantId != null && !Objects.equals(currentTenantId, tenantId)) {
+            throw new BusinessException("TENANT_CONTEXT_MISMATCH", "审批解析租户与当前上下文不一致");
+        }
+        boolean scopedTenant = currentTenantId == null;
+        if (scopedTenant) {
+            UserContext.restore(new UserContext.Snapshot(previousContext.userId(), previousContext.username(),
+                    tenantId, previousContext.roles()));
+        }
+        try {
+            return resolveWithinTenant(approverConfig, tenantId, projectId, policy);
+        } finally {
+            if (scopedTenant) {
+                UserContext.restore(previousContext);
+            }
+        }
+    }
+
+    private List<Long> resolveWithinTenant(String approverConfig, Long tenantId, Long projectId,
+                                           WorkflowSecurityPolicy policy) {
         if (approverConfig == null || approverConfig.isBlank() || "{}".equals(approverConfig.trim())) {
             throw new BusinessException("NO_APPROVER", "审批节点未配置审批人");
         }

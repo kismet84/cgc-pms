@@ -30,6 +30,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ProjectCloseoutService {
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
+    private static final int OVERVIEW_DETAIL_MAX_PAGE_SIZE = 100;
 
     private final JdbcTemplate jdbc;
     private final BusinessCodeGenerator businessCodeGenerator;
@@ -37,32 +38,72 @@ public class ProjectCloseoutService {
     private final ProjectAccessChecker projectAccessChecker;
     private final ProjectCloseGateService closeGateService;
 
+    @Transactional(readOnly = true)
     public Map<String, Object> overview(Long projectId) {
+        return overview(projectId, 1, OVERVIEW_DETAIL_MAX_PAGE_SIZE);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> overview(Long projectId, int detailPageNo, int detailPageSize) {
         projectAccessChecker.checkAccess(projectId, "查看项目竣工收尾工作台");
+        int safePageNo = Math.max(1, detailPageNo);
+        int safePageSize = Math.min(OVERVIEW_DETAIL_MAX_PAGE_SIZE, Math.max(1, detailPageSize));
+        long detailOffset = (long) (safePageNo - 1) * safePageSize;
+        Long tenantId = tenant();
         Map<String, Object> result = new LinkedHashMap<>();
         Map<String, Object> closeout = findOne("""
                 SELECT c.id,c.project_id projectId,c.closeout_code closeoutCode,c.planned_completion_date plannedCompletionDate,
                  c.actual_completion_date actualCompletionDate,c.status,c.final_owner_settlement_id finalOwnerSettlementId,
                  c.tail_collection_verified_at tailCollectionVerifiedAt,c.closed_at closedAt,c.remark
                 FROM project_closeout c WHERE c.tenant_id=? AND c.project_id=? AND c.deleted_flag=0
-                """, tenant(), projectId);
+                """, tenantId, projectId);
         result.put("closeout", closeout);
         result.put("stageGates", closeout == null ? Map.of()
                 : closeGateService.gates(longValue(closeout.get("id")), projectId));
+        result.put("detailPageNo", safePageNo);
+        result.put("detailPageSize", safePageSize);
+        result.put("detailTotals", jdbc.queryForMap("""
+                SELECT
+                 (SELECT COUNT(*) FROM closeout_section_acceptance
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) sectionAcceptances,
+                 (SELECT COUNT(*) FROM closeout_final_acceptance
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) finalAcceptances,
+                 (SELECT COUNT(*) FROM owner_settlement
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) settlements,
+                 (SELECT COUNT(*) FROM account_receivable
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) receivables,
+                 (SELECT COUNT(*) FROM closeout_warranty
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) warranties,
+                 (SELECT COUNT(*) FROM closeout_defect
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) defects,
+                 (SELECT COUNT(*) FROM closeout_archive_transfer
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) archiveTransfers,
+                 (SELECT COUNT(*) FROM project_wbs_task w
+                   JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                   WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                    AND p.status='ACTIVE' AND p.deleted_flag=0) wbsTasks,
+                 (SELECT COUNT(*) FROM qs_inspection_record
+                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) qualityInspections
+                """, tenantId, projectId, tenantId, projectId, tenantId, projectId,
+                tenantId, projectId, tenantId, projectId, tenantId, projectId,
+                tenantId, projectId, tenantId, projectId, tenantId, projectId));
         result.put("sectionAcceptances", jdbc.queryForList("""
                 SELECT a.id,a.closeout_id closeoutId,a.wbs_task_id wbsTaskId,w.task_code taskCode,w.task_name taskName,
                  a.quality_inspection_id qualityInspectionId,a.acceptance_code acceptanceCode,a.acceptance_name acceptanceName,
                  a.acceptance_date acceptanceDate,a.conclusion,a.status,a.confirmed_at confirmedAt,a.remark
-                FROM closeout_section_acceptance a JOIN project_wbs_task w ON w.id=a.wbs_task_id
+                FROM closeout_section_acceptance a
+                JOIN project_wbs_task w ON w.id=a.wbs_task_id AND w.tenant_id=a.tenant_id AND w.deleted_flag=0
                 WHERE a.tenant_id=? AND a.project_id=? AND a.deleted_flag=0 ORDER BY a.acceptance_date,a.id
-                """, tenant(), projectId));
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("finalAcceptances", jdbc.queryForList("""
                 SELECT id,closeout_id closeoutId,acceptance_code acceptanceCode,acceptance_date acceptanceDate,
                  organizer,participant_summary participantSummary,conclusion,acceptance_summary acceptanceSummary,
                  status,approval_instance_id approvalInstanceId,approved_at approvedAt,remark
                 FROM closeout_final_acceptance WHERE tenant_id=? AND project_id=? AND deleted_flag=0
-                ORDER BY created_at DESC
-                """, tenant(), projectId));
+                ORDER BY created_at DESC,id DESC
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("settlements", jdbc.queryForList("""
                 SELECT s.id,s.contract_id contractId,s.settlement_code settlementCode,s.settlement_date settlementDate,
                  s.gross_amount grossAmount,s.retention_amount retentionAmount,s.net_receivable_amount netReceivableAmount,
@@ -70,34 +111,39 @@ public class ProjectCloseoutService {
                 FROM owner_settlement s
                 WHERE s.tenant_id=? AND s.project_id=? AND s.deleted_flag=0
                 ORDER BY s.settlement_date DESC,s.id DESC
-                """, tenant(), projectId));
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("receivables", jdbc.queryForList("""
                 SELECT r.id,r.settlement_id settlementId,r.contract_id contractId,r.receivable_type receivableType,
                  r.receivable_code receivableCode,r.original_amount originalAmount,r.collected_amount collectedAmount,
                  r.outstanding_amount outstandingAmount,r.due_date dueDate,r.status
                 FROM account_receivable r
                 WHERE r.tenant_id=? AND r.project_id=? AND r.deleted_flag=0 ORDER BY r.settlement_id,r.receivable_type,r.id
-                """, tenant(), projectId));
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("warranties", jdbc.queryForList("""
                 SELECT id,closeout_id closeoutId,contract_id contractId,receivable_id receivableId,warranty_code warrantyCode,
                  warranty_amount warrantyAmount,warranty_start_date warrantyStartDate,warranty_end_date warrantyEndDate,
                  responsible_user_id responsibleUserId,status,released_at releasedAt,remark
-                FROM closeout_warranty WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC
-                """, tenant(), projectId));
+                FROM closeout_warranty WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC,id DESC
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("defects", jdbc.queryForList("""
             SELECT id,warranty_id warrantyId,defect_code defectCode,defect_title defectTitle,
                  defect_description defectDescription,responsible_user_id responsibleUserId,
                  rectification_deadline rectificationDeadline,status,
                  rectified_by rectifiedBy,rectified_at rectifiedAt,verified_by verifiedBy,verified_at verifiedAt,
                  verification_comment verificationComment,remark
-                FROM closeout_defect WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC
-                """, tenant(), projectId));
+                FROM closeout_defect WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC,id DESC
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("archiveTransfers", jdbc.queryForList("""
                 SELECT id,closeout_id closeoutId,transfer_code transferCode,transfer_date transferDate,
                  recipient_organization recipientOrganization,recipient_name recipientName,archive_location archiveLocation,
                  transfer_scope transferScope,status,accepted_at acceptedAt,remark
-                FROM closeout_archive_transfer WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC
-                """, tenant(), projectId));
+                FROM closeout_archive_transfer WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC,id DESC
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("wbsReadiness", jdbc.queryForMap("""
                 SELECT COUNT(*) totalTasks,
                  COALESCE(SUM(CASE WHEN w.status='COMPLETED' THEN 0 ELSE 1 END),0) incompleteTasks
@@ -105,7 +151,7 @@ public class ProjectCloseoutService {
                 JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
                 WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
                  AND p.status='ACTIVE' AND p.deleted_flag=0
-                """, tenant(), projectId));
+                """, tenantId, projectId));
         result.put("wbsTasks", jdbc.queryForList("""
                 SELECT w.id,w.task_code taskCode,w.task_name taskName,w.work_area workArea,w.status,w.actual_progress actualProgress
                 FROM project_wbs_task w
@@ -113,12 +159,14 @@ public class ProjectCloseoutService {
                 WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
                  AND p.status='ACTIVE' AND p.deleted_flag=0
                 ORDER BY w.sort_order,w.id
-                """, tenant(), projectId));
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         result.put("qualityInspections", jdbc.queryForList("""
                 SELECT id,wbs_task_id wbsTaskId,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
                 FROM qs_inspection_record WHERE tenant_id=? AND project_id=? AND deleted_flag=0
                 ORDER BY inspection_date DESC,id DESC
-                """, tenant(), projectId));
+                LIMIT ? OFFSET ?
+                """, tenantId, projectId, safePageSize, detailOffset));
         return result;
     }
 

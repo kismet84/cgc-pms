@@ -130,6 +130,9 @@ jobs:
         run: cd backend && ./mvnw -C verify
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
+      - name: Verify staged coverage contract
+        shell: pwsh
+        run: ./scripts/ci/test-coverage-contract.ps1
       - name: Summarize backend tests
         if: always()
         shell: pwsh
@@ -190,13 +193,36 @@ jobs:
       - name: Scan backend high and critical library vulnerabilities
         run: bash ./scripts/ci/scan-backend-dependencies.sh
 
+  reliability-contracts:
+    needs: pr-push-evidence
+    if: needs.pr-push-evidence.outputs.run-full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify deployment and backup contracts
+        shell: pwsh
+        run: |
+          ./scripts/ci/test-runtime-deployment-contract.ps1
+          ./scripts/ci/test-backup-restore-drill.ps1
+      - name: Verify backup failure atomicity
+        shell: bash
+        run: bash ./scripts/ci/test-backup-atomicity.sh
+      - name: Verify Codemap generator and current snapshot
+        run: |
+          node scripts/codemap/test-generate-codemap.mjs
+          node scripts/codemap/generate-codemap.mjs --verify
+
   backend-test-mysql:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       CI_MYSQL_DATABASE: cgc_pms_test
+      CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test
       CI_MYSQL_USER: cgc_test
       CI_MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD || format('ci-mysql-{0}', github.run_id) }}
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
@@ -227,14 +253,44 @@ jobs:
       - name: Verify MySQL migration user scope
         shell: bash
         run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
-      - name: Run MySQL migration, tenant scope, and concurrency tests
-        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest test -Dspring.profiles.active=test
+      - name: Prepare isolated MySQL upgrade schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CI_MYSQL_UPGRADE_DATABASE" =~ ^[a-z0-9_]+$ ]]
+          [[ "$CI_MYSQL_USER" =~ ^[a-z0-9_]+$ ]]
+          docker exec -e "MYSQL_PWD=$CI_MYSQL_ROOT_PASSWORD" "${{ job.services.mysql.id }}" \
+            mysql -uroot -e "CREATE DATABASE \`$CI_MYSQL_UPGRADE_DATABASE\`; GRANT ALL PRIVILEGES ON \`$CI_MYSQL_UPGRADE_DATABASE\`.* TO '$CI_MYSQL_USER'@'%'; FLUSH PRIVILEGES;"
+      - name: Verify isolated MySQL upgrade user scope
+        shell: bash
+        env:
+          CI_MYSQL_DATABASE: ${{ env.CI_MYSQL_UPGRADE_DATABASE }}
+        run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
+      - name: Run fresh MySQL baseline smoke test
+        run: cd backend && ./mvnw -C -Dtest=BaselineMySqlSmokeTest test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
           CGCPMS_M52_MYSQL_BASELINE: "true"
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
+          SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
+      - name: Run MySQL migration, tenant scope, and concurrency tests
+        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BidProjectScopeMySqlTest,PaymentMySqlConcurrencyTest,MdMaterialDeleteMySqlConcurrencyTest,CommunicationMySqlConcurrencyTest,CodeGenerationMySqlIntegrationTest,RbacTenantAssociationMySqlIsolationTest test -Dspring.profiles.active=test
+        env:
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
           CGCPMS_M70_MYSQL_CONCURRENCY: "true"
+          CGCPMS_M75_MYSQL_CONCURRENCY: "true"
+          CGCPMS_M81_MYSQL_CODE_GENERATION: "true"
+          CGCPMS_M92_MYSQL_TENANT_ASSOCIATION: "true"
           CGCPMS_MATERIAL_DELETE_MYSQL_CONCURRENCY: "true"
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
+          SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
+      - name: Run isolated MySQL baseline upgrade test
+        run: cd backend && ./mvnw -C -Dtest=BaselineMySqlUpgradeTest test -Dspring.profiles.active=test
+        env:
+          CGCPMS_M52_MYSQL_UPGRADE: "true"
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_UPGRADE_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
       - name: Upload MySQL smoke test reports
@@ -525,6 +581,7 @@ jobs:
       - backend-test
       - backend-order-sensitive
       - backend-dependency-scan
+      - reliability-contracts
       - backend-test-mysql
       - frontend-lint
       - type-check
@@ -544,7 +601,7 @@ jobs:
             echo "- Run number: ${{ github.run_number }}"
             echo "- Commit SHA: ${{ github.sha }}"
             echo "- PR push evidence: ${{ needs.pr-push-evidence.result }}"
-            echo "- Core gate jobs: pr-push-evidence, desktop-launcher, backend-test, backend-order-sensitive, backend-dependency-scan, backend-test-mysql, frontend-lint, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, sql-safety-scan, supply-chain-security, e2e (browser contract)"
+            echo "- Core gate jobs: pr-push-evidence, desktop-launcher, backend-test, backend-order-sensitive, backend-dependency-scan, reliability-contracts, backend-test-mysql, frontend-lint, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, sql-safety-scan, supply-chain-security, e2e (browser contract)"
             echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_TEST_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
             echo ""
             echo "### Job Results"
@@ -552,6 +609,7 @@ jobs:
             echo "- backend-test: ${{ needs.backend-test.result }}"
             echo "- backend-order-sensitive: ${{ needs.backend-order-sensitive.result }}"
             echo "- backend-dependency-scan: ${{ needs.backend-dependency-scan.result }}"
+            echo "- reliability-contracts: ${{ needs.reliability-contracts.result }}"
             echo "- backend-test-mysql: ${{ needs.backend-test-mysql.result }}"
             echo "- frontend-lint: ${{ needs.frontend-lint.result }}"
             echo "- type-check: ${{ needs.type-check.result }}"

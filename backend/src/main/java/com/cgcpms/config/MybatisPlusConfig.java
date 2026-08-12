@@ -39,15 +39,17 @@ public class MybatisPlusConfig {
         // Block full-table update / delete operations
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
 
+        // Association mappers require an authenticated or explicitly scoped tenant.
+        interceptor.addInnerInterceptor(new RbacTenantContextInnerInterceptor());
+
         // Tenant isolation: auto-inject tenant_id into every query
         interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
             @Override
             public Expression getTenantId() {
                 Long tenantId = UserContext.getCurrentTenantId();
-                if (tenantId == null) {
-                    return new LongValue(0);
-                }
-                return new LongValue(tenantId);
+                // Keep tenant-0 fallback for legacy startup/scheduled discovery paths. RBAC
+                // association mappers apply the stricter missing-context guard above.
+                return new LongValue(tenantId == null ? 0L : tenantId);
             }
 
             @Override
@@ -57,12 +59,8 @@ public class MybatisPlusConfig {
 
             @Override
             public boolean ignoreTable(String tableName) {
-                // Tables without tenant_id — tenant isolation is enforced
-                // through their related parent entities (e.g. sys_user, sys_role).
                 // Workflow templates are shared across tenants (tenant_id=0 fallback).
-                return "sys_user_role".equals(tableName)
-                        || "sys_role_menu".equals(tableName)
-                        || "wf_template".equals(tableName)
+                return "wf_template".equals(tableName)
                         || "wf_template_node".equals(tableName);
             }
         }));
