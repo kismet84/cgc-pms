@@ -202,6 +202,14 @@ UNION ALL SELECT 'role_alert_project_members',COUNT(DISTINCT u.username) FROM sy
   JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
   WHERE u.tenant_id=0 AND u.username IN ('demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
     AND pm.project_id=520000000000009002 AND pm.status='ACTIVE' AND pm.deleted_flag=0
+UNION ALL SELECT 'm3_daily_self_account',COUNT(DISTINCT u.username) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id AND r.role_code='EMPLOYEE' AND r.status='ENABLE' AND r.deleted_flag=0
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id AND m.perms='site:daily:self' AND m.status='ENABLE' AND m.deleted_flag=0
+  JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
+  WHERE u.tenant_id=0 AND u.username='ui26.staff01' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND pm.project_id=520000000000009002 AND pm.role_code='EMPLOYEE' AND pm.status='ACTIVE' AND pm.deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_instances',COUNT(*) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0 AND remark='M2八角色审批状态矩阵'
 UNION ALL SELECT 'role_workflow_status_pairs',COUNT(DISTINCT CONCAT(initiator_id,':',instance_status)) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_todos',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND t.task_status='PENDING' AND i.instance_status='RUNNING' AND t.deleted_flag=0 AND i.deleted_flag=0
@@ -665,6 +673,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.cost_manager_budget_permissions -eq 1 -and $metrics.production_measurement_permissions -eq 1 `
     -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 2 `
     -and $metrics.role_alert_project_members -eq 7 `
+    -and $metrics.m3_daily_self_account -eq 1 `
     -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
     -and $metrics.finance_demo_pay_application -eq 4 -and $metrics.finance_demo_pay_record -eq 4 `

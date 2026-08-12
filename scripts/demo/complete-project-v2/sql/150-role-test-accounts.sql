@@ -82,7 +82,8 @@ VALUES
   (520000000000008653,0,520000000000009002,520000000000008605,'CONSTRUCTION_LEAD','施工负责人',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M52 驾驶舱预警项目范围'),
   (520000000000008654,0,520000000000009002,520000000000008606,'TECHNICAL_LEAD','技术负责人',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M52 驾驶舱预警项目范围'),
   (520000000000008655,0,520000000000009002,520000000000008607,'COMPANY_FINANCE','公司财务',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M52 驾驶舱预警项目范围'),
-  (520000000000008656,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND deleted_flag=0 LIMIT 1),'PROJECT_MANAGER','项目经理',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M52 驾驶舱预警项目范围')
+  (520000000000008656,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND deleted_flag=0 LIMIT 1),'PROJECT_MANAGER','项目经理',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M52 驾驶舱预警项目范围'),
+  (520000000000008657,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.staff01' AND deleted_flag=0 LIMIT 1),'EMPLOYEE','员工',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M89 本人日报真实数据范围')
 ON DUPLICATE KEY UPDATE
   role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,
   updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0,remark=VALUES(remark);

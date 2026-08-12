@@ -111,12 +111,14 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
     -or -not $verifySource.Contains("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.approver_config,'$.type')),'')='ROLE'", [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.project_manager_variation_permissions -eq 1', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.role_workflow_action_permissions -eq 36', [StringComparison]::Ordinal) `
+    -or -not $verifySource.Contains("'m3_daily_self_account'", [StringComparison]::Ordinal) `
+    -or -not $verifySource.Contains('$metrics.m3_daily_self_account -eq 1', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.cost_breakdown_children -eq 3', [StringComparison]::Ordinal)) {
     throw 'LIVE_EVIDENCE_VERIFIER_CONTRACT_INVALID'
 }
 $loadSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'load.ps1'))
 $fixtureVersions = @(
-    "Id = 'ROLE_TEST_ACCOUNTS'; Version = 5",
+    "Id = 'ROLE_TEST_ACCOUNTS'; Version = 6",
     "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 4",
     "Id = 'SETTLEMENT_SOURCE_DATA'; Version = 7"
 )
@@ -135,11 +137,15 @@ foreach ($canonicalBinding in @(
     "username='demo.production' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='CONSTRUCTION_LEAD'",
     "username='demo.chief' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='TECHNICAL_LEAD'",
     "username='demo.finance' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='COMPANY_FINANCE'",
-    "username='ui26.bm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='SAFETY_LEAD'"
+    "username='ui26.bm01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='SAFETY_LEAD'",
+    "username='ui26.staff01' AND deleted_flag=0),(SELECT id FROM sys_role WHERE tenant_id=0 AND role_code='EMPLOYEE'"
 )) {
     if (-not $roleFixtureSource.Contains($canonicalBinding, [StringComparison]::Ordinal)) {
         throw "LIVE_EVIDENCE_CANONICAL_ROLE_FIXTURE_MISSING:$canonicalBinding"
     }
+}
+if (-not $roleFixtureSource.Contains("520000000000008657,0,520000000000009002,(SELECT id FROM sys_user WHERE tenant_id=0 AND username='ui26.staff01'", [StringComparison]::Ordinal)) {
+    throw 'LIVE_EVIDENCE_DAILY_SELF_PROJECT_MEMBER_MISSING'
 }
 if ($roleFixtureSource.Contains('INSERT IGNORE INTO sys_role_menu', [StringComparison]::Ordinal) `
     -or -not $roleFixtureSource.Contains("SET status='DISABLE'", [StringComparison]::Ordinal)) {
