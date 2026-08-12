@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 /** Versioned response-type and normalized-path amount contract. */
 public final class BusinessAmountFieldCatalog {
 
-    public static final String VERSION = "2026-08-12.v6";
+    public static final String VERSION = "2026-08-12.v7";
 
     private static final Pattern DECIMAL_TEXT = Pattern.compile(
             "[-+]?(?:(?:\\d+\\.\\d+)|(?:\\d+\\.)|(?:\\.\\d+)|(?:\\d+[eE][-+]?\\d+))");
@@ -268,6 +268,11 @@ public final class BusinessAmountFieldCatalog {
                             "$.receivables[*].collectedAmount", "$.receivables[*].outstandingAmount",
                             "$.warranties[*].warrantyAmount"),
                     safe("$.wbsReadiness.incompleteTasks", "$.wbsTasks[*].actualProgress")),
+            contract("com.cgcpms.tech.controller.TechnicalManagementController#overview",
+                    amounts(), safe("$.constructionFacts[*].currentProgress",
+                            "$.constructionFacts[*].completedQuantity")),
+            contract("com.cgcpms.tech.controller.TechnicalManagementController#trace",
+                    amounts("$.schemeApprovals[*].amount"), safe()),
             contract("com.cgcpms.schedule.controller.ProjectScheduleController#dailyProgress",
                     amounts(), safe("$.previousProgress", "$.currentProgress", "$.completedQuantity")),
             contract("com.cgcpms.schedule.controller.ProjectScheduleController#replaceDailyProgress",
