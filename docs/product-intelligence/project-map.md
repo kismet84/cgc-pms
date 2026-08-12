@@ -2,10 +2,10 @@
 
 ## 2026-08-12 主线92：审计遗留可靠性、安全与验证治理本地收口
 
-- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / PROTECTED_GIT_DELIVERY_PENDING`；可执行实现证据 SHA `4ea8f16fef83fc5ad48bfa47d5d3a2510d3ba007`。
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / PROTECTED_GIT_DELIVERY_PENDING`；可执行实现证据 SHA `dc3dad3d924071367d14961f026b518793ba53c3`。
 - 能力链：`1GiB cgroup → 65% JVM heap → persistent heapdump`；`MySQL+MinIO → .partial → staged verify → manifest/metadata → atomic complete`；`UserContext → RBAC association guard → tenant SQL`；`closeout overview → 九域 bounded page`；`weekly/manual rescan → fixed action/image digest`；`source fingerprint → Codemap generation base`。
 - 安全边界：RBAC 只对两关联 Mapper 缺上下文 fail-close，保留既有后台 tenant0 路径；CORS/CSRF 只承诺同站 credentialed Cookie；金额动态 Map 使用 endpoint 精确目录，未知 Decimal 继续拒绝。
-- 验证：后端 2735、前端 568、MySQL `1/24/1`、contract 98、9 组 live 80、技术/收尾真实浏览器、JaCoCo `79.827%/61.570%`、workflow required job=16 与 Codemap 通过。
+- 验证：后端 2735、前端 568、MySQL `1/24/1`、自有 4173 当前工作树 contract 98、9 组 live 80、技术/收尾真实浏览器、JaCoCo `79.827%/61.570%`、workflow required job=16 与 Codemap 通过。
 - 载体：[`第92条计划`](../plans/第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)、[`收口报告`](../quality/2026-08-12-issue-092-审计遗留可靠性安全与验证治理整改.md)。仅本地 dev/test/demo；无生产/非本地验收。
 - 零悬空：13 项=修复复验 11/有据关闭 2/正式承接 0/未收口 0；新增后续项 0、关闭后续项 0、净变化 `0`。
 
