@@ -71,10 +71,50 @@ describe('M5 purchase request, order and receipt contract', () => {
   })
 
   it('uses route-layered procurement execution and re-reads every successful write', () => {
-    const source = readFileSync(
+    const compatibilitySource = readFileSync(
       resolve(process.cwd(), 'src/pages/supply-chain/PurchaseExecutionPage.vue'),
       'utf8',
     )
+    const requestSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/pages/supply-chain/purchase-execution/PurchaseRequestWorkspace.vue',
+      ),
+      'utf8',
+    )
+    const orderSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/pages/supply-chain/purchase-execution/PurchaseOrderWorkspace.vue',
+      ),
+      'utf8',
+    )
+    const receiptSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'src/pages/supply-chain/purchase-execution/MaterialReceiptWorkspace.vue',
+      ),
+      'utf8',
+    )
+    const sharedSource = [
+      'PurchaseExecutionAttachments.vue',
+      'PurchaseExecutionDetail.vue',
+      'model.ts',
+    ]
+      .map((file) =>
+        readFileSync(
+          resolve(process.cwd(), 'src/pages/supply-chain/purchase-execution', file),
+          'utf8',
+        ),
+      )
+      .join('\n')
+    const source = [
+      compatibilitySource,
+      requestSource,
+      orderSource,
+      receiptSource,
+      sharedSource,
+    ].join('\n')
     const applicationSource = [
       'save-purchase-request.ts',
       'save-purchase-order.ts',
@@ -87,10 +127,10 @@ describe('M5 purchase request, order and receipt contract', () => {
         ),
       )
       .join('\n')
-    expect(source).toContain("route.path === '/purchase/order'")
-    expect(source).toContain("route.path === '/purchase/receipt'")
+    expect(compatibilitySource).toContain("route.path === '/purchase/order'")
+    expect(compatibilitySource).toContain("route.path === '/purchase/receipt'")
     expect(source).toContain('attachmentDocumentType')
-    expect(source).toContain('uploadReceiptAttachment')
+    expect(source).toContain('async function upload(')
     expect(source).toContain('DELIVERY_NOTE')
     expect(source).toContain('MATERIAL_ACCEPTANCE_FORM')
     expect(source).toContain('attachmentScanStatus')
@@ -99,8 +139,8 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('loadDocumentGenerationHistory')
     expect(source).toContain('downloadDocumentGeneration')
     expect(source).not.toContain('retryDocumentGeneration')
-    expect(source).toContain("previewDocument('PURCHASE_ORDER'")
-    expect(source).toContain('previewPurchaseOrderDocument')
+    expect(source).toContain("'PURCHASE_ORDER'")
+    expect(source).toContain('async function preview()')
     expect(source).toContain('printPurchaseOrderDocument')
     expect(source).toContain('预览草稿水印订单')
     expect(source).toContain('打印正式 PDF')
@@ -111,7 +151,7 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('await selectRecord(refreshed)')
     expect(source).toContain('let listController: AbortController | null = null')
     expect(source).toContain('let listGeneration = 0')
-    expect(source).toContain('./purchase-execution/application/save-purchase-order')
+    expect(orderSource).toContain('./application/save-purchase-order')
     expect(applicationSource).toContain("kind: 'FROM_REQUEST'")
     expect(applicationSource).toContain("kind: 'CREATE_EXCEPTION'")
     expect(applicationSource).toContain("kind: 'EDIT'")
@@ -121,7 +161,7 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('loadMaterials')
     expect(source).toContain('loadPurchaseRequestFormOptions')
     expect(source).toContain("hasPermission('purchase:request:self')")
-    expect(source).toContain('v-if="!purchaseRequestSelfOnly"')
+    expect(requestSource).toContain('v-if="!selfOnly"')
     expect(source).toContain('loadPartners')
     expect(source).toContain('loadContractPage')
     expect(source).toContain('loadContractItems')
@@ -145,30 +185,30 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('businessAttachments.length')
     expect(source).toContain('附件列表已更新')
     expect(source).not.toContain('生成并上传单据说明')
-    expect(source).toContain('requestItemDrafts')
-    expect(source).toContain('MaterialSearchPicker')
-    expect(source).toContain('@select="addRequestMaterial"')
+    expect(requestSource).toContain('const drafts = ref<RequestItemDraft[]>([])')
+    expect(requestSource).toContain('MaterialSearchPicker')
+    expect(requestSource).toContain('@select="addMaterial"')
     expect(source).toContain('materialId: material.id')
     expect(source).toContain("unit: material.unit || ''")
-    expect(source).toContain('orderItemDrafts')
+    expect(orderSource).toContain('const drafts = ref<OrderItemDraft[]>([])')
     expect(source).toContain('useLocation: requiredDraft')
     expect(source).toContain('currentDocument')
     expect(source).toContain('businessAttachments')
     expect(source).toContain('新建例外采购订单')
     expect(source).toContain('新建采购订单')
-    expect(source).toContain('orderCreateMode')
-    expect(source).toContain('requestCandidates')
-    expect(source).toContain('changeOrderRequest')
+    expect(orderSource).toContain('createMode')
+    expect(orderSource).toContain('requestCandidates')
+    expect(orderSource).toContain('changeRequest')
     expect(source).toContain('createPurchaseOrderFromRequest')
     expect(source).toContain("status: 'APPROVED'")
     expect(source).toContain('明细来自已审批采购申请，只读展示')
     expect(source).toContain('由服务端合同事实决定')
     expect(source).toContain('updatePurchaseOrder')
-    expect(source).toContain('orderItemEdits.value.map')
+    expect(orderSource).toContain('editItems.value.map')
     expect(source).toContain('来源行不可修改')
-    expect(source).toContain("contractId: requiredOrderEdit('contractId', '采购合同')")
-    expect(source).toContain('v-model="orderEditForm.contractId"')
-    expect(source).toContain('@update:model-value="changeEditorProject"')
+    expect(orderSource).toContain("contractId: requiredEdit('contractId', '采购合同')")
+    expect(orderSource).toContain('v-model="editForm.contractId"')
+    expect(orderSource).toMatch(/v-model="editForm\.contractId"[^>]*\bdisabled\b/)
     expect(source).not.toContain('convertPurchaseRequest')
     expect(source).toContain('v-model="form.requestId"')
     expect(source).toContain('编辑商业条件')
@@ -177,16 +217,16 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).not.toContain('不合格供应商退货')
     expect(source).toContain('confirmReceiptSupplierReturn')
     expect(source).toContain('remainingQuantity')
-    expect(source).toContain("receiptItem.systemBatchNo || selected.value?.systemBatchNo || '-'")
+    expect(source).toContain("item.systemBatchNo || selected?.systemBatchNo || '-'")
     expect(source).toContain("form.receiptMode === 'DIRECT_CONSUMPTION'")
+    expect(receiptSource).toContain("receiptMode: receipt.receiptMode || 'INVENTORY'")
+    expect(receiptSource).toContain("receiverId: receipt.receiverId || ''")
     expect(source).toContain('v-model="form.useLocation"')
     expect(source).toContain('label="使用部位"')
-    expect(source).toContain("'orderCode' in record")
+    expect(orderSource).toContain('statusLabel(record.orderStatus)')
     expect(source).toContain("CONVERTED: '已转订单'")
     expect(source).toContain("PARTIAL: '部分合格'")
-    expect(source).toContain(
-      "if ('receiptCode' in record) return statusLabel(record.approvalStatus)",
-    )
+    expect(receiptSource).toContain('statusLabel(record.approvalStatus)')
     expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
     expect(source).not.toMatch(
       /frontend-admin\/src|Legacy|totalAmount\s*[+]=|receivedQuantity\s*[+]=|label="[^"]*ID/,

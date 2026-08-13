@@ -3,7 +3,7 @@ package com.cgcpms.document;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.document.event.PurchaseRequestApprovedEvent;
 import com.cgcpms.document.service.DocumentGenerationService;
-import com.cgcpms.document.service.PurchaseRequestDocumentGenerationListener;
+import com.cgcpms.document.service.PurchaseDocumentGenerationListener;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -17,14 +17,14 @@ class PurchaseRequestDocumentGenerationListenerTest {
     void generationFailureIsAuditedAndNeverEscapesAfterCommitListener() {
         DocumentGenerationService generationService = mock(DocumentGenerationService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-        PurchaseRequestDocumentGenerationListener listener =
-                new PurchaseRequestDocumentGenerationListener(generationService, events);
+        PurchaseDocumentGenerationListener listener =
+                new PurchaseDocumentGenerationListener(generationService, events);
         PurchaseRequestApprovedEvent event = new PurchaseRequestApprovedEvent(7L, 9L, 101L, 301L);
         doThrow(new BusinessException("DOCUMENT_TEMPLATE_DEFAULT_MISSING", "缺少默认模板"))
                 .when(generationService).generateSystem("PURCHASE_REQUEST", 101L,
                         "PURCHASE_REQUEST:101:INSTANCE:301", 7L, 9L);
 
-        assertDoesNotThrow(() -> listener.afterCommit(event));
+        assertDoesNotThrow(() -> listener.afterRequestCommit(event));
 
         verify(generationService).generateSystem("PURCHASE_REQUEST", 101L,
                 "PURCHASE_REQUEST:101:INSTANCE:301", 7L, 9L);

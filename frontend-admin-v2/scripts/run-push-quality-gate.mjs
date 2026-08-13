@@ -12,6 +12,7 @@ const contractSpecSet = new Set(contractSpecs.map((name) => `e2e/${name}`))
 const localLiveCommand =
   'pwsh -NoProfile -File scripts/demo/complete-project-v2/verify-live-all.ps1'
 const pnpmCli = process.env.npm_execpath
+const captureBufferBytes = 16 * 1024 * 1024
 
 function resolveCommand(command, args) {
   if (command !== 'pnpm') return { executable: command, args }
@@ -24,6 +25,7 @@ function captureRaw(command, args, cwd = repositoryRoot) {
   const result = spawnSync(invocation.executable, invocation.args, {
     cwd,
     encoding: 'utf8',
+    maxBuffer: captureBufferBytes,
   })
   if (result.status !== 0) {
     const detail = result.stderr?.trim() || result.error?.message || `exit ${result.status}`

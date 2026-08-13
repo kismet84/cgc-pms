@@ -55,6 +55,28 @@ describe('V2 application-shell routes', () => {
     expect(route?.meta?.permission).toBe('project:file:query')
   })
 
+  it('loads the canonical cost target page without a budget wrapper', () => {
+    const source = readFileSync(resolve('src/router/components.ts'), 'utf8')
+    const route = routes
+      .flatMap((item) => item.children ?? [])
+      .find((item) => item.path === '/cost-budget')
+
+    expect(route?.meta?.permission).toBe('cost:target:query')
+    expect(source).toContain("'/cost-budget': CostTargetPage")
+    expect(source).not.toContain('CostBudgetPage')
+  })
+
+  it('loads each purchase execution route through its focused workspace', () => {
+    const source = readFileSync(resolve('src/router/components.ts'), 'utf8')
+
+    expect(source).toContain("'/inventory/purchase-request': PurchaseRequestWorkspace")
+    expect(source).toContain("'/purchase/order': PurchaseOrderWorkspace")
+    expect(source).toContain("'/purchase/receipt': MaterialReceiptWorkspace")
+    expect(source).not.toMatch(
+      /'\/(?:inventory\/purchase-request|purchase\/(?:order|receipt))': PurchaseExecutionPage/,
+    )
+  })
+
   it('keeps retired Legacy as frozen ledger universe and locks acceptance counts', () => {
     const ledger = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docs/ui-v2/route-migration-ledger.json'), 'utf8'),
@@ -172,11 +194,16 @@ describe('V2 application-shell routes', () => {
         v2View: '@/router.ts#V2CostSubjectRootRedirect',
         permission: 'cost:query',
       }),
-      ...['Taxonomy', 'Rules', 'Scope', 'Trace'].map((suffix) =>
+      ...[
+        ['Taxonomy', 'CostSubjectTaxonomyPage'],
+        ['Rules', 'CostSubjectRulesPage'],
+        ['Scope', 'CostSubjectScopePage'],
+        ['Trace', 'CostSubjectTracePage'],
+      ].map(([suffix, page]) =>
         expect.objectContaining({
           name: `CostSubject${suffix}`,
           status: 'V2_ACCEPTED',
-          v2View: '@/pages/master-data/CostSubjectPage.vue',
+          v2View: `@/pages/master-data/cost-subject/${page}.vue`,
         }),
       ),
     ])
@@ -209,7 +236,7 @@ describe('V2 application-shell routes', () => {
       expect.objectContaining({
         name: 'SystemUsers',
         status: 'V2_ACCEPTED',
-        v2View: '@/pages/system/AccessControlPage.vue',
+        v2View: '@/pages/system/access-control/UserManagementPage.vue',
       }),
       expect.objectContaining({
         name: 'SystemData',
@@ -220,12 +247,12 @@ describe('V2 application-shell routes', () => {
       expect.objectContaining({
         name: 'RoleManagement',
         status: 'V2_ACCEPTED',
-        v2View: '@/pages/system/AccessControlPage.vue',
+        v2View: '@/pages/system/access-control/RoleManagementPage.vue',
       }),
       expect.objectContaining({
         name: 'SystemPermissions',
         status: 'V2_ACCEPTED',
-        v2View: '@/pages/system/AccessControlPage.vue',
+        v2View: '@/pages/system/access-control/PermissionListPage.vue',
         permission: 'system:menu:query',
       }),
       expect.objectContaining({

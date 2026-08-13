@@ -8,6 +8,7 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.service.FileObjectTaskService;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.ProjectFileProjection;
 import com.cgcpms.file.vo.SysFileVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
-public class ProjectFileService {
+public class ProjectFileService implements ProjectFileProjection {
     private static final DateTimeFormatter DATE_CODE = DateTimeFormatter.BASIC_ISO_DATE;
     private static final int MAX_BATCH = 500;
     private static final Map<String, String> BUSINESS_CATEGORIES = Map.ofEntries(
@@ -98,6 +99,7 @@ public class ProjectFileService {
 
     /** Same-transaction projection for ordinary business attachments. */
     @Transactional(rollbackFor = Exception.class)
+    @Override
     public void indexBusinessFile(SysFile file) {
         String businessType = file.getBusinessType() == null ? "" : file.getBusinessType().trim().toUpperCase(Locale.ROOT);
         if (Set.of("PROJECT_FILE", "COMMUNICATION_MESSAGE", "PARTNER", "MATERIAL", "BID_COST")
@@ -158,6 +160,7 @@ public class ProjectFileService {
 
     /** Remove only the read-only projection; original business module remains deletion authority. */
     @Transactional(rollbackFor = Exception.class)
+    @Override
     public void invalidateBusinessFile(SysFile file) {
         List<Map<String, Object>> links = jdbcTemplate.queryForList("""
                 SELECT v.id,v.catalog_id,v.preview_storage_path,c.source_kind
@@ -309,6 +312,7 @@ public class ProjectFileService {
     }
 
     /** Called only by the persisted object-task worker after an authorized enqueue. */
+    @Override
     public void processConversionTask(long versionId) {
         PreviewRow row = requirePreviewRowInternal(versionId);
         if (!"OOXML".equals(previewKind(row.originalName(), row.contentType()))) {

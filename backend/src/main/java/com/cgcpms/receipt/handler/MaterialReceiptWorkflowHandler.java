@@ -1,5 +1,7 @@
 package com.cgcpms.receipt.handler;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.cost.service.CostGenerationService;
@@ -223,10 +225,6 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
             }
         }
         throw new BusinessException("ORDER_ITEM_CONCURRENT_CONFLICT", "采购订单明细并发更新冲突，请稍后重试");
-    }
-
-    private BigDecimal nvl(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
     }
 
     private boolean isDirectConsumption(MatReceipt receipt) {

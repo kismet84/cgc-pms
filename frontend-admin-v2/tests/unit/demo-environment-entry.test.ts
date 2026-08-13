@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 describe('V2 示例环境入口', () => {
   const loginPage = readFileSync(resolve('src/pages/auth/LoginPage.vue'), 'utf-8')
-  const appShell = readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8')
+  const appShell = [
+    readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8'),
+    readFileSync(resolve('src/layouts/ShellSidebar.vue'), 'utf-8'),
+  ].join('\n')
   const viteConfig = readFileSync(resolve('vite.config.ts'), 'utf-8')
   const devCompose = readFileSync(resolve('../deploy/docker-compose.dev.yml'), 'utf-8')
 

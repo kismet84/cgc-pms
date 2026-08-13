@@ -4,7 +4,7 @@
 
 当前状态：V1.5 开发版本已封存，V1.6 开发已启动；第58条主线已将新版切为仓库和本地正式前端，Legacy 源码已归档。当前环境与授权边界只读取 [AGENTS.md](../AGENTS.md)，本索引不复制。V1.5 权威结论见[开发版本归档](archive/v1.5/README.md)和[第57条主线正式收口验收报告](archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
 
-最新主线：第92条已完成本地 G0～G5、同 SHA push/PR CI、受保护合并与 post-merge 验证；实现 PR #435 合并 SHA 为 `04e45327dcaa`。第91条已由实现 PR #433 完成 G0～G5、同 SHA CI、合并与 post-merge 验证；第90条整体仍为计划状态。当前状态、计划和证据分别见[当前 Backlog](backlog/current-focus.md)、[第92条计划](plans/第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)和[第92条收口报告](quality/2026-08-12-issue-092-审计遗留可靠性安全与验证治理整改.md)。
+最新主线：第94条“全仓代码职责拆分与重复实现收敛”已完成本地 G0～G5，当前处于 `GIT_DELIVERY_IN_PROGRESS`；第93条已完成 G0～G5、实现/收口 PR 合并与 post-merge 验真。第90条字段权威源主线整体仍未授权，与第94条重叠文件必须串行且不得夹带实施。当前状态、计划、质量证据和前端迁移结果分别见[当前 Backlog](backlog/current-focus.md)、[第94条计划](plans/第94条主线-全仓代码职责拆分与重复实现收敛任务计划书.md)、[第94条质量报告](quality/2026-08-13-issue-094-全仓代码职责拆分与重复实现收敛.md)和[路由迁移台账](ui-v2/route-migration-ledger.md)。
 
 ## 权威层级与文档类型
 

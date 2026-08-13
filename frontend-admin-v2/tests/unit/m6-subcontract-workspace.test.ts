@@ -121,8 +121,11 @@ describe('M6 subcontract task and measure V2', () => {
       resolve(process.cwd(), 'src/pages/subcontract/SubcontractWorkspacePage.vue'),
       'utf8',
     )
-    const router = readFileSync(resolve(process.cwd(), 'src/router.ts'), 'utf8')
-    const catalog = readFileSync(resolve(process.cwd(), 'src/navigation/catalog.ts'), 'utf8')
+    const router = [
+      readFileSync(resolve(process.cwd(), 'src/router/components.ts'), 'utf8'),
+      readFileSync(resolve(process.cwd(), 'src/router/context-routes.ts'), 'utf8'),
+    ].join('\n')
+    const catalog = readFileSync(resolve(process.cwd(), 'src/navigation/domains/supply.ts'), 'utf8')
 
     expect(router).toContain("'/subcontract/task'")
     expect(router).toContain("'/subcontract/measure'")

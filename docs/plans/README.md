@@ -5,6 +5,7 @@
 - v1.5 计划书：[归档入口](../archive/v1.5/plans/)
 - v1.0 计划书：[归档入口](../archive/v1.0/plans/)
 - 当前工作焦点：[Backlog](../backlog/current-focus.md)
+- 本地实施与 G0～G5 已通过，当前 `GIT_DELIVERY_IN_PROGRESS`；受保护 exact-SHA push/PR/post-merge 完成前不声明已合并：[第94条主线：全仓代码职责拆分与重复实现收敛](第94条主线-全仓代码职责拆分与重复实现收敛任务计划书.md)
 - 已完成（实现 PR #441 与收口可靠性 PR #442 均完成同 SHA push/PR CI、受保护合并和 post-merge 验真；最终代码合并 SHA `6e8dfafb8b7d`）：[第93条主线：项目成员 API 审计字段防篡改与同根写入边界整改](第93条主线-项目成员API审计字段防篡改与同根写入边界整改任务计划书.md)
 - 已完成（实现 PR #435，G0～G5、同 SHA push/PR CI 与 post-merge 已通过；合并 SHA `04e45327dcaa`）：[第92条主线：审计遗留可靠性、安全与验证治理整改](第92条主线-审计遗留可靠性安全与验证治理整改任务计划书.md)
 - 已完成（实现 PR #433，G0～G5、同 SHA CI 与 post-merge 已通过；最终代码证据 SHA `b5b8eeaa8d65`）：[第91条主线：架构边界与查询性能分阶段整改](第91条主线-架构边界与查询性能分阶段整改任务计划书.md)

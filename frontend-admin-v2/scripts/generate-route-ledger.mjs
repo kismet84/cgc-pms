@@ -6,8 +6,21 @@ import ts from 'typescript'
 const scriptRoot = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const repositoryRoot = resolve(scriptRoot, '../..')
 const routerPath = resolve(repositoryRoot, 'archive/v1.6/frontend-admin-legacy/src/router/index.ts')
-const v2RouterPath = resolve(repositoryRoot, 'frontend-admin-v2/src/router.ts')
-const navigationCatalogPath = resolve(repositoryRoot, 'frontend-admin-v2/src/navigation/catalog.ts')
+const v2RouteSourcePaths = [
+  'frontend-admin-v2/src/router.ts',
+  'frontend-admin-v2/src/router/components.ts',
+  'frontend-admin-v2/src/router/context-routes.ts',
+  'frontend-admin-v2/src/router/route-registry.ts',
+].map((path) => resolve(repositoryRoot, path))
+const navigationCatalogPaths = [
+  'frontend-admin-v2/src/navigation/catalog.ts',
+  'frontend-admin-v2/src/navigation/domains/workbench.ts',
+  'frontend-admin-v2/src/navigation/domains/delivery.ts',
+  'frontend-admin-v2/src/navigation/domains/commercial.ts',
+  'frontend-admin-v2/src/navigation/domains/supply.ts',
+  'frontend-admin-v2/src/navigation/domains/finance.ts',
+  'frontend-admin-v2/src/navigation/domains/administration.ts',
+].map((path) => resolve(repositoryRoot, path))
 const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json')
 const markdownPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.md')
 
@@ -23,10 +36,10 @@ const acceptedRoutes = {
   Material: '@/router.ts#V2MaterialRedirect',
   MaterialDictionary: '@/pages/master-data/MaterialDictionaryPage.vue',
   CostSubject: '@/router.ts#V2CostSubjectRootRedirect',
-  CostSubjectTaxonomy: '@/pages/master-data/CostSubjectPage.vue',
-  CostSubjectRules: '@/pages/master-data/CostSubjectPage.vue',
-  CostSubjectScope: '@/pages/master-data/CostSubjectPage.vue',
-  CostSubjectTrace: '@/pages/master-data/CostSubjectPage.vue',
+  CostSubjectTaxonomy: '@/pages/master-data/cost-subject/CostSubjectTaxonomyPage.vue',
+  CostSubjectRules: '@/pages/master-data/cost-subject/CostSubjectRulesPage.vue',
+  CostSubjectScope: '@/pages/master-data/cost-subject/CostSubjectScopePage.vue',
+  CostSubjectTrace: '@/pages/master-data/cost-subject/CostSubjectTracePage.vue',
   Dashboard: '@/pages/dashboard/DashboardPage.vue',
   ReportCatalog: '@/pages/workbench/ReportCatalogPage.vue',
   Alert: '@/router.ts#V2LegacyAlertRedirect',
@@ -38,28 +51,28 @@ const acceptedRoutes = {
   ApprovalProcess: '@/pages/system/WorkflowProcessPage.vue',
   System: '@/router.ts#V2SystemRedirect',
   SystemDict: '@/pages/system/DictionaryPage.vue',
-  SystemUsers: '@/pages/system/AccessControlPage.vue',
+  SystemUsers: '@/pages/system/access-control/UserManagementPage.vue',
   SystemData: '@/pages/system/DataMaintenancePage.vue',
-  RoleManagement: '@/pages/system/AccessControlPage.vue',
-  SystemPermissions: '@/pages/system/AccessControlPage.vue',
+  RoleManagement: '@/pages/system/access-control/RoleManagementPage.vue',
+  SystemPermissions: '@/pages/system/access-control/PermissionListPage.vue',
   SystemAudit: '@/pages/system/AuditPage.vue',
   DocumentTemplateManagement: '@/pages/system/DocumentTemplatePage.vue',
   ApprovalDetail: '@/router.ts#V2LegacyApprovalDetailRedirect',
   Project: '@/router.ts#V2ProjectRedirect',
-  ProjectList: '@/pages/projects/ProjectPage.vue',
-  ProjectOverview: '@/pages/projects/ProjectPage.vue',
-  ProjectMembers: '@/pages/projects/ProjectPage.vue',
-  ProjectEdit: '@/pages/projects/ProjectPage.vue',
+  ProjectList: '@/pages/projects/project-routes/ProjectListPage.vue',
+  ProjectOverview: '@/pages/projects/project-routes/ProjectOverviewPage.vue',
+  ProjectMembers: '@/pages/projects/project-routes/ProjectMembersPage.vue',
+  ProjectEdit: '@/pages/projects/project-routes/ProjectEditPage.vue',
   ProjectSchedule: '@/pages/delivery/SchedulePage.vue',
   SiteDailyLog: '@/pages/delivery/DailyLogPage.vue',
   QualitySafety: '@/pages/delivery/QualitySafetyPage.vue',
   TechnicalManagement: '@/pages/delivery/TechnicalManagementPage.vue',
   ProjectCloseout: '@/pages/delivery/ProjectCloseoutPage.vue',
   Contract: '@/router.ts#V2ContractRootRedirect',
-  ContractLedger: '@/pages/commercial/ContractPage.vue',
-  ContractCreate: '@/pages/commercial/ContractPage.vue',
-  ContractDetail: '@/pages/commercial/ContractPage.vue',
-  ContractEdit: '@/pages/commercial/ContractPage.vue',
+  ContractLedger: '@/pages/commercial/contract/ContractLedgerPage.vue',
+  ContractCreate: '@/pages/commercial/contract/ContractCreatePage.vue',
+  ContractDetail: '@/pages/commercial/contract/ContractDetailPage.vue',
+  ContractEdit: '@/pages/commercial/contract/ContractEditPage.vue',
   Variation: '@/router.ts#V2VariationRootRedirect',
   VariationOrder: '@/pages/commercial/VariationPage.vue',
   BidCost: '@/pages/commercial/BidCostPage.vue',
@@ -71,13 +84,13 @@ const acceptedRoutes = {
   CostLedger: '@/pages/commercial/CostLedgerPage.vue',
   CostSummary: '@/pages/commercial/CostSummaryPage.vue',
   CostControl: '@/pages/commercial/CostControlPage.vue',
-  ProjectBudget: '@/pages/commercial/CostBudgetPage.vue',
+  ProjectBudget: '@/pages/commercial/CostTargetPage.vue',
   ProductionMeasurement: '@/pages/commercial/ProductionMeasurementPage.vue',
   SupplierSourcing: '@/pages/supply-chain/SupplierSourcingPage.vue',
   Purchase: '@/router.ts#V2PurchaseRedirect',
-  PurchaseOrder: '@/pages/supply-chain/PurchaseExecutionPage.vue',
-  PurchaseReceipt: '@/pages/supply-chain/PurchaseExecutionPage.vue',
-  InventoryPurchaseRequest: '@/pages/supply-chain/PurchaseExecutionPage.vue',
+  PurchaseOrder: '@/pages/supply-chain/purchase-execution/PurchaseOrderWorkspace.vue',
+  PurchaseReceipt: '@/pages/supply-chain/purchase-execution/MaterialReceiptWorkspace.vue',
+  InventoryPurchaseRequest: '@/pages/supply-chain/purchase-execution/PurchaseRequestWorkspace.vue',
   Inventory: '@/router.ts#V2InventoryRedirect',
   InventoryWarehouse: '@/pages/supply-chain/InventoryWorkspacePage.vue',
   InventoryStock: '@/pages/supply-chain/InventoryWorkspacePage.vue',
@@ -90,15 +103,15 @@ const acceptedRoutes = {
   SettlementList: '@/pages/settlement/SettlementWorkspacePage.vue',
   SettlementDetail: '@/pages/settlement/SettlementWorkspacePage.vue',
   Payment: '@/router.ts#V2PaymentRedirect',
-  PaymentApplication: '@/pages/finance/ReceivablesWorkspacePage.vue',
-  ExpenseApplication: '@/pages/finance/ReceivablesWorkspacePage.vue',
-  RevenueOperations: '@/pages/finance/ReceivablesWorkspacePage.vue',
-  Invoice: '@/pages/finance/ReceivablesWorkspacePage.vue',
-  FinanceOperations: '@/pages/finance/FinanceControlWorkspacePage.vue',
-  CashJournal: '@/pages/finance/FinanceControlWorkspacePage.vue',
-  CashForecast: '@/pages/finance/FinanceControlWorkspacePage.vue',
-  AccountingEntry: '@/pages/finance/FinanceControlWorkspacePage.vue',
-  FinancialClose: '@/pages/finance/FinanceControlWorkspacePage.vue',
+  PaymentApplication: '@/pages/finance/receivables-workspace/PaymentApplicationPage.vue',
+  ExpenseApplication: '@/pages/finance/receivables-workspace/ExpenseApplicationPage.vue',
+  RevenueOperations: '@/pages/finance/receivables-workspace/RevenueOperationsPage.vue',
+  Invoice: '@/pages/finance/receivables-workspace/InvoiceManagementPage.vue',
+  FinanceOperations: '@/pages/finance/finance-control-workspace/FinanceOperationsPage.vue',
+  CashJournal: '@/pages/finance/finance-control-workspace/CashJournalPage.vue',
+  CashForecast: '@/pages/finance/finance-control-workspace/CashForecastPage.vue',
+  AccountingEntry: '@/pages/finance/finance-control-workspace/AccountingEntryPage.vue',
+  FinancialClose: '@/pages/finance/finance-control-workspace/FinancialClosePage.vue',
 }
 
 const acceptedRoutePermissions = {
@@ -445,7 +458,7 @@ function renderMarkdown(ledger) {
 
 function assertAcceptedRouteSources(routerSource, catalogSource) {
   const missingViews = Object.entries(acceptedRoutes).flatMap(([name, view]) => {
-    const marker = view.startsWith('@/pages/') ? view.replace('@/', './') : view.split('#')[1]
+    const marker = view.startsWith('@/pages/') ? view.slice(2) : view.split('#')[1]
     return marker && !routerSource.includes(marker) ? [`${name} -> ${view}`] : []
   })
   if (missingViews.length) {
@@ -462,11 +475,13 @@ function assertAcceptedRouteSources(routerSource, catalogSource) {
 }
 
 async function buildLedger() {
-  const [source, v2RouterSource, navigationCatalogSource] = await Promise.all([
+  const [source, v2RouteSources, navigationCatalogSources] = await Promise.all([
     readFile(routerPath, 'utf8'),
-    readFile(v2RouterPath, 'utf8'),
-    readFile(navigationCatalogPath, 'utf8'),
+    Promise.all(v2RouteSourcePaths.map((path) => readFile(path, 'utf8'))),
+    Promise.all(navigationCatalogPaths.map((path) => readFile(path, 'utf8'))),
   ])
+  const v2RouterSource = v2RouteSources.join('\n')
+  const navigationCatalogSource = navigationCatalogSources.join('\n')
   assertAcceptedRouteSources(v2RouterSource, navigationCatalogSource)
   const sourceFile = ts.createSourceFile(
     routerPath,

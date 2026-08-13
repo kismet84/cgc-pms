@@ -91,8 +91,11 @@ describe('M6 settlement V2', () => {
       resolve(process.cwd(), 'src/pages/settlement/SettlementWorkspacePage.vue'),
       'utf8',
     )
-    const router = readFileSync(resolve(process.cwd(), 'src/router.ts'), 'utf8')
-    const catalog = readFileSync(resolve(process.cwd(), 'src/navigation/catalog.ts'), 'utf8')
+    const router = [
+      readFileSync(resolve(process.cwd(), 'src/router/components.ts'), 'utf8'),
+      readFileSync(resolve(process.cwd(), 'src/router/context-routes.ts'), 'utf8'),
+    ].join('\n')
+    const catalog = readFileSync(resolve(process.cwd(), 'src/navigation/domains/supply.ts'), 'utf8')
 
     expect(router).toContain("path: '/settlement'")
     expect(router).toContain("path: '/settlement/:id'")

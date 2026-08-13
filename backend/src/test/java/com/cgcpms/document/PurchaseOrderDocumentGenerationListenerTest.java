@@ -3,7 +3,7 @@ package com.cgcpms.document;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.document.event.PurchaseOrderApprovedEvent;
 import com.cgcpms.document.service.DocumentGenerationService;
-import com.cgcpms.document.service.PurchaseOrderDocumentGenerationListener;
+import com.cgcpms.document.service.PurchaseDocumentGenerationListener;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -17,14 +17,14 @@ class PurchaseOrderDocumentGenerationListenerTest {
     void generationFailureIsAuditedAndDoesNotEscapeAfterCommit() {
         DocumentGenerationService generationService = mock(DocumentGenerationService.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-        PurchaseOrderDocumentGenerationListener listener =
-                new PurchaseOrderDocumentGenerationListener(generationService, events);
+        PurchaseDocumentGenerationListener listener =
+                new PurchaseDocumentGenerationListener(generationService, events);
         PurchaseOrderApprovedEvent event = new PurchaseOrderApprovedEvent(7L, 9L, 301L, 401L);
         doThrow(new BusinessException("DOCUMENT_RENDER_FAILED", "渲染失败"))
                 .when(generationService).generateSystem("PURCHASE_ORDER", 301L,
                         "PURCHASE_ORDER:301:INSTANCE:401", 7L, 9L);
 
-        assertDoesNotThrow(() -> listener.afterCommit(event));
+        assertDoesNotThrow(() -> listener.afterOrderCommit(event));
 
         verify(generationService).generateSystem("PURCHASE_ORDER", 301L,
                 "PURCHASE_ORDER:301:INSTANCE:401", 7L, 9L);

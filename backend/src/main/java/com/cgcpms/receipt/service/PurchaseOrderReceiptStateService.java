@@ -1,5 +1,7 @@
 package com.cgcpms.receipt.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
@@ -10,7 +12,6 @@ import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,7 +42,4 @@ public class PurchaseOrderReceiptStateService {
                 .set(MatPurchaseOrder::getOrderStatus, status));
     }
 
-    private static BigDecimal nvl(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
-    }
 }

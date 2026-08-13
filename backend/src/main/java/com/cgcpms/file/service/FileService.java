@@ -11,7 +11,6 @@ import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
 import com.cgcpms.security.BusinessAmountAccess;
-import com.cgcpms.projectfile.ProjectFileService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -77,7 +76,7 @@ public class FileService {
     private final VirusScanner virusScanner;
     private final FileObjectTaskService objectTaskService;
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectProvider<ProjectFileService> projectFileServiceProvider;
+    private final ObjectProvider<? extends ProjectFileProjection> projectFileProjectionProvider;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     @Autowired
@@ -85,7 +84,8 @@ public class FileService {
                        com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer,
                        RetryTemplate minioRetryTemplate, ObjectProvider<MeterRegistry> meterRegistryProvider,
                        VirusScanner virusScanner, FileObjectTaskService objectTaskService,
-                       JdbcTemplate jdbcTemplate, ObjectProvider<ProjectFileService> projectFileServiceProvider) {
+                       JdbcTemplate jdbcTemplate,
+                       ObjectProvider<? extends ProjectFileProjection> projectFileProjectionProvider) {
         this.sysFileMapper = sysFileMapper;
         this.minioClient = minioClient;
         this.minioConfig = minioConfig;
@@ -95,7 +95,7 @@ public class FileService {
         this.virusScanner = virusScanner;
         this.objectTaskService = objectTaskService;
         this.jdbcTemplate = jdbcTemplate;
-        this.projectFileServiceProvider = projectFileServiceProvider;
+        this.projectFileProjectionProvider = projectFileProjectionProvider;
     }
 
     /** Compatibility constructor used by focused legacy unit tests. */
@@ -191,8 +191,8 @@ public class FileService {
             sysFile.setVirusScanDetail(null);
             sysFile.setVirusScannedAt(LocalDateTime.now());
             sysFileMapper.insert(sysFile);
-            if (projectFileServiceProvider != null) {
-                projectFileServiceProvider.ifAvailable(service -> service.indexBusinessFile(sysFile));
+            if (projectFileProjectionProvider != null) {
+                projectFileProjectionProvider.ifAvailable(projection -> projection.indexBusinessFile(sysFile));
             }
 
             return toVO(sysFile);
@@ -515,8 +515,8 @@ public class FileService {
             throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
         }
 
-        if (projectFileServiceProvider != null) {
-            projectFileServiceProvider.ifAvailable(service -> service.invalidateBusinessFile(sysFile));
+        if (projectFileProjectionProvider != null) {
+            projectFileProjectionProvider.ifAvailable(projection -> projection.invalidateBusinessFile(sysFile));
         }
 
         // Logical delete in DB

@@ -3,6 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AppShell from '@/layouts/AppShell.vue'
+import ShellHeaderWorkspace from '@/layouts/ShellHeaderWorkspace.vue'
+import ShellNotificationCenter from '@/layouts/ShellNotificationCenter.vue'
 import { loadNotificationSummary, openNotificationStream } from '@/services/alerts'
 import { loadCommunicationUnreadCount, openCommunicationStream } from '@/services/communication'
 import { useSessionStore } from '@/stores/session'
@@ -44,6 +46,75 @@ beforeEach(() => {
 })
 
 describe('AppShell communication unread', () => {
+  it('normalizes string unread counts before passing child props', async () => {
+    useSessionStore().replaceUserInfo({
+      tenantId: '1001',
+      userId: '1',
+      username: 'tester',
+      roles: ['USER'],
+      permissions: ['communication:view', 'alert:view', 'notification:view'],
+    })
+    vi.mocked(loadCommunicationUnreadCount).mockResolvedValue({
+      count: '0',
+    } as unknown as { count: number })
+    vi.mocked(loadNotificationSummary).mockResolvedValue([
+      { pageNo: 1, pageSize: 8, total: 0, records: [] },
+      { count: '3' } as unknown as { count: number },
+    ])
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const wrapper = mount(AppShell, { global: { plugins: [router] } })
+
+    try {
+      await flushPromises()
+      expect(wrapper.getComponent(ShellHeaderWorkspace).props('communicationUnreadCount')).toBe(0)
+      expect(wrapper.getComponent(ShellHeaderWorkspace).props('notificationUnreadCount')).toBe(3)
+      expect(wrapper.getComponent(ShellNotificationCenter).props('unreadCount')).toBe(3)
+      expect(warning.mock.calls.flat().join(' ')).not.toContain('Invalid prop')
+    } finally {
+      wrapper.unmount()
+      warning.mockRestore()
+    }
+  })
+
+  it('keeps mobile sidebar focus, scrim and body lock coordinated by the shell', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(AppShell, { global: { plugins: [router] } })
+    await flushPromises()
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+
+    const menu = wrapper.get('.app-shell__menu-toggle')
+    expect(menu.attributes('aria-expanded')).toBe('false')
+    await menu.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.app-shell__scrim').attributes('aria-label')).toBe('关闭导航')
+    expect(wrapper.get('.app-shell__menu-toggle').attributes('aria-expanded')).toBe('true')
+    expect(document.body.classList).toContain('v2-mobile-nav-open')
+    expect(focus).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('.app-shell__nav-close').trigger('click')
+    await flushPromises()
+    expect(document.body.classList).not.toContain('v2-mobile-nav-open')
+    expect(focus).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
   it('shows only accessible catalog pages in recent-open order', async () => {
     useSessionStore().replaceUserInfo({
       tenantId: '1001',

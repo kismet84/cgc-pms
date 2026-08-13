@@ -5,13 +5,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { V2Input, V2StatusToggle } from '@/components'
-import CostSubjectPage from '@/pages/master-data/CostSubjectPage.vue'
+import CostSubjectRulesPage from '@/pages/master-data/cost-subject/CostSubjectRulesPage.vue'
+import CostSubjectScopePage from '@/pages/master-data/cost-subject/CostSubjectScopePage.vue'
+import CostSubjectTaxonomyPage from '@/pages/master-data/cost-subject/CostSubjectTaxonomyPage.vue'
+import CostSubjectTracePage from '@/pages/master-data/cost-subject/CostSubjectTracePage.vue'
 import * as costSubject from '@/services/cost-subject'
 import { useSessionStore } from '@/stores/session'
 
-const route = vi.hoisted(() => ({ path: '/cost/subject/taxonomy' }))
-
-vi.mock('vue-router', () => ({ useRoute: () => route }))
 vi.mock('@/services/cost-subject', () => ({
   activateMappingVersion: vi.fn(),
   createAssignmentRule: vi.fn(),
@@ -217,9 +217,8 @@ beforeEach(() => {
 
 describe('M7 cost-subject center', () => {
   it('loads only taxonomy facts and hides writes without exact permissions', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query']))
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
     expect(wrapper.findAll('.v2-card')).toHaveLength(2)
@@ -240,19 +239,17 @@ describe('M7 cost-subject center', () => {
   })
 
   it('shows taxonomy writes to administrators without explicit permissions', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo({
       ...user([]),
       roles: ['SUPER_ADMIN'],
     })
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('新增一级科目')
   })
 
   it('keeps fixed target-cost subjects read-only and removes the default-ratio card', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit']))
     vi.mocked(costSubject.loadCostSubjectTree).mockResolvedValue([
       {
@@ -296,7 +293,7 @@ describe('M7 cost-subject center', () => {
       },
     ])
 
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
     expect(wrapper.text()).not.toContain('项目目标成本默认比例')
     expect(wrapper.text()).not.toContain('保存10类比例')
@@ -334,9 +331,8 @@ describe('M7 cost-subject center', () => {
   })
 
   it('links first-level selection to second-level subjects and detail', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query']))
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('5401.01.01')
@@ -350,9 +346,8 @@ describe('M7 cost-subject center', () => {
   })
 
   it('confirms ordinary cost-subject status through the dedicated API and rereads facts', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit']))
-    const wrapper = mount(CostSubjectPage, { attachTo: document.body })
+    const wrapper = mount(CostSubjectTaxonomyPage, { attachTo: document.body })
     await flushPromises()
 
     await wrapper.find('[aria-label="停用成本科目 投标费用"]').trigger('click')
@@ -369,11 +364,10 @@ describe('M7 cost-subject center', () => {
   })
 
   it('loads mapping and rule facts without touching other tabs', async () => {
-    route.path = '/cost/subject/rules'
     useSessionStore().replaceUserInfo(
       user(['cost:subject:mapping:query', 'cost:subject:rule:query']),
     )
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectRulesPage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('服务端映射版本')
@@ -386,9 +380,8 @@ describe('M7 cost-subject center', () => {
   })
 
   it('places project scope controls in the page heading', async () => {
-    route.path = '/cost/subject/scope'
     useSessionStore().replaceUserInfo(user(['cost:subject:scope:query']))
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectScopePage)
     await flushPromises()
 
     expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
@@ -399,10 +392,9 @@ describe('M7 cost-subject center', () => {
   })
 
   it('normalizes a created subject id and rereads detail plus taxonomy', async () => {
-    route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))
     vi.mocked(costSubject.createCostSubject).mockResolvedValue(9)
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
     await wrapper
@@ -429,9 +421,8 @@ describe('M7 cost-subject center', () => {
   })
 
   it('formats server amounts to two decimals and hides transfer actions without write permission', async () => {
-    route.path = '/cost/subject/trace'
     useSessionStore().replaceUserInfo(user(['cost:subject:audit:query']))
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTracePage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('¥125.23')
@@ -455,7 +446,6 @@ describe('M7 cost-subject center', () => {
   })
 
   it('creates workflow drafts without approval ids and submits eligible requests separately', async () => {
-    route.path = '/cost/subject/trace'
     useSessionStore().replaceUserInfo(
       user([
         'cost:subject:audit:query',
@@ -465,7 +455,7 @@ describe('M7 cost-subject center', () => {
         'cost:subject:allocation:submit',
       ]),
     )
-    const wrapper = mount(CostSubjectPage)
+    const wrapper = mount(CostSubjectTracePage)
     await flushPromises()
 
     expect(wrapper.text()).toContain('新建转入申请')
@@ -487,7 +477,7 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.submitBidTransferRequest).toHaveBeenCalledWith('41')
 
     const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/master-data/CostSubjectPage.vue'),
+      resolve(process.cwd(), 'src/pages/master-data/cost-subject/CostSubjectTracePage.vue'),
       'utf8',
     )
     const transferForm = source.match(/<form id="transfer-form"[\s\S]*?<\/form>/)?.[0] ?? ''

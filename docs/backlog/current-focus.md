@@ -1,5 +1,21 @@
 # Current Focus
 
+## 2026-08-13 第94条主线：全仓代码职责拆分与重复实现收敛本地 G0～G5 已通过
+
+- 目标：在不改变路由、API、权限、租户、金额、状态机、事务和数据库结果的前提下，分批拆解多路由页面、God Service、重复政策源与文件服务循环，并删除有证据的透明包装和等价重复。
+- 状态：`IMPLEMENTED / AUTHORIZED / G0-G5_PASSED / GIT_DELIVERY_IN_PROGRESS`；唯一状态与验收载体为[`第94条计划`](../plans/第94条主线-全仓代码职责拆分与重复实现收敛任务计划书.md)。
+- 基线：干净 `master@09b7e59bf72c`，任务分支 `codex/mainline-94-code-boundaries`，计划回滚点 `8ed14cdbcd7f`；Codemap 已按最终实现重生成并 verify。
+- 边界：第94条只做行为等价结构整改；不实施第90条字段、迁移、金额权威或状态语义，不新增依赖，不连接非本地环境。用户已授权本地实施、阻塞处置及全部收口后的受保护 Git 交付。
+- 结果：29 条业务路由直连 focused page；contracts/service/router/navigation/CSS/Shell/Canvas 收敛；Workflow/File policy 与 ProjectFile port 成为单一边界；成本、合同、现金、库存、质量、付款追溯只抽有净收益协作者。后端 2,841、MySQL 26、前端 625、browser contract 98、live 80、安全扫描、独立复核和治理门禁通过。详见[`质量报告`](../quality/2026-08-13-issue-094-全仓代码职责拆分与重复实现收敛.md)。
+- 零悬空：18 项结构发现由计划内部唯一承接；正式 Issue 新增 0、关闭 0、净变化 `0`。
+
+## 2026-08-13 第93条主线：项目成员 API 审计字段防篡改与同根写入边界已合并并完成 post-merge
+
+- 目标：阻断项目成员及同根实体对服务端审计/归属字段的客户端赋值路径，统一 V45 后审计列映射与恢复语义。
+- 状态：`COMPLETED / G0-G5_PASSED / GIT_DELIVERY_MERGED / REUSED_PUSH_CI / POST_MERGE_VERIFIED`；实现 PR #441、收口可靠性 PR #442 均已合并，最终代码合并 SHA `6e8dfafb8b7d`。
+- 结果：项目成员采用 Create/Update DTO 与 Service 白名单；同根写入边界、H2/MySQL、真实 API/页面、全量门禁和 Codemap 均已收口。唯一状态源为[`第93条计划`](../plans/第93条主线-项目成员API审计字段防篡改与同根写入边界整改任务计划书.md)。
+- 零悬空：正式承接 0、未收口 0；正式 Issue 新增 0、关闭 0、净变化 `0`。
+
 ## 2026-08-12 第92条主线：审计遗留可靠性、安全与验证治理已合并并完成 post-merge
 
 - 目标：关闭 JVM/1G 容器冲突、备份伪完整、RBAC 关联表租户兜底、closeout 无界详情、MySQL 门禁、供应链、镜像默认值、覆盖率、CORS/CSRF 与 Codemap 语义缺口。

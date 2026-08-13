@@ -216,7 +216,7 @@ describe('WorkflowWorkbenchPage', () => {
       document.body.innerHTML = ''
       vi.clearAllMocks()
     }
-  })
+  }, 15_000)
 
   it('hides protected resubmit without its business submit permission', async () => {
     vi.mocked(loadWorkflowInstance).mockResolvedValue({

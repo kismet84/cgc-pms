@@ -14,7 +14,15 @@ describe('business dictionary consumer contract', () => {
   })
 
   it('loads finance editor options dynamically without hardcoded option fallbacks', () => {
-    const page = source('src/pages/finance/ReceivablesWorkspacePage.vue')
+    const page = [
+      'src/pages/finance/receivables-workspace/PaymentApplicationPage.vue',
+      'src/pages/finance/receivables-workspace/ExpenseApplicationPage.vue',
+      'src/pages/finance/receivables-workspace/RevenueOperationsPage.vue',
+      'src/pages/finance/receivables-workspace/InvoiceManagementPage.vue',
+      'src/pages/finance/receivables-workspace/model.ts',
+    ]
+      .map(source)
+      .join('\n')
 
     for (const code of ['pay_type', 'expense_category', 'invoice_type', 'pay_method']) {
       expect(page).toContain(`loadEnabledDictDataByCode('${code}', signal)`)

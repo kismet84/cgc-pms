@@ -75,7 +75,7 @@ function apiError(message: string, status: number) {
   return Object.assign(new Error(message), { name: 'ApiClientError', code: 'TEST_ERROR', status })
 }
 
-async function mountPage(permissions: string[], path = '/cost-target/index', embedded = false) {
+async function mountPage(permissions: string[], path = '/cost-target/index', embedded?: boolean) {
   setActivePinia(createPinia())
   const session = useSessionStore()
   session.userInfo = { userId: '1', username: 'tester', roles: ['USER'], permissions }
@@ -84,6 +84,7 @@ async function mountPage(permissions: string[], path = '/cost-target/index', emb
     history: createMemoryHistory(),
     routes: [
       { path: '/cost-target/index', component: CostTargetPageView },
+      { path: '/cost-budget', component: CostTargetPageView },
       { path: '/cost-target/create', component: CostTargetPageView },
       { path: '/cost-target/:id/edit', component: CostTargetPageView },
     ],
@@ -91,7 +92,7 @@ async function mountPage(permissions: string[], path = '/cost-target/index', emb
   await router.push(path)
   await router.isReady()
   const wrapper = mount(CostTargetPageView, {
-    props: { embedded },
+    props: embedded === undefined ? {} : { embedded },
     global: { plugins: [router], stubs: { teleport: true } },
   })
   await flushPromises()
@@ -188,11 +189,10 @@ describe('M4 cost target page', () => {
     expect(button(wrapper, '删除')).toBeUndefined()
   })
 
-  it('puts embedded filters and create action on the unique project-budget h1 card', async () => {
+  it('derives the embedded budget heading from the canonical route', async () => {
     const { wrapper } = await mountPage(
       ['cost:target:query', 'cost:target:add'],
-      '/cost-target/index?projectId=P1',
-      true,
+      '/cost-budget?projectId=P1',
     )
 
     expect(wrapper.findAll('h1')).toHaveLength(1)

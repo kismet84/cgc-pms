@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.auth.context.UserContext;
-import com.cgcpms.document.service.PurchaseOrderDocumentEventPublisher;
+import com.cgcpms.document.service.PurchaseDocumentEventPublisher;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -40,7 +40,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
     private final MatPurchaseOrderItemMapper orderItemMapper;
     private final MatPurchaseRequestItemMapper requestItemMapper;
     private final BudgetLedgerService budgetLedgerService;
-    private final PurchaseOrderDocumentEventPublisher documentEvents;
+    private final PurchaseDocumentEventPublisher documentEvents;
 
     @Override
     public String supportBusinessType() {
@@ -96,7 +96,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "APPROVED")
                 .set(MatPurchaseOrder::getOrderStatus, "PERFORMING"));
-        documentEvents.approved(order.getTenantId(), UserContext.getCurrentUserId(), orderId,
+        documentEvents.orderApproved(order.getTenantId(), UserContext.getCurrentUserId(), orderId,
                 context.getInstance().getId());
     }
 

@@ -558,6 +558,8 @@ Assert-Contains $pushGate @(
   'nodeVersion: process.version',
   'process.env.npm_execpath',
   'executable: process.execPath',
+  'const captureBufferBytes = 16 * 1024 * 1024',
+  'maxBuffer: captureBufferBytes',
   'pnpmVersion',
   'gateEnvironment:',
   "captureRaw('git', ['diff', '--binary'",

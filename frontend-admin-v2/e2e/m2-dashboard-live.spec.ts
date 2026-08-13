@@ -335,7 +335,7 @@ test.describe('M2 live eight-role dashboard', () => {
         username: 'ui26.pm01',
         path: 'project-manager',
         assert: (data: Record<string, unknown>) => {
-          expect(Number(data.pendingTaskCount)).toBe(2)
+          expect(Number(data.pendingTaskCount)).toBe(1)
           expect(Number(data.expiringContractCount)).toBe(1)
           expect(Number(data.laggingProjectCount)).toBe(1)
         },

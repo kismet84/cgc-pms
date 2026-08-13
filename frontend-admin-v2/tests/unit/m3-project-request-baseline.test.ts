@@ -51,7 +51,10 @@ describe('M3 project request baseline', () => {
   })
 
   it('applies both project selects through the route before loading', () => {
-    const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
+    const source = [
+      readFileSync(resolve('src/pages/projects/project-routes/ProjectListPage.vue'), 'utf-8'),
+      readFileSync(resolve('src/pages/projects/project-routes/project-pages.css'), 'utf-8'),
+    ].join('\n')
     expect(source).toContain(`@update:model-value="applySelectFilter('projectType', $event)"`)
     expect(source).toContain(`@update:model-value="applySelectFilter('status', $event)"`)
     expect(source).toMatch(
@@ -66,8 +69,12 @@ describe('M3 project request baseline', () => {
   })
 
   it('renders project details as single-column cards with server-authoritative amounts', () => {
-    const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
-    const components = readFileSync(resolve('src/styles/components.css'), 'utf-8')
+    const source = [
+      readFileSync(resolve('src/pages/projects/project-routes/ProjectOverviewPage.vue'), 'utf-8'),
+      readFileSync(resolve('src/pages/projects/project-routes/model.ts'), 'utf-8'),
+      readFileSync(resolve('src/pages/projects/project-routes/project-pages.css'), 'utf-8'),
+    ].join('\n')
+    const components = readFileSync(resolve('src/styles/components/dialogs.css'), 'utf-8')
 
     expect(source).toContain('class="project-page__overview-stack"')
     expect(source).toMatch(
@@ -138,8 +145,11 @@ describe('M3 project request baseline', () => {
   })
 
   it('uses the validated public-shell project context and keeps aggregate routes on all projects', () => {
-    const shell = readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8')
-    const catalog = readFileSync(resolve('src/navigation/catalog.ts'), 'utf-8')
+    const shell = [
+      readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8'),
+      readFileSync(resolve('src/layouts/ShellHeaderWorkspace.vue'), 'utf-8'),
+    ].join('\n')
+    const catalog = readFileSync(resolve('src/navigation/domains/delivery.ts'), 'utf-8')
 
     expect(shell).toContain("{ value: '', label: '全部项目' }")
     expect(shell).toContain('allow-empty')

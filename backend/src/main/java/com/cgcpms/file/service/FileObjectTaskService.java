@@ -1,7 +1,6 @@
 package com.cgcpms.file.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.cgcpms.projectfile.ProjectFileService;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
 import lombok.extern.slf4j.Slf4j;
@@ -30,16 +29,16 @@ public class FileObjectTaskService {
     private final JdbcTemplate jdbcTemplate;
     private final MinioClient minioClient;
     private final ObjectProvider<FileObjectTaskService> selfProvider;
-    private final ObjectProvider<ProjectFileService> projectFileServiceProvider;
+    private final ObjectProvider<? extends ProjectFileProjection> projectFileProjectionProvider;
 
     @Autowired
     public FileObjectTaskService(JdbcTemplate jdbcTemplate, MinioClient minioClient,
                                  ObjectProvider<FileObjectTaskService> selfProvider,
-                                 ObjectProvider<ProjectFileService> projectFileServiceProvider) {
+                                 ObjectProvider<? extends ProjectFileProjection> projectFileProjectionProvider) {
         this.jdbcTemplate = jdbcTemplate;
         this.minioClient = minioClient;
         this.selfProvider = selfProvider;
-        this.projectFileServiceProvider = projectFileServiceProvider;
+        this.projectFileProjectionProvider = projectFileProjectionProvider;
     }
 
     /** Compatibility constructor used by focused legacy unit tests. */
@@ -119,10 +118,10 @@ public class FileObjectTaskService {
                         .object(String.valueOf(task.get("source_path")))
                         .build());
             } else if ("PREVIEW_CONVERT".equals(operation)) {
-                if (projectFileServiceProvider == null) {
+                if (projectFileProjectionProvider == null) {
                     throw new IllegalStateException("Project file preview service unavailable");
                 }
-                projectFileServiceProvider.getObject().processConversionTask(
+                projectFileProjectionProvider.getObject().processConversionTask(
                         ((Number) task.get("reference_id")).longValue());
             } else {
                 throw new IllegalStateException("Unsupported object task operation");

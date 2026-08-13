@@ -121,9 +121,13 @@ describe('M4 commercial contract baseline', () => {
 
   it('keeps the shared contract and service free of UI, Legacy and money coercion', () => {
     const sources = [
-      readFileSync(resolve('../packages/frontend-contracts/src/commercial.ts'), 'utf-8'),
-      readFileSync(resolve('src/services/commercial.ts'), 'utf-8'),
-    ].join('\n')
+      '../packages/frontend-contracts/src/commercial.ts',
+      ...['types', 'support', 'contract', 'variation', 'bid', 'cost', 'measurement'].map(
+        (module) => `src/services/commercial/${module}.ts`,
+      ),
+    ]
+      .map((file) => readFileSync(resolve(file), 'utf-8'))
+      .join('\n')
 
     expect(sources).not.toMatch(/from ["'](?:vue|pinia|vue-router)/)
     expect(sources).not.toContain('frontend-admin/')

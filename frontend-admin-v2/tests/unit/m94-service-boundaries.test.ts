@@ -1,0 +1,193 @@
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import * as commercial from '@/services/commercial'
+import type { BidCostOption, BidOwnerOption, CostSubjectOption } from '@/services/commercial'
+import * as finance from '@/services/finance'
+import type { BidFundAccountOption, PaymentSourceOptionRecord } from '@/services/finance'
+import * as supplyChain from '@/services/supply-chain'
+import type {
+  PurchaseRequestApprovalCommand,
+  PurchaseRequestFormOptions,
+  RequisitionFormOptions,
+  SupplyFormMaterialOption,
+} from '@/services/supply-chain'
+import * as systemManagement from '@/services/system-management'
+import type {
+  AuditRecord,
+  DataMaintenancePreview,
+  DictDataRecord,
+  DocumentDesignSchema,
+  DocumentGenerationRecord,
+  MenuRecord,
+  RoleRecord,
+  UserRecord,
+} from '@/services/system-management'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+
+const read = (path: string) => readFileSync(resolve(path), 'utf8')
+
+const domainModules = {
+  commercial: ['types', 'support', 'contract', 'variation', 'bid', 'cost', 'measurement'],
+  'supply-chain': ['types', 'support', 'inventory', 'requisition', 'purchase', 'sourcing'],
+  finance: ['types', 'support', 'payment', 'trace', 'cashbook', 'control', 'revenue'],
+  'system-management': ['support', 'access', 'menu', 'dictionary', 'document', 'audit-maintenance'],
+} as const
+
+const runtimeExportHashes = {
+  commercial: 'dd15ebb41ba453d71eb1c477afac53f73e8d786a149f2629984b291fc66c13c7',
+  'supply-chain': 'd0eb4ffea7da146d4c9978211d474fe1d9f09ea866b57523cb1e1f923d7f3367',
+  finance: '332a5bf8c6e237c720b1353d1b110aa2e3c73cab70349ae384747b00e1d359d3',
+  'system-management': 'd0f17314a8d9d61d2765e77d5ae3a781b453bff1acc4c4b5a18425cfadf6381a',
+} as const
+
+const typeExportHashes = {
+  commercial: '73aa6feb3d3f10fcd745d52db41970d4a1485a35ceeaa238124a1d542664c56d',
+  'supply-chain': 'ce12c8439b8d68390f35469a12f95d9429e6a9712bba78f50ce95c0a7738baf1',
+  finance: 'cac6868daf44392f2730fedc01b29ed60b4048a29d41b6394adb01a12fc2306a',
+  'system-management': 'e7b850bffe82a57df7885434cc591ae74246979ba597b9c32737f2ccfd668806',
+} as const
+
+const requestSurfaceHashes = {
+  commercial: '012fac32046fa776a2fbf0a90c7ef7953ef16659ad01f5629367065e393352eb',
+  'supply-chain': '1de67349b89976eef8cdb7bdb5e11f2c2d758e5dca1040d7d257e648b31667fc',
+  finance: 'a3125c665893601f79f9ed09c6abe8f47484d685c93b1ab1d1e7bfe218e6759d',
+  'system-management': 'd589588c009b1d6021783ca81ef2b48ccb89f7740dbd9fef9aa2d3e503151350',
+} as const
+
+const hash = (values: string[]) =>
+  createHash('sha256')
+    .update([...values].sort().join('\n'))
+    .digest('hex')
+
+const requestSurfaceHash = (source: string) =>
+  hash([
+    ...(source.match(/\b(?:COMMERCIAL_API|SUPPLY_CHAIN_API|FINANCE_API)\.[A-Za-z0-9_]+/g) ?? []),
+    ...[...source.matchAll(/['"`](\/[A-Za-z0-9][^'"`$\r\n]*)/g)].map((match) => match[1]),
+    ...(source.match(/\bmethod:\s*(?:['"][A-Z]+['"]|[A-Z_]+(?:\.[a-z]+)?)/g) ?? []),
+    ...(source.match(/\bnotifyError:\s*false/g) ?? []),
+  ])
+
+describe('M94 frontend service boundaries', () => {
+  it('keeps the cost-subject public path as a compatibility barrel', () => {
+    const barrel = read('src/services/cost-subject.ts')
+
+    for (const module of ['types', 'taxonomy', 'mapping', 'bid-transfer', 'finance-allocation']) {
+      expect(barrel).toContain(`export * from './cost-subject/${module}'`)
+    }
+    expect(barrel).not.toContain('apiRequest')
+  })
+
+  it('keeps taxonomy, mapping, bid transfer and finance allocation independent', () => {
+    const modules = {
+      taxonomy: read('src/services/cost-subject/taxonomy.ts'),
+      mapping: read('src/services/cost-subject/mapping.ts'),
+      bid: read('src/services/cost-subject/bid-transfer.ts'),
+      finance: read('src/services/cost-subject/finance-allocation.ts'),
+    }
+
+    expect(modules.taxonomy).toContain("'/cost-subjects/tree?category=COST'")
+    expect(modules.taxonomy).not.toContain('/bid-transfer')
+    expect(modules.mapping).toContain("'/cost-subject-v2/mapping-versions'")
+    expect(modules.mapping).not.toContain('/finance-allocation')
+    expect(modules.bid).toContain("'/cost-subject-v2/bid-transfers'")
+    expect(modules.bid).not.toContain('/finance-allocation')
+    expect(modules.finance).toContain("'/cost-subject-v2/finance-allocations'")
+    expect(modules.finance).not.toContain('/bid-transfer')
+  })
+
+  it('keeps four legacy service paths as focused compatibility barrels', () => {
+    for (const [service, modules] of Object.entries(domainModules)) {
+      const barrel = read(`src/services/${service}.ts`)
+      for (const module of modules) {
+        if (module === 'support') continue
+        expect(barrel, `${service}/${module}`).toContain(`export * from './${service}/${module}'`)
+      }
+      expect(barrel).not.toContain('apiRequest')
+    }
+  })
+
+  it('preserves exact runtime exports from every legacy public import path', () => {
+    const namespaces = {
+      commercial,
+      'supply-chain': supplyChain,
+      finance,
+      'system-management': systemManagement,
+    }
+    for (const [service, namespace] of Object.entries(namespaces)) {
+      expect(hash(Object.keys(namespace)), service).toBe(
+        runtimeExportHashes[service as keyof typeof runtimeExportHashes],
+      )
+    }
+  })
+
+  it('preserves exact public type exports from every legacy public import path', () => {
+    for (const [service, modules] of Object.entries(domainModules)) {
+      const source = modules
+        .map((module) => read(`src/services/${service}/${module}.ts`))
+        .join('\n')
+      const names = [...source.matchAll(/export\s+(?:interface|type)\s+([A-Za-z_]\w*)/g)].map(
+        (match) => match[1],
+      )
+      expect(hash(names), service).toBe(typeExportHashes[service as keyof typeof typeExportHashes])
+    }
+  })
+
+  it('preserves endpoint, method and local error-notification request tokens', () => {
+    for (const [service, modules] of Object.entries(domainModules)) {
+      const source = modules
+        .map((module) => read(`src/services/${service}/${module}.ts`))
+        .join('\n')
+      expect(requestSurfaceHash(source), service).toBe(
+        requestSurfaceHashes[service as keyof typeof requestSurfaceHashes],
+      )
+    }
+  })
+
+  it('keeps legacy type imports available', () => {
+    expectTypeOf<[CostSubjectOption, BidOwnerOption, BidCostOption]>().toMatchTypeOf<
+      [CostSubjectOption, BidOwnerOption, BidCostOption]
+    >()
+    expectTypeOf<
+      [
+        SupplyFormMaterialOption,
+        PurchaseRequestFormOptions,
+        RequisitionFormOptions,
+        PurchaseRequestApprovalCommand,
+      ]
+    >().toMatchTypeOf<
+      [
+        SupplyFormMaterialOption,
+        PurchaseRequestFormOptions,
+        RequisitionFormOptions,
+        PurchaseRequestApprovalCommand,
+      ]
+    >()
+    expectTypeOf<[BidFundAccountOption, PaymentSourceOptionRecord]>().toMatchTypeOf<
+      [BidFundAccountOption, PaymentSourceOptionRecord]
+    >()
+    expectTypeOf<
+      [
+        UserRecord,
+        RoleRecord,
+        MenuRecord,
+        DictDataRecord,
+        AuditRecord,
+        DataMaintenancePreview,
+        DocumentDesignSchema,
+        DocumentGenerationRecord,
+      ]
+    >().toMatchTypeOf<
+      [
+        UserRecord,
+        RoleRecord,
+        MenuRecord,
+        DictDataRecord,
+        AuditRecord,
+        DataMaintenancePreview,
+        DocumentDesignSchema,
+        DocumentGenerationRecord,
+      ]
+    >()
+  })
+})

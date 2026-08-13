@@ -1,0 +1,129 @@
+.variation-page {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.variation-page__form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+  align-items: end;
+}
+
+.variation-page__toolbar {
+  display: flex;
+  align-items: end;
+  gap: var(--v2-space-2);
+}
+
+.variation-page__filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+  gap: var(--v2-space-2);
+  width: min(68vw, 64rem);
+}
+
+.variation-page__table-wrap {
+  overflow-x: auto;
+}
+
+.variation-page__table-wrap table {
+  min-width: 64rem;
+}
+
+.variation-page__table-wrap .variation-page__actions {
+  flex-wrap: nowrap;
+}
+
+.variation-page__actions,
+.variation-page__pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  align-items: center;
+}
+
+.variation-page__pager {
+  justify-content: flex-end;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+.variation-page__detail-grid,
+.variation-page__trace {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--v2-space-2) var(--v2-space-4);
+  margin: 0;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+.variation-page dt {
+  color: var(--v2-color-text-secondary);
+}
+
+.variation-page dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.variation-page__items {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.variation-page__item {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.variation-page__native-field {
+  display: grid;
+  gap: var(--v2-space-2);
+  color: var(--v2-color-text-secondary);
+}
+
+.variation-page__native-field input,
+.variation-page__native-field textarea {
+  min-height: var(--v2-control-height-touch);
+  padding: var(--v2-space-2) var(--v2-space-3);
+}
+
+.variation-page__native-field textarea {
+  min-height: var(--v2-control-height-textarea);
+  resize: vertical;
+}
+
+.variation-page__wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 64rem) {
+  .variation-page__toolbar {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .variation-page__filters,
+  .variation-page__form,
+  .variation-page__item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .variation-page__filters {
+    width: 100%;
+  }
+}
+
+@media (max-width: 48rem) {
+  .variation-page__filters,
+  .variation-page__form,
+  .variation-page__item {
+    grid-template-columns: 1fr;
+  }
+}

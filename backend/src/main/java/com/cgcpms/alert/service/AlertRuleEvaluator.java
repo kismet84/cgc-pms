@@ -1,5 +1,7 @@
 package com.cgcpms.alert.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
 import com.cgcpms.alert.entity.AlertLog;
@@ -559,10 +561,6 @@ class AlertRuleEvaluator {
         alert.setProcessStatus("OPEN");
         alert.setDeletedFlag(0);
         return alert;
-    }
-
-    private static BigDecimal nvl(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
     }
 
     private BigDecimal ratio(BigDecimal actual, BigDecimal base) {

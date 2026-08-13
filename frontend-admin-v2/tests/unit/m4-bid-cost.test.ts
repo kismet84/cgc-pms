@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('M4 bid-cost compatibility', () => {
   it('keeps legacy bookmark as an explicit redirect', () => {
-    const router = read('src/router.ts')
+    const router = read('src/router/context-routes.ts')
     expect(router).toContain("path: '/bid-cost'")
     expect(router).toContain("path: '/engineering-tender/records'")
     expect(router).toContain("name: 'LegacyBidCostRedirect'")
@@ -15,7 +15,7 @@ describe('M4 bid-cost compatibility', () => {
 
   it('keeps the existing backend API while moving product routes', () => {
     const contract = read('../packages/frontend-contracts/src/commercial.ts')
-    const service = read('src/services/commercial.ts')
+    const service = read('src/services/commercial/bid.ts')
     expect(contract).toContain('bidCosts: "/bid-cost"')
     expect(service).toContain('COMMERCIAL_API.bidCosts')
   })

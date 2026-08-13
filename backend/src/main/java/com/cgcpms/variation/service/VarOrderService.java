@@ -1,5 +1,7 @@
 package com.cgcpms.variation.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -689,10 +691,6 @@ public class VarOrderService {
 
     private BigDecimal toBigDecimal(Object value) {
         return value instanceof BigDecimal decimal ? decimal : new BigDecimal(String.valueOf(value));
-    }
-
-    private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
     }
 
     private void validateDraftOrder(VarOrder order) {

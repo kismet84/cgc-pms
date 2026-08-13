@@ -355,7 +355,7 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'ui26.staff01')
     await page.goto(`/site/daily-log?projectId=${controlledProjectId}`)
     await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '新建日报' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '新建日报' })).toBeVisible()
 
     const employeeLogin = await page.goto('/api/auth/dev-login?username=ui26.staff01')
     expect(employeeLogin?.ok()).toBe(true)

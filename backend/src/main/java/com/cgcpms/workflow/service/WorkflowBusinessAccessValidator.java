@@ -31,6 +31,7 @@ import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.WorkflowSubmissionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -279,7 +280,7 @@ public class WorkflowBusinessAccessValidator {
     }
 
     public void requireSubmitPermission(String businessType) {
-        String requiredPermission = getRequiredPermission(businessType);
+        String requiredPermission = WorkflowSubmissionPolicy.requiredPermission(businessType);
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) {
             throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
@@ -291,40 +292,6 @@ public class WorkflowBusinessAccessValidator {
             }
         }
         throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
-    }
-
-    private String getRequiredPermission(String businessType) {
-        return switch (businessType) {
-            case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
-            case WorkflowBusinessTypes.PROJECT_APPROVAL -> "project:submit";
-            case WorkflowBusinessTypes.CONTRACT_REVENUE -> "revenue:submit";
-            case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
-            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
-            case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
-            case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
-            case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
-            case WorkflowBusinessTypes.VAR_ORDER -> "variation:order:submit";
-            case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
-            case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
-            case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
-            case WorkflowBusinessTypes.COST_CORRECTIVE_ACTION -> "cost:corrective:submit";
-            case WorkflowBusinessTypes.MATERIAL_REQUISITION -> "requisition:submit";
-            case WorkflowBusinessTypes.PROJECT_BUDGET -> "budget:submit";
-            case WorkflowBusinessTypes.EXPENSE -> "expense:submit";
-            case WorkflowBusinessTypes.OWNER_SETTLEMENT -> "revenue:settlement:submit";
-            case WorkflowBusinessTypes.PRODUCTION_MEASUREMENT -> "measurement:submit";
-            case WorkflowBusinessTypes.PROJECT_SCHEDULE -> "schedule:submit";
-            case WorkflowBusinessTypes.PROJECT_COMMENCEMENT -> "project:commencement:submit";
-            case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> "schedule:submit";
-            case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
-            case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
-            case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> "closeout:acceptance:submit";
-            case WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER -> "cost:subject:transfer:submit";
-            case WorkflowBusinessTypes.FINANCE_COST_ALLOCATION -> "cost:subject:allocation:submit";
-            case WorkflowBusinessTypes.QS_RECTIFICATION -> "quality:rectification:submit";
-            case WorkflowBusinessTypes.QS_CONSEQUENCE -> "quality:consequence:submit";
-            default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
-        };
     }
 
     private ValidationResult validateJdbc(String table, String statusColumn, Long businessId, Long tenantId,
