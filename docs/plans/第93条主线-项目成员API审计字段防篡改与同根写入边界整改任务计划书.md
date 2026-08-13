@@ -4,7 +4,7 @@
 
 > 编制日期：2026-08-13
 >
-> 计划状态：`LOCAL_G0-G5_PASS / GIT_DELIVERY_PENDING`
+> 计划状态：`LOCAL_G0-G5_PASS / GIT_DELIVERY_MERGED / REUSED_PUSH_CI`
 >
 > 审计与实施基线：`master@afc8b74ff483ba8fd1955f11d31276d917727d01`；任务分支 `codex/mainline-93-audit-field-hardening`
 >
@@ -285,4 +285,7 @@ git diff --check
 - 3 项审计输入裁决：`M93-F01` 有据关闭 1；`M93-F02/F03` 本轮修复并复验 2；正式承接 0，未收口 0。
 - 后续项统计：新增后续项 0、关闭后续项 0、后续项净变化 `0`；无无载体遗留项，`current-issues.json` 不改。
 - Git 授权：允许任务自有改动 commit、push、受保护 PR/合并、post-merge 验真及已合并源分支清理；不允许直接推送 `master`、强推、绕过保护、Tag、Release 或生产发布。
-- 当前结论：本地 `G0～G5 PASS`；仅受保护 Git 两阶段交付尚未完成，主线保持 `GIT_DELIVERY_PENDING`。
+- 实现源 HEAD `c1eb9c0eb4465996c8706b57944b05512c38ea02` 的 push CI run `31663379551` 完整通过，pre-PR exact-SHA verifier 为 `PASS`。
+- 实现 PR #441 的 PR run `31664096721` 成功复用同 SHA push 证据；受保护 squash 合并 SHA 为 `4ed199de9a97e609f919b7f3a871c5b2cf2247e3`。
+- Post-merge run `31664155763` 通过；verifier 为 `PASS / REUSED_PUSH_CI`，源树与合并树同为 `cdda49e1ea769e0b6b28a6f0d425ffde918464af`。
+- 当前结论：`LOCAL_G0-G5_PASS / GIT_DELIVERY_MERGED / REUSED_PUSH_CI`；不扩展为生产、Tag 或 Release 裁决。
