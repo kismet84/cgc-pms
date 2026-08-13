@@ -61,6 +61,9 @@ if [[ -n "${FAKE_MC_ARGV_LOG:-}" ]]; then
 fi
 if [[ "${1:-}" == '--version' ]]; then
   printf '%s\n' 'mc version RELEASE.contract'
+  for line_number in {1..4096}; do
+    printf 'Runtime contract line %s\n' "${line_number}"
+  done
   exit 0
 fi
 if [[ "${1:-}" == '--config-dir' ]]; then

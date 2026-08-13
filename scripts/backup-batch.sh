@@ -84,8 +84,12 @@ mapfile -t mysql_archives < <(find "${PARTIAL_BATCH}/mysql" -type f -name '*.sql
 }
 mapfile -t minio_objects < <(find "${PARTIAL_BATCH}/minio" -type f -print)
 printf 'object_count=%s\n' "${#minio_objects[@]}" > "${PARTIAL_BATCH}/minio.inventory"
-MYSQL_TOOL_VERSION="$(docker exec "${MYSQL_CONTAINER:-cgc-pms-mysql}" mysqldump --version | head -n 1 | tr -d '\r\n')"
-MINIO_TOOL_VERSION="$(mc --version | head -n 1 | tr -d '\r\n')"
+MYSQL_TOOL_OUTPUT="$(docker exec "${MYSQL_CONTAINER:-cgc-pms-mysql}" mysqldump --version)"
+MINIO_TOOL_OUTPUT="$(mc --version)"
+MYSQL_TOOL_VERSION="${MYSQL_TOOL_OUTPUT%%$'\n'*}"
+MINIO_TOOL_VERSION="${MINIO_TOOL_OUTPUT%%$'\n'*}"
+MYSQL_TOOL_VERSION="${MYSQL_TOOL_VERSION%$'\r'}"
+MINIO_TOOL_VERSION="${MINIO_TOOL_VERSION%$'\r'}"
 [[ -n "${MYSQL_TOOL_VERSION}" && -n "${MINIO_TOOL_VERSION}" ]] || {
   echo 'Backup tool versions could not be determined' >&2
   exit 1
