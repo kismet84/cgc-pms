@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -111,6 +112,36 @@ class MatPurchaseRequestControllerTest {
                 .andExpect(jsonPath("$.data.purpose").doesNotExist());
         mockMvc.perform(getWithApi("/purchase-requests/" + id + "/items").cookie(adminCookie()))
                 .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
+    @Order(3) @DisplayName("POST /purchase-requests/{id}/items/batch -> 路径归属与审批字段由服务端控制")
+    void testSaveItemsBatch_IgnoresServerManagedFields() throws Exception {
+        String response = mockMvc.perform(postWithApi("/purchase-requests").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":" + PROJECT_ID + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        Long isolatedRequestId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        mockMvc.perform(postWithApi("/purchase-requests/" + isolatedRequestId + "/items/batch")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                [{"id":999999,"tenantId":999,"requestId":888888,"materialId":1,
+                                  "quantity":2,"plannedDate":"2026-08-15",
+                                  "approvedQuantity":99,"approvalVersion":77}]
+                                """))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap("""
+                SELECT id, tenant_id, request_id, approved_quantity, approval_version
+                  FROM mat_purchase_request_item WHERE request_id = ?
+                """, isolatedRequestId);
+        Assertions.assertNotEquals(999999L, ((Number) stored.get("id")).longValue());
+        Assertions.assertEquals(TENANT_ID, ((Number) stored.get("tenant_id")).longValue());
+        Assertions.assertEquals(isolatedRequestId.longValue(), ((Number) stored.get("request_id")).longValue());
+        Assertions.assertNull(stored.get("approved_quantity"));
+        Assertions.assertEquals(0, ((Number) stored.get("approval_version")).intValue());
     }
 
     @Test

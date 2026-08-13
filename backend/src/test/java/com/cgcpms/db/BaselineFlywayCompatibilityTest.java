@@ -26,6 +26,7 @@ class BaselineFlywayCompatibilityTest {
         flyway.migrate();
 
         assertEquals("293", flyway.info().current().getVersion().getVersion());
+        assertUnifiedAuditColumns(flyway);
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
@@ -220,6 +221,7 @@ class BaselineFlywayCompatibilityTest {
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
         assertEquals("293", current.info().current().getVersion().getVersion());
+        assertUnifiedAuditColumns(current);
         assertEquals(9, count(current, "sys_menu", """
                 perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
                           'variation:order:item:edit','cost:target:add','cost:target:edit',
@@ -506,6 +508,20 @@ class BaselineFlywayCompatibilityTest {
                 .locations(locations)
                 .cleanDisabled(false)
                 .load();
+    }
+
+    private static void assertUnifiedAuditColumns(Flyway flyway) {
+        for (String table : List.of(
+                "pm_project_member", "ct_contract_change", "org_company", "org_department",
+                "org_position", "mat_purchase_request", "mat_purchase_request_item",
+                "cost_target", "cost_target_item", "mat_warehouse")) {
+            assertEquals(2, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                    "TABLE_NAME='" + table + "' AND COLUMN_NAME IN ('created_at','updated_at')"),
+                    table + " must use canonical audit columns");
+            assertEquals(0, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                    "TABLE_NAME='" + table + "' AND COLUMN_NAME IN ('created_time','updated_time')"),
+                    table + " must not retain legacy audit columns");
+        }
     }
 
     private static String url(String name) {

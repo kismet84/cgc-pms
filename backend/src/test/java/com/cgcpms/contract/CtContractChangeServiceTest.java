@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.dto.CreateContractChangeRequest;
+import com.cgcpms.contract.dto.UpdateContractChangeRequest;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.service.CtContractChangeService;
@@ -13,7 +15,9 @@ import com.cgcpms.system.mapper.SysUserMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -42,6 +46,9 @@ class CtContractChangeServiceTest {
     @Autowired
     private SysUserMapper sysUserMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
@@ -61,7 +68,7 @@ class CtContractChangeServiceTest {
     @DisplayName("分页查询 — 按 projectId 过滤返回匹配记录")
     void testGetPageByProject() {
         CtContractChange change = createTestChange("变更-分页测试");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         IPage<CtContractChange> page = changeService.getPage(1, 10, PROJECT_ID, null,
                 null, null, null);
@@ -73,7 +80,7 @@ class CtContractChangeServiceTest {
     @DisplayName("分页查询 — 按 contractId 过滤返回匹配记录")
     void testGetPageByContract() {
         CtContractChange change = createTestChange("变更-合同过滤");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         IPage<CtContractChange> page = changeService.getPage(1, 10, null, CONTRACT_ID,
                 null, null, null);
@@ -86,7 +93,7 @@ class CtContractChangeServiceTest {
     void testGetPageByChangeType() {
         CtContractChange change = createTestChange("变更-类型过滤");
         change.setChangeType("AMOUNT_INCREASE");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         IPage<CtContractChange> page = changeService.getPage(1, 10, null, null,
                 "AMOUNT_INCREASE", null, null);
@@ -98,7 +105,7 @@ class CtContractChangeServiceTest {
     @DisplayName("分页查询 — 按 approvalStatus 过滤")
     void testGetPageByApprovalStatus() {
         CtContractChange change = createTestChange("变更-状态过滤");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         IPage<CtContractChange> page = changeService.getPage(1, 10, null, null,
                 null, "DRAFT", null);
@@ -110,7 +117,7 @@ class CtContractChangeServiceTest {
     @DisplayName("分页查询 — 按 changeCode 模糊搜索")
     void testGetPageByChangeCode() {
         CtContractChange change = createTestChange("变更-编号搜索");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         // 模糊搜索 changeCode 中的部分内容
         IPage<CtContractChange> page = changeService.getPage(1, 10, null, null,
@@ -123,7 +130,7 @@ class CtContractChangeServiceTest {
     @DisplayName("分页查询 — 租户隔离: 其他租户看不到当前租户的记录")
     void testGetPageTenantIsolation() {
         CtContractChange change = createTestChange("变更-租户隔离");
-        changeService.create(change);
+        changeService.create(createRequest(change));
 
         // 切换到租户 999（非当前租户）
         TestUserContext.setAdmin(999L, TestUserContext.USER_ADMIN);
@@ -145,7 +152,7 @@ class CtContractChangeServiceTest {
     @DisplayName("按ID查询 — 存在时返回完整实体")
     void testGetByIdFound() {
         CtContractChange change = createTestChange("变更-ID查询");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         CtContractChange result = changeService.getById(id);
         assertNotNull(result);
@@ -165,7 +172,7 @@ class CtContractChangeServiceTest {
     @DisplayName("按ID查询 — 租户隔离: 跨租户查询抛 CT_CHANGE_NOT_FOUND")
     void testGetByIdTenantIsolation() {
         CtContractChange change = createTestChange("变更-跨租户查询");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         TestUserContext.setAdmin(999L, TestUserContext.USER_ADMIN);
         BusinessException ex = assertThrows(BusinessException.class,
@@ -181,7 +188,7 @@ class CtContractChangeServiceTest {
     @DisplayName("创建 — 成功后自动生成 changeCode 和默认 approvalStatus")
     void testCreateSuccess() {
         CtContractChange change = createTestChange("变更-创建测试");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         assertNotNull(id, "创建应返回 ID");
         CtContractChange saved = changeMapper.selectById(id);
@@ -208,7 +215,7 @@ class CtContractChangeServiceTest {
         change.setContractId(-999L);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> changeService.create(change));
+                () -> changeService.create(createRequest(change)));
         assertEquals("CONTRACT_NOT_FOUND", ex.getCode());
     }
 
@@ -220,7 +227,7 @@ class CtContractChangeServiceTest {
         CtContractChange change = createTestChange("变更-DRAFT合同");
         change.setContractId(CONTRACT_ID);
         // contract 30001 is APPROVED/PERFORMING, so this should succeed
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
         assertNotNull(id);
     }
 
@@ -228,10 +235,10 @@ class CtContractChangeServiceTest {
     @DisplayName("创建 — changeCode 序号自动递增")
     void testCreateAutoIncrementCode() {
         CtContractChange c1 = createTestChange("变更-序号测试1");
-        Long id1 = changeService.create(c1);
+        Long id1 = changeService.create(createRequest(c1));
 
         CtContractChange c2 = createTestChange("变更-序号测试2");
-        Long id2 = changeService.create(c2);
+        Long id2 = changeService.create(createRequest(c2));
 
         CtContractChange saved1 = changeMapper.selectById(id1);
         CtContractChange saved2 = changeMapper.selectById(id2);
@@ -250,17 +257,40 @@ class CtContractChangeServiceTest {
     @DisplayName("更新 — DRAFT 状态允许编辑")
     void testUpdateDraftAllowed() {
         CtContractChange change = createTestChange("变更-更新测试");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         CtContractChange toUpdate = new CtContractChange();
         toUpdate.setId(id);
         toUpdate.setChangeName("变更-已更新名称");
         toUpdate.setChangeAmount(new BigDecimal("200000.00"));
-        changeService.update(toUpdate);
+        changeService.update(id, updateRequest(toUpdate));
 
         CtContractChange updated = changeMapper.selectById(id);
         assertEquals("变更-已更新名称", updated.getChangeName());
         assertEquals(0, new BigDecimal("200000.00").compareTo(updated.getChangeAmount()));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("更新 — 空白业务事项键按未提供处理，主表与登记表保持一致")
+    void testUpdateBlankBusinessMatterKeyKeepsRegistryConsistent() {
+        CtContractChange change = createTestChange("变更-事项键空白更新");
+        String matterKey = "M93-MATTER-" + System.nanoTime();
+        change.setBusinessMatterKey(matterKey);
+        Long id = changeService.create(createRequest(change));
+
+        CtContractChange update = createTestChange("变更-事项键保持");
+        update.setBusinessMatterKey("   ");
+        changeService.update(id, updateRequest(update));
+
+        CtContractChange saved = changeMapper.selectById(id);
+        assertEquals(matterKey, saved.getBusinessMatterKey());
+        Integer activeRegistryCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM business_matter_registry
+                 WHERE source_type = 'CT_CHANGE' AND source_id = ?
+                   AND matter_key = ? AND status = 'ACTIVE' AND active_token = 1
+                """, Integer.class, id, matterKey);
+        assertEquals(1, activeRegistryCount);
     }
 
     @Test
@@ -270,7 +300,7 @@ class CtContractChangeServiceTest {
         toUpdate.setId(-999L);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> changeService.update(toUpdate));
+                () -> changeService.update(-999L, updateRequest(toUpdate)));
         assertEquals("CT_CHANGE_NOT_FOUND", ex.getCode());
     }
 
@@ -278,7 +308,7 @@ class CtContractChangeServiceTest {
     @DisplayName("更新 — costGeneratedFlag=1 时禁止编辑")
     void testUpdateCostGeneratedRejected() {
         CtContractChange change = createTestChange("变更-成本已生成");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         // 直接通过 mapper 设置 costGeneratedFlag=1
         CtContractChange existing = changeMapper.selectById(id);
@@ -290,7 +320,7 @@ class CtContractChangeServiceTest {
         toUpdate.setChangeName("变更-尝试修改");
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> changeService.update(toUpdate));
+                () -> changeService.update(id, updateRequest(toUpdate)));
         assertEquals("COST_GENERATED", ex.getCode());
     }
 
@@ -302,7 +332,7 @@ class CtContractChangeServiceTest {
     @DisplayName("删除 — DRAFT 状态允许软删除")
     void testDeleteDraftAllowed() {
         CtContractChange change = createTestChange("变更-删除测试");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         changeService.delete(id);
 
@@ -323,7 +353,7 @@ class CtContractChangeServiceTest {
     @DisplayName("删除 — costGeneratedFlag=1 时禁止删除")
     void testDeleteCostGeneratedRejected() {
         CtContractChange change = createTestChange("变更-删除被拒");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         CtContractChange existing = changeMapper.selectById(id);
         existing.setCostGeneratedFlag(1);
@@ -342,7 +372,7 @@ class CtContractChangeServiceTest {
     @DisplayName("提交审批 — DRAFT 状态可提交，状态变为 APPROVING")
     void testSubmitForApprovalSuccess() {
         CtContractChange change = createTestChange("变更-提交审批");
-        Long id = changeService.create(change);
+        Long id = changeService.create(createRequest(change));
 
         changeService.submitForApproval(id);
 
@@ -374,6 +404,21 @@ class CtContractChangeServiceTest {
         change.setAfterAmount(new BigDecimal("600000.00"));
         change.setReason("测试变更原因");
         return change;
+    }
+
+    private CreateContractChangeRequest createRequest(CtContractChange change) {
+        return new CreateContractChangeRequest(
+                change.getProjectId(), change.getContractId(), change.getChangeName(),
+                change.getBusinessMatterKey(), change.getChangeType(), change.getBeforeAmount(),
+                change.getChangeAmount(), change.getAfterAmount(), change.getReason(), change.getRemark());
+    }
+
+    private UpdateContractChangeRequest updateRequest(CtContractChange change) {
+        return new UpdateContractChangeRequest(
+                PROJECT_ID, CONTRACT_ID, change.getChangeName(), change.getBusinessMatterKey(),
+                change.getChangeType() == null ? "AMOUNT_INCREASE" : change.getChangeType(),
+                change.getBeforeAmount(), change.getChangeAmount(), change.getAfterAmount(),
+                change.getReason(), change.getRemark());
     }
 
     /** V85 migration deletes default admin (id=1); workflow engine needs this user. */

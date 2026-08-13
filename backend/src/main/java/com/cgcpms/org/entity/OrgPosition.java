@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -17,8 +18,10 @@ import java.time.LocalDateTime;
 public class OrgPosition extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     private Long companyId;
@@ -32,20 +35,24 @@ public class OrgPosition extends BaseEntity {
     private String status;
 
     /** 数据库审计列 created_at — 由 MyMetaObjectHandler 自动填充 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
     /** 数据库审计列 updated_at — 由 MyMetaObjectHandler 自动填充 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
     /** 覆盖 BaseEntity.createdAt，避免与 createdTime 的列映射冲突 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime createdAt;
 
     /** 覆盖 BaseEntity.updatedAt，避免与 updatedTime 的列映射冲突 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime updatedAt;
 }

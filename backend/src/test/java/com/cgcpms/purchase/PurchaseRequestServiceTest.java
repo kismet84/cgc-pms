@@ -543,6 +543,52 @@ class PurchaseRequestServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("创建和编辑采购申请忽略客户端ID、租户、编号与明细审批状态")
+    void serverManagedRequestFieldsCannotBeInjected() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setId(42L);
+        request.setTenantId(999L);
+        request.setProjectId(PROJECT_ID);
+        request.setRequestCode("CLIENT-CODE");
+        request.setApprovalStatus("APPROVED");
+        request.setStatus("CONVERTED");
+        Long requestId = requestService.create(request);
+
+        assertNotEquals(42L, requestId);
+        MatPurchaseRequest saved = requestMapper.selectById(requestId);
+        assertEquals(TENANT_ID, saved.getTenantId());
+        assertNotEquals("CLIENT-CODE", saved.getRequestCode());
+        assertEquals("DRAFT", saved.getApprovalStatus());
+        assertEquals("DRAFT", saved.getStatus());
+
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(1L);
+        item.setQuantity(BigDecimal.ONE);
+        item.setApprovedQuantity(new BigDecimal("999"));
+        item.setApprovalVersion(999);
+        requestService.saveItemsBatch(requestId, List.of(item));
+
+        MatPurchaseRequestItem savedItem = requestItemMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseRequestItem>()
+                                .eq(MatPurchaseRequestItem::getRequestId, requestId))
+                .getFirst();
+        assertNull(savedItem.getApprovedQuantity());
+        assertEquals(0, savedItem.getApprovalVersion(), "审批版本必须使用服务端初值");
+
+        String generatedCode = saved.getRequestCode();
+        MatPurchaseRequest update = new MatPurchaseRequest();
+        update.setId(requestId);
+        update.setTenantId(999L);
+        update.setProjectId(PROJECT_ID);
+        update.setRequestCode("CLIENT-UPDATE");
+        requestService.update(update);
+        MatPurchaseRequest updated = requestMapper.selectById(requestId);
+        assertEquals(TENANT_ID, updated.getTenantId());
+        assertEquals(generatedCode, updated.getRequestCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("保存采购申请明细时拒绝跨租户物料")
     void saveItemsBatchRejectsMaterialFromAnotherTenant() {
         MatPurchaseRequest request = new MatPurchaseRequest();

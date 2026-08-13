@@ -1,0 +1,183 @@
+package com.cgcpms.project;
+
+import com.cgcpms.auth.util.CookieUtils;
+import com.cgcpms.auth.util.JwtUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("local")
+class PmProjectMemberControllerIntegrationTest {
+
+    private static final long ADMIN_ID = 1L;
+    private static final long TENANT_ID = 0L;
+    private static final long PROJECT_ID = 10001L;
+    private static final long TARGET_USER_ID = 930013000001L;
+    private static final long CROSS_TENANT_USER_ID = 930013000002L;
+    private static final Timestamp ATTACK_TIME = Timestamp.valueOf("1999-01-01 00:00:00");
+    private static final Timestamp FORCED_OLD_UPDATE_TIME = Timestamp.valueOf("2000-01-01 00:00:00");
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Transactional
+    void postUpdateAndRestoreKeepServerManagedFieldsAuthoritative() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag
+                ) SELECT ?, ?, 'admin', '{noop}test', '测试管理员', 'ENABLE', 1, ?, ?, 0
+                  WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
+                """, ADMIN_ID, TENANT_ID, ADMIN_ID, ADMIN_ID, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, '{noop}test', '主线93成员', 'ENABLE', 0, ?, ?, 0)
+                """, TARGET_USER_ID, TENANT_ID, "m93-member-" + TARGET_USER_ID,
+                ADMIN_ID, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, 999, ?, '{noop}test', '其他租户成员', 'ENABLE', 0, ?, ?, 0)
+                """, CROSS_TENANT_USER_ID, "m93-cross-tenant-" + CROSS_TENANT_USER_ID,
+                ADMIN_ID, ADMIN_ID);
+
+        mockMvc.perform(post("/api/projects/{projectId}/members", PROJECT_ID)
+                        .contextPath("/api").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(attackBody(CROSS_TENANT_USER_ID, "EMPLOYEE", "跨租户用户")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_MEMBER_USER_INVALID"));
+        Integer crossTenantMemberCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pm_project_member
+                 WHERE project_id = ? AND user_id = ?
+                """, Integer.class, PROJECT_ID, CROSS_TENANT_USER_ID);
+        assertEquals(0, crossTenantMemberCount);
+
+        String createResponse = mockMvc.perform(post("/api/projects/{projectId}/members", PROJECT_ID)
+                        .contextPath("/api").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(attackBody(TARGET_USER_ID, "EMPLOYEE", "首次创建")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        long memberId = objectMapper.readTree(createResponse).path("data").asLong();
+
+        Map<String, Object> created = readMember(memberId);
+        assertNotEquals(42L, memberId);
+        assertOwnershipAndAudit(created, TARGET_USER_ID);
+        assertEquals("EMPLOYEE", created.get("role_code"));
+        Timestamp originalCreatedAt = (Timestamp) created.get("created_at");
+        long originalCreatedBy = ((Number) created.get("created_by")).longValue();
+        jdbcTemplate.update("UPDATE pm_project_member SET updated_by = 12345, updated_at = ? WHERE id = ?",
+                FORCED_OLD_UPDATE_TIME, memberId);
+
+        mockMvc.perform(put("/api/projects/{projectId}/members/{id}", PROJECT_ID, memberId)
+                        .contextPath("/api").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(attackBody(TARGET_USER_ID, "PROCUREMENT_LEAD", "合法更新")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+
+        Map<String, Object> updated = readMember(memberId);
+        assertOwnershipAndAudit(updated, TARGET_USER_ID);
+        assertEquals("PROCUREMENT_LEAD", updated.get("role_code"));
+        assertEquals(originalCreatedAt, updated.get("created_at"));
+        assertEquals(originalCreatedBy, ((Number) updated.get("created_by")).longValue());
+        assertEquals(ADMIN_ID, ((Number) updated.get("updated_by")).longValue());
+        assertNotEquals(FORCED_OLD_UPDATE_TIME, updated.get("updated_at"));
+
+        Map<String, Object> beforeRejectedUpdate = Map.copyOf(updated);
+        mockMvc.perform(put("/api/projects/{projectId}/members/{id}", PROJECT_ID, memberId)
+                        .contextPath("/api").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(attackBody(TARGET_USER_ID + 1, "EMPLOYEE", "非法换人")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_MEMBER_USER_IMMUTABLE"));
+        assertEquals(beforeRejectedUpdate, readMember(memberId));
+
+        mockMvc.perform(delete("/api/projects/{projectId}/members/{id}", PROJECT_ID, memberId)
+                        .contextPath("/api").cookie(adminCookie()))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("UPDATE pm_project_member SET updated_by = 12346, updated_at = ? WHERE id = ?",
+                FORCED_OLD_UPDATE_TIME, memberId);
+        String restoreResponse = mockMvc.perform(post("/api/projects/{projectId}/members", PROJECT_ID)
+                        .contextPath("/api").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(attackBody(TARGET_USER_ID, "EMPLOYEE", "软删除恢复")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        assertEquals(memberId, objectMapper.readTree(restoreResponse).path("data").asLong());
+
+        Map<String, Object> restored = readMember(memberId);
+        assertOwnershipAndAudit(restored, TARGET_USER_ID);
+        assertEquals(originalCreatedAt, restored.get("created_at"));
+        assertEquals(originalCreatedBy, ((Number) restored.get("created_by")).longValue());
+        assertEquals(ADMIN_ID, ((Number) restored.get("updated_by")).longValue());
+        assertNotEquals(FORCED_OLD_UPDATE_TIME, restored.get("updated_at"));
+        assertEquals("EMPLOYEE", restored.get("role_code"));
+    }
+
+    private Cookie adminCookie() {
+        String token = jwtUtils.generateToken(
+                ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Map<String, Object> readMember(long memberId) {
+        return jdbcTemplate.queryForMap("""
+                SELECT id, tenant_id, project_id, user_id, role_code, created_by, created_at,
+                       updated_by, updated_at, deleted_flag
+                  FROM pm_project_member WHERE id = ?
+                """, memberId);
+    }
+
+    private void assertOwnershipAndAudit(Map<String, Object> row, long expectedUserId) {
+        assertEquals(TENANT_ID, ((Number) row.get("tenant_id")).longValue());
+        assertEquals(PROJECT_ID, ((Number) row.get("project_id")).longValue());
+        assertEquals(expectedUserId, ((Number) row.get("user_id")).longValue());
+        assertEquals(0, ((Number) row.get("deleted_flag")).intValue());
+        assertNotEquals(999L, ((Number) row.get("created_by")).longValue());
+        assertNotEquals(999L, ((Number) row.get("updated_by")).longValue());
+        assertNotEquals(ATTACK_TIME, row.get("created_at"));
+        assertNotEquals(ATTACK_TIME, row.get("updated_at"));
+    }
+
+    private String attackBody(long userId, String roleCode, String remark) {
+        return """
+                {"id":42,"tenantId":999,"projectId":888,"userId":%d,"roleCode":"%s",
+                 "positionName":"材料员","status":"ACTIVE","remark":"%s",
+                 "createdBy":999,"createdTime":"1999-01-01 00:00:00",
+                 "createdAt":"1999-01-01T00:00:00","updatedBy":999,
+                 "updatedTime":"1999-01-01 00:00:00","updatedAt":"1999-01-01T00:00:00",
+                 "deletedFlag":1}
+                """.formatted(userId, roleCode, remark);
+    }
+}

@@ -247,13 +247,15 @@ class CostTargetControllerTest {
     void testCreateCostTarget() throws Exception {
         String body = """
                 {
+                    "id": 42,
+                    "tenantId": 999,
                     "projectId": %d,
                     "versionNo": "%s",
                     "versionName": "测试版本",
                     "totalTargetAmount": 500000.00,
-                    "isActive": 0,
-                    "approvalStatus": "DRAFT",
-                    "status": "DRAFT"
+                    "isActive": 1,
+                    "approvalStatus": "APPROVED",
+                    "status": "ACTIVE"
                 }
                 """.formatted(PROJECT_ID, TEST_VERSION);
 
@@ -271,6 +273,14 @@ class CostTargetControllerTest {
                 response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
         Assertions.assertNotNull(testTargetId, "Created target ID should not be null");
         Assertions.assertTrue(testTargetId > 0, "Created target ID should be positive");
+        Assertions.assertNotEquals(42L, testTargetId);
+        var saved = jdbcTemplate.queryForMap("""
+                SELECT tenant_id,is_active,approval_status,status FROM cost_target WHERE id=?
+                """, testTargetId);
+        Assertions.assertEquals(0L, ((Number) saved.get("tenant_id")).longValue());
+        Assertions.assertEquals(0, ((Number) saved.get("is_active")).intValue());
+        Assertions.assertEquals("DRAFT", saved.get("approval_status"));
+        Assertions.assertEquals("DRAFT", saved.get("status"));
     }
 
     @Test
@@ -365,7 +375,8 @@ class CostTargetControllerTest {
     @DisplayName("T4: POST /cost-targets/{id}/items → 200 batch save")
     void testBatchSaveItems() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
-        String items = defaultItemsJson();
+        String items = defaultItemsJson()
+                .replaceFirst("\\{", "{\"id\":42,\"tenantId\":999,\"targetId\":999,\"projectId\":999,");
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
                         .param("version", currentVersion(testTargetId))
@@ -373,6 +384,14 @@ class CostTargetControllerTest {
                         .content(items))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
+        var first = jdbcTemplate.queryForMap("""
+                SELECT id,tenant_id,target_id,project_id FROM cost_target_item
+                WHERE target_id=? ORDER BY sort_order,id LIMIT 1
+                """, testTargetId);
+        Assertions.assertNotEquals(42L, ((Number) first.get("id")).longValue());
+        Assertions.assertEquals(0L, ((Number) first.get("tenant_id")).longValue());
+        Assertions.assertEquals(testTargetId.longValue(), ((Number) first.get("target_id")).longValue());
+        Assertions.assertEquals(PROJECT_ID, ((Number) first.get("project_id")).longValue());
     }
 
     // ═══════════════════════════════════════════════════════════════

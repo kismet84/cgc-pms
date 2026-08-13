@@ -3,9 +3,9 @@ package com.cgcpms.purchase.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -16,9 +16,8 @@ import java.time.LocalDateTime;
 /**
  * 采购申请明细实体 — 对应 V35 mat_purchase_request_item 表。
  * <p>
- * V35 使用 created_time / updated_time 列名，与 BaseEntity 默认的 created_at / updated_at
- * 不同。因此新增 createdTime / updatedTime 字段并显式映射，同时将 BaseEntity 的
- * createdAt / updatedAt 标记为 exist=false 以避免映射冲突。
+ * V35 原使用 created_time / updated_time；V45 已统一为 created_at / updated_at。
+ * 为兼容既有 Java 调用方保留 createdTime / updatedTime 属性并显式映射当前列。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -26,11 +25,13 @@ import java.time.LocalDateTime;
 public class MatPurchaseRequestItem extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
-    @NotNull
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long requestId;
 
     private Long materialId;
@@ -52,9 +53,11 @@ public class MatPurchaseRequestItem extends BaseEntity {
 
     /** 当前审批轮次批准数量；原申请数量 quantity 始终保留。 */
     @JsonSerialize(using = ToStringSerializer.class)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private BigDecimal approvedQuantity;
 
     /** 审批数量 CAS 版本。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Integer approvalVersion;
 
     @JsonSerialize(using = ToStringSerializer.class)
@@ -73,21 +76,25 @@ public class MatPurchaseRequestItem extends BaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate plannedDate;
 
-    // ── V35 使用 created_time / updated_time 列名 ──
+    // ── V35 原列经 V45 统一为 created_at / updated_at ──
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
-    /** 屏蔽 BaseEntity.createdAt（V35 表无 created_at 列） */
+    /** 屏蔽 BaseEntity.createdAt，当前列由 createdTime 显式映射。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime createdAt;
 
-    /** 屏蔽 BaseEntity.updatedAt（V35 表无 updated_at 列） */
+    /** 屏蔽 BaseEntity.updatedAt，当前列由 updatedTime 显式映射。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime updatedAt;
 }

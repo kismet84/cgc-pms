@@ -71,6 +71,8 @@ public class MatWarehouseService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatWarehouse warehouse) {
         projectAccessChecker.checkAccess(warehouse.getProjectId(), "创建仓库");
+        if (warehouse.getStatus() == null) warehouse.setStatus("ENABLE");
+        validateStatus(warehouse.getStatus());
         warehouse.setTenantId(UserContext.getCurrentTenantId());
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             warehouse.setId(null);
@@ -90,8 +92,9 @@ public class MatWarehouseService {
     @Transactional(rollbackFor = Exception.class)
     public void update(MatWarehouse warehouse) {
         MatWarehouse existing = requireAccessibleWarehouse(warehouse.getId(), "更新仓库");
+        if (warehouse.getStatus() != null) validateStatus(warehouse.getStatus());
         existing.setWarehouseName(warehouse.getWarehouseName());
-        existing.setStatus(warehouse.getStatus());
+        if (warehouse.getStatus() != null) existing.setStatus(warehouse.getStatus());
         existing.setRemark(warehouse.getRemark());
         matWarehouseMapper.updateById(existing);
     }
@@ -99,6 +102,7 @@ public class MatWarehouseService {
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
         MatWarehouse existing = requireAccessibleWarehouse(id, "更新仓库状态");
+        validateStatus(status);
         existing.setStatus(status);
         matWarehouseMapper.updateById(existing);
     }
@@ -126,6 +130,12 @@ public class MatWarehouseService {
         }
         projectAccessChecker.checkAccess(warehouse.getProjectId(), action);
         return warehouse;
+    }
+
+    private void validateStatus(String status) {
+        if (!"ENABLE".equals(status) && !"DISABLE".equals(status)) {
+            throw new BusinessException("WAREHOUSE_STATUS_INVALID", "仓库状态只允许 ENABLE 或 DISABLE");
+        }
     }
 
     private MatWarehouseVO toVO(MatWarehouse w) {

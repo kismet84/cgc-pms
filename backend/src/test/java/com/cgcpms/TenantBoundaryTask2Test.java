@@ -15,6 +15,7 @@ import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
+import com.cgcpms.project.dto.CreateProjectMemberRequest;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.project.service.PmProjectMemberService;
@@ -344,7 +345,9 @@ class TenantBoundaryTask2Test {
         member.setStatus("ACTIVE");
         // Client tries to inject tenant B
         member.setTenantId(TENANT_B);
-        Long id = projectMemberService.create(tenantAProjectId, member);
+        Long id = projectMemberService.create(tenantAProjectId, new CreateProjectMemberRequest(
+                member.getUserId(), member.getRoleCode(), member.getPositionName(),
+                member.getStartDate(), member.getEndDate(), member.getStatus(), member.getRemark()));
         assertNotNull(id);
 
         // Verify it has tenant A

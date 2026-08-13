@@ -58,12 +58,32 @@ class CtContractChangeControllerTest {
 
     @Test @Order(3) @DisplayName("POST /contract-changes -> 200 creates change")
     void testCreate() throws Exception {
-        String body = "{\"projectId\":10001,\"contractId\":" + CONTRACT_ID + ",\"changeName\":\"CC-TEST-" + System.nanoTime() + "\",\"changeType\":\"AMOUNT\",\"changeAmount\":5000.00,\"reason\":\"测试变更\"}";
+        String body = """
+                {"id":42,"tenantId":999,"projectId":10001,"contractId":%d,
+                 "changeCode":"CLIENT-CODE","changeName":"CC-TEST-%d","changeType":"AMOUNT",
+                 "changeAmount":5000.00,"reason":"测试变更","approvalStatus":"APPROVED",
+                 "effectiveFlag":1,"costGeneratedFlag":1,"createdBy":999,"updatedBy":999,
+                 "createdTime":"1999-01-01 00:00:00","updatedTime":"1999-01-01 00:00:00","deletedFlag":1}
+                """.formatted(CONTRACT_ID, System.nanoTime());
         String resp = mockMvc.perform(p("/contract-changes").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
         changeId = Long.parseLong(resp.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
         Assertions.assertNotNull(changeId);
+        Assertions.assertNotEquals(42L, changeId);
+        var saved = jdbcTemplate.queryForMap("""
+                SELECT tenant_id,change_code,approval_status,effective_flag,cost_generated_flag,
+                       created_by,updated_by,created_at,updated_at,deleted_flag
+                FROM ct_contract_change WHERE id=?
+                """, changeId);
+        Assertions.assertEquals(0L, ((Number) saved.get("tenant_id")).longValue());
+        Assertions.assertNotEquals("CLIENT-CODE", saved.get("change_code"));
+        Assertions.assertEquals("DRAFT", saved.get("approval_status"));
+        Assertions.assertEquals(0, ((Number) saved.get("effective_flag")).intValue());
+        Assertions.assertEquals(0, ((Number) saved.get("cost_generated_flag")).intValue());
+        Assertions.assertEquals(0, ((Number) saved.get("deleted_flag")).intValue());
+        Assertions.assertNotEquals(999L, ((Number) saved.get("created_by")).longValue());
+        Assertions.assertNotEquals(java.sql.Timestamp.valueOf("1999-01-01 00:00:00"), saved.get("created_at"));
     }
 
     @Test @Order(4) @DisplayName("POST /contract-changes missing required -> 400")
@@ -87,19 +107,52 @@ class CtContractChangeControllerTest {
     @Test @Order(7) @DisplayName("PUT /contract-changes/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(changeId);
-        String body = "{\"projectId\":10001,\"contractId\":" + CONTRACT_ID + ",\"changeName\":\"CC-UPD-" + System.nanoTime() + "\",\"changeType\":\"AMOUNT\",\"changeAmount\":8000.00,\"reason\":\"更新变更\"}";
+        Object originalCreatedAt = jdbcTemplate.queryForObject(
+                "SELECT created_at FROM ct_contract_change WHERE id=?", Object.class, changeId);
+        String body = """
+                {"id":42,"tenantId":999,"projectId":10001,"contractId":%d,
+                 "changeCode":"CLIENT-UPDATE","changeName":"CC-UPD-%d","changeType":"AMOUNT",
+                 "changeAmount":8000.00,"reason":"更新变更","approvalStatus":"APPROVED",
+                 "effectiveFlag":1,"costGeneratedFlag":1,"createdBy":999,"updatedBy":999,
+                 "createdTime":"1999-01-01 00:00:00","updatedTime":"1999-01-01 00:00:00","deletedFlag":1}
+                """.formatted(CONTRACT_ID, System.nanoTime());
         mockMvc.perform(u("/contract-changes/" + changeId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+        var saved = jdbcTemplate.queryForMap("""
+                SELECT tenant_id,project_id,contract_id,change_code,approval_status,effective_flag,
+                       cost_generated_flag,created_by,created_at,deleted_flag
+                FROM ct_contract_change WHERE id=?
+                """, changeId);
+        Assertions.assertEquals(0L, ((Number) saved.get("tenant_id")).longValue());
+        Assertions.assertEquals(10001L, ((Number) saved.get("project_id")).longValue());
+        Assertions.assertEquals(CONTRACT_ID, ((Number) saved.get("contract_id")).longValue());
+        Assertions.assertNotEquals("CLIENT-UPDATE", saved.get("change_code"));
+        Assertions.assertEquals("DRAFT", saved.get("approval_status"));
+        Assertions.assertEquals(0, ((Number) saved.get("effective_flag")).intValue());
+        Assertions.assertEquals(0, ((Number) saved.get("cost_generated_flag")).intValue());
+        Assertions.assertEquals(0, ((Number) saved.get("deleted_flag")).intValue());
+        Assertions.assertEquals(originalCreatedAt, saved.get("created_at"));
     }
 
-    @Test @Order(8) @DisplayName("DELETE /contract-changes/{id} -> 200 (before submit)")
+    @Test @Order(8) @DisplayName("PUT /contract-changes/{id} rejects project/contract reassignment")
+    void testUpdateRelationImmutable() throws Exception {
+        Assertions.assertNotNull(changeId);
+        String body = "{\"projectId\":99999,\"contractId\":" + CONTRACT_ID
+                + ",\"changeName\":\"不可改归属\",\"changeType\":\"AMOUNT\"}";
+        mockMvc.perform(u("/contract-changes/" + changeId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CT_CHANGE_RELATION_IMMUTABLE"));
+    }
+
+    @Test @Order(9) @DisplayName("DELETE /contract-changes/{id} -> 200 (before submit)")
     void testDelete() throws Exception {
         Assertions.assertNotNull(changeId);
         mockMvc.perform(d("/contract-changes/" + changeId).cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(9) @DisplayName("POST /contract-changes -> 200 recreates after delete")
+    @Test @Order(10) @DisplayName("POST /contract-changes -> 200 recreates after delete")
     void testRecreate() throws Exception {
         String body = "{\"projectId\":10001,\"contractId\":" + CONTRACT_ID + ",\"changeName\":\"CC-RECREATE-" + System.nanoTime() + "\",\"changeType\":\"AMOUNT\",\"changeAmount\":5000.00,\"reason\":\"重创变更\"}";
         String resp = mockMvc.perform(p("/contract-changes").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -109,7 +162,7 @@ class CtContractChangeControllerTest {
         Assertions.assertNotNull(changeId);
     }
 
-    @Test @Order(10) @DisplayName("POST /contract-changes/{id}/submit -> 2xx")
+    @Test @Order(11) @DisplayName("POST /contract-changes/{id}/submit -> 2xx")
     void testSubmit() throws Exception {
         Assertions.assertNotNull(changeId);
         mockMvc.perform(p("/contract-changes/" + changeId + "/submit").cookie(adminCookie()))

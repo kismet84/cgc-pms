@@ -107,6 +107,22 @@ class BaselineMySqlUpgradeTest {
         current.migrate();
 
         assertEquals("293", current.info().current().getVersion().getVersion());
+        assertEquals(20, count(current, """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema=DATABASE()
+                  AND table_name IN ('pm_project_member','ct_contract_change','org_company','org_department',
+                                     'org_position','mat_purchase_request','mat_purchase_request_item',
+                                     'cost_target','cost_target_item','mat_warehouse')
+                  AND column_name IN ('created_at','updated_at')
+                """));
+        assertEquals(0, count(current, """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema=DATABASE()
+                  AND table_name IN ('pm_project_member','ct_contract_change','org_company','org_department',
+                                     'org_position','mat_purchase_request','mat_purchase_request_item',
+                                     'cost_target','cost_target_item','mat_warehouse')
+                  AND column_name IN ('created_time','updated_time')
+                """));
         assertEquals(1, count(current, """
                 SELECT COUNT(*) FROM information_schema.views
                 WHERE table_schema=DATABASE() AND table_name='v_business_audit_event'

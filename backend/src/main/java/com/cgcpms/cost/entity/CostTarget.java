@@ -33,9 +33,11 @@ import java.time.LocalDateTime;
 public class CostTarget extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonSerialize(using = ToStringSerializer.class)
     private Long tenantId;
 
@@ -79,15 +81,18 @@ public class CostTarget extends BaseEntity {
     private BigDecimal targetCostRate;
 
     /** 是否生效版本：0否，1是。同一项目仅允许一个生效版本 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Integer isActive;
 
     /** 审批状态：DRAFT草稿，APPROVING审批中，APPROVED已通过，REJECTED已驳回 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate effectiveDate;
 
     /** 业务状态：DRAFT草稿，ACTIVE已生效，CANCELLED已作废 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String status;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
@@ -99,19 +104,23 @@ public class CostTarget extends BaseEntity {
 
     // ── V22 列经 V44 统一为 created_at / updated_at ──
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
-    /** 屏蔽 BaseEntity.createdAt（V22 表无 created_at 列） */
+    /** 屏蔽 BaseEntity.createdAt，当前列由 createdTime 显式映射。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime createdAt;
 
-    /** 屏蔽 BaseEntity.updatedAt（V22 表无 updated_at 列） */
+    /** 屏蔽 BaseEntity.updatedAt，当前列由 updatedTime 显式映射。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime updatedAt;
 }
