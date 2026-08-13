@@ -708,7 +708,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.canonical_role_mapping -eq 9 `
     -and $metrics.project_manager_contract_query -eq 1 `
     -and $metrics.project_manager_variation_permissions -eq 1 -and $metrics.technical_variation_bid_permissions -eq 6 `
-    -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.project_accountant_cost_target_permissions -eq 1 `
+    -and $metrics.project_manager_cost_target_permissions -eq 1 -and $metrics.project_accountant_cost_target_permissions -eq 1 `
     -and $metrics.project_manager_cost_summary_permissions -eq 1 -and $metrics.project_accountant_cost_summary_permissions -eq 1 `
     -and $metrics.project_accountant_budget_permissions -eq 1 -and $metrics.construction_measurement_permissions -eq 1 `
     -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 2 `

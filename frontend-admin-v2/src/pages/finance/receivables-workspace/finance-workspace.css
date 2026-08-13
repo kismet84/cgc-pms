@@ -1,0 +1,40 @@
+.finance-workspace {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+
+.finance-workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+}
+
+.finance-workspace__table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.finance-workspace__table {
+  min-width: 44rem;
+}
+
+.finance-workspace__form,
+.finance-workspace__revenue-sections {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.finance-workspace__form--payment {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 32.5rem) {
+  .finance-workspace__form--payment {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-workspace__actions > * {
+    flex: 1 1 100%;
+  }
+}

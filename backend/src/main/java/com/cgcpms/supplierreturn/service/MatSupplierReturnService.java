@@ -1,5 +1,7 @@
 package com.cgcpms.supplierreturn.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.audit.service.MandatoryAuditService;
@@ -414,7 +416,4 @@ public class MatSupplierReturnService {
         return nvl(amount).divide(quantity, 2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
-    }
 }

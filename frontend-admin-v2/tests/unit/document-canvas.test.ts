@@ -1,6 +1,12 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import DocumentCanvas from '@/components/document/DocumentCanvas.vue'
+import {
+  applyCanvasLayout,
+  flowLayoutConflict,
+  snapCanvasMove,
+  validDocumentDesignSchema,
+} from '@/components/document/documentCanvasEngine'
 import type { DocumentDesignSchema, DocumentCatalogField } from '@/services/system-management'
 
 const blank = (): DocumentDesignSchema => ({
@@ -36,6 +42,38 @@ const fields: DocumentCatalogField[] = [
 ]
 
 describe('document canvas', () => {
+  it('keeps validation, layout and snapping in the pure canvas engine', () => {
+    const schema = blank()
+    schema.elements = [
+      { id: 'a', type: 'TEXT', xMm: 20, yMm: 30, widthMm: 20, heightMm: 10 },
+      { id: 'b', type: 'TEXT', xMm: 60, yMm: 50, widthMm: 20, heightMm: 20 },
+    ]
+
+    expect(flowLayoutConflict(schema)).toBe('')
+    expect(validDocumentDesignSchema(schema)).toBe(true)
+    expect(
+      applyCanvasLayout({
+        action: 'TOP',
+        items: schema.elements,
+        primaryId: 'a',
+        alignmentReference: 'SELECTION',
+        canvasBounds: { xMm: 12, yMm: 12, widthMm: 186, heightMm: 273 },
+        gap: 5,
+      }).map((item) => item.yMm),
+    ).toEqual([30, 30])
+    expect(
+      snapCanvasMove({
+        dx: 3,
+        dy: 2,
+        moving: [schema.elements[0]!],
+        references: [{ xMm: 25, yMm: 32, widthMm: 20, heightMm: 10 }],
+        pxPerMm: 2,
+        snapToGrid: false,
+        smartGuides: true,
+      }),
+    ).toMatchObject({ dx: 5, dy: 2, guideLines: { xMm: 25, yMm: 32 } })
+  })
+
   it('shows only Chinese business field labels while keeping path search', async () => {
     const wrapper = mount(DocumentCanvas, { props: { modelValue: blank(), fields } })
     const fieldButtons = wrapper.findAll('.document-canvas__field')

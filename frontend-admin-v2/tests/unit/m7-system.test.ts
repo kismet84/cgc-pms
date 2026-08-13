@@ -2,7 +2,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import AccessControlPage from '@/pages/system/AccessControlPage.vue'
+import PermissionListPage from '@/pages/system/access-control/PermissionListPage.vue'
+import RoleManagementPage from '@/pages/system/access-control/RoleManagementPage.vue'
+import UserManagementPage from '@/pages/system/access-control/UserManagementPage.vue'
 import DataMaintenancePage from '@/pages/system/DataMaintenancePage.vue'
 import {
   bindDefaultDocumentVersion,
@@ -290,11 +292,11 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/permissions', component: AccessControlPage }],
+      routes: [{ path: '/system/permissions', component: PermissionListPage }],
     })
     await router.push('/system/permissions')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    const wrapper = mount(PermissionListPage, { global: { plugins: [router] } })
     await flushPromises()
 
     expect(wrapper.find('.access-control-page__description').exists()).toBe(false)
@@ -473,11 +475,11 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/users', component: AccessControlPage }],
+      routes: [{ path: '/system/users', component: UserManagementPage }],
     })
     await router.push('/system/users')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    const wrapper = mount(UserManagementPage, { global: { plugins: [router] } })
     await flushPromises()
 
     expect(wrapper.findAll('.v2-card')).toHaveLength(2)
@@ -619,11 +621,11 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/users', component: AccessControlPage }],
+      routes: [{ path: '/system/users', component: UserManagementPage }],
     })
     await router.push('/system/users')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    const wrapper = mount(UserManagementPage, { global: { plugins: [router] } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('正在读取用户详情')
@@ -716,11 +718,11 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/roles', component: AccessControlPage }],
+      routes: [{ path: '/system/roles', component: RoleManagementPage }],
     })
     await router.push('/system/roles')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    const wrapper = mount(RoleManagementPage, { global: { plugins: [router] } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('固定角色清单')
@@ -785,11 +787,11 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/system/permissions', component: AccessControlPage }],
+      routes: [{ path: '/system/permissions', component: PermissionListPage }],
     })
     await router.push('/system/permissions')
     await router.isReady()
-    const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
+    const wrapper = mount(PermissionListPage, { global: { plugins: [router] } })
     await flushPromises()
 
     expect(wrapper.text()).toContain('财务权限提示')

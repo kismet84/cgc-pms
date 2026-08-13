@@ -9,6 +9,16 @@ function read(path: string): string {
   return readFileSync(resolve(path), 'utf-8')
 }
 
+function componentCssSource(): string {
+  const root = resolve(sourceRoot, 'styles/components')
+  return [
+    read(resolve(sourceRoot, 'styles/components.css')),
+    ...readdirSync(root)
+      .filter((file) => file.endsWith('.css'))
+      .map((file) => read(resolve(root, file))),
+  ].join('\n')
+}
+
 function vuePages(root = pageRoot): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(root, entry.name)
@@ -188,7 +198,10 @@ describe('全 V2 UI 整改门禁', () => {
   })
 
   it('keeps the 10px shell content inset on workflow routes', () => {
-    const shell = read(resolve(sourceRoot, 'layouts/AppShell.vue'))
+    const shell = [
+      read(resolve(sourceRoot, 'layouts/AppShell.vue')),
+      read(resolve(sourceRoot, 'layouts/app-shell.css')),
+    ].join('\n')
     expect(shell).toMatch(
       /\.app-shell__content \{[\s\S]*?padding: 10px;[\s\S]*?\}\s*\.app-shell__content\.app-shell__content--full \{[\s\S]*?\}/,
     )
@@ -347,14 +360,14 @@ describe('全 V2 UI 整改门禁', () => {
       }
     }
 
-    const components = read(resolve(sourceRoot, 'styles/components.css'))
+    const components = componentCssSource()
     expect(components).toContain('.v2-table-cell--numeric')
     expect(components).toContain('.v2-table-cell--status')
     expect(components).toContain('.v2-table-cell--actions')
   })
 
   it('keeps dialog action bars liquid and shared', () => {
-    const components = read(resolve(sourceRoot, 'styles/components.css'))
+    const components = componentCssSource()
     const schedule = read(resolve(sourceRoot, 'pages/delivery/SchedulePage.vue'))
     const footer = components.match(/\.v2-dialog__footer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
     expect(footer).toMatch(
@@ -369,9 +382,18 @@ describe('全 V2 UI 整改门禁', () => {
 
   it('blocks the eleven supply-chain regressions', () => {
     const supplier = read(resolve(sourceRoot, 'pages/supply-chain/SupplierSourcingPage.vue'))
-    const purchase = read(resolve(sourceRoot, 'pages/supply-chain/PurchaseExecutionPage.vue'))
+    const purchase = [
+      'PurchaseRequestWorkspace.vue',
+      'PurchaseOrderWorkspace.vue',
+      'MaterialReceiptWorkspace.vue',
+      'PurchaseExecutionDetail.vue',
+      'PurchaseExecutionAttachments.vue',
+      'model.ts',
+    ]
+      .map((name) => read(resolve(sourceRoot, 'pages/supply-chain/purchase-execution', name)))
+      .join('\n')
     const inventory = read(resolve(sourceRoot, 'pages/supply-chain/InventoryWorkspacePage.vue'))
-    const contract = read(resolve('../packages/frontend-contracts/src/supply-chain.ts'))
+    const contract = read(resolve('../packages/frontend-contracts/src/supply-chain/purchase.ts'))
     const requestVo = read(
       resolve('../backend/src/main/java/com/cgcpms/purchase/vo/MatPurchaseRequestVO.java'),
     )
@@ -404,7 +426,9 @@ describe('全 V2 UI 整改门禁', () => {
 
   it('keeps supply-chain workspace titles in H1 cards and warehouse filters optional', () => {
     for (const name of [
-      'PurchaseExecutionPage.vue',
+      'purchase-execution/PurchaseRequestWorkspace.vue',
+      'purchase-execution/PurchaseOrderWorkspace.vue',
+      'purchase-execution/MaterialReceiptWorkspace.vue',
       'InventoryWorkspacePage.vue',
       'RequisitionWorkspacePage.vue',
     ]) {
@@ -502,11 +526,18 @@ describe('全 V2 UI 整改门禁', () => {
 
   it('uses toast for supply-chain detail read failures', () => {
     const main = read(resolve(sourceRoot, 'main.ts'))
-    const service = read(resolve(sourceRoot, 'services/supply-chain.ts'))
+    const service = ['requisition', 'purchase']
+      .map((module) => read(resolve(sourceRoot, `services/supply-chain/${module}.ts`)))
+      .join('\n')
     expect(main).toMatch(/onError:\s*\(notice\)\s*=>\s*showToast\('error'/)
     expect(main).not.toMatch(/onError:[^\n]*setRequestNotice/)
 
-    for (const name of ['PurchaseExecutionPage.vue', 'RequisitionWorkspacePage.vue']) {
+    for (const name of [
+      'purchase-execution/PurchaseRequestWorkspace.vue',
+      'purchase-execution/PurchaseOrderWorkspace.vue',
+      'purchase-execution/MaterialReceiptWorkspace.vue',
+      'RequisitionWorkspacePage.vue',
+    ]) {
       const source = read(resolve(pageRoot, 'supply-chain', name))
       expect(source, `${name} inline detail failure`).not.toMatch(
         /<(?:V2Alert|V2PageState)\b[^>]*v-(?:if|else-if)="detailError"/,
@@ -537,8 +568,14 @@ describe('全 V2 UI 整改门禁', () => {
 
   it('keeps current browser-comment remediations behind static gates', () => {
     const supplier = read(resolve(sourceRoot, 'pages/supply-chain/SupplierSourcingPage.vue'))
-    const purchase = read(resolve(sourceRoot, 'pages/supply-chain/PurchaseExecutionPage.vue'))
-    const contract = read(resolve(sourceRoot, 'pages/commercial/ContractPage.vue'))
+    const purchaseDetail = read(
+      resolve(sourceRoot, 'pages/supply-chain/purchase-execution/PurchaseExecutionDetail.vue'),
+    )
+    const purchaseModel = read(
+      resolve(sourceRoot, 'pages/supply-chain/purchase-execution/model.ts'),
+    )
+    const purchase = `${purchaseDetail}\n${purchaseModel}`
+    const contract = read(resolve(sourceRoot, 'pages/commercial/contract/ContractLedgerPage.vue'))
 
     expect(purchase).toContain('class="v2-detail-dialog__section"')
     expect(purchase).toContain('class="v2-detail-dialog__section-heading"')
@@ -551,11 +588,7 @@ describe('全 V2 UI 整改门禁', () => {
     }
     expect(purchase).not.toContain('purchase-execution-page__items')
     expect(purchase).not.toContain('function itemQuantity')
-    const detailTableSource = purchase.slice(
-      purchase.indexOf('const detailTable'),
-      purchase.indexOf('async function loadPage'),
-    )
-    expect(detailTableSource).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
+    expect(purchaseModel).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
 
     expect(contract).not.toMatch(/<V2Alert\b[^>]*v-if="errorMessage"/)
     expect(contract).toContain('v-if="!contracts.length && !errorMessage"')

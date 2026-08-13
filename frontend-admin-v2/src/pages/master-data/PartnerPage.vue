@@ -28,6 +28,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
+import PartnerDetailFacts from './partner/PartnerDetailFacts.vue'
 
 const session = useSessionStore()
 const loading = ref(false)
@@ -93,10 +94,6 @@ const riskOptions = computed(() =>
 
 function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
-}
-
-function text(value: unknown): string {
-  return value === null || value === undefined || value === '' ? '—' : String(value)
 }
 
 function typeLabel(value: string): string {
@@ -546,68 +543,12 @@ onBeforeUnmount(() => loadController?.abort())
             title="合作方详情加载失败"
             :description="detailError"
           />
-          <dl v-else-if="detailRecord" class="partner-detail__facts">
-            <div>
-              <dt>合作方名称</dt>
-              <dd>{{ detailRecord.partnerName }}</dd>
-            </div>
-            <div>
-              <dt>合作方编号</dt>
-              <dd>{{ detailRecord.partnerCode }}</dd>
-            </div>
-            <div>
-              <dt>合作方类型</dt>
-              <dd>{{ typeLabel(detailRecord.partnerType) }}</dd>
-            </div>
-            <div>
-              <dt>统一社会信用代码</dt>
-              <dd>{{ text(detailRecord.creditCode) }}</dd>
-            </div>
-            <div>
-              <dt>法定代表人</dt>
-              <dd>{{ text(detailRecord.legalPerson) }}</dd>
-            </div>
-            <div>
-              <dt>联系人</dt>
-              <dd>{{ text(detailRecord.contactName) }}</dd>
-            </div>
-            <div>
-              <dt>联系电话</dt>
-              <dd>{{ text(detailRecord.contactPhone) }}</dd>
-            </div>
-            <div>
-              <dt>开户银行</dt>
-              <dd>{{ text(detailRecord.bankName) }}</dd>
-            </div>
-            <div>
-              <dt>银行账号</dt>
-              <dd>{{ text(detailRecord.bankAccount) }}</dd>
-            </div>
-            <div>
-              <dt>资质等级</dt>
-              <dd>{{ text(detailRecord.qualificationLevel) }}</dd>
-            </div>
-            <div>
-              <dt>默认提前期</dt>
-              <dd>{{ text(detailRecord.defaultLeadDays) }}</dd>
-            </div>
-            <div>
-              <dt>风险等级</dt>
-              <dd>{{ riskLabel(detailRecord.riskLevel) }}</dd>
-            </div>
-            <div>
-              <dt>状态</dt>
-              <dd>
-                <V2Badge :tone="detailRecord.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ detailRecord.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
-              </dd>
-            </div>
-            <div>
-              <dt>黑名单</dt>
-              <dd>{{ detailRecord.blacklistFlag ? '是' : '否' }}</dd>
-            </div>
-          </dl>
+          <PartnerDetailFacts
+            v-else-if="detailRecord"
+            :record="detailRecord"
+            :partner-type-label="typeLabel(detailRecord.partnerType)"
+            :risk-level-label="riskLabel(detailRecord.riskLevel)"
+          />
           <V2PageState v-else kind="empty" title="暂无合作方详情" description="请选择合作方。" />
         </section>
       </div>

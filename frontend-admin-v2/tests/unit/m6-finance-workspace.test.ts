@@ -22,6 +22,27 @@ import {
   writebackPayment,
 } from '@/services/finance'
 
+const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
+const aggregate = (paths: string[]) => paths.map(source).join('\n')
+const receivablesSource = () =>
+  aggregate([
+    'src/pages/finance/receivables-workspace/PaymentApplicationPage.vue',
+    'src/pages/finance/receivables-workspace/ExpenseApplicationPage.vue',
+    'src/pages/finance/receivables-workspace/RevenueOperationsPage.vue',
+    'src/pages/finance/receivables-workspace/InvoiceManagementPage.vue',
+    'src/pages/finance/receivables-workspace/model.ts',
+  ])
+const controlSource = () =>
+  aggregate([
+    'src/pages/finance/finance-control-workspace/FinanceOperationsPage.vue',
+    'src/pages/finance/finance-control-workspace/CashJournalPage.vue',
+    'src/pages/finance/finance-control-workspace/FundAccountsPage.vue',
+    'src/pages/finance/finance-control-workspace/CashForecastPage.vue',
+    'src/pages/finance/finance-control-workspace/AccountingEntryPage.vue',
+    'src/pages/finance/finance-control-workspace/FinancialClosePage.vue',
+    'src/pages/finance/finance-control-workspace/model.ts',
+  ])
+
 describe('M6 finance workspace contract', () => {
   it('keeps finance endpoints and decimal fields stable', () => {
     expect(FINANCE_API.revenueSettlements).toBe('/revenue-operations/settlements')
@@ -66,30 +87,22 @@ describe('M6 finance workspace contract', () => {
     vi.unstubAllGlobals()
   })
   it('keeps enterprise reads separate from project detail writes', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain('企业资金概览')
-    expect(source).toContain('项目资金对比')
-    expect(source).toMatch(/loadFinanceOperationsWorkspace\(\s*projectId\.value \|\| undefined,/)
-    expect(source).toMatch(/loadCashForecastCycles\(\s*projectId\.value \|\| undefined,/)
-    expect(source).toContain('if (!projectRequired()) return')
-    expect(source).toContain(
-      "mode === 'operations' && projectId && can('finance:analytics:maintain')",
-    )
-    expect(source).not.toContain('资金运营和预测必须按单项目范围读取')
+    const pages = controlSource()
+    expect(pages).toContain('企业资金概览')
+    expect(pages).toContain('项目资金对比')
+    expect(pages).toMatch(/loadFinanceOperationsWorkspace\(\s*projectId\.value \|\| undefined,/)
+    expect(pages).toMatch(/loadCashForecastCycles\(projectId\.value \|\| undefined,/)
+    expect(pages).toContain('if (!projectRequired()) return')
+    expect(pages).toContain("projectId && can('finance:analytics:maintain')")
+    expect(pages).not.toContain('资金运营和预测必须按单项目范围读取')
   })
   it('keeps abort state scoped to each finance request', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain('const request = new AbortController()')
-    expect(source).toContain('if (!request.signal.aborted)')
-    expect(source).not.toContain('if (!controller.signal.aborted)')
-    expect(source).toContain('dashboardStatusLabel(')
-    expect(source).toContain("['PAID', 'PARTIALLY_PAID'].includes(row.payStatus || '')")
+    const pages = receivablesSource()
+    expect(pages).toContain('const request = new AbortController()')
+    expect(pages).toContain('if (!request.signal.aborted)')
+    expect(pages).not.toContain('if (!controller.signal.aborted)')
+    expect(pages).toContain('dashboardStatusLabel(')
+    expect(pages).toContain("['PAID', 'PARTIALLY_PAID'].includes(row.payStatus || '')")
   })
   it('keeps payment writeback server-authoritative and string-valued', async () => {
     const fetchMock = vi.fn(
@@ -119,118 +132,89 @@ describe('M6 finance workspace contract', () => {
     vi.unstubAllGlobals()
   })
   it('binds material payment to an authoritative receipt source', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("sourceType !== 'MAT_RECEIPT'")
-    expect(source).toContain('材料付款必须选择材料验收来源')
-    expect(source).toContain("sourceType === 'DIRECT' ? paymentId")
-    expect(source).toContain('await savePaymentSources(paymentId')
-    expect(source).toContain('await deletePayment(createdPaymentId)')
-    expect(source).toContain('本次新建草稿已回滚')
-    expect(source).not.toContain('await savePaymentBasis(paymentId')
-    expect(source).not.toContain(
+    const page = source('src/pages/finance/receivables-workspace/PaymentApplicationPage.vue')
+    expect(page).toContain("sourceType !== 'MAT_RECEIPT'")
+    expect(page).toContain('材料付款必须选择材料验收来源')
+    expect(page).toContain("sourceType === 'DIRECT' ? paymentId")
+    expect(page).toContain('await savePaymentSources(paymentId')
+    expect(page).toContain('await deletePayment(createdPaymentId)')
+    expect(page).toContain('本次新建草稿已回滚')
+    expect(page).not.toContain('await savePaymentBasis(paymentId')
+    expect(page).not.toContain(
       "editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'",
     )
-    expect(source).not.toContain('Number(value.applyAmount)')
+    expect(page).not.toContain('Number(value.applyAmount)')
   })
   it('exposes writeback only through the authoritative payment endpoint', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("session.hasPermission('payment:record:writeback')")
-    expect(source).toContain('await writebackPayment(command)')
-    expect(source).toContain(".replace('T', ' ')}:00")
-    expect(source).not.toContain('Number(value.payAmount)')
-    expect(source).toContain("value == null ? '' : String(value).trim()")
-    expect(source).toContain(
+    const pages = receivablesSource()
+    expect(pages).toContain("session.hasPermission('payment:record:writeback')")
+    expect(pages).toContain('await writebackPayment(command)')
+    expect(pages).toContain(".replace('T', ' ')}:00")
+    expect(pages).not.toContain('Number(value.payAmount)')
+    expect(pages).toContain("value == null ? '' : String(value).trim()")
+    expect(pages).toContain(
       '{ payRecordId: command.payRecordId, allocatedAmount: command.invoiceAmount }',
     )
-    expect(source).toContain("'INVOICE',")
-    expect(source).toContain("'ELECTRONIC_INVOICE'")
+    expect(pages).toContain("'INVOICE',")
+    expect(pages).toContain("'ELECTRONIC_INVOICE'")
   })
   it('binds sales invoices to receivables and uploaded evidence', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("receivableId: required(value.receivableId, '应收款')")
-    expect(source).toContain("amount: required(value.allocationAmount, '分配金额')")
-    expect(source).toContain("throw new TypeError('销项发票附件不能为空')")
-    expect(source).toContain("'SALES_INVOICE',")
-    expect(source).toContain("'ELECTRONIC_INVOICE'")
-    expect(source).not.toContain('allocations: []')
+    const pages = receivablesSource()
+    expect(pages).toContain("receivableId: required(value.receivableId, '应收款')")
+    expect(pages).toContain("amount: required(value.allocationAmount, '分配金额')")
+    expect(pages).toContain("throw new TypeError('销项发票附件不能为空')")
+    expect(pages).toContain("'SALES_INVOICE',")
+    expect(pages).toContain("'ELECTRONIC_INVOICE'")
+    expect(pages).not.toContain('allocations: []')
   })
   it('binds owner settlements to an approved contract revenue fact', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("revenueId: required(value.revenueId, '已审批收入确认')")
-    expect(source).toContain('await loadApprovedContractRevenues(editor.value.projectId, value)')
-    expect(source).toContain("item.approvalStatus === 'APPROVED'")
-    expect(source).toContain('label="已审批收入确认"')
+    const pages = receivablesSource()
+    expect(pages).toContain("revenueId: required(value.revenueId, '已审批收入确认')")
+    expect(pages).toContain('await loadApprovedContractRevenues(editor.value.projectId, value)')
+    expect(pages).toContain("item.approvalStatus === 'APPROVED'")
+    expect(pages).toContain('label="已审批收入确认"')
   })
   it('filters finance editor candidates by active project and authoritative contract relations', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("item.status === 'ACTIVE'")
-    expect(source).toContain("item.approvalStatus === 'APPROVED'")
-    expect(source).toContain("item.contractStatus === 'PERFORMING'")
-    expect(source).toContain("performing && item.contractType === 'MAIN'")
-    expect(source).toContain('selectedContract.value?.partyBId')
-    expect(source).toContain('selectedContract.value?.partyAId')
-    expect(source).toContain(':options="payeePartnerOptions"')
-    expect(source).not.toContain(
+    const pages = receivablesSource()
+    expect(pages).toContain("item.status === 'ACTIVE'")
+    expect(pages).toContain("item.approvalStatus === 'APPROVED'")
+    expect(pages).toContain("item.contractStatus === 'PERFORMING'")
+    expect(pages).toContain("kind !== 'revenue' || item.contractType === 'MAIN'")
+    expect(pages).toContain('selectedContract.value?.partyBId')
+    expect(pages).toContain('selectedContract.value?.partyAId')
+    expect(pages).toContain(':options="payeePartnerOptions"')
+    expect(pages).not.toContain(
       "if (editorKind.value === 'expense') editor.value.payeePartnerId = contract?.partyBId",
     )
   })
   it('uploads required expense evidence before submission', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("throw new TypeError('费用附件不能为空')")
-    expect(source).toContain(
+    const page = source('src/pages/finance/receivables-workspace/ExpenseApplicationPage.vue')
+    expect(page).toContain("throw new TypeError('费用附件不能为空')")
+    expect(page).toContain(
       "await uploadSiteFile(expenseAttachment.value, 'EXPENSE', expenseId, 'OTHER')",
     )
-    expect(source).toContain('@change="onExpenseAttachment"')
+    expect(page).toContain('@change="onExpenseAttachment"')
   })
   it('retains created draft ids before fallible follow-up writes', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain('value.id = paymentId')
-    expect(source).toContain('value.id = expenseId')
-    expect(source).toContain('session.hasAdminOrPermission(')
+    const pages = receivablesSource()
+    expect(pages).toContain('value.id = paymentId')
+    expect(pages).toContain('value.id = expenseId')
+    expect(pages).toContain('session.hasAdminOrPermission(')
   })
   it('binds collections to receivables, fund accounts, and bank evidence', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("fundAccountId: required(value.fundAccountId, '资金账户')")
-    expect(source).toContain("throw new TypeError('银行回单不能为空')")
-    expect(source).toContain(
-      'const collectionId = value.id || (await createCollection(command)).id',
-    )
-    expect(source).toContain("'COLLECTION_RECORD',")
-    expect(source).toContain("'BANK_RECEIPT'")
-    expect(source).toContain('await confirmCollection(collectionId, command.allocations ?? [])')
-    expect(source).toContain("openForm('collection')")
+    const pages = receivablesSource()
+    expect(pages).toContain("fundAccountId: required(value.fundAccountId, '资金账户')")
+    expect(pages).toContain("throw new TypeError('银行回单不能为空')")
+    expect(pages).toContain('const collectionId = (await createCollection(command)).id')
+    expect(pages).toContain("'COLLECTION_RECORD',")
+    expect(pages).toContain("'BANK_RECEIPT'")
+    expect(pages).toContain('await confirmCollection(collectionId, command.allocations ?? [])')
+    expect(pages).toContain("openForm('collection')")
   })
   it('confirms sales invoices only after evidence upload', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    const upload = source.indexOf("'SALES_INVOICE',")
-    const confirm = source.indexOf('await confirmSalesInvoice(salesInvoiceId, command.allocations)')
+    const page = source('src/pages/finance/receivables-workspace/RevenueOperationsPage.vue')
+    const upload = page.indexOf("'SALES_INVOICE',")
+    const confirm = page.indexOf('await confirmSalesInvoice(salesInvoiceId, command.allocations)')
     expect(upload).toBeGreaterThan(0)
     expect(confirm).toBeGreaterThan(upload)
   })
@@ -261,14 +245,11 @@ describe('M6 finance workspace contract', () => {
     vi.unstubAllGlobals()
   })
   it('exposes payment reversal only for successful server records and authorized users', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("session.hasPermission('payment:record:reverse')")
-    expect(source).toContain('Boolean(paymentRecord(row))')
-    expect(source).toContain('await reversePaymentRecord(target.id')
-    expect(source).toContain('生成反向支付事实，不删除原支付记录。')
+    const page = source('src/pages/finance/receivables-workspace/PaymentApplicationPage.vue')
+    expect(page).toContain("session.hasPermission('payment:record:reverse')")
+    expect(page).toContain('Boolean(paymentRecord(row))')
+    expect(page).toContain('await reversePaymentRecord(target.id')
+    expect(page).toContain('生成反向支付事实，不删除原支付记录。')
   })
   it('creates fund accounts without front-end decimal conversion', async () => {
     const fetchMock = vi.fn(
@@ -293,17 +274,14 @@ describe('M6 finance workspace contract', () => {
     vi.unstubAllGlobals()
   })
   it('keeps fund-account maintenance on its own workspace tab', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
-      'utf8',
-    )
-    expect(source).toContain("route.path === '/fund-accounts'")
-    expect(source).toContain('v-else-if="mode === \'accounts\'"')
-    expect(source).toContain('accounts.value = await loadFundAccounts(request.signal)')
-    expect(source).toContain('journal.value = await loadCashJournal(')
-    expect(source).toContain('@click="openFundAccount"')
-    expect(source).toContain("uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')")
-    expect(source).toContain("can('file:upload') || can('cashbook:journal:maintain')")
+    const accounts = source('src/pages/finance/finance-control-workspace/FundAccountsPage.vue')
+    const journal = source('src/pages/finance/finance-control-workspace/CashJournalPage.vue')
+    expect(accounts).toContain('accounts.value = await loadFundAccounts(request.signal)')
+    expect(accounts).toContain('@click="openFundAccount"')
+    expect(accounts).not.toContain('loadCashJournal')
+    expect(journal).toContain('journal.value = await loadCashJournal(')
+    expect(journal).toContain("uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')")
+    expect(journal).toContain("can('file:upload') || can('cashbook:journal:maintain')")
   })
   it('opens authoritative payment traces from application, journal, invoice and voucher', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: '0', data: [] })))
@@ -321,22 +299,16 @@ describe('M6 finance workspace contract', () => {
     vi.unstubAllGlobals()
   })
   it('renders trace links without client-side relationship synthesis', () => {
-    const receivables = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
-      'utf8',
-    )
-    const control = readFileSync(
-      resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
-      'utf8',
-    )
+    const receivables = receivablesSource()
+    const control = controlSource()
     const dialog = readFileSync(
       resolve(process.cwd(), 'src/components/finance/PaymentTraceDialog.vue'),
       'utf8',
     )
     expect(receivables).toContain('loadPaymentTraceByApplication')
     expect(receivables).toContain('loadPaymentTraceByInvoice')
-    expect(control).toContain("openTrace('journal', row.id)")
-    expect(control).toContain("openTrace('voucher', row.id)")
+    expect(control).toContain('loadPaymentTraceByCashJournal')
+    expect(control).toContain('loadPaymentTraceByVoucher')
     expect(dialog).toContain('缺链由接口直接拒绝，不在页面补链。')
   })
   it('renders the backend payment trace shape and conservation facts', () => {

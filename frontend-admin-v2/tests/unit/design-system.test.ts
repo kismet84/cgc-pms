@@ -24,6 +24,16 @@ function vueSources(root: string): string[] {
   })
 }
 
+function componentCssSource(): string {
+  const componentRoot = resolve(sourceRoot, 'styles/components')
+  return [
+    readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8'),
+    ...readdirSync(componentRoot)
+      .filter((file) => file.endsWith('.css'))
+      .map((file) => readFileSync(resolve(componentRoot, file), 'utf-8')),
+  ].join('\n')
+}
+
 describe('V2 design system', () => {
   it('keeps public components documented and design checks wired into CI', () => {
     const standard = readFileSync(uiStandardPath, 'utf-8')
@@ -182,7 +192,7 @@ describe('V2 design system', () => {
   it('keeps a small set of architectural bans', () => {
     const pageSources = vueSources(resolve(sourceRoot, 'pages')).join('\n')
     const componentSources = vueSources(resolve(sourceRoot, 'components')).join('\n')
-    const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+    const componentCss = componentCssSource()
 
     expect(pageSources).not.toContain('window.confirm(')
     expect(pageSources).not.toContain('<V2GlassButton')

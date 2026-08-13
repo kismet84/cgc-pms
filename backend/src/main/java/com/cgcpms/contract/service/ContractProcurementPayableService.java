@@ -1,5 +1,7 @@
 package com.cgcpms.contract.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -43,7 +45,4 @@ public class ContractProcurementPayableService {
         return payable;
     }
 
-    private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
-    }
 }

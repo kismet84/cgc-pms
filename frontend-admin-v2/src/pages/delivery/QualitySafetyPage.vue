@@ -3,8 +3,6 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   ContractRecord,
-  FieldQualityIssueCommand,
-  FieldQualityRectificationCommand,
   PartnerRecord,
   QualityConsequenceCommand,
   QualityInspectionCommand,
@@ -23,8 +21,6 @@ import type {
   SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2ActionMenu,
-  V2Badge,
   V2Button,
   V2Card,
   V2Dialog,
@@ -36,7 +32,7 @@ import {
   useToastMessage,
 } from '@/components'
 import { loadContractPage, loadPartners } from '@/services/commercial'
-import { listSiteFiles, uploadSiteFileIdempotently } from '@/services/delivery'
+import { listSiteFiles } from '@/services/delivery'
 import {
   activateQualityPlan,
   completeQualityPlan,
@@ -56,7 +52,6 @@ import { featureFlags } from '@/services/featureFlags'
 import {
   FieldDraftRepository,
   fieldDraftStatusLabel,
-  fieldDraftSyncFailure,
   type FieldDraft,
 } from '@/services/fieldDrafts'
 import { isApiClientError } from '@/services/request'
@@ -65,6 +60,17 @@ import { getSessionNamespaceIdentity, useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import V2Tabs from '@/components/V2Tabs.vue'
 import { deliveryLabel } from './labels'
+import QualityConsequencePanel from './quality-safety/QualityConsequencePanel.vue'
+import QualityInspectionPanel from './quality-safety/QualityInspectionPanel.vue'
+import QualityPlanPanel from './quality-safety/QualityPlanPanel.vue'
+import QualityRectificationPanel from './quality-safety/QualityRectificationPanel.vue'
+import QualityReinspectionPanel from './quality-safety/QualityReinspectionPanel.vue'
+import {
+  persistQualityDraft,
+  restoreQualityDraft as restorePersistedQualityDraft,
+  synchronizeQualityDraft,
+  type QualityDraftPayload,
+} from './quality-safety/quality-draft-sync'
 
 type QualityTab = QualityWorkspaceView
 type DialogKind =
@@ -83,9 +89,6 @@ interface EvidenceTarget {
   label: string
   issue?: QualityIssueRecord
 }
-type QualityDraftPayload =
-  | { kind: 'ISSUE'; inspectionId: string; command: FieldQualityIssueCommand }
-  | { kind: 'RECTIFICATION'; command: FieldQualityRectificationCommand }
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const route = useRoute()
@@ -302,13 +305,6 @@ function clearNotice(): void {
   errorMessage.value = ''
   successMessage.value = ''
 }
-function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
-  if (['ACTIVE', 'COMPLETED', 'CLOSED', 'PASSED', 'POSTED'].includes(status)) return 'success'
-  if (['RECTIFYING', 'PENDING_REINSPECTION', 'SUBMITTED'].includes(status)) return 'warning'
-  if (['REJECTED', 'CRITICAL'].includes(status)) return 'danger'
-  return 'neutral'
-}
-
 async function loadProject(preserveNotice = false): Promise<void> {
   projectController?.abort()
   traceController?.abort()
@@ -518,6 +514,23 @@ function showEvidence(target: EvidenceTarget): void {
   evidenceTarget.value = target
   dialog.value = 'evidence'
 }
+function showInspectionEvidence(inspection: QualityInspectionRecord): void {
+  showEvidence({
+    businessType: 'QS_INSPECTION',
+    businessId: inspection.id,
+    documentType: 'INSPECTION_EVIDENCE',
+    label: '检查证据',
+  })
+}
+function showIssueEvidence(issue: QualityIssueRecord): void {
+  showEvidence({
+    businessType: 'QS_ISSUE',
+    businessId: issue.id,
+    documentType: 'ISSUE_EVIDENCE',
+    label: '问题证据',
+    issue,
+  })
+}
 async function uploadRequired(
   type: string,
   businessId: string,
@@ -569,19 +582,13 @@ async function saveQualityDraft(
   const payload = qualityDraftPayload(kind)
   if (!payload) return false
   try {
-    const repository = localRepository()
-    const id = qualityDraftId(payload)
-    const clientRequestId = localDraft.value?.clientRequestId ?? crypto.randomUUID()
-    if (payload.kind === 'ISSUE') payload.command.clientRequestId = clientRequestId
-    else payload.command.clientRequestId = clientRequestId
-    localDraft.value = await repository.put({
-      id,
-      kind: payload.kind === 'ISSUE' ? 'QUALITY_ISSUE' : 'QUALITY_RECTIFICATION',
-      clientRequestId,
-      status,
+    localDraft.value = await persistQualityDraft({
+      repository: localRepository(),
       payload,
+      currentDraft: localDraft.value,
+      evidence: evidence.value,
+      status,
     })
-    if (evidence.value) await repository.putAttachment(id, evidence.value)
     successMessage.value = status === 'DRAFT' ? '质量安全草稿已保存到本机' : '草稿已进入待同步状态'
     return true
   } catch (error) {
@@ -595,49 +602,30 @@ async function syncQualityDraft(kind: QualityDraftPayload['kind']): Promise<void
     return
   const repository = localRepository()
   const draft = localDraft.value
-  if (!navigator.onLine) {
-    localDraft.value = await repository.put({ ...draft, status: 'RETRYABLE', error: '当前离线' })
-    errorMessage.value = '当前离线，草稿保留为可重试状态'
-    return
-  }
-  const attachments = await repository.attachments(draft.id)
-  if (!attachments.length) {
-    errorMessage.value = '同步质量问题或整改前必须选择证据附件'
-    return
-  }
   saving.value = true
-  clearNotice()
   try {
-    localDraft.value = await repository.put({ ...draft, status: 'SYNCING' })
-    if (draft.payload.kind === 'ISSUE') {
-      const created = await createQualityIssue(draft.payload.inspectionId, draft.payload.command)
-      await uploadDraftAttachments(attachments, 'QS_ISSUE', created.id, 'ISSUE_EVIDENCE')
-    } else {
-      const created = await createQualityRectification(draft.payload.command)
-      if (created.status === 'DRAFT') {
-        await uploadDraftAttachments(
-          attachments,
-          'QS_RECTIFICATION',
-          created.id,
-          'RECTIFICATION_EVIDENCE',
-        )
-        await submitQualityRectification(created.id)
-      }
+    const result = await synchronizeQualityDraft({
+      repository,
+      draft,
+      online: navigator.onLine,
+    })
+    localDraft.value = result.draft
+    if (result.kind === 'OFFLINE') {
+      errorMessage.value = '当前离线，草稿保留为可重试状态'
+      return
     }
-    await repository.removeAttachments(draft.id)
-    localDraft.value = await repository.put({ ...draft, status: 'SYNCED' })
+    if (result.kind === 'MISSING_EVIDENCE') {
+      errorMessage.value = '同步质量问题或整改前必须选择证据附件'
+      return
+    }
+    if (result.kind === 'FAILED') {
+      errorMessage.value = result.message
+      return
+    }
+    clearNotice()
     dialog.value = null
     successMessage.value = '质量安全本地草稿已同步'
     await loadProject(true)
-  } catch (error) {
-    const code = isApiClientError(error) ? error.code : undefined
-    const status = isApiClientError(error) ? error.status : undefined
-    localDraft.value = await repository.put({
-      ...draft,
-      status: fieldDraftSyncFailure(code, status),
-      error: errorText(error, '同步失败'),
-    })
-    errorMessage.value = errorText(error, '质量安全本地草稿同步失败')
   } finally {
     saving.value = false
   }
@@ -649,8 +637,8 @@ async function restoreQualityDraft(kind: QualityDraftPayload['kind']): Promise<v
   try {
     const payload = qualityDraftPayload(kind)
     if (!payload) return
-    const draft = await localRepository().get<QualityDraftPayload>(qualityDraftId(payload))
-    if (!draft || draft.status === 'SYNCED') return
+    const draft = await restorePersistedQualityDraft(localRepository(), payload)
+    if (!draft) return
     localDraft.value = draft
     if (draft.payload.kind === 'ISSUE') Object.assign(issueForm, draft.payload.command)
     else Object.assign(rectificationForm, draft.payload.command)
@@ -678,34 +666,12 @@ function qualityDraftPayload(kind: QualityDraftPayload['kind']): QualityDraftPay
   }
 }
 
-function qualityDraftId(payload: QualityDraftPayload): string {
-  return payload.kind === 'ISSUE'
-    ? `quality:issue:${payload.inspectionId}`
-    : `quality:rectification:${payload.command.issueId}`
-}
-
 function localRepository(): FieldDraftRepository {
   if (draftRepository) return draftRepository
   const identity = getSessionNamespaceIdentity()
   if (!identity) throw new TypeError('当前会话缺少租户标识，不能使用本地草稿')
   draftRepository = new FieldDraftRepository(identity.tenantId, identity.userId)
   return draftRepository
-}
-
-async function uploadDraftAttachments(
-  attachments: Awaited<ReturnType<FieldDraftRepository['attachments']>>,
-  businessType: string,
-  businessId: string,
-  documentType: string,
-): Promise<void> {
-  for (const attachment of attachments) {
-    await uploadSiteFileIdempotently(
-      new File([attachment.file], attachment.name, { type: attachment.type }),
-      businessType,
-      businessId,
-      documentType,
-    )
-  }
 }
 
 const savePlan = () =>
@@ -898,322 +864,54 @@ onBeforeUnmount(() => {
           :aria-labelledby="`quality-tab-${activeTab}`"
           class="quality-page__record-sections"
         >
-          <div v-if="activeTab === 'plan'">
-            <div v-if="plans.length" class="quality-page__table-wrap">
-              <table class="quality-page__table v2-table--top" aria-label="检查计划">
-                <thead>
-                  <tr>
-                    <th scope="col">计划编号</th>
-                    <th scope="col">计划名称</th>
-                    <th scope="col">状态</th>
-                    <th scope="col">周期</th>
-                    <th scope="col" class="v2-table-cell--actions">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(plan, index) in pagedPlans" :key="plan.id">
-                    <th scope="row">{{ plan.planCode }}</th>
-                    <td>
-                      <V2Button
-                        size="small"
-                        variant="ghost"
-                        :aria-pressed="selectedPlanId === plan.id"
-                        @click="selectPlan(plan.id)"
-                      >
-                        {{ plan.planName }}
-                      </V2Button>
-                    </td>
-                    <td>
-                      <V2Badge :tone="statusTone(plan.status)">{{
-                        deliveryLabel(plan.status)
-                      }}</V2Badge>
-                    </td>
-                    <td>{{ plan.startDate }} 至 {{ plan.endDate }}</td>
-                    <td class="v2-table-cell--actions">
-                      <V2ActionMenu
-                        :label="`${plan.planCode}更多操作`"
-                        :placement="index >= pagedPlans.length - 3 ? 'top-end' : 'bottom-end'"
-                      >
-                        <V2Button
-                          v-if="canPlan && plan.status === 'DRAFT'"
-                          size="small"
-                          variant="secondary"
-                          :loading="saving"
-                          @click="activatePlan(plan)"
-                          >激活</V2Button
-                        >
-                        <V2Button
-                          v-if="canPlan && plan.status === 'ACTIVE'"
-                          size="small"
-                          variant="ghost"
-                          :loading="saving"
-                          @click="finishPlan(plan)"
-                          >完成</V2Button
-                        >
-                        <span v-if="!canPlan || !['DRAFT', 'ACTIVE'].includes(plan.status)">—</span>
-                      </V2ActionMenu>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <V2PageState
-              v-else-if="!errorMessage"
-              kind="empty"
-              title="暂无检查计划"
-              description="当前检查类型下没有计划。"
-            />
-          </div>
-
-          <div v-else-if="activeTab === 'inspection'">
-            <div v-if="inspections.length" class="quality-page__table-wrap">
-              <table class="quality-page__table v2-table--top" aria-label="检查记录">
-                <thead>
-                  <tr>
-                    <th scope="col">检查编号</th>
-                    <th scope="col">位置 / 摘要</th>
-                    <th scope="col">状态</th>
-                    <th scope="col">日期</th>
-                    <th scope="col" class="v2-table-cell--actions">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(inspection, index) in pagedInspections" :key="inspection.id">
-                    <th scope="row">{{ inspection.inspectionCode }}</th>
-                    <td>{{ inspection.location }} · {{ inspection.summary }}</td>
-                    <td>
-                      <V2Badge :tone="statusTone(inspection.status)">{{
-                        deliveryLabel(inspection.status)
-                      }}</V2Badge>
-                    </td>
-                    <td>{{ inspection.inspectionDate }}</td>
-                    <td class="v2-table-cell--actions">
-                      <V2ActionMenu
-                        :label="`${inspection.inspectionCode}更多操作`"
-                        :placement="index >= pagedInspections.length - 3 ? 'top-end' : 'bottom-end'"
-                      >
-                        <V2Button
-                          v-if="canInspect && inspection.status === 'DRAFT'"
-                          size="small"
-                          variant="ghost"
-                          @click="
-                            showEvidence({
-                              businessType: 'QS_INSPECTION',
-                              businessId: inspection.id,
-                              documentType: 'INSPECTION_EVIDENCE',
-                              label: '检查证据',
-                            })
-                          "
-                          >上传检查证据</V2Button
-                        >
-                        <V2Button
-                          v-if="canInspect && inspection.status === 'DRAFT'"
-                          size="small"
-                          variant="secondary"
-                          @click="show('issue', inspection)"
-                          >登记问题</V2Button
-                        >
-                        <V2Button
-                          v-if="canInspect && inspection.status === 'DRAFT'"
-                          size="small"
-                          variant="ghost"
-                          :loading="saving"
-                          @click="submitInspection(inspection)"
-                          >提交检查</V2Button
-                        >
-                        <span v-if="!canInspect || inspection.status !== 'DRAFT'">—</span>
-                      </V2ActionMenu>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <V2PageState
-              v-else-if="!errorMessage"
-              kind="empty"
-              title="暂无检查记录"
-              description="当前计划下没有检查记录。"
-            />
-          </div>
-
-          <div v-else-if="activeTab === 'rectification'">
-            <div v-if="rectificationIssues.length" class="quality-page__table-wrap">
-              <table class="quality-page__table v2-table--top" aria-label="问题整改">
-                <thead>
-                  <tr>
-                    <th scope="col">问题编号</th>
-                    <th scope="col">标题</th>
-                    <th scope="col">严重度</th>
-                    <th scope="col">状态</th>
-                    <th scope="col">整改期限</th>
-                    <th scope="col" class="v2-table-cell--actions">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(issue, index) in pagedRectificationIssues" :key="issue.id">
-                    <th scope="row">
-                      <V2Button
-                        size="small"
-                        variant="ghost"
-                        class="v2-table__record-link"
-                        @click="openTrace(issue)"
-                      >
-                        {{ issue.issueCode }}
-                      </V2Button>
-                    </th>
-                    <td>{{ issue.title }}</td>
-                    <td>
-                      <V2Badge :tone="statusTone(issue.severity)">{{
-                        deliveryLabel(issue.severity)
-                      }}</V2Badge>
-                    </td>
-                    <td>
-                      <V2Badge :tone="statusTone(issue.status)">{{
-                        deliveryLabel(issue.status)
-                      }}</V2Badge>
-                    </td>
-                    <td>{{ issue.dueDate }}</td>
-                    <td class="v2-table-cell--actions">
-                      <V2ActionMenu
-                        :label="`${issue.issueCode}更多操作`"
-                        :placement="
-                          index >= pagedRectificationIssues.length - 3 ? 'top-end' : 'bottom-end'
-                        "
-                      >
-                        <V2Button
-                          v-if="canInspect && issue.status === 'OPEN'"
-                          size="small"
-                          variant="ghost"
-                          @click="
-                            showEvidence({
-                              businessType: 'QS_ISSUE',
-                              businessId: issue.id,
-                              documentType: 'ISSUE_EVIDENCE',
-                              label: '问题证据',
-                              issue,
-                            })
-                          "
-                          >上传问题证据</V2Button
-                        >
-                        <V2Button
-                          v-if="canRectify && issue.status === 'RECTIFYING'"
-                          size="small"
-                          @click="show('rectification', issue)"
-                          >提交整改</V2Button
-                        >
-                      </V2ActionMenu>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <V2PageState
-              v-else-if="!errorMessage"
-              kind="empty"
-              title="暂无待处理问题"
-              description="当前没有需要登记证据或整改的问题。"
-            />
-          </div>
-
-          <div v-else-if="activeTab === 'reinspection'">
-            <div v-if="reinspectionIssues.length" class="quality-page__table-wrap">
-              <table class="quality-page__table v2-table--top" aria-label="复检闭环">
-                <thead>
-                  <tr>
-                    <th scope="col">问题编号</th>
-                    <th scope="col">标题</th>
-                    <th scope="col">严重度</th>
-                    <th scope="col">整改期限</th>
-                    <th scope="col">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="issue in pagedReinspectionIssues" :key="issue.id">
-                    <th scope="row">
-                      <V2Button
-                        size="small"
-                        variant="ghost"
-                        class="v2-table__record-link"
-                        @click="openTrace(issue)"
-                      >
-                        {{ issue.issueCode }}
-                      </V2Button>
-                    </th>
-                    <td>{{ issue.title }}</td>
-                    <td>
-                      <V2Badge :tone="statusTone(issue.severity)">{{
-                        deliveryLabel(issue.severity)
-                      }}</V2Badge>
-                    </td>
-                    <td>{{ issue.dueDate }}</td>
-                    <td>
-                      <V2Button v-if="canReinspect" size="small" @click="showReinspection(issue)"
-                        >复检</V2Button
-                      >
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <V2PageState
-              v-else-if="!errorMessage"
-              kind="empty"
-              title="暂无待复检问题"
-              description="当前没有已提交整改、等待复检的问题。"
-            />
-          </div>
-
-          <div v-else-if="activeTab === 'consequence'">
-            <div v-if="consequenceIssues.length" class="quality-page__table-wrap">
-              <table class="v2-table--top" aria-label="后果追踪">
-                <thead>
-                  <tr>
-                    <th scope="col">问题编号</th>
-                    <th scope="col">标题</th>
-                    <th scope="col">责任合作方</th>
-                    <th scope="col">状态</th>
-                    <th scope="col">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="issue in pagedConsequenceIssues" :key="issue.id">
-                    <th scope="row">
-                      <V2Button
-                        size="small"
-                        variant="ghost"
-                        class="v2-table__record-link"
-                        @click="openTrace(issue)"
-                      >
-                        {{ issue.issueCode }}
-                      </V2Button>
-                    </th>
-                    <td>{{ issue.title }}</td>
-                    <td>{{ partnerLabel(issue.responsiblePartnerId) }}</td>
-                    <td>
-                      <V2Badge :tone="statusTone(issue.status)">{{
-                        deliveryLabel(issue.status)
-                      }}</V2Badge>
-                    </td>
-                    <td>
-                      <V2Button
-                        v-if="canConsequence && issue.responsibleKind === 'PARTNER'"
-                        size="small"
-                        variant="ghost"
-                        @click="show('consequence', issue)"
-                        >登记后果</V2Button
-                      >
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <V2PageState
-              v-else-if="!errorMessage"
-              kind="empty"
-              title="暂无后果追踪事项"
-              description="当前没有已闭环且归属合作方的问题。"
-            />
-          </div>
+          <QualityPlanPanel
+            v-if="activeTab === 'plan'"
+            :plans="pagedPlans"
+            :selected-plan-id="selectedPlanId"
+            :can-maintain="canPlan"
+            :saving="saving"
+            :has-error="Boolean(errorMessage)"
+            @select="selectPlan"
+            @activate="activatePlan"
+            @finish="finishPlan"
+          />
+          <QualityInspectionPanel
+            v-else-if="activeTab === 'inspection'"
+            :inspections="pagedInspections"
+            :can-maintain="canInspect"
+            :saving="saving"
+            :has-error="Boolean(errorMessage)"
+            @upload-evidence="showInspectionEvidence"
+            @create-issue="show('issue', $event)"
+            @submit="submitInspection"
+          />
+          <QualityRectificationPanel
+            v-else-if="activeTab === 'rectification'"
+            :issues="pagedRectificationIssues"
+            :can-inspect="canInspect"
+            :can-rectify="canRectify"
+            :has-error="Boolean(errorMessage)"
+            @open-trace="openTrace"
+            @upload-evidence="showIssueEvidence"
+            @rectify="show('rectification', $event)"
+          />
+          <QualityReinspectionPanel
+            v-else-if="activeTab === 'reinspection'"
+            :issues="pagedReinspectionIssues"
+            :can-reinspect="canReinspect"
+            :has-error="Boolean(errorMessage)"
+            @open-trace="openTrace"
+            @reinspect="showReinspection"
+          />
+          <QualityConsequencePanel
+            v-else-if="activeTab === 'consequence'"
+            :issues="pagedConsequenceIssues"
+            :can-consequence="canConsequence"
+            :has-error="Boolean(errorMessage)"
+            :partner-label="partnerLabel"
+            @open-trace="openTrace"
+            @create-consequence="show('consequence', $event)"
+          />
         </section>
         <V2PageState
           v-else-if="!errorMessage"

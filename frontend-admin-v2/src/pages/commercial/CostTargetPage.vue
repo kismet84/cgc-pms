@@ -70,7 +70,8 @@ const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const { embedded = false } = defineProps<{ embedded?: boolean }>()
+const props = defineProps<{ embedded?: boolean }>()
+const embedded = computed(() => route.path === '/cost-budget' || props.embedded === true)
 
 const filter = reactive<CostTargetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostTargetRecord[]>([])

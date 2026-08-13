@@ -2,6 +2,7 @@ package com.cgcpms.cashbook;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.bid.entity.BidCost;
@@ -34,6 +35,7 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.cashbook.vo.CashJournalEntryVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.io.Resources;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -189,6 +191,10 @@ class CashJournalPrivacyTest {
     @Test
     void generalQueriesScopeHistoricalNullProjectBidRowsBeforeRead() throws Exception {
         authenticate("cashbook:journal:query");
+        if (TableInfoHelper.getTableInfo(CashJournalEntry.class) == null) {
+            TableInfoHelper.initTableInfo(
+                    new MapperBuilderAssistant(new MybatisConfiguration(), ""), CashJournalEntry.class);
+        }
         when(projectAccessChecker.accessibleProjectIds()).thenReturn(List.of(9L));
         List<String> wrapperSql = new ArrayList<>();
         when(entryMapper.selectSummaryAggregate(eq(TENANT_ID), any())).thenAnswer(invocation -> {

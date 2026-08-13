@@ -62,7 +62,10 @@ describe('M6 contract and read-only canary baseline', () => {
       close: 'finance:close:query',
     })
 
-    const catalog = readFileSync(resolve('src/navigation/catalog.ts'), 'utf-8')
+    const catalog = [
+      readFileSync(resolve('src/navigation/domains/supply.ts'), 'utf-8'),
+      readFileSync(resolve('src/navigation/domains/finance.ts'), 'utf-8'),
+    ].join('\n')
     for (const permission of [
       ...Object.values(SUBCONTRACT_QUERY_PERMISSIONS),
       ...Object.values(FINANCE_QUERY_PERMISSIONS),
@@ -186,18 +189,22 @@ describe('M6 contract and read-only canary baseline', () => {
       readFileSync(resolve('../packages/frontend-contracts/src/subcontract.ts'), 'utf-8'),
       readFileSync(resolve('../packages/frontend-contracts/src/finance.ts'), 'utf-8'),
       readFileSync(resolve('src/services/subcontract.ts'), 'utf-8'),
-      readFileSync(resolve('src/services/finance.ts'), 'utf-8'),
+      ...['types', 'support', 'payment', 'trace', 'cashbook', 'control', 'revenue'].map((module) =>
+        readFileSync(resolve(`src/services/finance/${module}.ts`), 'utf-8'),
+      ),
     ].join('\n')
 
     expect(sources).not.toMatch(/from ["'](?:vue|pinia|vue-router)/)
     expect(sources).not.toContain('frontend-admin/')
     expect(sources).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
-    const financeService = readFileSync(resolve('src/services/finance.ts'), 'utf-8')
+    const financeService = readFileSync(resolve('src/services/finance/revenue.ts'), 'utf-8')
     expect(financeService).toContain('createOwnerSettlement')
   })
 
   it('exposes ISSUE-053-033 revenue and ISSUE-053-034 finance-control adapters', () => {
-    const source = readFileSync(resolve('src/services/finance.ts'), 'utf-8')
+    const source = ['revenue', 'control']
+      .map((module) => readFileSync(resolve(`src/services/finance/${module}.ts`), 'utf-8'))
+      .join('\n')
     expect(source).toContain('loadRevenueSettlements')
     expect(source).toContain('loadFinanceOperationsWorkspace')
     expect(source).toContain('loadCashForecastCycles')

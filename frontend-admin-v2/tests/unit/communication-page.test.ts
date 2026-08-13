@@ -74,8 +74,15 @@ beforeEach(() => {
 
 describe('CommunicationPage', () => {
   it('keeps chat unread state separate from the notification center', () => {
-    const shell = readFileSync(resolve('src/layouts/AppShell.vue'), 'utf8')
-    expect(shell).toContain('loadCommunicationUnreadCount')
+    const shell = [
+      readFileSync(resolve('src/layouts/AppShell.vue'), 'utf8'),
+      readFileSync(resolve('src/layouts/ShellHeaderWorkspace.vue'), 'utf8'),
+    ].join('\n')
+    const communication = readFileSync(resolve('src/layouts/useShellCommunication.ts'), 'utf8')
+    const notifications = readFileSync(resolve('src/layouts/useShellNotifications.ts'), 'utf8')
+    expect(shell).toContain('useShellCommunication')
+    expect(communication).toContain('loadCommunicationUnreadCount')
+    expect(notifications).toContain('loadNotificationSummary')
     expect(shell).toContain('communicationUnreadCount')
     expect(shell).toContain('notificationUnreadCount')
     expect(shell).toContain('to="/communication"')

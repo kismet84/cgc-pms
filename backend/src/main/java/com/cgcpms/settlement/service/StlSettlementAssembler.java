@@ -7,19 +7,11 @@ import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.common.util.DateTimeUtils;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-
 /**
  * 结算 VO 组装器 — 纯数据转换，无数据库访问。
  */
 @Component
 public class StlSettlementAssembler {
-
-    // ---- BigDecimal helpers ----
-
-    static BigDecimal nullToZero(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
-    }
 
     // ---- VO mapping ----
 

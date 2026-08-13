@@ -1,5 +1,7 @@
 package com.cgcpms.receipt.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -467,10 +469,6 @@ public class MatReceiptService {
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (qualified.signum() == 0) return "REJECTED";
         return qualified.compareTo(actual) == 0 ? "QUALIFIED" : "PARTIAL";
-    }
-
-    private BigDecimal nvl(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
     }
 
     private boolean isDirectConsumption(MatReceipt receipt) {

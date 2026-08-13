@@ -8,9 +8,9 @@ import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.ProjectFileProjection;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
-import com.cgcpms.projectfile.ProjectFileService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -32,12 +32,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.net.ConnectException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -86,14 +88,14 @@ class FileServiceTest {
     private VirusScanner virusScanner;
 
     @MockitoBean
-    private ProjectFileService projectFileService;
+    private ProjectFileProjection projectFileProjection;
 
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         authenticate("business:amount:view");
         when(virusScanner.scan(any(byte[].class))).thenReturn(VirusScanner.ScanResult.clean());
-        clearInvocations(minioClient, authorizer, virusScanner);
+        clearInvocations(minioClient, authorizer, virusScanner, projectFileProjection);
     }
 
     @AfterEach
@@ -329,6 +331,26 @@ class FileServiceTest {
         assertEquals("tenants/" + TestUserContext.TENANT_0 + "/" + businessType + "/" + businessId
                 + "/files/" + stored.getId() + "/" + stored.getFileName(), stored.getStoragePath());
         assertEquals("hash.pdf", stored.getOriginalName());
+    }
+
+    @Test
+    @DisplayName("upload projects persisted metadata inside the file transaction")
+    void testUploadProjectsInsideTransaction() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "projection.pdf", "application/pdf", "%PDF-1.4 projection".getBytes());
+        long businessId = Math.abs(System.nanoTime());
+        AtomicBoolean transactionActive = new AtomicBoolean();
+        doAnswer(invocation -> {
+            transactionActive.set(TransactionSynchronizationManager.isActualTransactionActive());
+            return null;
+        }).when(projectFileProjection).indexBusinessFile(any(SysFile.class));
+
+        fileService.upload(file, "CONTRACT", businessId);
+
+        var projected = org.mockito.ArgumentCaptor.forClass(SysFile.class);
+        verify(projectFileProjection).indexBusinessFile(projected.capture());
+        assertTrue(transactionActive.get());
+        assertNotNull(sysFileMapper.selectById(projected.getValue().getId()));
     }
 
     @Test
@@ -787,10 +809,21 @@ class FileServiceTest {
     void testDeleteRemovesObjectAfterTransactionCommit() throws Exception {
         SysFile file = insertFile("CONTRACT", 30006L, TestUserContext.TENANT_0,
                 "contract-ok.pdf", "application/pdf");
+        AtomicBoolean projectionTransactionActive = new AtomicBoolean();
+        doAnswer(invocation -> {
+            projectionTransactionActive.set(TransactionSynchronizationManager.isActualTransactionActive());
+            return null;
+        }).when(projectFileProjection).invalidateBusinessFile(any(SysFile.class));
 
         fileService.delete(file.getId());
 
         verify(authorizer).checkDeleteAccess("CONTRACT", 30006L, "OTHER");
+        var invalidated = org.mockito.ArgumentCaptor.forClass(SysFile.class);
+        verify(projectFileProjection).invalidateBusinessFile(invalidated.capture());
+        assertEquals(file.getId(), invalidated.getValue().getId());
+        assertEquals("CONTRACT", invalidated.getValue().getBusinessType());
+        assertEquals(30006L, invalidated.getValue().getBusinessId());
+        assertTrue(projectionTransactionActive.get());
         var args = org.mockito.ArgumentCaptor.forClass(RemoveObjectArgs.class);
         verify(minioClient).removeObject(args.capture());
         assertEquals("test-bucket", args.getValue().bucket());

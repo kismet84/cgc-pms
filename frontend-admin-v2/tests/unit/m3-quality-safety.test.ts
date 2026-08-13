@@ -17,6 +17,18 @@ const pageSource = readFileSync(
   resolve(process.cwd(), 'src/pages/delivery/QualitySafetyPage.vue'),
   'utf8',
 )
+const panelSource = [
+  'QualityPlanPanel.vue',
+  'QualityInspectionPanel.vue',
+  'QualityRectificationPanel.vue',
+  'QualityReinspectionPanel.vue',
+  'QualityConsequencePanel.vue',
+]
+  .map((file) =>
+    readFileSync(resolve(process.cwd(), 'src/pages/delivery/quality-safety', file), 'utf8'),
+  )
+  .join('\n')
+const qualitySource = `${pageSource}\n${panelSource}`
 const serviceSource = readFileSync(resolve(process.cwd(), 'src/services/quality.ts'), 'utf8')
 
 function response(data: unknown): Response {
@@ -226,7 +238,7 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain(
       '[item.partyAId, item.partyBId].includes(consequenceForm.partnerId)',
     )
-    expect(pageSource).toContain("canConsequence && issue.responsibleKind === 'PARTNER'")
+    expect(qualitySource).toContain("canConsequence && issue.responsibleKind === 'PARTNER'")
     expect(pageSource).toContain("loadPartners({ pageNo: 1, pageSize: 200, status: 'ENABLE' })")
     expect(pageSource).toContain('整改已提交审批')
     expect(pageSource).toContain('后果已提交审批')
@@ -258,32 +270,32 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain('loadQualityWorkspace(')
     expect(pageSource).not.toContain('scopeProjectIds')
     expect(pageSource).not.toContain('previousSelectedPlanId')
-    expect(pageSource).toContain('@click="selectPlan(plan.id)"')
+    expect(pageSource).toContain('@select="selectPlan"')
+    expect(panelSource).toContain("emit('select', plan.id)")
     expect(pageSource).toContain('query: { ...route.query, planId }')
     expect(pageSource).not.toContain('v-model="inspectionTypeFilter"')
     expect(pageSource).not.toContain('class="quality-page__facts"')
     expect(pageSource).not.toContain('质量安全闭环概览')
     expect(pageSource).not.toContain('当前项目 {{ currentProjectLabel }}')
     expect(pageSource).not.toContain("当前计划 {{ selectedPlan?.planName || '未选择' }}")
-    expect(pageSource).toContain('partnerLabel(issue.responsiblePartnerId)')
-    expect(pageSource.match(/v-else-if="!errorMessage"/g)).toHaveLength(6)
+    expect(qualitySource).toContain('partnerLabel(issue.responsiblePartnerId)')
+    expect(pageSource.match(/v-else-if="!errorMessage"/g)).toHaveLength(1)
+    expect(panelSource.match(/v-else-if="!hasError"/g)).toHaveLength(5)
   })
 
   it('keeps existing business actions in their matching active panels', () => {
     for (const action of [
       "show('plan')",
       "show('inspection')",
-      "show('issue', inspection)",
-      "show('rectification', issue)",
-      'showReinspection(issue)',
-      "show('consequence', issue)",
-      'openTrace(issue)',
+      '@create-issue="show(\'issue\', $event)"',
+      '@rectify="show(\'rectification\', $event)"',
+      '@reinspect="showReinspection"',
+      '@create-consequence="show(\'consequence\', $event)"',
+      '@open-trace="openTrace"',
     ])
       expect(pageSource).toContain(action)
     expect(pageSource).toContain('v-if="activeTab === \'plan\' && canPlan && projectId"')
     expect(pageSource).toContain("activeTab === 'inspection'")
-    expect(pageSource).toContain('v-if="rectificationIssues.length"')
-    expect(pageSource).toContain('v-if="reinspectionIssues.length"')
-    expect(pageSource).toContain('v-if="consequenceIssues.length"')
+    expect(panelSource.match(/v-if="issues.length"/g)).toHaveLength(3)
   })
 })

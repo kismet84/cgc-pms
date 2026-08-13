@@ -1,5 +1,7 @@
 package com.cgcpms.settlement.service;
 
+import static com.cgcpms.common.util.BigDecimalUtils.nvl;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -176,13 +178,13 @@ public class StlSettlementQueryService {
 
         for (StlSettlement settlement : settlements) {
             BigDecimal paidAmount = currentPaidAmounts.getOrDefault(
-                    settlement.getId(), StlSettlementAssembler.nullToZero(settlement.getPaidAmount()));
+                    settlement.getId(), nvl(settlement.getPaidAmount()));
             BigDecimal unpaidAmount = currentPaidAmounts.containsKey(settlement.getId())
                     ? currentUnpaidAmount(settlement, paidAmount)
-                    : StlSettlementAssembler.nullToZero(settlement.getUnpaidAmount());
-            totalContractAmount = totalContractAmount.add(StlSettlementAssembler.nullToZero(settlement.getContractAmount()));
-            totalFinalAmount = totalFinalAmount.add(StlSettlementAssembler.nullToZero(settlement.getFinalAmount()));
-            totalChangeAmount = totalChangeAmount.add(StlSettlementAssembler.nullToZero(settlement.getChangeAmount()));
+                    : nvl(settlement.getUnpaidAmount());
+            totalContractAmount = totalContractAmount.add(nvl(settlement.getContractAmount()));
+            totalFinalAmount = totalFinalAmount.add(nvl(settlement.getFinalAmount()));
+            totalChangeAmount = totalChangeAmount.add(nvl(settlement.getChangeAmount()));
             totalPaidAmount = totalPaidAmount.add(paidAmount);
             totalUnpaidAmount = totalUnpaidAmount.add(unpaidAmount);
             if (SETTLEMENT_DRAFT.equals(settlement.getSettlementStatus())) {

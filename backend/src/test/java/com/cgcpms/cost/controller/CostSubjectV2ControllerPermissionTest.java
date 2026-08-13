@@ -1,7 +1,7 @@
 package com.cgcpms.cost.controller;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class CostSubjectV2ControllerPermissionTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory tokenFactory;
 
     @Test
     @DisplayName("V2查询端点未登录返回401")
@@ -69,7 +69,7 @@ class CostSubjectV2ControllerPermissionTest {
 
     private Cookie cookie(String permission) {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(1L, "cost-v2-test", 0L,
+                tokenFactory.generateToken(1L, "cost-v2-test", 0L,
                         List.of("COMMON_USER"), List.of(permission)));
     }
 }

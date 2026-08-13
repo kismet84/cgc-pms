@@ -3,7 +3,6 @@ package com.cgcpms.cashbook.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.bid.entity.BidCost;
@@ -36,10 +35,8 @@ import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
-import com.cgcpms.file.vo.SysFileVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,18 +44,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
-@RequiredArgsConstructor
 public class CashJournalService {
 
     private final CashJournalEntryMapper entryMapper;
@@ -79,6 +72,48 @@ public class CashJournalService {
     private final BidCostMapper bidCostMapper;
     private final BidDepositMapper bidDepositMapper;
     private final CostSubjectMapper costSubjectMapper;
+    private final CashJournalReadOperations readOperations;
+
+    public CashJournalService(CashJournalEntryMapper entryMapper,
+                              FundAccountMapper fundAccountMapper,
+                              FundAccountService fundAccountService,
+                              CtContractMapper contractMapper,
+                              ProjectAccessChecker projectAccessChecker,
+                              CashJournalChangeLogMapper changeLogMapper,
+                              SysFileMapper sysFileMapper,
+                              ObjectMapper objectMapper,
+                              CashJournalAlertService cashJournalAlertService,
+                              AccountingPeriodGuard periodGuard,
+                              PayRecordMapper payRecordMapper,
+                              PayApplicationMapper payApplicationMapper,
+                              PaymentApplicationSourceService paymentSourceService,
+                              ContractBudgetAllocationService contractBudgetAllocationService,
+                              PaymentArchiveEvidenceService paymentArchiveEvidenceService,
+                              BidCostMapper bidCostMapper,
+                              BidDepositMapper bidDepositMapper,
+                              CostSubjectMapper costSubjectMapper) {
+        this.entryMapper = entryMapper;
+        this.fundAccountMapper = fundAccountMapper;
+        this.fundAccountService = fundAccountService;
+        this.contractMapper = contractMapper;
+        this.projectAccessChecker = projectAccessChecker;
+        this.changeLogMapper = changeLogMapper;
+        this.sysFileMapper = sysFileMapper;
+        this.objectMapper = objectMapper;
+        this.cashJournalAlertService = cashJournalAlertService;
+        this.periodGuard = periodGuard;
+        this.payRecordMapper = payRecordMapper;
+        this.payApplicationMapper = payApplicationMapper;
+        this.paymentSourceService = paymentSourceService;
+        this.contractBudgetAllocationService = contractBudgetAllocationService;
+        this.paymentArchiveEvidenceService = paymentArchiveEvidenceService;
+        this.bidCostMapper = bidCostMapper;
+        this.bidDepositMapper = bidDepositMapper;
+        this.costSubjectMapper = costSubjectMapper;
+        this.readOperations = new CashJournalReadOperations(
+                entryMapper, fundAccountMapper, projectAccessChecker, changeLogMapper,
+                sysFileMapper, bidDepositMapper, costSubjectMapper);
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO createManual(CashJournalCreateRequest request) {
@@ -109,7 +144,7 @@ public class CashJournalService {
         entry.setClosureDueAt(LocalDateTime.now().plusHours(24));
         entry.setVersion(0);
         insertWithEntryNo(entry);
-        return toVO(entry);
+        return readOperations.toVO(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -137,7 +172,7 @@ public class CashJournalService {
                 .eq(CashJournalEntry::getTenantId, tenantId())
                 .eq(CashJournalEntry::getSourceType, CashbookConstants.SourceType.PAY_RECORD)
                 .eq(CashJournalEntry::getSourceId, record.getId()));
-        if (existing != null) return toVO(existing);
+        if (existing != null) return readOperations.toVO(existing);
         periodGuard.assertWritable(record.getPayDate());
 
         CashJournalEntry entry = new CashJournalEntry();
@@ -165,10 +200,10 @@ public class CashJournalService {
                     .eq(CashJournalEntry::getTenantId, tenantId())
                     .eq(CashJournalEntry::getSourceType, CashbookConstants.SourceType.PAY_RECORD)
                     .eq(CashJournalEntry::getSourceId, record.getId()));
-            if (existing != null) return toVO(existing);
+            if (existing != null) return readOperations.toVO(existing);
             throw error;
         }
-        return toVO(entry);
+        return readOperations.toVO(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -225,7 +260,7 @@ public class CashJournalService {
         if (reopened) {
             appendChange(entry, CashbookConstants.ChangeAction.UPDATE_AFTER_REOPEN, null, before, snapshot(entry));
         }
-        return toVO(entry);
+        return readOperations.toVO(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -278,7 +313,7 @@ public class CashJournalService {
             appendChange(entry, CashbookConstants.ChangeAction.REARCHIVE, null, before, snapshot(entry));
         }
         cashJournalAlertService.archiveForEntry(entry);
-        return toVO(entry);
+        return readOperations.toVO(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -322,7 +357,7 @@ public class CashJournalService {
             original.setStatus(CashbookConstants.Status.REVERSED);
             updateEntry(original);
             appendChange(original, CashbookConstants.ChangeAction.REVERSE, reason.trim(), before, snapshot(original));
-            return toVO(original);
+            return readOperations.toVO(original);
         }
         if (!CashbookConstants.Status.ARCHIVED.equals(original.getStatus())
                 || CashbookConstants.SourceType.REVERSAL.equals(original.getSourceType())
@@ -382,7 +417,7 @@ public class CashJournalService {
         applyDepositArchive(reversal);
         appendChange(original, CashbookConstants.ChangeAction.REVERSE, reason.trim(), before,
                 snapshot(Map.of("original", original, "reversal", reversal)));
-        return toVO(reversal);
+        return readOperations.toVO(reversal);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -425,108 +460,32 @@ public class CashJournalService {
         updateEntry(entry);
         revertDepositArchive(entry);
         appendChange(entry, CashbookConstants.ChangeAction.REOPEN, reason.trim(), before, snapshot(entry));
-        return toVO(entry);
+        return readOperations.toVO(entry);
     }
 
     public IPage<CashJournalEntryVO> page(CashJournalQuery query) {
         normalizeQuery(query);
         boolean bidOnly = requireBidQueryScope(query);
-        IPage<CashJournalEntryVO> page = entryMapper.selectPageWithBalance(
-                new Page<>(query.getPageNo(), query.getPageSize()), tenantId(), query,
-                query.getProjectId() == null ? projectAccessChecker.accessibleProjectIds() : List.of(query.getProjectId()));
-        if (bidOnly) page.getRecords().forEach(entry -> entry.setRunningBalance(null));
-        return page;
+        return readOperations.page(query, bidOnly);
     }
 
     @Transactional(readOnly = true)
     public CashJournalSummaryVO summary(CashJournalQuery query) {
         normalizeQuery(query);
         boolean bidOnly = requireBidQueryScope(query);
-        Long tenantId = tenantId();
-        List<Long> accessibleProjectIds = query.getProjectId() == null
-                ? projectAccessChecker.accessibleProjectIds()
-                : List.of(query.getProjectId());
-        CashJournalEntryMapper.CashJournalAggregate aggregate = entryMapper.selectSummaryAggregate(
-                tenantId, baseWrapper(query, accessibleProjectIds));
-        if (aggregate == null) aggregate = CashJournalEntryMapper.CashJournalAggregate.empty();
-        BigDecimal cashOut = aggregate.getCashOut() == null ? BigDecimal.ZERO : aggregate.getCashOut();
-        BigDecimal cashIn = aggregate.getCashIn() == null ? BigDecimal.ZERO : aggregate.getCashIn();
-        BigDecimal actualBidExpense = aggregate.getActualBidExpense() == null
-                ? BigDecimal.ZERO : aggregate.getActualBidExpense();
-
-        CashJournalSummaryVO summary = new CashJournalSummaryVO();
-        if (!bidOnly) {
-            BigDecimal cash = BigDecimal.ZERO;
-            BigDecimal bank = BigDecimal.ZERO;
-            for (FundAccountMapper.AccountTypeBalance account
-                    : fundAccountMapper.selectBalancesByType(tenantId, query.getAccountId(), false)) {
-                if (CashbookConstants.AccountType.CASH.equals(account.getAccountType())) {
-                    cash = cash.add(account.getBalance());
-                }
-                if (CashbookConstants.AccountType.BANK.equals(account.getAccountType())) {
-                    bank = bank.add(account.getBalance());
-                }
-            }
-            summary.setCashBalance(money(cash));
-            summary.setBankBalance(money(bank));
-            summary.setIncome(money(cashIn));
-            summary.setExpense(money(cashOut));
-            summary.setPendingCount(aggregate.getPendingCount() == null ? 0L : aggregate.getPendingCount());
-        }
-        summary.setCumulativeCashOut(money(cashOut));
-        summary.setCumulativeCashIn(money(cashIn));
-        summary.setCashNetOutflow(money(cashOut.subtract(cashIn)));
-        summary.setActualBidExpense(money(actualBidExpense));
-        summary.setOutstandingDeposit(money(outstandingDeposit(tenantId, query.getBidCostId())));
-        return summary;
+        return readOperations.summary(query, bidOnly);
     }
 
     public CashJournalEntryVO getById(Long id) {
         CashJournalEntry entry = requireEntry(id);
         requireBidQueryScope(entry.getBidCostId());
-        CashJournalEntryVO vo = toVO(entry);
-        if (entry.getAccountId() != null) {
-            FundAccount account = fundAccountMapper.selectOne(new LambdaQueryWrapper<FundAccount>()
-                    .eq(FundAccount::getTenantId, tenantId())
-                    .eq(FundAccount::getId, entry.getAccountId()));
-            if (account != null) {
-                vo.setAccountName(account.getAccountName());
-                vo.setAccountType(account.getAccountType());
-            }
-        }
-        vo.setAttachments(sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
-                        .eq(SysFile::getTenantId, tenantId())
-                        .eq(SysFile::getBusinessType, "CASH_JOURNAL")
-                        .eq(SysFile::getBusinessId, id)
-                        .orderByDesc(SysFile::getCreatedAt))
-                .stream().map(this::toFileVO).toList());
-        vo.setChangeLogs(changeLogMapper.selectList(new LambdaQueryWrapper<CashJournalChangeLog>()
-                .eq(CashJournalChangeLog::getTenantId, tenantId())
-                .eq(CashJournalChangeLog::getJournalEntryId, id)
-                .orderByAsc(CashJournalChangeLog::getCreatedAt)));
-        return vo;
+        return readOperations.detail(entry);
     }
 
     public byte[] exportCsv(CashJournalQuery query) {
         normalizeQuery(query);
         requireBidExportScope(query.getBidCostId());
-        List<CashJournalEntry> entries = entryMapper.selectList(baseWrapper(query)
-                .orderByDesc(CashJournalEntry::getBusinessDate)
-                .orderByDesc(CashJournalEntry::getId));
-        StringBuilder csv = new StringBuilder("\uFEFF流水号,业务日期,方向,金额,投标ID,成本科目,状态,来源,摘要,往来单位\r\n");
-        for (CashJournalEntry entry : entries) {
-            csv.append(csv(entry.getEntryNo())).append(',')
-                    .append(entry.getBusinessDate()).append(',')
-                    .append(entry.getDirection()).append(',')
-                    .append(money(entry.getAmount())).append(',')
-                    .append(entry.getBidCostId() == null ? "" : entry.getBidCostId()).append(',')
-                    .append(csv(entry.getCostSubjectNameSnapshot())).append(',')
-                    .append(entry.getStatus()).append(',')
-                    .append(entry.getSourceType()).append(',')
-                    .append(csv(entry.getSummary())).append(',')
-                    .append(csv(entry.getCounterpartyName())).append("\r\n");
-        }
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        return readOperations.exportCsv(query);
     }
 
     public CashJournalEntry requireEntry(Long id) {
@@ -674,11 +633,6 @@ public class CashJournalService {
         }
     }
 
-    private BigDecimal outstandingDeposit(Long tenantId, Long bidCostId) {
-        if (bidCostId == null) return BigDecimal.ZERO;
-        return bidDepositMapper.selectOutstandingTotal(tenantId, bidCostId);
-    }
-
     private boolean requireBidQueryScope(Long bidCostId) {
         boolean bidOnly = isLimitedToBid("bid:cost:query", "cashbook:journal:query");
         if (bidOnly && bidCostId == null) {
@@ -748,72 +702,6 @@ public class CashJournalService {
     }
 
     private record BidContext(BidCost bid, CostSubject subject, BidDeposit deposit) {
-    }
-
-    private LambdaQueryWrapper<CashJournalEntry> baseWrapper(CashJournalQuery query) {
-        List<Long> projectIds = query.getProjectId() == null
-                ? projectAccessChecker.accessibleProjectIds()
-                : List.of(query.getProjectId());
-        return baseWrapper(query, projectIds);
-    }
-
-    private LambdaQueryWrapper<CashJournalEntry> baseWrapper(CashJournalQuery query,
-                                                              List<Long> projectIds) {
-        LambdaQueryWrapper<CashJournalEntry> wrapper = new LambdaQueryWrapper<CashJournalEntry>()
-                .eq(CashJournalEntry::getTenantId, tenantId());
-        if (query.getAccountId() != null) wrapper.eq(CashJournalEntry::getAccountId, query.getAccountId());
-        if (StringUtils.hasText(query.getDirection())) wrapper.eq(CashJournalEntry::getDirection, query.getDirection());
-        if (StringUtils.hasText(query.getStatus())) wrapper.eq(CashJournalEntry::getStatus, query.getStatus());
-        if (StringUtils.hasText(query.getSourceType())) wrapper.eq(CashJournalEntry::getSourceType, query.getSourceType());
-        if (query.getSourceId() != null) wrapper.eq(CashJournalEntry::getSourceId, query.getSourceId());
-        if (query.getProjectId() != null) {
-            wrapper.and(scope -> scope.eq(CashJournalEntry::getProjectId, query.getProjectId())
-                    .or(linked -> linked.isNull(CashJournalEntry::getProjectId)
-                            .exists("SELECT 1 FROM bid_cost b WHERE b.tenant_id=cash_journal_entry.tenant_id "
-                                    + "AND b.id=cash_journal_entry.bid_cost_id AND b.project_id={0} "
-                                    + "AND b.deleted_flag=0", query.getProjectId())));
-        }
-        else {
-            String accessibleBid = "SELECT 1 FROM bid_cost b "
-                    + "WHERE b.tenant_id=cash_journal_entry.tenant_id "
-                    + "AND b.id=cash_journal_entry.bid_cost_id AND b.deleted_flag=0 "
-                    + "AND (b.project_id IS NULL"
-                    + (projectIds.isEmpty() ? "" : " OR b.project_id IN ("
-                    + IntStream.range(0, projectIds.size()).mapToObj(i -> "{" + i + "}")
-                    .collect(Collectors.joining(",")) + ")")
-                    + ")";
-            wrapper.and(scope -> {
-                scope.and(unprojected -> unprojected.isNull(CashJournalEntry::getProjectId)
-                        .and(bid -> bid.isNull(CashJournalEntry::getBidCostId)
-                                .or().exists(accessibleBid, projectIds.toArray())));
-                if (!projectIds.isEmpty()) scope.or().in(CashJournalEntry::getProjectId, projectIds);
-            });
-        }
-        if (query.getContractId() != null) wrapper.eq(CashJournalEntry::getContractId, query.getContractId());
-        if (query.getBidCostId() != null) wrapper.eq(CashJournalEntry::getBidCostId, query.getBidCostId());
-        if (query.getCostSubjectId() != null) wrapper.eq(CashJournalEntry::getCostSubjectId, query.getCostSubjectId());
-        if (query.getBidDepositId() != null) wrapper.eq(CashJournalEntry::getBidDepositId, query.getBidDepositId());
-        if (StringUtils.hasText(query.getCostSubjectRootCode())) {
-            wrapper.exists("SELECT 1 FROM cost_subject child JOIN cost_subject root "
-                    + "ON root.tenant_id=child.tenant_id AND root.id=child.parent_id AND root.deleted_flag=0 "
-                    + "WHERE child.tenant_id=cash_journal_entry.tenant_id "
-                    + "AND child.id=cash_journal_entry.cost_subject_id AND child.deleted_flag=0 "
-                    + "AND root.subject_code={0}", query.getCostSubjectRootCode().trim());
-        }
-        if (query.getBusinessDateStart() != null) wrapper.ge(CashJournalEntry::getBusinessDate, query.getBusinessDateStart());
-        if (query.getBusinessDateEnd() != null) wrapper.le(CashJournalEntry::getBusinessDate, query.getBusinessDateEnd());
-        String attachmentExists = "SELECT 1 FROM sys_file f WHERE f.tenant_id = cash_journal_entry.tenant_id "
-                + "AND f.business_type = 'CASH_JOURNAL' AND f.business_id = cash_journal_entry.id "
-                + "AND f.deleted_flag = 0";
-        if (Boolean.TRUE.equals(query.getHasAttachment())) wrapper.exists(attachmentExists);
-        if (Boolean.FALSE.equals(query.getHasAttachment())) wrapper.notExists(attachmentExists);
-        if (StringUtils.hasText(query.getKeyword())) {
-            String keyword = query.getKeyword().trim();
-            wrapper.and(w -> w.like(CashJournalEntry::getEntryNo, keyword)
-                    .or().like(CashJournalEntry::getSummary, keyword)
-                    .or().like(CashJournalEntry::getCounterpartyName, keyword));
-        }
-        return wrapper;
     }
 
     private void normalizeQuery(CashJournalQuery query) {
@@ -914,43 +802,6 @@ public class CashJournalService {
         }
     }
 
-    private CashJournalEntryVO toVO(CashJournalEntry entry) {
-        CashJournalEntryVO vo = new CashJournalEntryVO();
-        vo.setId(String.valueOf(entry.getId()));
-        vo.setEntryNo(entry.getEntryNo());
-        vo.setAccountId(entry.getAccountId() == null ? null : String.valueOf(entry.getAccountId()));
-        vo.setDirection(entry.getDirection());
-        vo.setAmount(money(entry.getAmount()));
-        vo.setBusinessDate(entry.getBusinessDate());
-        vo.setCounterpartyName(entry.getCounterpartyName());
-        vo.setSummary(entry.getSummary());
-        vo.setProjectId(entry.getProjectId() == null ? null : String.valueOf(entry.getProjectId()));
-        vo.setContractId(entry.getContractId() == null ? null : String.valueOf(entry.getContractId()));
-        vo.setBidCostId(entry.getBidCostId() == null ? null : String.valueOf(entry.getBidCostId()));
-        vo.setCostSubjectId(entry.getCostSubjectId() == null ? null : String.valueOf(entry.getCostSubjectId()));
-        vo.setBidDepositId(entry.getBidDepositId() == null ? null : String.valueOf(entry.getBidDepositId()));
-        vo.setCostSubjectCode(entry.getCostSubjectCodeSnapshot());
-        vo.setCostSubjectName(entry.getCostSubjectNameSnapshot());
-        if (entry.getCostSubjectId() != null) {
-            CostSubject subject = costSubjectMapper.selectById(entry.getCostSubjectId());
-            if (subject != null && Objects.equals(subject.getTenantId(), tenantId())) {
-                vo.setCostSubjectAccountCategory(subject.getAccountCategory());
-            }
-        }
-        vo.setSourceType(entry.getSourceType());
-        vo.setSourceId(entry.getSourceId() == null ? null : String.valueOf(entry.getSourceId()));
-        vo.setStatus(entry.getStatus());
-        vo.setClosureDueAt(entry.getClosureDueAt());
-        vo.setArchivedBy(entry.getArchivedBy() == null ? null : String.valueOf(entry.getArchivedBy()));
-        vo.setArchivedAt(entry.getArchivedAt());
-        vo.setReverseOfEntryId(entry.getReverseOfEntryId() == null ? null : String.valueOf(entry.getReverseOfEntryId()));
-        vo.setReversalEntryId(entry.getReversalEntryId() == null ? null : String.valueOf(entry.getReversalEntryId()));
-        vo.setVersion(entry.getVersion());
-        vo.setCreatedAt(entry.getCreatedAt());
-        vo.setCreatedBy(entry.getCreatedBy() == null ? null : String.valueOf(entry.getCreatedBy()));
-        return vo;
-    }
-
     private boolean isCurrentlyReopened(Long entryId) {
         long reopenCount = reopenCount(entryId);
         long rearchiveCount = changeLogMapper.selectCount(new LambdaQueryWrapper<CashJournalChangeLog>()
@@ -1027,37 +878,14 @@ public class CashJournalService {
         }
     }
 
-    private SysFileVO toFileVO(SysFile file) {
-        SysFileVO vo = new SysFileVO();
-        vo.setId(String.valueOf(file.getId()));
-        vo.setBusinessType(file.getBusinessType());
-        vo.setBusinessId(String.valueOf(file.getBusinessId()));
-        vo.setOriginalName(file.getOriginalName());
-        vo.setFileSize(file.getFileSize());
-        vo.setContentType(file.getContentType());
-        vo.setCreatedAt(file.getCreatedAt() == null ? null : file.getCreatedAt().toString());
-        return vo;
-    }
-
-    private String money(BigDecimal value) {
-        return (value == null ? BigDecimal.ZERO : value).setScale(2).toPlainString();
-    }
-
     private String trimToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private String csv(String value) {
-        if (value == null) return "";
-        String firstNonWhitespace = value.stripLeading();
-        String safe = !firstNonWhitespace.isEmpty() && "=+-@".indexOf(firstNonWhitespace.charAt(0)) >= 0
-                ? "'" + value : value;
-        return '"' + safe.replace("\"", "\"\"") + '"';
-    }
-
-    private Long tenantId() {
+    static Long tenantId() {
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId == null) throw new BusinessException("TENANT_CONTEXT_REQUIRED", "缺少租户上下文");
         return tenantId;
     }
+
 }

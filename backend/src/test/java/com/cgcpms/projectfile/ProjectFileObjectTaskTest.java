@@ -5,12 +5,15 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.service.FileObjectTaskService;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.ProjectFileProjection;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import io.minio.MinioClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,6 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class ProjectFileObjectTaskTest {
@@ -38,7 +42,9 @@ class ProjectFileObjectTaskTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<FileObjectTaskService> self = mock(ObjectProvider.class);
         @SuppressWarnings("unchecked")
-        ObjectProvider<ProjectFileService> projectFiles = mock(ObjectProvider.class);
+        ObjectProvider<ProjectFileProjection> projectFiles = mock(ObjectProvider.class);
+        ProjectFileProjection projection = mock(ProjectFileProjection.class);
+        when(projectFiles.getObject()).thenReturn(projection);
         FileObjectTaskService service = new FileObjectTaskService(
                 jdbc, mock(MinioClient.class), self, projectFiles);
 
@@ -57,6 +63,11 @@ class ProjectFileObjectTaskTest {
                 "SELECT status FROM sys_file_object_task WHERE id=?", String.class, first));
         assertEquals(202L, jdbc.queryForObject(
                 "SELECT reference_id FROM sys_file_object_task WHERE id=?", Long.class, first));
+
+        service.processNow(first);
+        verify(projection).processConversionTask(202L);
+        assertEquals("SUCCEEDED", jdbc.queryForObject(
+                "SELECT status FROM sys_file_object_task WHERE id=?", String.class, first));
     }
 
     @Test
@@ -65,6 +76,44 @@ class ProjectFileObjectTaskTest {
         assertEquals("DIRECT", ProjectFileService.previewKind("photo.bin", "image/png"));
         assertEquals("OOXML", ProjectFileService.previewKind("plan.DOCX", "application/octet-stream"));
         assertEquals("UNSUPPORTED", ProjectFileService.previewKind("legacy.doc", "application/msword"));
+    }
+
+    @Test
+    void invalidationDeletesDerivedPreviewOnlyAfterCommit() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:project_file_invalidation;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.execute("""
+                CREATE TABLE project_file_catalog(
+                    id BIGINT PRIMARY KEY,tenant_id BIGINT,source_kind VARCHAR(20),
+                    deleted_flag INT,updated_at TIMESTAMP)
+                """);
+        jdbc.execute("""
+                CREATE TABLE project_file_version_link(
+                    id BIGINT PRIMARY KEY,tenant_id BIGINT,catalog_id BIGINT,sys_file_id BIGINT,
+                    preview_storage_path VARCHAR(500),deleted_flag INT,updated_at TIMESTAMP)
+                """);
+        jdbc.update("INSERT INTO project_file_catalog VALUES(20,7,'BUSINESS',0,CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO project_file_version_link VALUES(30,7,20,10,'derived/preview.pdf',0,CURRENT_TIMESTAMP)");
+        FileService files = mock(FileService.class);
+        ProjectFileService service = new ProjectFileService(jdbc, mock(ProjectAccessChecker.class),
+                mock(BusinessObjectAuthorizer.class), files, mock(FileObjectTaskService.class),
+                mock(OfficePreviewClient.class));
+        var source = new com.cgcpms.file.entity.SysFile();
+        source.setId(10L);
+        source.setTenantId(7L);
+        TransactionTemplate transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+
+        transaction.executeWithoutResult(status -> {
+            service.invalidateBusinessFile(source);
+            verify(files, never()).deleteDerivedPreviewLater(7L, "derived/preview.pdf");
+        });
+
+        verify(files).deleteDerivedPreviewLater(7L, "derived/preview.pdf");
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT deleted_flag FROM project_file_version_link WHERE id=30", Integer.class));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT deleted_flag FROM project_file_catalog WHERE id=20", Integer.class));
     }
 
     @Test

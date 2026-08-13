@@ -38,6 +38,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -52,6 +54,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -60,6 +63,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -100,6 +104,42 @@ class BusinessObjectAuthorizerTest {
     void tearDown() {
         TestUserContext.clear();
         SecurityContextHolder.clearContext();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "PROJECT", "PROJECT_FILE", "PROJECT_COMMENCEMENT", "COMMUNICATION_MESSAGE",
+            "CONTRACT", "INVOICE", "RECEIPT", "PURCHASE_REQUEST", "PURCHASE_ORDER",
+            "MATERIAL_RECEIPT", "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
+            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
+            "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
+            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION",
+            "QS_INSPECTION", "QS_ISSUE", "QS_RECTIFICATION",
+            "SUPPLIER_SOURCING", "SUPPLIER_QUOTE",
+            "TECH_SCHEME", "TECH_DRAWING_VERSION", "TECH_DRAWING_REVIEW", "TECH_RFI",
+            "TECH_RFI_RESPONSE", "TECH_DISCLOSURE", "TECH_ARCHIVE",
+            "CLOSEOUT_SECTION_ACCEPTANCE", "CLOSEOUT_FINAL_ACCEPTANCE", "CLOSEOUT_DEFECT",
+            "CLOSEOUT_WARRANTY", "CLOSEOUT_ARCHIVE_TRANSFER"
+    })
+    void everyKnownBusinessTypeIsRecognizedBeforeObjectResolution(String businessType) {
+        try {
+            authorizer.checkReadAccess(businessType, Long.MAX_VALUE);
+        } catch (BusinessException error) {
+            assertNotEquals("FILE_BIZ_TYPE_UNKNOWN", error.getCode());
+        }
+    }
+
+    @Test
+    void unknownAndMissingBusinessTypesFailBeforeAuthorityOrObjectLookup() {
+        setAuthentication();
+
+        for (String businessType : new String[] {null, "", " ", "UNKNOWN"}) {
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> authorizer.checkReadAccess(businessType, 1L));
+            assertEquals("FILE_BIZ_TYPE_UNKNOWN", error.getCode());
+        }
+
+        verifyNoInteractions(projectAccessChecker, projectMapper, contractMapper, jdbcTemplate);
     }
 
     @Test

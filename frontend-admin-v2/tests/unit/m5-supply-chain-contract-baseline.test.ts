@@ -189,9 +189,13 @@ describe('M5 supply chain contract baseline', () => {
 
   it('keeps the contract and service UI-free, Legacy-free and read-only', () => {
     const sources = [
-      readFileSync(resolve('../packages/frontend-contracts/src/supply-chain.ts'), 'utf-8'),
-      readFileSync(resolve('src/services/supply-chain.ts'), 'utf-8'),
-    ].join('\n')
+      '../packages/frontend-contracts/src/supply-chain.ts',
+      ...['types', 'support', 'inventory', 'requisition', 'purchase', 'sourcing'].map(
+        (module) => `src/services/supply-chain/${module}.ts`,
+      ),
+    ]
+      .map((file) => readFileSync(resolve(file), 'utf-8'))
+      .join('\n')
 
     expect(sources).not.toMatch(/from ["'](?:vue|pinia|vue-router)/)
     expect(sources).not.toContain('frontend-admin/')

@@ -623,19 +623,9 @@ public class QualitySafetyService {
         projectAccessChecker.checkAccess(issue.getProjectId(), "追溯质量安全整改闭环");
         QualityInspectionPlan plan = requirePlan(issue.getPlanId());
         QualityInspectionRecord inspection = requireInspection(issue.getInspectionId());
-        List<QualityRectification> rectifications = rectificationMapper.selectList(new LambdaQueryWrapper<QualityRectification>()
-                .eq(QualityRectification::getTenantId, tenantId()).eq(QualityRectification::getIssueId, issueId)
-                .orderByAsc(QualityRectification::getRoundNo));
-        QualityConsequence consequence = first(consequenceMapper.selectList(new LambdaQueryWrapper<QualityConsequence>()
-                .eq(QualityConsequence::getTenantId, tenantId()).eq(QualityConsequence::getIssueId, issueId)));
-        QualityPartnerEvaluation evaluation = consequence == null ? null : first(evaluationMapper.selectList(
-                new LambdaQueryWrapper<QualityPartnerEvaluation>()
-                        .eq(QualityPartnerEvaluation::getTenantId, tenantId())
-                        .eq(QualityPartnerEvaluation::getConsequenceId, consequence.getId())
-                        .eq(QualityPartnerEvaluation::getDeletedFlag, 0)));
-        CostItem costItem = consequence == null || consequence.getCostItemId() == null
-                ? null : costItemMapper.selectById(consequence.getCostItemId());
-        return new Trace(plan, inspection, issue, rectifications, consequence, evaluation, costItem);
+        return new QualitySafetyTraceAssembler(
+                rectificationMapper, consequenceMapper, evaluationMapper, costItemMapper)
+                .assemble(tenantId(), plan, inspection, issue);
     }
 
     private void validatePlanCommand(PlanCommand command) {

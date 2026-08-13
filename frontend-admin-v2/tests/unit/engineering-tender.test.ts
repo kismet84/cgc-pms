@@ -7,8 +7,8 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('engineering tender and construction mainline contracts', () => {
   it('publishes exactly two engineering tender menu tabs plus one context detail route', () => {
-    const catalog = read('src/navigation/catalog.ts')
-    const router = read('src/router.ts')
+    const catalog = read('src/navigation/domains/delivery.ts')
+    const router = read('src/router/context-routes.ts')
     expect(catalog).toContain("label: '工程投标'")
     expect(catalog).toContain("label: '投标记录'")
     expect(catalog).toContain("label: '投标成本'")
@@ -34,7 +34,7 @@ describe('engineering tender and construction mainline contracts', () => {
 
   it('uses service-owned status automation without manual controls', () => {
     const detail = read('src/pages/commercial/BidTenderDetailPage.vue')
-    const service = read('src/services/commercial.ts')
+    const service = read('src/services/commercial/bid.ts')
     expect(detail).not.toContain('changeBidStatus')
     expect(detail).toContain('await finalizeBidDocument(bidId.value, version.id)')
     expect(detail).toContain(
