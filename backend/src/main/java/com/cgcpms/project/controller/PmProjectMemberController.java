@@ -3,7 +3,8 @@ package com.cgcpms.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
-import com.cgcpms.project.entity.PmProjectMember;
+import com.cgcpms.project.dto.CreateProjectMemberRequest;
+import com.cgcpms.project.dto.UpdateProjectMemberRequest;
 import com.cgcpms.project.service.PmProjectMemberService;
 import com.cgcpms.project.vo.PmProjectMemberVO;
 import jakarta.validation.Valid;
@@ -38,15 +39,16 @@ public class PmProjectMemberController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:add')")
-    public ApiResponse<Long> create(@PathVariable Long projectId, @Valid @RequestBody PmProjectMember member) {
-        return ApiResponse.success(memberService.create(projectId, member));
+    public ApiResponse<Long> create(@PathVariable Long projectId,
+                                    @Valid @RequestBody CreateProjectMemberRequest request) {
+        return ApiResponse.success(memberService.create(projectId, request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:edit')")
     public ApiResponse<Void> update(@PathVariable Long projectId, @PathVariable Long id,
-                                    @Valid @RequestBody PmProjectMember member) {
-        memberService.update(projectId, id, member);
+                                    @Valid @RequestBody UpdateProjectMemberRequest request) {
+        memberService.update(projectId, id, request);
         return ApiResponse.success();
     }
 

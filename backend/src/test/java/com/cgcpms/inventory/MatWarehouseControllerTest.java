@@ -76,7 +76,23 @@ class MatWarehouseControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(8) @DisplayName("DELETE /inventory/warehouses/{id} -> 200")
+    @Test @Order(8) @DisplayName("POST/PUT /inventory/warehouses rejects invalid status")
+    void testInvalidStatusRejectedOnRegularEndpoints() throws Exception {
+        mockMvc.perform(p("/inventory/warehouses").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"warehouseName\":\"非法状态仓\",\"projectId\":10001,\"status\":\"BROKEN\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WAREHOUSE_STATUS_INVALID"));
+
+        Assertions.assertNotNull(whId);
+        mockMvc.perform(u("/inventory/warehouses/" + whId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"warehouseName\":\"非法状态仓\",\"projectId\":10001,\"status\":\"BROKEN\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("WAREHOUSE_STATUS_INVALID"));
+    }
+
+    @Test @Order(9) @DisplayName("DELETE /inventory/warehouses/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(whId);
         mockMvc.perform(d("/inventory/warehouses/" + whId).cookie(adminCookie()))

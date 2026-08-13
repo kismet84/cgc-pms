@@ -158,8 +158,10 @@ public class MatPurchaseRequestService {
     public Long create(MatPurchaseRequest request) {
         validateProjectRequired(request.getProjectId());
         projectAccessChecker.checkAccess(request.getProjectId(), "创建采购申请");
+        request.setId(null);
         request.setContractId(null);
         request.setPurpose(null);
+        request.setRequestCode(null);
 
         Long tenantId = UserContext.getCurrentTenantId();
         request.setApprovalStatus("DRAFT");
@@ -223,6 +225,8 @@ public class MatPurchaseRequestService {
         request.setContractId(null);
         // purpose 已退出新流程；置空使 MyBatis 不更新历史列。
         request.setPurpose(null);
+        request.setTenantId(existing.getTenantId());
+        request.setRequestCode(null);
 
         requestMapper.updateById(request);
     }
@@ -368,6 +372,8 @@ public class MatPurchaseRequestService {
             item.setId(IdWorker.getId());
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
+            item.setApprovedQuantity(null);
+            item.setApprovalVersion(null);
             // Auto-create material if name provided but no existing materialId
             resolveMaterialId(item, tenantId);
         }

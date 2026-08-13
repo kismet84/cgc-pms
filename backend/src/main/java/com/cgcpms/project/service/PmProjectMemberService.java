@@ -5,12 +5,16 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.project.dto.CreateProjectMemberRequest;
+import com.cgcpms.project.dto.UpdateProjectMemberRequest;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.project.vo.PmProjectMemberVO;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +34,7 @@ public class PmProjectMemberService {
     private final PmProjectMemberMapper memberMapper;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final SysUserMapper sysUserMapper;
 
     /**
      * Verify the project exists and belongs to the current tenant.
@@ -55,7 +60,7 @@ public class PmProjectMemberService {
                .eq(PmProjectMember::getProjectId, projectId);
         if (StringUtils.hasText(roleCode)) wrapper.eq(PmProjectMember::getRoleCode, roleCode);
         if (StringUtils.hasText(status)) wrapper.eq(PmProjectMember::getStatus, status);
-        wrapper.orderByDesc(PmProjectMember::getCreatedTime);
+        wrapper.orderByDesc(PmProjectMember::getCreatedAt);
 
         Page<PmProjectMember> page = memberMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
         return page.convert(this::toVO);
@@ -78,16 +83,21 @@ public class PmProjectMemberService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Long create(Long projectId, PmProjectMember member) {
+    public Long create(Long projectId, CreateProjectMemberRequest request) {
         verifyProjectOwnership(projectId);
-        validateRoleCode(member.getRoleCode(), null);
+        validateRoleCode(request.roleCode(), null);
+        validateTargetUser(request.userId());
 
-        // Set tenant and project from context/path — ignore any client-supplied values
+        PmProjectMember member = new PmProjectMember();
         member.setTenantId(UserContext.getCurrentTenantId());
         member.setProjectId(projectId);
-        if (member.getStatus() == null) {
-            member.setStatus("ACTIVE");
-        }
+        member.setUserId(request.userId());
+        member.setRoleCode(request.roleCode());
+        member.setPositionName(request.positionName());
+        member.setStartDate(request.startDate());
+        member.setEndDate(request.endDate());
+        member.setStatus(request.status() == null ? "ACTIVE" : request.status());
+        member.setRemark(request.remark());
 
         Long existingId = memberMapper.selectIdIncludingDeleted(
                 UserContext.getCurrentTenantId(), projectId, member.getUserId());
@@ -107,7 +117,7 @@ public class PmProjectMemberService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void update(Long projectId, Long id, PmProjectMember member) {
+    public void update(Long projectId, Long id, UpdateProjectMemberRequest request) {
         verifyProjectOwnership(projectId);
 
         PmProjectMember existing = memberMapper.selectById(id);
@@ -120,14 +130,20 @@ public class PmProjectMemberService {
         if (!existing.getProjectId().equals(projectId)) {
             throw new BusinessException("MEMBER_NOT_FOUND", "项目成员不存在");
         }
-        validateRoleCode(member.getRoleCode(), existing.getRoleCode());
+        if (!Objects.equals(request.userId(), existing.getUserId())) {
+            throw new BusinessException("PROJECT_MEMBER_USER_IMMUTABLE", "项目成员用户不可修改");
+        }
+        validateRoleCode(request.roleCode(), existing.getRoleCode());
 
-        // Preserve immutable fields
-        member.setId(id);
-        member.setTenantId(existing.getTenantId());
-        member.setProjectId(existing.getProjectId());
-        member.setUserId(existing.getUserId());
-        memberMapper.updateById(member);
+        PmProjectMember update = new PmProjectMember();
+        update.setId(id);
+        update.setRoleCode(request.roleCode());
+        if (request.positionName() != null) update.setPositionName(request.positionName());
+        if (request.startDate() != null) update.setStartDate(request.startDate());
+        if (request.endDate() != null) update.setEndDate(request.endDate());
+        if (request.status() != null) update.setStatus(request.status());
+        if (request.remark() != null) update.setRemark(request.remark());
+        memberMapper.updateById(update);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -154,6 +170,13 @@ public class PmProjectMemberService {
         throw new BusinessException("PROJECT_MEMBER_ROLE_INVALID", "项目角色必须使用七类项目范围系统角色");
     }
 
+    private void validateTargetUser(Long userId) {
+        SysUser user = sysUserMapper.selectByTenantAndId(UserContext.getCurrentTenantId(), userId);
+        if (user == null || !"ENABLE".equals(user.getStatus())) {
+            throw new BusinessException("PROJECT_MEMBER_USER_INVALID", "项目成员用户不存在、已停用或不属于当前租户");
+        }
+    }
+
     private PmProjectMemberVO toVO(PmProjectMember m) {
         PmProjectMemberVO vo = new PmProjectMemberVO();
         vo.setId(m.getId() != null ? m.getId().toString() : null);
@@ -166,8 +189,8 @@ public class PmProjectMemberService {
         vo.setEndDate(m.getEndDate() != null ? m.getEndDate().toString() : null);
         vo.setStatus(m.getStatus());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedTime() != null ? DateTimeUtils.DTF.format(m.getCreatedTime()) : null);
-        vo.setUpdatedAt(m.getUpdatedTime() != null ? DateTimeUtils.DTF.format(m.getUpdatedTime()) : null);
+        vo.setCreatedAt(m.getCreatedAt() != null ? DateTimeUtils.DTF.format(m.getCreatedAt()) : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? DateTimeUtils.DTF.format(m.getUpdatedAt()) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }

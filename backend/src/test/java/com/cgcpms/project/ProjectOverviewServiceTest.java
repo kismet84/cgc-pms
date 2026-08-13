@@ -13,6 +13,7 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.PaymentTestFixtures;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.dto.CreateProjectMemberRequest;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.service.PmProjectMemberService;
@@ -119,7 +120,7 @@ class ProjectOverviewServiceTest {
             user.setUsername(username);
             user.setRealName(realName);
             user.setPassword("test");
-            user.setStatus("ACTIVE");
+            user.setStatus("ENABLE");
             sysUserMapper.insert(user);
         }
     }
@@ -210,7 +211,9 @@ class ProjectOverviewServiceTest {
             member.setUserId(i == 0 ? TEST_USER_1 : TEST_USER_2);
             member.setRoleCode(i == 0 ? "PROJECT_MANAGER" : "PROJECT_ACCOUNTANT");
             member.setPositionName(i == 0 ? "项目经理" : "项目会计");
-            memberService.create(testProjectId, member);
+            memberService.create(testProjectId, new CreateProjectMemberRequest(
+                    member.getUserId(), member.getRoleCode(), member.getPositionName(),
+                    null, null, null, null));
         }
 
         // ACT: Get overview

@@ -5,6 +5,7 @@ import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.service.AlertEvaluationService;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.contract.dto.CreateContractChangeRequest;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.entity.CtContractItem;
@@ -241,7 +242,7 @@ class Phase3IntegrationTest {
         change.setAfterAmount(currentBefore.add(new BigDecimal("500000.00")));
         change.setReason("钢材价格波动调整");
 
-        Long changeId = changeService.create(change);
+        Long changeId = changeService.create(createChangeRequest(change));
         assertNotNull(changeId, "变更ID不应为空");
 
         // 3. 验证变更已保存
@@ -665,7 +666,7 @@ class Phase3IntegrationTest {
         change.setAfterAmount(new BigDecimal("45300000.00"));
         change.setReason("设计变更增加混凝土用量");
 
-        Long changeId = changeService.create(change);
+        Long changeId = changeService.create(createChangeRequest(change));
         changeService.submitForApproval(changeId);
         WfInstance changeInst = findInstance(WorkflowBusinessTypes.CT_CHANGE, changeId);
         assertNotNull(changeInst);
@@ -880,6 +881,13 @@ class Phase3IntegrationTest {
     // ═══════════════════════════════════════════════════════════
     // 辅助方法
     // ═══════════════════════════════════════════════════════════
+
+    private CreateContractChangeRequest createChangeRequest(CtContractChange change) {
+        return new CreateContractChangeRequest(
+                change.getProjectId(), change.getContractId(), change.getChangeName(),
+                change.getBusinessMatterKey(), change.getChangeType(), change.getBeforeAmount(),
+                change.getChangeAmount(), change.getAfterAmount(), change.getReason(), change.getRemark());
+    }
 
     /** 逐节点审批通过所有待办任务 */
     private void approveAllPendingTasks(Long instanceId) {

@@ -3,6 +3,8 @@ package com.cgcpms.contract.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.contract.dto.CreateContractChangeRequest;
+import com.cgcpms.contract.dto.UpdateContractChangeRequest;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.service.CtContractChangeService;
 import com.cgcpms.contract.vo.CtContractChangeVO;
@@ -41,15 +43,14 @@ public class CtContractChangeController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody CtContractChange change) {
-        return ApiResponse.success(ctContractChangeService.create(change));
+    public ApiResponse<Long> create(@Valid @RequestBody CreateContractChangeRequest request) {
+        return ApiResponse.success(ctContractChangeService.create(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContractChange change) {
-        change.setId(id);
-        ctContractChangeService.update(change);
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody UpdateContractChangeRequest request) {
+        ctContractChangeService.update(id, request);
         return ApiResponse.success();
     }
 

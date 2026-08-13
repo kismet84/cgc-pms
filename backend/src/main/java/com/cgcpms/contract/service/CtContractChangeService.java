@@ -8,6 +8,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.dto.CreateContractChangeRequest;
+import com.cgcpms.contract.dto.UpdateContractChangeRequest;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
@@ -23,6 +25,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -59,13 +62,13 @@ public class CtContractChangeService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Long create(CtContractChange change) {
+    public Long create(CreateContractChangeRequest request) {
         // 校验合同状态：PERFORMING/APPROVED 才允许创建变更
-        CtContract contract = ctContractMapper.selectById(change.getContractId());
+        CtContract contract = ctContractMapper.selectById(request.contractId());
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
-        checkProjectAccess(change.getProjectId(), "创建合同变更");
-        if (!java.util.Objects.equals(contract.getProjectId(), change.getProjectId()))
+        checkProjectAccess(request.projectId(), "创建合同变更");
+        if (!Objects.equals(contract.getProjectId(), request.projectId()))
             throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "合同不属于当前项目");
 
         String contractStatus = contract.getContractStatus();
@@ -74,24 +77,27 @@ public class CtContractChangeService {
             throw new BusinessException("CONTRACT_STATUS_INVALID",
                     "DRAFT 或 TERMINATED 状态的合同禁止创建变更");
 
+        CtContractChange change = new CtContractChange();
+        change.setTenantId(UserContext.getCurrentTenantId());
+        change.setProjectId(request.projectId());
+        change.setContractId(request.contractId());
+        change.setChangeName(request.changeName());
+        change.setBusinessMatterKey(businessMatterRegistryService.normalize(request.businessMatterKey()));
+        change.setChangeType(request.changeType());
+        change.setBeforeAmount(request.beforeAmount());
+        change.setChangeAmount(request.changeAmount());
+        change.setAfterAmount(request.afterAmount());
+        change.setReason(request.reason());
+        change.setRemark(request.remark());
+
         // 自动编号: CC-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         change.setChangeCode(codeGenerationService.nextCode(
                 ctContractChangeMapper, CtContractChange::getChangeCode,
                 "CC-", UserContext.getCurrentTenantId(), true));
 
-        // 默认值
-        if (change.getApprovalStatus() == null || change.getApprovalStatus().isBlank()) {
-            change.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
-        }
-        if (change.getEffectiveFlag() == null) {
-            change.setEffectiveFlag(0);
-        }
-        if (change.getCostGeneratedFlag() == null) {
-            change.setCostGeneratedFlag(0);
-        }
-
-        change.setTenantId(UserContext.getCurrentTenantId());
-        change.setBusinessMatterKey(businessMatterRegistryService.normalize(change.getBusinessMatterKey()));
+        change.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
+        change.setEffectiveFlag(0);
+        change.setCostGeneratedFlag(0);
         ctContractChangeMapper.insert(change);
         businessMatterRegistryService.register(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
                 change.getId(), change.getProjectId(), change.getContractId(), change.getBusinessMatterKey());
@@ -99,23 +105,39 @@ public class CtContractChangeService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void update(CtContractChange change) {
-        CtContractChange existing = ctContractChangeMapper.selectById(change.getId());
+    public void update(Long id, UpdateContractChangeRequest request) {
+        CtContractChange existing = ctContractChangeMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
         checkProjectAccess(existing.getProjectId(), "编辑合同变更");
+
+        if (!Objects.equals(request.projectId(), existing.getProjectId())
+                || !Objects.equals(request.contractId(), existing.getContractId()))
+            throw new BusinessException("CT_CHANGE_RELATION_IMMUTABLE", "合同变更所属项目和合同不可修改");
 
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CT_CHANGE_IN_APPROVAL", "合同变更审批中或已审批，不可编辑");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
-        if (change.getBusinessMatterKey() != null) {
+        String normalizedBusinessMatterKey = null;
+        if (StringUtils.hasText(request.businessMatterKey())) {
             businessMatterRegistryService.replace(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
                     existing.getId(), existing.getProjectId(), existing.getContractId(),
-                    existing.getBusinessMatterKey(), change.getBusinessMatterKey());
-            change.setBusinessMatterKey(businessMatterRegistryService.normalize(change.getBusinessMatterKey()));
+                    existing.getBusinessMatterKey(), request.businessMatterKey());
+            normalizedBusinessMatterKey = businessMatterRegistryService.normalize(request.businessMatterKey());
         }
+
+        CtContractChange change = new CtContractChange();
+        change.setId(id);
+        change.setChangeName(request.changeName());
+        change.setBusinessMatterKey(normalizedBusinessMatterKey);
+        change.setChangeType(request.changeType());
+        change.setBeforeAmount(request.beforeAmount());
+        change.setChangeAmount(request.changeAmount());
+        change.setAfterAmount(request.afterAmount());
+        change.setReason(request.reason());
+        change.setRemark(request.remark());
         ctContractChangeMapper.updateById(change);
     }
 

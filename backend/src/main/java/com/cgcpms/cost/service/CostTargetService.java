@@ -160,6 +160,7 @@ public class CostTargetService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(CostTarget target) {
         PmProject project = lockWritableProject(target.getProjectId(), "创建目标成本");
+        target.setId(null);
         target.setTenantId(UserContext.getCurrentTenantId());
         target.setProjectId(project.getId());
         target.setApprovalStatus("DRAFT");
@@ -381,6 +382,7 @@ public class CostTargetService {
                 if (!subjects.add(item.getCostSubjectId())) throw new BusinessException("COST_TARGET_SUBJECT_DUPLICATE", "同一目标成本版本内成本科目不能重复");
                 requireLeafCostSubject(item.getCostSubjectId(), target.getProjectId());
                 requireEnabledUser(item.getResponsibleUserId());
+                item.setId(null);
                 item.setTargetId(targetId);
                 item.setTenantId(UserContext.getCurrentTenantId());
                 item.setProjectId(target.getProjectId());
