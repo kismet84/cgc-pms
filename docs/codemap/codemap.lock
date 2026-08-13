@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-13T03:33:43.256Z",
+  "generation_time": "2026-08-13T04:02:43.712Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "ac7eacec5b5658ea44afa157f439c6c5aaea9902ad8face249de6708b368aecf"
+      "fingerprint": "9aedef22800d53901b862dff13197820e457fac06dedf9394aaf91f7f3f3d956"
     },
     {
       "id": "desktop_launcher",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 139,
-      "fingerprint": "61fdac7cff649bc21db75a72ccba455b35b38a949fd9ce979c3448c71de9f1e4"
+      "fingerprint": "b15d17089326c0f2212b8eae86c2cb196af004243b01b4567d61befd238c28f0"
     },
     {
       "id": "frontend_v2",
@@ -123,7 +123,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "ff5826653ca39404f31bb2c5e72a4e075683143f923a2b2f8c2bf9f50610bb85"
+      "fingerprint": "ccea5a60e3cfeb9fc74b5540a6956af572cd51847527cf438efe5ea49945316a"
     },
     {
       "id": "shared_packages",
@@ -134,11 +134,11 @@
       "fingerprint": "e719fda3f054adb4f1e6ace4237decef109220ae0ea7d5efd74254f1f4c42aec"
     }
   ],
-  "generation_base_commit": "4ed199de9a97e609f919b7f3a871c5b2cf2247e3",
+  "generation_base_commit": "0c16b3ba7636934a76357e39fb70b34a97716aad",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "afc8b74ff483ba8fd1955f11d31276d917727d01",
+    "previous_generation_base_commit": "0c16b3ba7636934a76357e39fb70b34a97716aad",
     "stale_modules": [
       "documentation"
     ],

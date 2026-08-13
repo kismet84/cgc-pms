@@ -4,7 +4,7 @@
 
 > 编制日期：2026-08-13
 >
-> 计划状态：`LOCAL_G0-G5_PASS / GIT_DELIVERY_MERGED / REUSED_PUSH_CI`
+> 计划状态：`IMPLEMENTATION_GIT_MERGED / CLOSEOUT_FIX_LOCAL_PASS / EXACT_SHA_CI_PENDING`
 >
 > 审计与实施基线：`master@afc8b74ff483ba8fd1955f11d31276d917727d01`；任务分支 `codex/mainline-93-audit-field-hardening`
 >
@@ -288,4 +288,6 @@ git diff --check
 - 实现源 HEAD `c1eb9c0eb4465996c8706b57944b05512c38ea02` 的 push CI run `31663379551` 完整通过，pre-PR exact-SHA verifier 为 `PASS`。
 - 实现 PR #441 的 PR run `31664096721` 成功复用同 SHA push 证据；受保护 squash 合并 SHA 为 `4ed199de9a97e609f919b7f3a871c5b2cf2247e3`。
 - Post-merge run `31664155763` 通过；verifier 为 `PASS / REUSED_PUSH_CI`，源树与合并树同为 `cdda49e1ea769e0b6b28a6f0d425ffde918464af`。
-- 当前结论：`LOCAL_G0-G5_PASS / GIT_DELIVERY_MERGED / REUSED_PUSH_CI`；不扩展为生产、Tag 或 Release 裁决。
+- 独立收口分支首次 push CI run `31664340025` 唯一失败项为 `reliability-contracts`：MySQL/MinIO 备份均已完成，`backup-batch.sh` 在 `pipefail` 下用 `head` 截断多行 `mc --version` 时发生 SIGPIPE；4096 行探针将旧管道稳定复现为退出码 141。该项分类 `quality_or_security`，已改为完整采集后由 shell 内建提取首行，并以原子性契约、运行部署契约和真实恢复演练复验；原失败 run 保留，新 SHA 重新执行完整 CI。
+- 交付中新发现 1 项，已本轮修复并复验；正式承接 0、未收口 0，后续项净变化仍为 `0`。
+- 当前结论：实现交付为 `LOCAL_G0-G5_PASS / GIT_DELIVERY_MERGED / REUSED_PUSH_CI`；收口可靠性修复为 `LOCAL_PASS / EXACT_SHA_CI_PENDING`，完整受保护交付完成前不得将当前分支裁为已合并；不扩展为生产、Tag 或 Release 裁决。
