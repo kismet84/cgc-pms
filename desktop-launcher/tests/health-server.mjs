@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const [modePath, readyPath, portText = '55173'] = process.argv.slice(2)
+const [modePath, readyPath, portText = '0'] = process.argv.slice(2)
 if (!modePath || !readyPath) throw new Error('modePath and readyPath are required')
 
 const server = createServer((request, response) => {
@@ -25,5 +25,5 @@ server.on('error', (error) => {
   writeFileSync(readyPath, `ERROR:${error.code ?? error.message}`)
   process.exitCode = 1
 })
-server.listen(Number(portText), '127.0.0.1', () => writeFileSync(readyPath, String(process.pid)))
+server.listen(Number(portText), '127.0.0.1', () => writeFileSync(readyPath, String(server.address().port)))
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)))

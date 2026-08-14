@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,6 +82,9 @@ class ProjectOverviewServiceTest {
     @Autowired
     private SysUserMapper sysUserMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private Long testProjectId;
 
     @BeforeEach
@@ -123,6 +127,23 @@ class ProjectOverviewServiceTest {
             user.setStatus("ENABLE");
             sysUserMapper.insert(user);
         }
+    }
+
+    private void ensureProjectRoleAssignment(Long userId, String roleCode) {
+        Long roleId = jdbcTemplate.queryForObject("""
+                SELECT id FROM sys_role
+                 WHERE tenant_id = ? AND role_code = ? AND deleted_flag = 0
+                """, Long.class, TENANT_0, roleCode);
+        assertNotNull(roleId, "项目角色夹具必须存在");
+        jdbcTemplate.update("UPDATE sys_role SET status='ENABLE', data_scope='PROJECT_MEMBER' WHERE id=?", roleId);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id, tenant_id, user_id, role_id)
+                SELECT ?, ?, ?, ?
+                 WHERE NOT EXISTS (
+                       SELECT 1 FROM sys_user_role
+                        WHERE tenant_id = ? AND user_id = ? AND role_id = ?
+                 )
+                """, IdWorker.getId(), TENANT_0, userId, roleId, TENANT_0, userId, roleId);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -205,6 +226,8 @@ class ProjectOverviewServiceTest {
         // Create members with real users
         ensureTestUser(TEST_USER_1, "user1", "张三");
         ensureTestUser(TEST_USER_2, "user2", "李四");
+        ensureProjectRoleAssignment(TEST_USER_1, "PROJECT_MANAGER");
+        ensureProjectRoleAssignment(TEST_USER_2, "PROJECT_ACCOUNTANT");
 
         for (int i = 0; i < 2; i++) {
             PmProjectMember member = new PmProjectMember();

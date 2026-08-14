@@ -4,6 +4,7 @@ import type {
   CostBreakdownVO,
   CostManagerDashboardVO,
   FinanceDashboardVO,
+  ManagementDashboardVO,
   ProjectManagerDashboardVO,
 } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
@@ -223,6 +224,50 @@ const financeData: FinanceDashboardVO = {
   ],
 }
 
+const managementData: ManagementDashboardVO = {
+  activeProjectCount: 6,
+  totalContractAmount: '6000000.00',
+  totalDynamicCost: '4800000.00',
+  totalExpectedProfit: '1200000.00',
+  totalPaidAmount: '2000000.00',
+  totalPendingTaskCount: 8,
+  totalRiskCount: 2,
+  unavailableMetrics: [],
+  projectRankings: Array.from({ length: 6 }, (_, index) => ({
+    projectId: String(index + 1),
+    projectName: `排名项目${index + 1}`,
+    projectCode: `PJ-${index + 1}`,
+    status: 'ACTIVE',
+    targetCost: '800000.00',
+    dynamicCost: '780000.00',
+    contractIncome: '1000000.00',
+    expectedProfit: String(200000 - index * 10000),
+    costDeviation: '-20000.00',
+    paidAmount: '300000.00',
+    contractAmount: '1000000.00',
+    pendingTaskCount: index,
+    riskCount: 0,
+  })),
+  metricSources: [],
+  majorRisks: [],
+  overdueItems: [
+    {
+      taskId: 'T-1',
+      instanceId: 'I-1',
+      businessType: 'CONTRACT',
+      businessId: 'C-1',
+      title: '合同审批逾期',
+      itemSummary: '施工合同审批',
+      taskStatus: 'PENDING',
+      receivedAt: '2026-07-01 10:00:00',
+      ownerName: '成本经理',
+      pendingDays: 9,
+      projectId: '1',
+      projectName: '项目一',
+    },
+  ],
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((resolvePromise) => {
@@ -231,14 +276,17 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-async function mountDashboard(permissions: string[]) {
+async function mountDashboard(
+  permissions: string[],
+  options: { roles?: string[]; path?: string } = {},
+) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const session = useSessionStore()
   session.userInfo = {
     userId: '1',
     username: 'tester',
-    roles: ['USER'],
+    roles: options.roles ?? ['USER'],
     permissions: ['dashboard:view', ...permissions],
   }
   session.status = 'authenticated'
@@ -254,13 +302,13 @@ async function mountDashboard(permissions: string[]) {
     history: createMemoryHistory(),
     routes: [{ path: '/dashboard', component: DashboardPage }],
   })
-  await router.push('/dashboard')
+  await router.push(options.path ?? '/dashboard')
   await router.isReady()
   const wrapper = mount(DashboardPage, {
     global: { plugins: [pinia, router], stubs: { teleport: true } },
   })
   await flushPromises()
-  return { wrapper, workspace }
+  return { wrapper, workspace, router }
 }
 
 beforeEach(() => {
@@ -320,7 +368,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.find('[aria-label="驾驶舱角色视图"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('待处理任务')
     expect(wrapper.text()).toContain('2')
-    expect(wrapper.text()).toContain('项目经营健康评分')
+    expect(wrapper.text()).toContain('项目履约健康概览')
     expect(wrapper.get('.health-score').attributes('aria-label')).toContain('分数越高越健康')
     expect(wrapper.get('.health-score__value strong').text()).toMatch(/^\d+$/)
     expect(wrapper.text()).toContain('经营动态')
@@ -329,6 +377,87 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('预警列表')
     expect(wrapper.get('.command-panel__title .v2-button--secondary').text()).toBe('查看最高风险')
     expect(wrapper.find('.highest-risk .v2-button').exists()).toBe(false)
+  })
+
+  it('consumes the canonical persona query without expanding its data permission', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(pmData)
+    const { wrapper, router } = await mountDashboard(['dashboard:project-manager:view'], {
+      roles: ['SAFETY_LEAD'],
+      path: '/dashboard?persona=SAFETY_LEAD&role=pm',
+    })
+
+    expect(router.currentRoute.value.query).toMatchObject({ persona: 'SAFETY_LEAD', role: 'pm' })
+    expect(loadDashboard).toHaveBeenCalledWith(
+      'pm',
+      { projectId: '1', period: '2026-07' },
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.text()).toContain('安全负责人驾驶舱')
+    expect(wrapper.text()).toContain('关注质量安全风险、整改任务与闭环时效')
+    expect(wrapper.text()).toContain('安全闭环健康概览')
+    expect(wrapper.text()).toContain('质量安全预警')
+  })
+
+  it('renders nine persona lenses and bounded management ranking and overdue context', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(managementData)
+    vi.mocked(loadAlerts).mockResolvedValue({
+      records: [
+        {
+          id: 'M-1',
+          projectId: '1',
+          ruleType: 'DYNAMIC_COST_EXCEEDS_TARGET',
+          severity: 'HIGH',
+          message: '成本超标风险',
+          triggeredAt: '2026-07-20 10:00:00',
+          isRead: 0,
+          processStatus: 'OPEN',
+        },
+        {
+          id: 'M-2',
+          projectId: '1',
+          ruleType: 'CONTRACT_OVERDUE',
+          severity: 'HIGH',
+          message: '合同到期风险',
+          triggeredAt: '2026-07-21 10:00:00',
+          isRead: 0,
+          processStatus: 'OPEN',
+        },
+      ],
+      total: 2,
+      pageNo: 1,
+      pageSize: 50,
+    })
+    const { wrapper, router } = await mountDashboard(['*'], {
+      roles: ['SUPER_ADMIN'],
+      path: '/dashboard?persona=COMPANY_OWNER&role=mgmt',
+    })
+    const push = vi.spyOn(router, 'push').mockResolvedValue(undefined)
+
+    expect(wrapper.get('[aria-label="驾驶舱角色视图"]').findAll('button')).toHaveLength(9)
+    expect(wrapper.text()).toContain('公司老板驾驶舱')
+    expect(wrapper.text()).toContain('项目排名（按预计利润）')
+    expect(wrapper.get('.dashboard-activity-list').text()).toContain('排名项目5')
+    expect(wrapper.get('.dashboard-activity-list').text()).not.toContain('排名项目6')
+    expect(wrapper.get('.management-overdue-panel').text()).toContain('合同审批逾期')
+    expect(wrapper.get('.management-overdue-panel').text()).toContain('施工合同审批')
+    expect(wrapper.get('.management-overdue-panel').text()).toContain('项目一')
+    expect(wrapper.get('.management-overdue-panel').text()).toContain('9 天')
+    expect(wrapper.get('.management-overdue-panel').text()).toContain('只读监督')
+
+    await wrapper.get('.risk-filter--type select').setValue('合同超期')
+    expect(wrapper.get('#risk-list').text()).toContain('合同到期风险')
+    expect(wrapper.get('#risk-list').text()).not.toContain('成本超标风险')
+
+    await wrapper.get('[aria-label="审批事项：合同审批逾期"]').trigger('click')
+    expect(push).toHaveBeenCalledWith({
+      path: '/approval/instances/I-1',
+      query: { returnTab: 'todo' },
+    })
+    const viewAll = wrapper.findAll('button').find((button) => button.text() === '查看全部项目')
+    expect(viewAll).toBeDefined()
+    await viewAll!.trigger('click')
+    expect(push).toHaveBeenCalledWith({ path: '/project/list', query: { period: '2026-07' } })
   })
 
   it('refreshes the dashboard and reports success', async () => {

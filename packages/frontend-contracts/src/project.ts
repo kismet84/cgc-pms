@@ -43,7 +43,10 @@ export interface ProjectMember {
   tenantId: string;
   projectId: string;
   userId: string;
+  username?: string | null;
+  realName?: string | null;
   roleCode: string;
+  roleName?: string | null;
   positionName?: string | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -58,6 +61,29 @@ export interface ProjectMemberBrief {
   userId: string;
   userName: string;
   roleCode: string;
+}
+
+export interface ProjectMemberRoleOption {
+  roleCode: string;
+  roleName: string;
+}
+
+export interface ProjectMemberUserOption {
+  userId: string;
+  username: string;
+  realName?: string | null;
+  roleCodes: string[];
+}
+
+export interface ProjectMemberOptions {
+  roles: ProjectMemberRoleOption[];
+  users: ProjectMemberUserOption[];
+  usersTruncated: boolean;
+}
+
+export interface ProjectMemberOptionQuery {
+  keyword?: string;
+  includeUserId?: string;
 }
 
 export interface ProjectOverview {
@@ -173,6 +199,8 @@ export const PROJECT_API = {
     `/projects/${encodeURIComponent(projectId)}/overview`,
   members: (projectId: string) =>
     `/projects/${encodeURIComponent(projectId)}/members`,
+  memberOptions: (projectId: string) =>
+    `/projects/${encodeURIComponent(projectId)}/members/options`,
   member: (projectId: string, memberId: string) =>
     `/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(memberId)}`,
   archive: (projectId: string) =>

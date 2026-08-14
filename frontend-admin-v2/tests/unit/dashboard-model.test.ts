@@ -11,9 +11,29 @@ import {
   formatRatio,
   normalizeGaugeValue,
   primaryRiskItems,
+  resolveDashboardPersonas,
+  resolvePersonaDashboardRole,
 } from '@/pages/dashboard/model'
 
 describe('dashboard display model', () => {
+  it('maps nine canonical personas onto permitted dashboard data views', () => {
+    expect(resolveDashboardPersonas(['SAFETY_LEAD'], [], ['pm'])).toEqual(['SAFETY_LEAD'])
+    expect(resolvePersonaDashboardRole('SAFETY_LEAD', ['pm'])).toBe('pm')
+    expect(
+      resolveDashboardPersonas(
+        ['SUPER_ADMIN'],
+        ['*'],
+        ['pm', 'bm', 'cost', 'purchase', 'production', 'chiefEngineer', 'finance', 'mgmt'],
+      ),
+    ).toHaveLength(9)
+  })
+
+  it('falls back to the permitted data role for legacy accounts without a canonical persona', () => {
+    expect(resolveDashboardPersonas(['USER'], [], ['chiefEngineer'])).toEqual(['TECHNICAL_LEAD'])
+    expect(resolveDashboardPersonas(['SAFETY_LEAD'], [], ['mgmt'])).toEqual(['COMPANY_OWNER'])
+    expect(resolvePersonaDashboardRole('PROJECT_ACCOUNTANT', ['bm', 'cost'], 'bm')).toBe('bm')
+  })
+
   it('maps INFO alerts to the styled other risk level', () => {
     expect(alertRiskLevel('INFO')).toBe('other')
   })

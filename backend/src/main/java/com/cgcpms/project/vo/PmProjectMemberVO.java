@@ -9,7 +9,10 @@ public class PmProjectMemberVO {
     private String tenantId;
     private String projectId;
     private String userId;
+    private String username;
+    private String realName;
     private String roleCode;
+    private String roleName;
     private String positionName;
     private String startDate;
     private String endDate;

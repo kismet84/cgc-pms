@@ -45,21 +45,31 @@ function Test-PrPushCiEvidence {
   if ([string]$PullRequest.head.repo.full_name -ne $ExpectedRepository) {
     throw "PR_PUSH_CI_FORK_REQUIRES_FULL: $($PullRequest.head.repo.full_name)"
   }
-  $controlPlaneChanges = @($ChangedFiles | Where-Object {
-    $path = [string]$_.filename
-    $path.StartsWith('.github/workflows/') -or
-      $path.StartsWith('.github/actions/') -or
-      $path -eq '.github/CODEOWNERS' -or
-      $path -eq 'backend/pom.xml' -or
-      $path -eq 'frontend-admin-v2/package.json' -or
-      $path -eq 'frontend-admin-v2/playwright.config.ts' -or
-      $path.StartsWith('frontend-admin-v2/scripts/') -or
-      $path.StartsWith('scripts/ci/') -or
-      $path -eq 'scripts/codex-autopilot/verify-pre-pr-ci.ps1' -or
-      $path -eq 'scripts/codex-autopilot/codex-autopilot.config.json' -or
-      $path -eq '.agents/skills/cgc-pms-ci-gate-triage/SKILL.md' -or
-      $path -eq 'scripts/check-sql-safety.ps1'
-  } | ForEach-Object { [string]$_.filename })
+  $declaredChangedFileCount = [int]$PullRequest.changed_files
+  if ($declaredChangedFileCount -ge 3000 -or $ChangedFiles.Count -ne $declaredChangedFileCount) {
+    throw "PR_PUSH_CI_CHANGED_FILES_INCOMPLETE: declared=$declaredChangedFileCount, collected=$($ChangedFiles.Count), api_limit=3000"
+  }
+  $controlPlaneChanges = @($ChangedFiles | ForEach-Object {
+    foreach ($candidatePath in @($_.filename, $_.previous_filename)) {
+      $path = [string]$candidatePath
+      if ([string]::IsNullOrWhiteSpace($path)) { continue }
+      if ($path.StartsWith('.github/workflows/') -or
+          $path.StartsWith('.github/actions/') -or
+          $path -eq '.github/CODEOWNERS' -or
+          $path -eq 'backend/pom.xml' -or
+          $path -eq 'frontend-admin-v2/package.json' -or
+          $path -eq 'frontend-admin-v2/playwright.config.ts' -or
+          $path.StartsWith('frontend-admin-v2/scripts/') -or
+          $path.StartsWith('scripts/ci/') -or
+          $path.StartsWith('scripts/codemap/') -or
+          $path -eq 'scripts/codex-autopilot/verify-pre-pr-ci.ps1' -or
+          $path -eq 'scripts/codex-autopilot/codex-autopilot.config.json' -or
+          $path -eq '.agents/skills/cgc-pms-ci-gate-triage/SKILL.md' -or
+          $path -eq 'scripts/check-sql-safety.ps1') {
+        $path
+      }
+    }
+  } | Sort-Object -Unique)
   if ($controlPlaneChanges.Count -gt 0) {
     throw "PR_PUSH_CI_CONTROL_PLANE_CHANGED: $($controlPlaneChanges -join ', ')"
   }

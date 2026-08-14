@@ -4,10 +4,11 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'verify-pr-push-evidence.ps1')
 
-function New-PullRequest([string]$HeadSha,[string]$BaseSha,[string]$Repository='kismet84/cgc-pms',[string]$Branch='codex/example') {
+function New-PullRequest([string]$HeadSha,[string]$BaseSha,[string]$Repository='kismet84/cgc-pms',[string]$Branch='codex/example',[int]$ChangedFiles=1) {
   return [pscustomobject]@{
     number = 7
     state = 'open'
+    changed_files = $ChangedFiles
     head = [pscustomobject]@{ sha=$HeadSha; ref=$Branch; repo=[pscustomobject]@{ full_name=$Repository } }
     base = [pscustomobject]@{ sha=$BaseSha; ref='master' }
   }
@@ -52,6 +53,10 @@ if ($result.status -ne 'PASS' -or $result.mode -ne 'REUSED_PUSH_CI' -or $result.
 
 $fork = $arguments.Clone(); $fork.PullRequest = New-PullRequest $headSha $baseSha 'outside/fork'
 Assert-Rejected { Test-PrPushCiEvidence @fork } 'PR_PUSH_CI_FORK_REQUIRES_FULL'
+$truncatedFiles = $arguments.Clone(); $truncatedFiles.PullRequest = New-PullRequest $headSha $baseSha $repository 'codex/example' 2
+Assert-Rejected { Test-PrPushCiEvidence @truncatedFiles } 'PR_PUSH_CI_CHANGED_FILES_INCOMPLETE.*declared=2, collected=1'
+$apiLimitFiles = $arguments.Clone(); $apiLimitFiles.PullRequest = New-PullRequest $headSha $baseSha $repository 'codex/example' 3000
+Assert-Rejected { Test-PrPushCiEvidence @apiLimitFiles } 'PR_PUSH_CI_CHANGED_FILES_INCOMPLETE.*api_limit=3000'
 $behind = $arguments.Clone(); $behind.Comparison = [pscustomobject]@{ behind_by=1 }
 Assert-Rejected { Test-PrPushCiEvidence @behind } 'PR_PUSH_CI_HEAD_BEHIND_BASE'
 $controlPlane = $arguments.Clone(); $controlPlane.ChangedFiles = @([pscustomobject]@{ filename='.github/workflows/ci.yml' })
@@ -60,6 +65,15 @@ $selectorControlPlane = $arguments.Clone(); $selectorControlPlane.ChangedFiles =
 Assert-Rejected { Test-PrPushCiEvidence @selectorControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
 $frontendScriptControlPlane = $arguments.Clone(); $frontendScriptControlPlane.ChangedFiles = @([pscustomobject]@{ filename='frontend-admin-v2/scripts/generate-route-ledger.mjs' })
 Assert-Rejected { Test-PrPushCiEvidence @frontendScriptControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
+foreach ($codemapPath in @('scripts/codemap/generate-codemap.mjs','scripts/codemap/test-generate-codemap.mjs')) {
+  $codemapControlPlane = $arguments.Clone(); $codemapControlPlane.ChangedFiles = @([pscustomobject]@{ filename=$codemapPath })
+  Assert-Rejected { Test-PrPushCiEvidence @codemapControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED'
+}
+$renamedControlPlane = $arguments.Clone(); $renamedControlPlane.ChangedFiles = @([pscustomobject]@{
+  filename='frontend-admin-v2/src/pages/renamed-control-plane.mjs'
+  previous_filename='scripts/codemap/generate-codemap.mjs'
+})
+Assert-Rejected { Test-PrPushCiEvidence @renamedControlPlane } 'PR_PUSH_CI_CONTROL_PLANE_CHANGED.*scripts/codemap/generate-codemap.mjs'
 $wrongHead = $arguments.Clone(); $wrongHead.PullRequest = New-PullRequest ('c' * 40) $baseSha
 Assert-Rejected { Test-PrPushCiEvidence @wrongHead } 'PR_PUSH_CI_HEAD_MISMATCH'
 $wrongBase = $arguments.Clone(); $wrongBase.PullRequest = New-PullRequest $headSha ('d' * 40)

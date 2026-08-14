@@ -12,8 +12,12 @@ import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.project.vo.PmProjectMemberOptionsVO;
+import com.cgcpms.project.vo.PmProjectMemberRoleRowVO;
 import com.cgcpms.project.vo.PmProjectMemberVO;
+import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
@@ -24,17 +28,34 @@ import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PmProjectMemberService {
 
+    private static final List<String> PROJECT_ROLE_ORDER = List.of(
+            SystemRoleContract.PROJECT_MANAGER,
+            SystemRoleContract.PROJECT_ACCOUNTANT,
+            SystemRoleContract.TECHNICAL_LEAD,
+            SystemRoleContract.SAFETY_LEAD,
+            SystemRoleContract.CONSTRUCTION_LEAD,
+            SystemRoleContract.PROCUREMENT_LEAD,
+            SystemRoleContract.EMPLOYEE);
+
     private final PmProjectMemberMapper memberMapper;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final SysUserMapper sysUserMapper;
+    private final SysRoleMapper sysRoleMapper;
 
     /**
      * Verify the project exists and belongs to the current tenant.
@@ -63,7 +84,24 @@ public class PmProjectMemberService {
         wrapper.orderByDesc(PmProjectMember::getCreatedAt);
 
         Page<PmProjectMember> page = memberMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-        return page.convert(this::toVO);
+        if (page.getRecords().isEmpty()) return page.convert(member -> toVO(member, null, null));
+
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<Long> userIds = page.getRecords().stream()
+                .map(PmProjectMember::getUserId).filter(Objects::nonNull).distinct().toList();
+        List<String> roleCodes = page.getRecords().stream()
+                .map(PmProjectMember::getRoleCode).filter(StringUtils::hasText).distinct().toList();
+        Map<Long, SysUser> users = userIds.isEmpty() ? Map.of() : sysUserMapper.selectList(
+                        new LambdaQueryWrapper<SysUser>()
+                                .eq(SysUser::getTenantId, tenantId)
+                                .in(SysUser::getId, userIds))
+                .stream().collect(Collectors.toMap(SysUser::getId, Function.identity()));
+        Map<String, SysRole> roles = roleCodes.isEmpty() ? Map.of() : sysRoleMapper.selectList(
+                        new LambdaQueryWrapper<SysRole>()
+                                .eq(SysRole::getTenantId, tenantId)
+                                .in(SysRole::getRoleCode, roleCodes))
+                .stream().collect(Collectors.toMap(SysRole::getRoleCode, Function.identity()));
+        return page.convert(member -> toVO(member, users.get(member.getUserId()), roles.get(member.getRoleCode())));
     }
 
     public PmProjectMemberVO getById(Long projectId, Long id) {
@@ -79,7 +117,56 @@ public class PmProjectMemberService {
         if (!member.getProjectId().equals(projectId)) {
             throw new BusinessException("MEMBER_NOT_FOUND", "项目成员不存在");
         }
-        return toVO(member);
+        SysUser user = sysUserMapper.selectByTenantAndId(UserContext.getCurrentTenantId(), member.getUserId());
+        SysRole role = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getTenantId, UserContext.getCurrentTenantId())
+                .eq(SysRole::getRoleCode, member.getRoleCode()));
+        return toVO(member, user, role);
+    }
+
+    public PmProjectMemberOptionsVO getOptions(Long projectId) {
+        return getOptions(projectId, "", null);
+    }
+
+    public PmProjectMemberOptionsVO getOptions(Long projectId, String keyword, Long includeUserId) {
+        verifyProjectOwnership(projectId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        if (normalizedKeyword.length() > 100) {
+            throw new BusinessException("PROJECT_MEMBER_SEARCH_INVALID", "候选成员搜索词不能超过100个字符");
+        }
+        if (includeUserId != null && memberMapper.selectCount(
+                new LambdaQueryWrapper<PmProjectMember>()
+                        .eq(PmProjectMember::getTenantId, tenantId)
+                        .eq(PmProjectMember::getProjectId, projectId)
+                        .eq(PmProjectMember::getUserId, includeUserId)) == 0) {
+            throw new BusinessException("MEMBER_NOT_FOUND", "项目成员不存在");
+        }
+        List<PmProjectMemberOptionsVO.RoleOption> roles = sysRoleMapper.selectList(
+                        new LambdaQueryWrapper<SysRole>()
+                                .eq(SysRole::getTenantId, tenantId)
+                                .eq(SysRole::getStatus, "ENABLE")
+                                .eq(SysRole::getDataScope, "PROJECT_MEMBER")
+                                .in(SysRole::getRoleCode, PROJECT_ROLE_ORDER))
+                .stream()
+                .sorted(Comparator.comparingInt(role -> PROJECT_ROLE_ORDER.indexOf(role.getRoleCode())))
+                .map(role -> new PmProjectMemberOptionsVO.RoleOption(role.getRoleCode(), role.getRoleName()))
+                .toList();
+
+        Map<Long, CandidateBuilder> candidates = new LinkedHashMap<>();
+        Long includedCandidateUserId = includeUserId == null ? -1L : includeUserId;
+        for (PmProjectMemberRoleRowVO row : memberMapper.selectEnabledProjectRoleRows(
+                tenantId, projectId, normalizedKeyword, includedCandidateUserId)) {
+            CandidateBuilder candidate = candidates.computeIfAbsent(row.getUserId(), ignored ->
+                    new CandidateBuilder(row.getUserId(), row.getUsername(), row.getRealName()));
+            candidate.roleCodes.add(row.getRoleCode());
+        }
+        boolean usersTruncated = candidates.size() > 100;
+        List<PmProjectMemberOptionsVO.UserOption> users = candidates.values().stream()
+                .limit(100)
+                .map(CandidateBuilder::toVO)
+                .toList();
+        return new PmProjectMemberOptionsVO(roles, users, usersTruncated);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -87,6 +174,7 @@ public class PmProjectMemberService {
         verifyProjectOwnership(projectId);
         validateRoleCode(request.roleCode(), null);
         validateTargetUser(request.userId());
+        validateAssignableRole(request.userId(), request.roleCode());
 
         PmProjectMember member = new PmProjectMember();
         member.setTenantId(UserContext.getCurrentTenantId());
@@ -134,6 +222,12 @@ public class PmProjectMemberService {
             throw new BusinessException("PROJECT_MEMBER_USER_IMMUTABLE", "项目成员用户不可修改");
         }
         validateRoleCode(request.roleCode(), existing.getRoleCode());
+        boolean roleChanged = !Objects.equals(request.roleCode(), existing.getRoleCode());
+        boolean reactivating = "ACTIVE".equals(request.status()) && !"ACTIVE".equals(existing.getStatus());
+        if (roleChanged || reactivating) {
+            validateTargetUser(existing.getUserId());
+            validateAssignableRole(existing.getUserId(), request.roleCode());
+        }
 
         PmProjectMember update = new PmProjectMember();
         update.setId(id);
@@ -177,13 +271,31 @@ public class PmProjectMemberService {
         }
     }
 
-    private PmProjectMemberVO toVO(PmProjectMember m) {
+    private void validateAssignableRole(Long userId, String roleCode) {
+        SysRole role = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getTenantId, UserContext.getCurrentTenantId())
+                .eq(SysRole::getRoleCode, roleCode)
+                .eq(SysRole::getStatus, "ENABLE")
+                .eq(SysRole::getDataScope, "PROJECT_MEMBER"));
+        if (role == null) {
+            throw new BusinessException("PROJECT_MEMBER_ROLE_INVALID", "项目角色必须使用启用的项目范围系统角色");
+        }
+        if (!sysUserMapper.selectEnabledRoleCodesByTenantAndUserId(
+                UserContext.getCurrentTenantId(), userId).contains(roleCode)) {
+            throw new BusinessException("PROJECT_MEMBER_ROLE_MISMATCH", "项目角色必须与用户启用的系统角色一致");
+        }
+    }
+
+    private PmProjectMemberVO toVO(PmProjectMember m, SysUser user, SysRole role) {
         PmProjectMemberVO vo = new PmProjectMemberVO();
         vo.setId(m.getId() != null ? m.getId().toString() : null);
         vo.setTenantId(m.getTenantId() != null ? m.getTenantId().toString() : null);
         vo.setProjectId(m.getProjectId() != null ? m.getProjectId().toString() : null);
         vo.setUserId(m.getUserId() != null ? m.getUserId().toString() : null);
+        vo.setUsername(user != null ? user.getUsername() : null);
+        vo.setRealName(user != null ? user.getRealName() : null);
         vo.setRoleCode(m.getRoleCode());
+        vo.setRoleName(role != null ? role.getRoleName() : null);
         vo.setPositionName(m.getPositionName());
         vo.setStartDate(m.getStartDate() != null ? m.getStartDate().toString() : null);
         vo.setEndDate(m.getEndDate() != null ? m.getEndDate().toString() : null);
@@ -193,5 +305,27 @@ public class PmProjectMemberService {
         vo.setUpdatedAt(m.getUpdatedAt() != null ? DateTimeUtils.DTF.format(m.getUpdatedAt()) : null);
         vo.setRemark(m.getRemark());
         return vo;
+    }
+
+    private static final class CandidateBuilder {
+        private final Long userId;
+        private final String username;
+        private final String realName;
+        private final List<String> roleCodes = new ArrayList<>();
+
+        private CandidateBuilder(Long userId, String username, String realName) {
+            this.userId = userId;
+            this.username = username;
+            this.realName = realName;
+        }
+
+        private PmProjectMemberOptionsVO.UserOption toVO() {
+            List<String> orderedRoles = roleCodes.stream()
+                    .distinct()
+                    .sorted(Comparator.comparingInt(PROJECT_ROLE_ORDER::indexOf))
+                    .toList();
+            return new PmProjectMemberOptionsVO.UserOption(
+                    Objects.toString(userId), username, realName, orderedRoles);
+        }
     }
 }

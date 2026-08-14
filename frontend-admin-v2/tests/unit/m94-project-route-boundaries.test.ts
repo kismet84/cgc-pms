@@ -83,10 +83,11 @@ describe('M94 project route boundaries', () => {
 
     expect(page).toContain('cleanMemberCommand')
     expect(page).toContain('loadProjectMembers')
-    expect(page).toContain('loadProjectUsers')
+    expect(page).toContain('loadProjectMemberOptions')
     expect(page).toContain('projectRoleOptions')
     expect(page).toContain('new Set(members.value.map((member) => member.userId))')
-    expect(page).toContain("can('system:user:query') || isSuperAdmin(session.roles)")
+    expect(page).not.toContain('loadProjectUsers')
+    expect(page).not.toContain('system:user:query')
     expect(page).not.toMatch(
       /loadProjectPage|loadProjectOverview|loadProjectCommencement|updateProject\b/,
     )

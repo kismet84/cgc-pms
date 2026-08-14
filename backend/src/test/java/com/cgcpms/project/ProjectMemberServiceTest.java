@@ -41,6 +41,8 @@ class ProjectMemberServiceTest {
 
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_0 = 0L;
+    private static final List<String> FIXTURE_PROJECT_ROLES = List.of(
+            "PROJECT_ACCOUNTANT", "TECHNICAL_LEAD", "CONSTRUCTION_LEAD", "PROCUREMENT_LEAD");
 
     @Autowired
     private PmProjectService projectService;
@@ -77,6 +79,24 @@ class ProjectMemberServiceTest {
                   WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
                 """, userId, TENANT_0, "member-fixture-" + userId,
                 "成员夹具" + userId, USER_ADMIN, USER_ADMIN, userId);
+        for (int i = 0; i < FIXTURE_PROJECT_ROLES.size(); i++) {
+            String roleCode = FIXTURE_PROJECT_ROLES.get(i);
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user_role (id, tenant_id, user_id, role_id)
+                    SELECT ?, ?, ?, r.id
+                      FROM sys_role r
+                     WHERE r.tenant_id = ?
+                       AND r.role_code = ?
+                       AND r.status = 'ENABLE'
+                       AND r.data_scope = 'PROJECT_MEMBER'
+                       AND r.deleted_flag = 0
+                       AND NOT EXISTS (
+                           SELECT 1 FROM sys_user_role ur
+                            WHERE ur.tenant_id = ? AND ur.user_id = ? AND ur.role_id = r.id
+                       )
+                    """, 9_400_000_000_000L + userId * 10 + i,
+                    TENANT_0, userId, TENANT_0, roleCode, TENANT_0, userId);
+        }
     }
 
     @AfterEach
@@ -111,7 +131,7 @@ class ProjectMemberServiceTest {
 
         PmProjectMember member = new PmProjectMember();
         member.setUserId(1001L);
-        member.setRoleCode("PROJECT_MANAGER");
+        member.setRoleCode("TECHNICAL_LEAD");
         member.setPositionName("项目经理");
 
         Long id = memberService.create(testProjectId, createRequest(member));
@@ -122,7 +142,7 @@ class ProjectMemberServiceTest {
         assertNotNull(vo, "应能查询到刚创建的成员");
         assertEquals(testProjectId.toString(), vo.getProjectId());
         assertEquals("1001", vo.getUserId());
-        assertEquals("PROJECT_MANAGER", vo.getRoleCode());
+        assertEquals("TECHNICAL_LEAD", vo.getRoleCode());
         assertEquals("项目经理", vo.getPositionName());
         assertEquals("ACTIVE", vo.getStatus(), "未指定status时应默认为ACTIVE");
         assertNotNull(vo.getId(), "VO的ID应为String类型");
@@ -176,7 +196,7 @@ class ProjectMemberServiceTest {
         for (int i = 0; i < 3; i++) {
             PmProjectMember m = new PmProjectMember();
             m.setUserId(1100L + i);
-            m.setRoleCode(i == 0 ? "PROJECT_MANAGER" : "PROJECT_ACCOUNTANT");
+            m.setRoleCode(i == 0 ? "TECHNICAL_LEAD" : "PROJECT_ACCOUNTANT");
             m.setPositionName("成员" + (i + 1));
             m.setStatus(i < 2 ? "ACTIVE" : "INACTIVE");
             memberService.create(testProjectId, createRequest(m));
@@ -187,8 +207,8 @@ class ProjectMemberServiceTest {
         assertTrue(page1.getTotal() >= 3, "应至少有3条记录");
 
         // Page 2: filter by roleCode
-        IPage<PmProjectMemberVO> page2 = memberService.getPage(testProjectId, 1, 20, "PROJECT_MANAGER", null);
-        assertTrue(page2.getTotal() >= 1, "按PM角色筛选应有结果");
+        IPage<PmProjectMemberVO> page2 = memberService.getPage(testProjectId, 1, 20, "TECHNICAL_LEAD", null);
+        assertTrue(page2.getTotal() >= 1, "按技术负责人角色筛选应有结果");
 
         // Page 3: filter by status
         IPage<PmProjectMemberVO> page3 = memberService.getPage(testProjectId, 1, 20, null, "ACTIVE");
@@ -199,7 +219,8 @@ class ProjectMemberServiceTest {
         assertTrue(page4.getTotal() >= 1, "按CM+ACTIVE筛选应有结果");
 
         System.out.println("✅ TC3 通过: total=" + page1.getTotal()
-                + ", PM=" + page2.getTotal() + ", ACTIVE=" + page3.getTotal() + ", CM+ACTIVE=" + page4.getTotal());
+                + ", TECHNICAL_LEAD=" + page2.getTotal()
+                + ", ACTIVE=" + page3.getTotal() + ", PROJECT_ACCOUNTANT+ACTIVE=" + page4.getTotal());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -215,7 +236,7 @@ class ProjectMemberServiceTest {
 
         PmProjectMember member = new PmProjectMember();
         member.setUserId(1003L);
-        member.setRoleCode("PROJECT_MANAGER");
+        member.setRoleCode("TECHNICAL_LEAD");
         member.setPositionName("原始职位");
         member.setStatus("ACTIVE");
         Long id = memberService.create(testProjectId, createRequest(member));
@@ -282,9 +303,9 @@ class ProjectMemberServiceTest {
                 () -> memberService.update(testProjectId, historical.getId(), updateRequest(unchanged)));
         assertEquals("PROJECT_MEMBER_ROLE_INVALID", legacySwapError.getCode());
 
-        unchanged.setRoleCode("PROJECT_MANAGER");
+        unchanged.setRoleCode("PROJECT_ACCOUNTANT");
         memberService.update(testProjectId, historical.getId(), updateRequest(unchanged));
-        assertEquals("PROJECT_MANAGER",
+        assertEquals("PROJECT_ACCOUNTANT",
                 memberService.getById(testProjectId, historical.getId()).getRoleCode());
     }
 
@@ -329,13 +350,13 @@ class ProjectMemberServiceTest {
 
         PmProjectMember rejoined = new PmProjectMember();
         rejoined.setUserId(1009L);
-        rejoined.setRoleCode("PROJECT_MANAGER");
+        rejoined.setRoleCode("TECHNICAL_LEAD");
         rejoined.setPositionName("重新加入岗位");
         Long restoredId = memberService.create(testProjectId, createRequest(rejoined));
 
         assertEquals(originalId, restoredId, "应恢复原成员记录而非新建冲突记录");
         PmProjectMemberVO restored = memberService.getById(testProjectId, restoredId);
-        assertEquals("PROJECT_MANAGER", restored.getRoleCode());
+        assertEquals("TECHNICAL_LEAD", restored.getRoleCode());
         assertEquals("重新加入岗位", restored.getPositionName());
         assertEquals("ACTIVE", restored.getStatus());
         assertEquals(createdAt, restored.getCreatedAt(), "恢复时应保留原始创建审计时间");
@@ -387,7 +408,7 @@ class ProjectMemberServiceTest {
             start.await();
             PmProjectMember member = new PmProjectMember();
             member.setUserId(userId);
-            member.setRoleCode("PROJECT_MANAGER");
+            member.setRoleCode("TECHNICAL_LEAD");
             return "SUCCESS:" + memberService.create(projectId, createRequest(member));
         } catch (BusinessException ex) {
             return ex.getCode();
@@ -409,7 +430,7 @@ class ProjectMemberServiceTest {
 
         PmProjectMember member = new PmProjectMember();
         member.setUserId(1005L);
-        member.setRoleCode("PROJECT_MANAGER");
+        member.setRoleCode("TECHNICAL_LEAD");
         member.setPositionName("隔离测试成员");
         Long id = memberService.create(testProjectId, createRequest(member));
 
@@ -457,7 +478,7 @@ class ProjectMemberServiceTest {
         // Create member in project A
         PmProjectMember member = new PmProjectMember();
         member.setUserId(1006L);
-        member.setRoleCode("PROJECT_MANAGER");
+        member.setRoleCode("TECHNICAL_LEAD");
         member.setPositionName("项目A成员");
         Long memberId = memberService.create(testProjectId, createRequest(member));
 
@@ -485,7 +506,7 @@ class ProjectMemberServiceTest {
         // Create should fail
         PmProjectMember member = new PmProjectMember();
         member.setUserId(1007L);
-        member.setRoleCode("PROJECT_MANAGER");
+        member.setRoleCode("TECHNICAL_LEAD");
         assertThrows(BusinessException.class,
                 () -> memberService.create(fakeProjectId, createRequest(member)),
                 "不存在的项目create应失败");

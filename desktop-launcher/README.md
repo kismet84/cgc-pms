@@ -12,6 +12,8 @@ pwsh -NoProfile -File desktop-launcher/tests/launcher-contract.ps1
 pwsh -NoProfile -File desktop-launcher/scripts/package.ps1
 ```
 
+The contract test runs two workers concurrently. Each worker uses its own GUID-scoped build, temporary, local-data, health-port, mutex, and event resources, then removes only that verified test root.
+
 Chromium archives, build output, packages, profiles, state, and logs are not committed. `chromium.lock.json` is the authority for exact upstream revision, version, source, hashes, and license.
 
 ## Security boundary

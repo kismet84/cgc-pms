@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-13T22:28:00.057Z",
+  "generation_time": "2026-08-14T05:55:52.705Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,9 +50,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4131,
-  "repository_file_count": 4131,
-  "included_file_count": 2867,
+  "tracked_file_count": 4133,
+  "repository_file_count": 4133,
+  "included_file_count": 2869,
   "excluded_file_count": 1264,
   "modules": [
     {
@@ -70,8 +70,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1890,
-      "fingerprint": "e947e0e0740816856c2a697c7e2876ec8f0b3a2f33594f23205a1a0602352c7f"
+      "file_count": 1892,
+      "fingerprint": "bc0838c14db1e5b3fbe8304f6cbf60036e33e4fe7a338793f93b32d5ba4be68f"
     },
     {
       "id": "delivery_tooling",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "104386d845f602e0ae692d7e5cb72812dc485befc22cf42baa749505bd4a8663"
+      "fingerprint": "5ac3dc348ccd29a9bc2c72281ce7689faefeb7e96270cf2575e8e96a06fc9afa"
     },
     {
       "id": "desktop_launcher",
@@ -91,7 +91,7 @@
         "desktop-launcher/**"
       ],
       "file_count": 17,
-      "fingerprint": "e5b23fd46665cbd32adb7f78c1a162735759be8a8e027d49fb957707b287b88f"
+      "fingerprint": "ab8cabcf0f4f600862c9ee53c4c50442194d7e2badf059b1c82dfce75f24c92d"
     },
     {
       "id": "documentation",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 406,
-      "fingerprint": "320b665c4ca05957ae4b07341dd7456cdfba14a82bd9c332402caa5c5f509df0"
+      "fingerprint": "1a8859cefca28b3846aeda01d57a0796ffb73dd92b4443788ba0ee9bc00c318a"
     },
     {
       "id": "mobile",
@@ -131,16 +131,16 @@
         "packages/**"
       ],
       "file_count": 38,
-      "fingerprint": "04f84fa5c18f8ad33e5b7b91a3fbbe5e449dd20e55873e184354d4c8f83205fc"
+      "fingerprint": "ea249f53a87e0c467de8a2cbf5f327c5d78e6d9ffb7902d22d94be654b796a9c"
     }
   ],
-  "generation_base_commit": "898ff5cd4e7222e174e43e41ebac4679f4ea8b12",
+  "generation_base_commit": "24fb605083dc9ff639b991b5dabbfdf241455e25",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "8ed14cdbcd7fce6f3babaadc67bff1484c5f2d21",
+    "previous_generation_base_commit": "24fb605083dc9ff639b991b5dabbfdf241455e25",
     "stale_modules": [
-      "documentation"
+      "backend"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

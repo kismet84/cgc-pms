@@ -8,19 +8,59 @@ function selectOption(control: Locator, value: string) {
   return control.selectOption(value)
 }
 
-const roles = [
-  { label: '项目经理', path: '/api/dashboard/project-manager' },
-  { label: '商务经理', path: '/api/dashboard/business-manager' },
-  { label: '成本经理', path: '/api/dashboard/cost-manager' },
-  { label: '采购经理', path: '/api/dashboard/purchase-manager' },
-  { label: '生产经理', path: '/api/dashboard/production-manager' },
-  { label: '总工程师', path: '/api/dashboard/chief-engineer' },
-  { label: '财务', path: '/api/dashboard/finance' },
-  { label: '管理层', path: '/api/dashboard/management' },
+const personaLabels = [
+  '公司老板',
+  '公司财务',
+  '项目经理',
+  '项目会计',
+  '技术负责人',
+  '安全负责人',
+  '施工负责人',
+  '采购负责人',
+  '员工',
 ] as const
 
-test.describe('M2 live eight-role dashboard', () => {
+test.describe('M2 live nine-role dashboard', () => {
   test.skip(!runLiveDashboard, 'Set V2_LIVE_DASHBOARD=1 only against the local test/demo runtime')
+
+  test('dev role switcher exposes nine canonical roles and updates dashboard context', async ({
+    page,
+  }) => {
+    expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
+    await page.goto('/dashboard?persona=COMPANY_OWNER&role=mgmt')
+
+    const sidebar = page.locator('#shell-navigation')
+    await sidebar.getByRole('button', { name: '切换演示角色' }).click()
+    const switcher = sidebar.getByRole('region', { name: '演示角色' })
+    await expect(switcher.getByRole('button')).toHaveCount(9)
+    for (const label of personaLabels) {
+      await expect(switcher.getByRole('button', { name: new RegExp(label) })).toBeVisible()
+    }
+    for (const legacyLabel of [
+      '商务经理',
+      '成本经理',
+      '采购经理',
+      '生产经理',
+      '总工程师',
+      '管理层支持',
+      '物资支持',
+    ]) {
+      await expect(switcher.getByText(legacyLabel, { exact: true })).toHaveCount(0)
+    }
+
+    const switched = page.waitForResponse((response) =>
+      response.url().includes('/api/auth/dev-login?username=ui26.bm01'),
+    )
+    await switcher.getByRole('button', { name: /安全负责人/ }).click()
+    expect((await switched).ok()).toBe(true)
+    await expect(page).toHaveURL(/\/dashboard\?persona=SAFETY_LEAD&role=pm/)
+    await expect(page.getByRole('banner').getByText('陈思远', { exact: true })).toBeVisible()
+
+    const userInfo = await page.request.get('/api/auth/userinfo')
+    expect(userInfo.ok()).toBe(true)
+    const payload = (await userInfo.json()) as { data: { roles: string[] } }
+    expect(payload.data.roles).toEqual(['SAFETY_LEAD'])
+  })
 
   test('shell context survives cross-workspace navigation and reaches dashboard requests', async ({
     page,
@@ -506,7 +546,7 @@ test.describe('M2 live eight-role dashboard', () => {
     expect(login?.ok()).toBe(true)
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/dashboard?role=pm')
-    await expect(page.getByText('项目经营健康评分')).toBeVisible()
+    await expect(page.getByText('项目履约健康概览')).toBeVisible()
     await expect(page.locator('#global-project')).toContainText('全部项目')
     await expect(page.locator('#global-project')).toHaveValue('')
     await expect(page.locator('#global-report-period')).toContainText('全部报告期')
@@ -523,14 +563,14 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
     await expect(
       page.getByRole('navigation', { name: '驾驶舱角色视图' }).getByRole('button'),
-    ).toHaveCount(roles.length)
+    ).toHaveCount(personaLabels.length)
 
     const managementResponse = page.waitForResponse(
       (response) => new URL(response.url()).pathname === '/api/dashboard/management',
     )
-    await page.getByRole('button', { name: '管理层', exact: true }).click()
+    await page.getByRole('button', { name: '公司老板', exact: true }).click()
     expect((await managementResponse).ok()).toBe(true)
-    await expect(page.getByText('项目经营健康评分')).toBeVisible()
+    await expect(page.getByText('公司经营健康概览')).toBeVisible()
 
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -539,7 +579,7 @@ test.describe('M2 live eight-role dashboard', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/dashboard?role=mgmt')
-      await expect(page.getByText('项目经营健康评分')).toBeVisible()
+      await expect(page.getByText('公司经营健康概览')).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

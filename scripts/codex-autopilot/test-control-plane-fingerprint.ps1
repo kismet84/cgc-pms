@@ -16,6 +16,9 @@ if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/schemas/classification-result.schema.json') { throw 'control-plane fingerprint does not cover classifier schema' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains '.github/workflows/ci.yml') { throw 'control-plane fingerprint does not cover the pre-PR equivalent CI workflow' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/verify-pre-pr-ci.ps1') { throw 'control-plane fingerprint does not cover the pre-PR evidence gate' }
+foreach ($codemapPath in @('scripts/codemap/generate-codemap.mjs','scripts/codemap/test-generate-codemap.mjs')) {
+  if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $codemapPath) { throw "control-plane fingerprint does not cover Codemap control path: $codemapPath" }
+}
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md') { throw 'control-plane fingerprint does not cover the AutoPilot owner skill' }
 foreach ($skill in @('.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md','.agents/skills/cgc-pms-ci-gate-triage/SKILL.md','.agents/skills/cgc-pms-runtime-refresh/SKILL.md')) {
   if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $skill) { throw "control-plane fingerprint does not cover project execution skill: $skill" }
