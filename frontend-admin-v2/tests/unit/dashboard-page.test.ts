@@ -30,7 +30,10 @@ vi.mock('@/services/alerts', () => ({
   evaluateAlerts: vi.fn(),
 }))
 vi.mock('@/pages/dashboard/DashboardGauge.vue', () => ({
-  default: { template: '<div class="test-gauge" />' },
+  default: {
+    props: ['variant'],
+    template: '<div class="test-gauge" :data-variant="variant" />',
+  },
 }))
 vi.mock('@/pages/dashboard/DashboardTrendChart.vue', () => ({
   default: {
@@ -241,7 +244,7 @@ const managementData: ManagementDashboardVO = {
     targetCost: '800000.00',
     dynamicCost: '780000.00',
     contractIncome: '1000000.00',
-    expectedProfit: String(200000 - index * 10000),
+    expectedProfit: index === 4 ? '-10000.00' : String(200000 - index * 10000),
     costDeviation: '-20000.00',
     paidAmount: '300000.00',
     contractAmount: '1000000.00',
@@ -437,8 +440,42 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('[aria-label="驾驶舱角色视图"]').findAll('button')).toHaveLength(9)
     expect(wrapper.text()).toContain('公司老板驾驶舱')
     expect(wrapper.text()).toContain('项目排名（按预计利润）')
-    expect(wrapper.get('.dashboard-activity-list').text()).toContain('排名项目5')
-    expect(wrapper.get('.dashboard-activity-list').text()).not.toContain('排名项目6')
+    expect(wrapper.get('.test-gauge').attributes('data-variant')).toBe('arc')
+
+    const rankingToggle = wrapper.get('[aria-label="项目排名展示方式"]')
+    const rankingButtons = rankingToggle.findAll('button')
+    expect(rankingButtons.map((button) => button.text())).toEqual(['图表', '列表'])
+    expect(rankingButtons[0]!.attributes('aria-pressed')).toBe('true')
+    expect(rankingButtons[1]!.attributes('aria-pressed')).toBe('false')
+    expect(wrapper.get('.management-ranking-chart').attributes('aria-label')).toBe(
+      '按预计利润降序的项目排名图',
+    )
+    expect(wrapper.get('.management-ranking-chart').text()).toContain('排名项目5')
+    expect(wrapper.get('.management-ranking-chart').text()).not.toContain('排名项目6')
+    expect(wrapper.get('.management-ranking-chart__bar.is-negative').exists()).toBe(true)
+
+    await rankingButtons[1]!.trigger('click')
+    expect(rankingButtons[0]!.attributes('aria-pressed')).toBe('false')
+    expect(rankingButtons[1]!.attributes('aria-pressed')).toBe('true')
+    const rankingTable = wrapper.get('.management-ranking-table')
+    expect(rankingTable.findAll('thead th').map((cell) => cell.text())).toEqual([
+      '排名',
+      '项目',
+      '预计利润',
+      '动态成本',
+      '状态',
+    ])
+    const rankingRows = rankingTable.findAll('tbody tr')
+    expect(rankingRows).toHaveLength(5)
+    expect(rankingRows[0]!.findAll('td').map((cell) => cell.text())).toEqual([
+      '1',
+      '排名项目1PJ-1',
+      '20.00 万元',
+      '78.00 万元',
+      '进行中',
+    ])
+    expect(rankingRows[4]!.findAll('td')[2]!.classes()).toContain('is-danger')
+    expect(rankingRows[4]!.findAll('td')[2]!.text()).toBe('-1.00 万元')
     expect(wrapper.get('.management-overdue-panel').text()).toContain('合同审批逾期')
     expect(wrapper.get('.management-overdue-panel').text()).toContain('施工合同审批')
     expect(wrapper.get('.management-overdue-panel').text()).toContain('项目一')
