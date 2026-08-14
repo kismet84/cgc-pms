@@ -2,7 +2,10 @@
 import { onMounted, ref, watch } from 'vue'
 import { normalizeGaugeValue } from './model'
 
-const props = defineProps<{ value: number; colorToken: string }>()
+const props = withDefaults(
+  defineProps<{ value: number; colorToken: string; variant?: 'ring' | 'arc' }>(),
+  { variant: 'ring' },
+)
 const canvas = ref<HTMLCanvasElement | null>(null)
 
 function cssValue(token: string): string {
@@ -23,9 +26,11 @@ function draw(): void {
   context.clearRect(0, 0, size, size)
   context.lineWidth = 9
   context.lineCap = 'round'
+  const startAngle = props.variant === 'arc' ? Math.PI * 0.75 : -Math.PI / 2
+  const sweep = props.variant === 'arc' ? Math.PI * 1.5 : Math.PI * 2
   context.strokeStyle = cssValue('--v2-color-border-subtle')
   context.beginPath()
-  context.arc(size / 2, size / 2, 58, 0, Math.PI * 2)
+  context.arc(size / 2, size / 2, 58, startAngle, startAngle + sweep)
   context.stroke()
   context.strokeStyle = cssValue(props.colorToken)
   context.beginPath()
@@ -33,14 +38,14 @@ function draw(): void {
     size / 2,
     size / 2,
     58,
-    -Math.PI / 2,
-    -Math.PI / 2 + Math.PI * 2 * (normalizeGaugeValue(props.value) / 100),
+    startAngle,
+    startAngle + sweep * (normalizeGaugeValue(props.value) / 100),
   )
   context.stroke()
 }
 
 onMounted(draw)
-watch(() => [props.value, props.colorToken], draw)
+watch(() => [props.value, props.colorToken, props.variant], draw)
 </script>
 
 <template>

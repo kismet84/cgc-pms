@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -198,13 +199,7 @@ class CostTargetControllerTest {
                 SELECT 33003,0,?,?,'CSTM','成本经理',CURRENT_DATE,'ACTIVE',1,0
                 WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE id=33003)
                 """, PROJECT_ID, ACTION_USER_ID);
-        jdbcTemplate.update("""
-                INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
-                SELECT 33004,0,?,r.id FROM sys_role r
-                WHERE r.tenant_id=0 AND r.role_code='PROJECT_MANAGER'
-                  AND r.status='ENABLE' AND r.deleted_flag=0
-                  AND NOT EXISTS (SELECT 1 FROM sys_user_role WHERE id=33004)
-                """, OUTSIDER_USER_ID);
+        seedOutsiderProjectManagerRole();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -664,6 +659,36 @@ class CostTargetControllerTest {
 
     @Test
     @Order(17)
+    @Transactional
+    @DisplayName("composite draft rejects candidate after project-manager role is removed")
+    void testCompositeDraftRejectsManagerRoleMismatch() throws Exception {
+        int removed = jdbcTemplate.update("""
+                DELETE FROM sys_user_role
+                WHERE tenant_id=0 AND user_id=? AND role_id IN (
+                    SELECT id FROM sys_role
+                    WHERE tenant_id=0 AND role_code='PROJECT_MANAGER' AND deleted_flag=0
+                )
+                """, OUTSIDER_USER_ID);
+        Assertions.assertTrue(removed > 0, "候选用户应先持有项目经理系统角色");
+        String body = """
+                {
+                  "projectId": %d,
+                  "projectManagerId": %d,
+                  "versionNo": "V-COMPOSITE-ROLE-GUARD-%d",
+                  "versionName": "项目经理角色一致性校验",
+                  "items": %s
+                }
+                """.formatted(PROJECT_ID, OUTSIDER_USER_ID, System.nanoTime(), defaultItemsJson());
+        mockMvc.perform(postWithApiContext("/cost-targets/drafts")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_MANAGER_INVALID"));
+    }
+
+    @Test
+    @Order(18)
     @DisplayName("activate endpoint keeps one active version per project")
     void testActivateEndpointKeepsUniqueActiveVersion() throws Exception {
         long firstId = 3399101L;
@@ -694,7 +719,7 @@ class CostTargetControllerTest {
     }
 
     @Test
-    @Order(18)
+    @Order(19)
     @DisplayName("composite draft saves header and items with server-computed totals")
     void testCompositeDraftComputesTotals() throws Exception {
         previousCompositeManagerId = jdbcTemplate.queryForObject(
@@ -733,6 +758,16 @@ class CostTargetControllerTest {
                 SELECT COUNT(*) FROM pm_project_member
                 WHERE project_id=? AND user_id=? AND role_code='PROJECT_MANAGER' AND status='ACTIVE' AND deleted_flag=0
                 """, Integer.class, PROJECT_ID, OUTSIDER_USER_ID));
+    }
+
+    private void seedOutsiderProjectManagerRole() {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id,tenant_id,user_id,role_id)
+                SELECT 33004,0,?,r.id FROM sys_role r
+                WHERE r.tenant_id=0 AND r.role_code='PROJECT_MANAGER'
+                  AND r.status='ENABLE' AND r.deleted_flag=0
+                  AND NOT EXISTS (SELECT 1 FROM sys_user_role WHERE id=33004)
+                """, OUTSIDER_USER_ID);
     }
 
     private void assertActionPassesSecurity(String authority, MockHttpServletRequestBuilder request) throws Exception {

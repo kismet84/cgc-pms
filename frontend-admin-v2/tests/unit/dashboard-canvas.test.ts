@@ -58,6 +58,19 @@ describe('Dashboard canvas design tokens', () => {
 
     expect(context.strokeStyle).toBe('#2563eb')
     expect(context.stroke).toHaveBeenCalledTimes(2)
+    expect(context.arc).toHaveBeenNthCalledWith(1, 71, 71, 58, -Math.PI / 2, Math.PI * 1.5)
+  })
+
+  it('draws the management gauge as a 270 degree arc', () => {
+    const context = canvasContext()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context)
+
+    mount(DashboardGauge, {
+      props: { value: 100, colorToken: '--v2-color-primary', variant: 'arc' },
+    })
+
+    expect(context.arc).toHaveBeenNthCalledWith(1, 71, 71, 58, Math.PI * 0.75, Math.PI * 2.25)
+    expect(context.arc).toHaveBeenNthCalledWith(2, 71, 71, 58, Math.PI * 0.75, Math.PI * 2.25)
   })
 
   it('resolves trend colors and font from declared CSS tokens', () => {

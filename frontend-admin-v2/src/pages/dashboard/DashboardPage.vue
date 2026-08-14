@@ -129,6 +129,7 @@ const breakdownError = ref(false)
 const expandedSubjects = ref(new Set<string>())
 const expandedFinanceContracts = ref(new Set<string>())
 const trendRange = ref<'year' | 'half' | 'quarter'>('year')
+const managementRankingView = ref<'chart' | 'table'>('chart')
 const riskFilter = ref<'all' | DashboardRiskLevel>('all')
 const riskTypeFilter = ref('all')
 const riskPage = ref(1)
@@ -176,6 +177,23 @@ const managementOverdueItems = computed(() =>
     title: item.title?.trim() || item.itemSummary?.trim() || '未命名待办',
     businessTypeLabel: workflowBusinessTypeLabel(item.businessType),
     taskStatus: dashboardStatusLabel(item.taskStatus),
+  })),
+)
+const managementRankings = computed(() => managementData.value?.projectRankings.slice(0, 5) ?? [])
+const managementRankingMax = computed(() =>
+  Math.max(
+    0,
+    ...managementRankings.value.map((project) => Math.abs(Number(project.expectedProfit) || 0)),
+  ),
+)
+const managementRankingRows = computed(() =>
+  managementRankings.value.map((project) => ({
+    ...project,
+    expectedProfitDisplay: managementRankingAmount(project.expectedProfit),
+    dynamicCostDisplay: managementRankingAmount(project.dynamicCost),
+    barWidth: managementRankingWidth(project.expectedProfit),
+    negative: Number(project.expectedProfit) < 0,
+    statusLabel: dashboardStatusLabel(project.status),
   })),
 )
 const selectedAlertProjectLabel = computed(
@@ -675,6 +693,17 @@ function toggleFinanceContract(contractId: string): void {
   expandedFinanceContracts.value = next
 }
 
+function managementRankingWidth(value: string | null | undefined): number {
+  const numeric = Math.abs(Number(value))
+  if (!Number.isFinite(numeric) || numeric <= 0 || managementRankingMax.value <= 0) return 0
+  return Math.max(2, (numeric / managementRankingMax.value) * 100)
+}
+
+function managementRankingAmount(value: string | null | undefined): string {
+  const amount = compactDashboardValue(formatAmount(value))
+  return amount.unit ? `${amount.value} ${amount.unit}` : amount.value
+}
+
 function managementRiskType(item: unknown): string {
   if (!item || typeof item !== 'object' || !('alert' in item)) return '经营风险'
   const alert = (item as { alert?: AlertRecord }).alert
@@ -783,6 +812,7 @@ function isAbort(errorValue: unknown): boolean {
               <DashboardGauge
                 :value="health.score"
                 :color-token="health.tone === 'danger' ? '--v2-color-danger' : '--v2-color-primary'"
+                :variant="isManagementDashboard ? 'arc' : undefined"
               />
               <div class="health-score__value">
                 <strong>{{ Math.round(health.score) }}</strong>
@@ -832,10 +862,15 @@ function isAbort(errorValue: unknown): boolean {
                     ? trendDefinition.title
                     : currentPersona.activityTitle
               }}</strong>
-              <span v-if="trendDefinition.series.length">（万元）</span>
+              <span v-if="isManagementDashboard">（{{ managementRankingRows.length }}）</span>
+              <span v-else-if="trendDefinition.series.length">（万元）</span>
               <span v-else>（{{ activityItems.length }}）</span>
             </div>
-            <div v-if="trendDefinition.series.length" class="trend-range" aria-label="趋势时间范围">
+            <div
+              v-if="!isManagementDashboard && trendDefinition.series.length"
+              class="trend-range"
+              aria-label="趋势时间范围"
+            >
               <V2Button
                 v-for="range in [
                   { value: 'year', label: '近12个月' },
@@ -851,17 +886,91 @@ function isAbort(errorValue: unknown): boolean {
                 {{ range.label }}
               </V2Button>
             </div>
-            <V2Button
-              v-if="isManagementDashboard"
-              size="small"
-              variant="ghost"
-              @click="openAllRankedProjects"
-            >
-              查看全部项目
-            </V2Button>
+            <div v-if="isManagementDashboard" class="management-ranking-actions">
+              <div class="management-ranking-toggle" role="group" aria-label="项目排名展示方式">
+                <V2Button
+                  size="small"
+                  :variant="managementRankingView === 'chart' ? 'secondary' : 'ghost'"
+                  :aria-pressed="managementRankingView === 'chart'"
+                  @click="managementRankingView = 'chart'"
+                >
+                  图表
+                </V2Button>
+                <V2Button
+                  size="small"
+                  :variant="managementRankingView === 'table' ? 'secondary' : 'ghost'"
+                  :aria-pressed="managementRankingView === 'table'"
+                  @click="managementRankingView = 'table'"
+                >
+                  列表
+                </V2Button>
+              </div>
+              <V2Button size="small" variant="ghost" @click="openAllRankedProjects">
+                查看全部项目
+              </V2Button>
+            </div>
           </header>
+          <template v-if="isManagementDashboard">
+            <ol
+              v-if="managementRankingRows.length && managementRankingView === 'chart'"
+              class="management-ranking-chart"
+              aria-label="按预计利润降序的项目排名图"
+            >
+              <li v-for="(project, index) in managementRankingRows" :key="project.projectId">
+                <span class="management-ranking-chart__rank">{{ index + 1 }}</span>
+                <span class="management-ranking-chart__name" :title="project.projectName">
+                  {{ project.projectName }}
+                </span>
+                <span class="management-ranking-chart__track">
+                  <span
+                    class="management-ranking-chart__bar"
+                    :class="{ 'is-negative': project.negative }"
+                    :style="{ width: `${project.barWidth}%` }"
+                  />
+                </span>
+                <strong :class="{ 'is-danger': project.negative }">
+                  {{ project.expectedProfitDisplay }}
+                </strong>
+              </li>
+            </ol>
+            <div
+              v-else-if="managementRankingRows.length"
+              class="risk-table-wrap management-ranking-table-wrap"
+              tabindex="0"
+            >
+              <table class="risk-table management-ranking-table v2-table--compact">
+                <caption class="v2-visually-hidden">
+                  按预计利润降序的项目排名表
+                </caption>
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>项目</th>
+                    <th>预计利润</th>
+                    <th>动态成本</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(project, index) in managementRankingRows" :key="project.projectId">
+                    <td>{{ index + 1 }}</td>
+                    <td>
+                      <strong>{{ project.projectName }}</strong>
+                      <span>{{ project.projectCode }}</span>
+                    </td>
+                    <td :class="{ 'is-danger': project.negative }">
+                      {{ project.expectedProfitDisplay }}
+                    </td>
+                    <td>{{ project.dynamicCostDisplay }}</td>
+                    <td>{{ project.statusLabel }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else class="trend-empty">当前筛选条件下暂无可排名项目</p>
+          </template>
           <DashboardTrendChart
-            v-if="trendDefinition.series.length && visibleTrendPoints.length"
+            v-else-if="trendDefinition.series.length && visibleTrendPoints.length"
             :points="visibleTrendPoints"
             :series="trendDefinition.series"
             :aria-label="trendDefinition.ariaLabel"
@@ -1498,6 +1607,77 @@ function isAbort(errorValue: unknown): boolean {
 .trend-range {
   display: flex;
   gap: var(--v2-space-1);
+}
+.management-ranking-actions,
+.management-ranking-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--v2-space-1);
+}
+.management-ranking-actions {
+  flex-wrap: wrap;
+}
+.management-ranking-chart {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-3) var(--v2-space-4);
+  margin: 0;
+  list-style: none;
+}
+.management-ranking-chart li {
+  display: grid;
+  min-width: 0;
+  min-height: 36px;
+  grid-template-columns: var(--v2-space-5) minmax(0, 0.8fr) minmax(4rem, 1.6fr) max-content;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+.management-ranking-chart__rank {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.management-ranking-chart__name {
+  overflow: hidden;
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.management-ranking-chart__track {
+  height: var(--v2-space-3);
+  overflow: hidden;
+  background: var(--v2-color-surface-subtle);
+  border-radius: var(--v2-radius-xs);
+}
+.management-ranking-chart__bar {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--v2-color-primary), var(--v2-color-info));
+  border-radius: inherit;
+}
+.management-ranking-chart__bar.is-negative {
+  background: var(--v2-color-danger);
+}
+.management-ranking-chart strong {
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-11);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.management-ranking-table-wrap {
+  min-height: 0;
+}
+.management-ranking-table td:nth-child(n + 3) {
+  white-space: nowrap;
+}
+.management-ranking-table td:nth-child(2) span {
+  display: block;
+  margin-top: var(--v2-space-1);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
 }
 .trend-chart,
 .trend-empty {
