@@ -1,5 +1,6 @@
 package com.cgcpms;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -37,6 +38,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -319,9 +321,11 @@ class TenantBoundaryTask2Test {
     }
 
     @Test
+    @Transactional
     @DisplayName("T-BOUND-7: PmProjectMember create ignores client-supplied tenantId")
     void testProjectMemberCreateIgnoresClientTenantId() {
         TestUserContext.setAdmin(TENANT_A, USER_A);
+        ensureProjectRoleAssignment(USER_A, "EMPLOYEE");
         // Need a tenant A project to add a member to
         Long tenantAProjectId;
         PmProject projTA = new PmProject();
@@ -357,6 +361,32 @@ class TenantBoundaryTask2Test {
         // Clean up
         TestUserContext.setAdmin(TENANT_A, USER_A);
         projectMemberService.delete(tenantAProjectId, id);
+    }
+
+    private void ensureProjectRoleAssignment(long userId, String roleCode) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag
+                ) SELECT ?, ?, ?, '{noop}test', ?, 'ENABLE', 1, ?, ?, 0
+                  WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
+                """, userId, TENANT_A, "tenant-boundary-admin-" + userId,
+                "租户边界管理员", userId, userId, userId);
+        jdbcTemplate.update("UPDATE sys_user SET status='ENABLE' WHERE tenant_id=? AND id=?", TENANT_A, userId);
+        Long roleId = jdbcTemplate.queryForObject("""
+                SELECT id FROM sys_role
+                 WHERE tenant_id = ? AND role_code = ? AND deleted_flag = 0
+                """, Long.class, TENANT_A, roleCode);
+        assertNotNull(roleId, "项目角色夹具必须存在");
+        jdbcTemplate.update("UPDATE sys_role SET status='ENABLE', data_scope='PROJECT_MEMBER' WHERE id=?", roleId);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id, tenant_id, user_id, role_id)
+                SELECT ?, ?, ?, ?
+                 WHERE NOT EXISTS (
+                       SELECT 1 FROM sys_user_role
+                        WHERE tenant_id = ? AND user_id = ? AND role_id = ?
+                 )
+                """, IdWorker.getId(), TENANT_A, userId, roleId, TENANT_A, userId, roleId);
     }
 
     // ═══════════════════════════════════════════════════════════════

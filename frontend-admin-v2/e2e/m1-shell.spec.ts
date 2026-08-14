@@ -248,11 +248,18 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
     await page.setViewportSize(viewport)
     await page.goto('/dashboard')
     await expect(page.getByRole('heading', { level: 1, name: '公司老板驾驶舱' })).toBeVisible()
-    const dashboardHeadingBox = await page
+    const dashboardHeadingMetrics = await page
       .getByRole('heading', { level: 1, name: '公司老板驾驶舱' })
-      .boundingBox()
-    expect(dashboardHeadingBox?.width).toBeGreaterThan(100)
-    expect(dashboardHeadingBox?.height).toBeLessThan(50)
+      .evaluate((heading) => {
+        const style = window.getComputedStyle(heading)
+        return {
+          height: heading.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+          writingMode: style.writingMode,
+        }
+      })
+    expect(dashboardHeadingMetrics.writingMode).toBe('horizontal-tb')
+    expect(dashboardHeadingMetrics.height).toBeLessThan(dashboardHeadingMetrics.lineHeight * 1.5)
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
     await expect(page.getByRole('navigation', { name: '工作区标签页' })).toHaveCount(1)
