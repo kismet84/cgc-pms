@@ -139,7 +139,7 @@ function Assert-Rejected([scriptblock]$Action,[string]$Name) {
 }
 
 function Assert-NoWorkflowPathFilters([string]$Text,[string]$Name) {
-  if ([regex]::IsMatch($Text, '(?m)^\s*[''"]?paths(?:-ignore)?[''"]?\s*:')) {
+  if ([regex]::IsMatch($Text, '(?m)(?:^|[,{])\s*[''"]?paths(?:-ignore)?[''"]?\s*:')) {
     throw "$Name must not use path filters that can leave required checks pending"
   }
 }
@@ -158,7 +158,9 @@ $prodCompose = Read-RepoText 'deploy\docker-compose.prod.yml'
 $frontendDockerfile = Read-RepoText 'frontend-admin-v2\Dockerfile'
 foreach ($pathFilterSample in @(
   "on:`n  push:`n    `"paths`":`n      - docs/**",
-  "on:`n  pull_request:`n    'paths-ignore' :`n      - docs/**"
+  "on:`n  pull_request:`n    'paths-ignore' :`n      - docs/**",
+  "pull_request: { paths: [docs/**] }",
+  "on: { push: { 'paths-ignore': [docs/**] } }"
 )) {
   Assert-Rejected { Assert-NoWorkflowPathFilters $pathFilterSample 'path-filter contract self-check' } 'quoted workflow path filter'
 }
