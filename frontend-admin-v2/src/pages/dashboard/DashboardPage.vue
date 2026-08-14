@@ -7,6 +7,7 @@ import type {
   DashboardDataByRole,
   DashboardRole,
   FinanceDashboardVO,
+  ManagementDashboardVO,
   SubjectBreakdown,
 } from '@cgc-pms/frontend-contracts'
 import { hasPermission, resolveDashboardRoles } from '@cgc-pms/frontend-contracts'
@@ -37,7 +38,9 @@ import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import {
   DASHBOARD_ROLE_LABELS,
+  DASHBOARD_PERSONAS,
   DASHBOARD_RISK_LABELS,
+  type DashboardPersona,
   type DashboardRiskLevel,
   alertRiskLevel,
   compactDashboardValue,
@@ -49,8 +52,11 @@ import {
   formatDecimal,
   formatDashboardMessage,
   primaryRiskItems,
+  resolveDashboardPersonas,
+  resolvePersonaDashboardRole,
 } from './model'
 import { alertRuleLabel, alertStatusLabel, severityTone } from '../workbench/alert-report-model'
+import { workflowBusinessTypeLabel } from '../workbench/model'
 import DashboardGauge from './DashboardGauge.vue'
 import DashboardTrendChart from './DashboardTrendChart.vue'
 
@@ -60,11 +66,50 @@ const session = useSessionStore()
 const workspace = useWorkspaceStore()
 
 const allowedRoles = computed(() => resolveDashboardRoles(session.roles, session.permissions))
-const requestedRole = typeof route.query.role === 'string' ? route.query.role : ''
-const selectedRole = ref<DashboardRole>(
-  allowedRoles.value.includes(requestedRole as DashboardRole)
-    ? (requestedRole as DashboardRole)
-    : (allowedRoles.value[0] ?? 'pm'),
+const availablePersonas = computed(() =>
+  resolveDashboardPersonas(session.roles, session.permissions, allowedRoles.value),
+)
+
+function resolveDashboardSelection(
+  personaValue: unknown,
+  roleValue: unknown,
+): { persona: DashboardPersona; role: DashboardRole } {
+  const personaQuery = typeof personaValue === 'string' ? personaValue.toUpperCase() : ''
+  const roleQuery = typeof roleValue === 'string' ? (roleValue as DashboardRole) : undefined
+  const persona = availablePersonas.value.includes(personaQuery as DashboardPersona)
+    ? (personaQuery as DashboardPersona)
+    : undefined
+  const role = roleQuery && allowedRoles.value.includes(roleQuery) ? roleQuery : undefined
+
+  if (persona && role && DASHBOARD_PERSONAS[persona].dashboardRoles.includes(role)) {
+    return { persona, role }
+  }
+  if (role) {
+    const matchedPersona = availablePersonas.value.find(
+      (candidate) => resolvePersonaDashboardRole(candidate, allowedRoles.value, role) === role,
+    )
+    if (matchedPersona) return { persona: matchedPersona, role }
+  }
+
+  const fallbackPersona = persona ?? availablePersonas.value[0] ?? 'PROJECT_MANAGER'
+  return {
+    persona: fallbackPersona,
+    role:
+      resolvePersonaDashboardRole(fallbackPersona, allowedRoles.value) ??
+      allowedRoles.value[0] ??
+      'pm',
+  }
+}
+
+const initialSelection = resolveDashboardSelection(route.query.persona, route.query.role)
+const selectedPersona = ref<DashboardPersona>(initialSelection.persona)
+const selectedRole = ref<DashboardRole>(initialSelection.role)
+const currentPersona = computed(() => DASHBOARD_PERSONAS[selectedPersona.value])
+const availablePersonaRoles = computed(() =>
+  currentPersona.value.dashboardRoles.filter((role) => allowedRoles.value.includes(role)),
+)
+const personaRoleOptions = computed(() =>
+  availablePersonaRoles.value.map((role) => ({ value: role, label: DASHBOARD_ROLE_LABELS[role] })),
 )
 const data = ref<DashboardDataByRole[DashboardRole] | null>(null)
 const alertRows = ref<AlertRecord[]>([])
@@ -85,6 +130,7 @@ const expandedSubjects = ref(new Set<string>())
 const expandedFinanceContracts = ref(new Set<string>())
 const trendRange = ref<'year' | 'half' | 'quarter'>('year')
 const riskFilter = ref<'all' | DashboardRiskLevel>('all')
+const riskTypeFilter = ref('all')
 const riskPage = ref(1)
 const riskPageSize = 10
 const riskFilterOptions = [
@@ -115,6 +161,23 @@ const projectUnsupported = computed(
 const currentProjectLabel = computed(
   () => currentProject.value?.label ?? (selectedRole.value === 'mgmt' ? '租户汇总' : '全部项目'),
 )
+const isManagementDashboard = computed(
+  () => selectedPersona.value === 'COMPANY_OWNER' && selectedRole.value === 'mgmt',
+)
+const managementData = computed(() =>
+  isManagementDashboard.value && data.value ? (data.value as ManagementDashboardVO) : null,
+)
+const managementOverdueUnavailable = computed(() =>
+  managementData.value?.unavailableMetrics?.includes('overdueItems'),
+)
+const managementOverdueItems = computed(() =>
+  (managementData.value?.overdueItems ?? []).slice(0, 10).map((item) => ({
+    ...item,
+    title: item.title?.trim() || item.itemSummary?.trim() || '未命名待办',
+    businessTypeLabel: workflowBusinessTypeLabel(item.businessType),
+    taskStatus: dashboardStatusLabel(item.taskStatus),
+  })),
+)
 const selectedAlertProjectLabel = computed(
   () =>
     workspace.projects.find((item) => item.value === selectedAlert.value?.projectId)?.label ?? '—',
@@ -144,6 +207,13 @@ const risks = computed(() =>
     status: dashboardStatusLabel(item.status),
   })),
 )
+const riskTypeOptions = computed(() => [
+  { value: 'all', label: '全部类型' },
+  ...Array.from(new Set(risks.value.map(managementRiskType))).map((label) => ({
+    value: label,
+    label,
+  })),
+])
 const showRiskValueColumn = computed(() =>
   risks.value.some((item) => 'value' in item && Boolean(item.value)),
 )
@@ -151,7 +221,7 @@ const riskTableColumnCount = computed(() => (showRiskValueColumn.value ? 6 : 5))
 const activityItems = computed(() =>
   data.value
     ? dashboardActivityItems(selectedRole.value, data.value)
-        .slice(0, 6)
+        .slice(0, isManagementDashboard.value ? 5 : 6)
         .map((item) => ({
           ...item,
           title: formatDashboardMessage(item.title),
@@ -243,7 +313,8 @@ const filteredRisks = computed(() => {
     riskFilter.value === 'all'
       ? risks.value
       : risks.value.filter((item) => item.riskLevel === riskFilter.value)
-  return items
+  if (!isManagementDashboard.value || riskTypeFilter.value === 'all') return items
+  return items.filter((item) => managementRiskType(item) === riskTypeFilter.value)
 })
 const riskPageCount = computed(() =>
   Math.max(1, Math.ceil(filteredRisks.value.length / riskPageSize)),
@@ -277,20 +348,21 @@ const canLoadBreakdown = computed(
 )
 
 watch(
-  allowedRoles,
-  (roles) => {
-    if (!roles.includes(selectedRole.value) && roles[0]) selectedRole.value = roles[0]
+  [availablePersonas, allowedRoles, () => route.query.persona, () => route.query.role],
+  () => {
+    const selection = resolveDashboardSelection(route.query.persona, route.query.role)
+    selectedPersona.value = selection.persona
+    selectedRole.value = selection.role
   },
   { immediate: true },
 )
 
-watch(selectedRole, (role) => {
-  const query = { ...route.query, role }
-  void router.replace({ path: route.path, query, hash: route.hash })
+watch([riskFilter, riskTypeFilter], () => {
+  riskPage.value = 1
 })
 
-watch(riskFilter, () => {
-  riskPage.value = 1
+watch(riskTypeOptions, (options) => {
+  if (!options.some((option) => option.value === riskTypeFilter.value)) riskTypeFilter.value = 'all'
 })
 
 watch(riskPageCount, (pageCount) => {
@@ -533,8 +605,52 @@ async function refreshDashboard(): Promise<void> {
   }
 }
 
-function selectRole(role: DashboardRole): void {
+function syncDashboardRoute(): void {
+  if (route.query.persona === selectedPersona.value && route.query.role === selectedRole.value) {
+    return
+  }
+  const query = {
+    ...route.query,
+    persona: selectedPersona.value,
+    role: selectedRole.value,
+  }
+  void router.replace({ path: route.path, query, hash: route.hash })
+}
+
+function selectPersona(persona: DashboardPersona): void {
+  const role = resolvePersonaDashboardRole(persona, allowedRoles.value)
+  if (!role) return
+  selectedPersona.value = persona
   selectedRole.value = role
+  syncDashboardRoute()
+}
+
+function selectRole(role: string): void {
+  const dashboardRole = role as DashboardRole
+  if (!availablePersonaRoles.value.includes(dashboardRole)) return
+  selectedRole.value = dashboardRole
+  syncDashboardRoute()
+}
+
+function openAllRankedProjects(): void {
+  void router.push({
+    path: '/project/list',
+    query: {
+      ...(workspace.selectedReportPeriod ? { period: workspace.selectedReportPeriod } : {}),
+      ...(route.query.desktop === '1' ? { desktop: '1' } : {}),
+    },
+  })
+}
+
+function openManagementOverdue(instanceId: string | null | undefined): void {
+  if (!instanceId) return
+  void router.push({
+    path: `/approval/instances/${instanceId}`,
+    query: {
+      returnTab: 'todo',
+      ...(route.query.desktop === '1' ? { desktop: '1' } : {}),
+    },
+  })
 }
 
 function toggleSubject(subject: SubjectBreakdown): void {
@@ -559,6 +675,12 @@ function toggleFinanceContract(contractId: string): void {
   expandedFinanceContracts.value = next
 }
 
+function managementRiskType(item: unknown): string {
+  if (!item || typeof item !== 'object' || !('alert' in item)) return '经营风险'
+  const alert = (item as { alert?: AlertRecord }).alert
+  return alert ? alertRuleLabel(alert.ruleType) : '经营风险'
+}
+
 function isAbort(errorValue: unknown): boolean {
   return errorValue instanceof DOMException && errorValue.name === 'AbortError'
 }
@@ -566,23 +688,27 @@ function isAbort(errorValue: unknown): boolean {
 
 <template>
   <section class="dashboard-page" aria-labelledby="dashboard-title">
-    <V2Card title="经营驾驶舱" title-id="dashboard-title" :heading-level="1">
+    <V2Card
+      :title="allowedRoles.length ? `${currentPersona.label}驾驶舱` : '经营驾驶舱'"
+      title-id="dashboard-title"
+      :heading-level="1"
+    >
       <template #actions>
         <nav
-          v-if="allowedRoles.length > 1"
+          v-if="availablePersonas.length > 1"
           class="dashboard-page__roles"
           aria-label="驾驶舱角色视图"
         >
           <V2Button
-            v-for="role in allowedRoles"
-            :key="role"
+            v-for="persona in availablePersonas"
+            :key="persona"
             class="dashboard-page__role-button"
             size="small"
-            :variant="selectedRole === role ? 'primary' : 'secondary'"
-            :aria-pressed="selectedRole === role"
-            @click="selectRole(role)"
+            :variant="selectedPersona === persona ? 'primary' : 'secondary'"
+            :aria-pressed="selectedPersona === persona"
+            @click="selectPersona(persona)"
           >
-            {{ DASHBOARD_ROLE_LABELS[role] }}
+            {{ DASHBOARD_PERSONAS[persona].label }}
           </V2Button>
         </nav>
       </template>
@@ -592,7 +718,7 @@ function isAbort(errorValue: unknown): boolean {
       code="403"
       kind="error"
       title="暂无驾驶舱权限"
-      description="当前账号没有任何角色驾驶舱查看权限。"
+      description="当前账号的业务角色未匹配可用驾驶舱数据权限。"
       :heading-level="2"
     />
     <V2PageState
@@ -624,8 +750,20 @@ function isAbort(errorValue: unknown): boolean {
     <template v-else-if="data">
       <section id="health-overview" class="command-panel health-panel">
         <header class="command-panel__title">
-          <strong>项目经营健康评分</strong>
-          <span>{{ currentProjectLabel }} · {{ DASHBOARD_ROLE_LABELS[selectedRole] }}</span>
+          <strong>{{ currentPersona.healthTitle }}</strong>
+          <V2Select
+            v-if="availablePersonaRoles.length > 1"
+            class="dashboard-page__lens-select"
+            :model-value="selectedRole"
+            :options="personaRoleOptions"
+            label="数据视角"
+            hide-label
+            @update:model-value="selectRole"
+          />
+          <span>
+            {{ currentProjectLabel }} · {{ currentPersona.viewLabel }} ·
+            {{ currentPersona.responsibility }}
+          </span>
           <V2Button size="small" variant="ghost" :loading="loading" @click="refreshDashboard">
             刷新
           </V2Button>
@@ -687,7 +825,11 @@ function isAbort(errorValue: unknown): boolean {
           <header class="panel-toolbar">
             <div>
               <strong>{{
-                trendDefinition.series.length ? trendDefinition.title : '经营动态'
+                isManagementDashboard
+                  ? '项目排名（按预计利润）'
+                  : trendDefinition.series.length
+                    ? trendDefinition.title
+                    : currentPersona.activityTitle
               }}</strong>
               <span v-if="trendDefinition.series.length">（万元）</span>
               <span v-else>（{{ activityItems.length }}）</span>
@@ -708,6 +850,14 @@ function isAbort(errorValue: unknown): boolean {
                 {{ range.label }}
               </V2Button>
             </div>
+            <V2Button
+              v-if="isManagementDashboard"
+              size="small"
+              variant="ghost"
+              @click="openAllRankedProjects"
+            >
+              查看全部项目
+            </V2Button>
           </header>
           <DashboardTrendChart
             v-if="trendDefinition.series.length && visibleTrendPoints.length"
@@ -736,7 +886,7 @@ function isAbort(errorValue: unknown): boolean {
 
         <section id="risk-list" class="command-panel risk-panel">
           <header class="panel-toolbar">
-            <strong>预警列表（{{ risks.length }}）</strong>
+            <strong>{{ currentPersona.riskTitle }}（{{ risks.length }}）</strong>
             <div class="risk-panel__actions">
               <V2Select
                 v-model="riskFilter"
@@ -745,6 +895,15 @@ function isAbort(errorValue: unknown): boolean {
                 hide-label
                 :options="riskFilterOptions"
                 placeholder="全部预警"
+              />
+              <V2Select
+                v-if="isManagementDashboard"
+                v-model="riskTypeFilter"
+                class="risk-filter risk-filter--type"
+                label="风险类型"
+                hide-label
+                :options="riskTypeOptions"
+                placeholder="全部类型"
               />
               <div v-if="canEvaluateAlerts" class="risk-evaluate-action">
                 <V2Button
@@ -821,6 +980,58 @@ function isAbort(errorValue: unknown): boolean {
           </footer>
         </section>
       </div>
+
+      <section v-if="isManagementDashboard" class="command-panel management-overdue-panel">
+        <header class="panel-toolbar">
+          <strong>逾期事项（{{ managementOverdueItems.length }}）</strong>
+          <span>最多展示 10 项</span>
+        </header>
+        <div class="risk-table-wrap" tabindex="0">
+          <table class="risk-table v2-table--compact">
+            <caption class="v2-visually-hidden">
+              管理层逾期待办事项
+            </caption>
+            <thead>
+              <tr>
+                <th>接收日期 / 待办事项</th>
+                <th>业务类型</th>
+                <th>所属项目</th>
+                <th>逾期天数</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in managementOverdueItems" :key="item.taskId">
+                <td>
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    :aria-label="`审批事项：${item.title}`"
+                    @click="openManagementOverdue(item.instanceId)"
+                  >
+                    {{ item.title }}
+                  </V2Button>
+                  <span v-if="item.receivedAt">{{ item.receivedAt }}</span>
+                  <span v-if="item.itemSummary">{{ item.itemSummary }}</span>
+                </td>
+                <td>{{ item.businessTypeLabel }}</td>
+                <td>{{ item.projectName || '—' }}</td>
+                <td>{{ item.pendingDays == null ? '—' : `${item.pendingDays} 天` }}</td>
+                <td>{{ item.taskStatus }}</td>
+                <td>只读监督</td>
+              </tr>
+              <tr v-if="managementOverdueUnavailable" class="empty-row">
+                <td colspan="6">历史报告期不提供实时逾期事项</td>
+              </tr>
+              <tr v-else-if="!managementOverdueItems.length" class="empty-row">
+                <td colspan="6">当前没有逾期事项</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section v-if="financeSummary.length" class="command-panel finance-summary-panel">
         <header class="panel-toolbar"><strong>资金闭环指标</strong></header>

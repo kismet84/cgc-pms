@@ -576,6 +576,37 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertTrue(empty.getMajorRisks().isEmpty());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("5.5 Management view: overdue tasks retain actionable business context")
+    void testManagementView_OverdueTaskContext() {
+        SeedResult seeded = seed("MGMT_OVERDUE_CONTEXT");
+        WfInstance instance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, TENANT_ID)
+                .eq(WfInstance::getProjectId, seeded.projectId)
+                .eq(WfInstance::getTitle, "审批-MGMT_OVERDUE_CONTEXT"));
+        assertNotNull(instance);
+        WfTask task = wfTaskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, TENANT_ID)
+                .eq(WfTask::getInstanceId, instance.getId()));
+        assertNotNull(task);
+        task.setReceivedAt(LocalDateTime.now().minusDays(9));
+        wfTaskMapper.updateById(task);
+
+        DashboardTaskItemVO overdue = dashboardService.getManagementView(seeded.projectId)
+                .getOverdueItems().stream()
+                .filter(item -> task.getId().toString().equals(item.getTaskId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals("审批-MGMT_OVERDUE_CONTEXT", overdue.getTitle());
+        assertEquals("合同审批摘要-MGMT_OVERDUE_CONTEXT", overdue.getItemSummary());
+        assertEquals(seeded.projectId.toString(), overdue.getProjectId());
+        assertEquals(seeded.projectName, overdue.getProjectName());
+        assertEquals("成本经理", overdue.getOwnerName());
+        assertTrue(overdue.getPendingDays() >= 9);
+    }
+
     private String applySelfScope(Long visibleProjectId, Long hiddenProjectId, long scopedUserId) {
         PmProject visible = projectMapper.selectById(visibleProjectId);
         visible.setCreatedBy(scopedUserId);

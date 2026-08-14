@@ -33,6 +33,178 @@ export interface DashboardHealth {
   tone: 'success' | 'warning' | 'danger'
 }
 
+export type DashboardPersona =
+  | 'COMPANY_OWNER'
+  | 'COMPANY_FINANCE'
+  | 'PROJECT_MANAGER'
+  | 'PROJECT_ACCOUNTANT'
+  | 'TECHNICAL_LEAD'
+  | 'SAFETY_LEAD'
+  | 'CONSTRUCTION_LEAD'
+  | 'PROCUREMENT_LEAD'
+  | 'EMPLOYEE'
+
+export interface DashboardPersonaDefinition {
+  label: string
+  responsibility: string
+  viewLabel: string
+  healthTitle: string
+  activityTitle: string
+  riskTitle: string
+  dashboardRoles: readonly DashboardRole[]
+}
+
+export const DASHBOARD_PERSONA_ORDER: readonly DashboardPersona[] = [
+  'COMPANY_OWNER',
+  'COMPANY_FINANCE',
+  'PROJECT_MANAGER',
+  'PROJECT_ACCOUNTANT',
+  'TECHNICAL_LEAD',
+  'SAFETY_LEAD',
+  'CONSTRUCTION_LEAD',
+  'PROCUREMENT_LEAD',
+  'EMPLOYEE',
+]
+
+export const DASHBOARD_PERSONAS: Record<DashboardPersona, DashboardPersonaDefinition> = {
+  COMPANY_OWNER: {
+    label: '公司老板',
+    responsibility: '统览公司经营、利润、风险与项目履约',
+    viewLabel: '公司经营',
+    healthTitle: '公司经营健康概览',
+    activityTitle: '项目经营排名',
+    riskTitle: '重大经营风险',
+    dashboardRoles: ['mgmt'],
+  },
+  COMPANY_FINANCE: {
+    label: '公司财务',
+    responsibility: '把控资金、预算、付款与经营核算',
+    viewLabel: '资金财务',
+    healthTitle: '资金运行健康概览',
+    activityTitle: '资金支付趋势',
+    riskTitle: '资金与付款预警',
+    dashboardRoles: ['finance'],
+  },
+  PROJECT_MANAGER: {
+    label: '项目经理',
+    responsibility: '统筹项目履约、审批、进度与合同节点',
+    viewLabel: '项目履约',
+    healthTitle: '项目履约健康概览',
+    activityTitle: '项目经营动态',
+    riskTitle: '项目履约预警',
+    dashboardRoles: ['pm'],
+  },
+  PROJECT_ACCOUNTANT: {
+    label: '项目会计',
+    responsibility: '跟踪项目成本、偏差、合同与付款',
+    viewLabel: '成本核算',
+    healthTitle: '项目成本健康概览',
+    activityTitle: '成本与合同动态',
+    riskTitle: '成本与结算预警',
+    dashboardRoles: ['cost', 'bm', 'finance'],
+  },
+  TECHNICAL_LEAD: {
+    label: '技术负责人',
+    responsibility: '推进技术审查、设计协调与问题闭环',
+    viewLabel: '技术履约',
+    healthTitle: '技术履约健康概览',
+    activityTitle: '技术履约动态',
+    riskTitle: '技术履约预警',
+    dashboardRoles: ['chiefEngineer'],
+  },
+  SAFETY_LEAD: {
+    label: '安全负责人',
+    responsibility: '关注质量安全风险、整改任务与闭环时效',
+    viewLabel: '安全闭环',
+    healthTitle: '安全闭环健康概览',
+    activityTitle: '整改与审批动态',
+    riskTitle: '质量安全预警',
+    dashboardRoles: ['pm'],
+  },
+  CONSTRUCTION_LEAD: {
+    label: '施工负责人',
+    responsibility: '协调现场物资、领用、计量与施工执行',
+    viewLabel: '施工物资',
+    healthTitle: '施工执行健康概览',
+    activityTitle: '施工与物资动态',
+    riskTitle: '施工执行预警',
+    dashboardRoles: ['production'],
+  },
+  PROCUREMENT_LEAD: {
+    label: '采购负责人',
+    responsibility: '跟踪采购申请、订单交付、收货与库存',
+    viewLabel: '采购供应',
+    healthTitle: '采购供应健康概览',
+    activityTitle: '采购与交付动态',
+    riskTitle: '采购与库存预警',
+    dashboardRoles: ['purchase'],
+  },
+  EMPLOYEE: {
+    label: '员工',
+    responsibility: '处理本人业务、跟进待办与闭环事项',
+    viewLabel: '个人工作',
+    healthTitle: '个人工作健康概览',
+    activityTitle: '工作动态',
+    riskTitle: '待办与风险',
+    dashboardRoles: ['pm'],
+  },
+}
+
+const DASHBOARD_ROLE_PERSONAS: Record<DashboardRole, DashboardPersona> = {
+  pm: 'PROJECT_MANAGER',
+  bm: 'PROJECT_ACCOUNTANT',
+  cost: 'PROJECT_ACCOUNTANT',
+  purchase: 'PROCUREMENT_LEAD',
+  production: 'CONSTRUCTION_LEAD',
+  chiefEngineer: 'TECHNICAL_LEAD',
+  finance: 'COMPANY_FINANCE',
+  mgmt: 'COMPANY_OWNER',
+}
+
+export function resolveDashboardPersonas(
+  roles: readonly string[],
+  permissions: readonly string[],
+  availableDashboardRoles: readonly DashboardRole[],
+): DashboardPersona[] {
+  const normalizedRoles = new Set(roles.map((role) => role.trim().toUpperCase()).filter(Boolean))
+  const isAdministrator =
+    normalizedRoles.has('ADMIN') || normalizedRoles.has('SUPER_ADMIN') || permissions.includes('*')
+  const canonical = DASHBOARD_PERSONA_ORDER.filter((persona) => normalizedRoles.has(persona))
+  const compatibleCanonical = canonical.filter((persona) =>
+    DASHBOARD_PERSONAS[persona].dashboardRoles.some((role) =>
+      availableDashboardRoles.includes(role),
+    ),
+  )
+  const candidates = isAdministrator
+    ? DASHBOARD_PERSONA_ORDER
+    : compatibleCanonical.length
+      ? compatibleCanonical
+      : availableDashboardRoles.map((role) => DASHBOARD_ROLE_PERSONAS[role])
+
+  return [...new Set(candidates)].filter((persona) =>
+    DASHBOARD_PERSONAS[persona].dashboardRoles.some((role) =>
+      availableDashboardRoles.includes(role),
+    ),
+  )
+}
+
+export function resolvePersonaDashboardRole(
+  persona: DashboardPersona,
+  availableDashboardRoles: readonly DashboardRole[],
+  preferredRole?: DashboardRole,
+): DashboardRole | undefined {
+  if (
+    preferredRole &&
+    DASHBOARD_PERSONAS[persona].dashboardRoles.includes(preferredRole) &&
+    availableDashboardRoles.includes(preferredRole)
+  ) {
+    return preferredRole
+  }
+  return DASHBOARD_PERSONAS[persona].dashboardRoles.find((role) =>
+    availableDashboardRoles.includes(role),
+  )
+}
+
 export const DASHBOARD_ROLE_LABELS: Record<DashboardRole, string> = {
   pm: '项目经理',
   bm: '商务经理',

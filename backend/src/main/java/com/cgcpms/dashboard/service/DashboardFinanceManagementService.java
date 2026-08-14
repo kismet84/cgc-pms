@@ -42,7 +42,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -277,21 +276,15 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                     .toList();
             vo.setTotalPendingTaskCount((long) visiblePending.size());
             LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+            Map<Long, String> activeProjectNames = DashboardViewSupport.projectNameMap(activeProjects);
             vo.setOverdueItems(visiblePending.stream()
                     .filter(task -> task.getReceivedAt() != null
                             && task.getReceivedAt().isBefore(sevenDaysAgo))
                     .limit(20)
-                    .map(task -> {
-                        DashboardTaskItemVO item = new DashboardTaskItemVO();
-                        item.setTaskId(String.valueOf(task.getId()));
-                        item.setInstanceId(String.valueOf(task.getInstanceId()));
-                        item.setBusinessType(task.getBusinessType());
-                        item.setTaskStatus(task.getTaskStatus());
-                        if (task.getReceivedAt() != null) {
-                            item.setReceivedAt(DateTimeUtils.DTF.format(task.getReceivedAt()));
-                        }
-                        return item;
-                    })
+                    .map(task -> DashboardViewSupport.toTaskItem(
+                            task,
+                            pendingInstanceMap.get(task.getInstanceId()),
+                            activeProjectNames))
                     .toList());
             List<AlertLog> unreadAlerts = alertLogMapper.selectList(
                     new LambdaQueryWrapper<AlertLog>()
