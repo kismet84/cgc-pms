@@ -33,6 +33,8 @@
       ".github/workflows/ci.yml",
       ".github/workflows/post-merge.yml",
       ".github/CODEOWNERS",
+      "scripts/codemap/generate-codemap.mjs",
+      "scripts/codemap/test-generate-codemap.mjs",
       ".agents/skills/cgc-pms-mainline-owner-flow/SKILL.md",
       ".agents/skills/cgc-pms-ci-gate-triage/SKILL.md",
       ".agents/skills/cgc-pms-runtime-refresh/SKILL.md",

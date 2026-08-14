@@ -6,7 +6,9 @@ param(
   [string]$Architecture = 'x64',
   [switch]$Contract,
   [ValidateRange(1024, 65535)]
-  [int]$HealthPort = 55173
+  [int]$HealthPort = 55173,
+  [ValidatePattern('^[0-9a-f]{32}$')]
+  [string]$ContractRunId = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,19 +61,24 @@ function Invoke-Native([string]$File, [string[]]$Arguments) {
 
 Import-VsDevEnvironment
 New-Item -ItemType Directory -Force -Path $outRoot | Out-Null
-& (Join-Path $PSScriptRoot 'generate-icon.ps1') | Out-Null
 
-$resourceRoot = Join-Path $launcherRoot 'resources'
+$sourceResourceRoot = Join-Path $launcherRoot 'resources'
 $source = Join-Path $launcherRoot 'src\main.cpp'
 $common = @('/nologo', '/EHsc', '/std:c++17', '/W4', '/WX', '/permissive-', '/utf-8', '/MT', '/O2')
 
 if ($Contract) {
-  $contractRoot = Join-Path $outRoot 'contract'
+  if (!$ContractRunId) { $ContractRunId = [guid]::NewGuid().ToString('N') }
+  $contractRoot = Join-Path $outRoot "contract\$ContractRunId\build"
   Assert-UnderLauncher $contractRoot
   if (Test-Path -LiteralPath $contractRoot) { Remove-Item -LiteralPath $contractRoot -Recurse -Force }
   $packageRoot = Join-Path $contractRoot '中文 空格'
   $chromiumRoot = Join-Path $packageRoot 'chromium'
-  New-Item -ItemType Directory -Force -Path $chromiumRoot | Out-Null
+  $resourceRoot = Join-Path $contractRoot 'resources'
+  New-Item -ItemType Directory -Force -Path $chromiumRoot, $resourceRoot | Out-Null
+  foreach ($resourceName in 'launcher.rc', 'app.manifest') {
+    Copy-Item -LiteralPath (Join-Path $sourceResourceRoot $resourceName) -Destination $resourceRoot
+  }
+  & (Join-Path $PSScriptRoot 'generate-icon.ps1') -OutputPath (Join-Path $resourceRoot 'cgc-pms.ico') | Out-Null
 
   $launcherRes = Join-Path $contractRoot 'launcher.res'
   Push-Location $resourceRoot
@@ -103,6 +110,8 @@ $releaseRoot = Join-Path $outRoot $Configuration
 Assert-UnderLauncher $releaseRoot
 if (Test-Path -LiteralPath $releaseRoot) { Remove-Item -LiteralPath $releaseRoot -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
+$resourceRoot = $sourceResourceRoot
+& (Join-Path $PSScriptRoot 'generate-icon.ps1') | Out-Null
 $resource = Join-Path $releaseRoot 'launcher.res'
 Push-Location $resourceRoot
 try { Invoke-Native 'rc.exe' @('/nologo', "/fo$resource", 'launcher.rc') } finally { Pop-Location }

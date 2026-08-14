@@ -138,6 +138,12 @@ function Assert-Rejected([scriptblock]$Action,[string]$Name) {
   if (!$rejected) { throw "$Name negative self-test did not fail" }
 }
 
+function Assert-NoWorkflowPathFilters([string]$Text,[string]$Name) {
+  if ([regex]::IsMatch($Text, '(?m)^\s*[''"]?paths(?:-ignore)?[''"]?\s*:')) {
+    throw "$Name must not use path filters that can leave required checks pending"
+  }
+}
+
 $workflow = Read-RepoText '.github\workflows\ci.yml'
 $postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
 $supplyChainRescan = Read-RepoText '.github\workflows\supply-chain-rescan.yml'
@@ -150,6 +156,12 @@ $dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
 $minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
 $prodCompose = Read-RepoText 'deploy\docker-compose.prod.yml'
 $frontendDockerfile = Read-RepoText 'frontend-admin-v2\Dockerfile'
+foreach ($pathFilterSample in @(
+  "on:`n  push:`n    `"paths`":`n      - docs/**",
+  "on:`n  pull_request:`n    'paths-ignore' :`n      - docs/**"
+)) {
+  Assert-Rejected { Assert-NoWorkflowPathFilters $pathFilterSample 'path-filter contract self-check' } 'quoted workflow path filter'
+}
 foreach ($mutableImageSample in @("services:`n  db:`n    image: postgres:latest", 'docker run --rm postgres:latest')) {
   $mutableImageRejected = $false
   try { Assert-ImmutableImageRefs $mutableImageSample 'contract self-check' } catch { $mutableImageRejected = $true }
@@ -209,6 +221,7 @@ $e2e = Get-JobBlock $workflow 'e2e'
 $sqlSafety = Get-JobBlock $workflow 'sql-safety-scan'
 
 Assert-Contains $workflow @('branches-ignore: [master, main]','pull_request:','branches: [master, main]','workflow_dispatch:') 'workflow triggers'
+Assert-NoWorkflowPathFilters $workflow 'required workflow'
 Assert-Contains $workflow @('run-name: CI ${{ github.event_name }} ${{ github.event.pull_request.number || github.sha }}') 'workflow run identity'
 Assert-Contains $workflow @(
   'concurrency:','group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}','cancel-in-progress: true'
@@ -248,7 +261,7 @@ Assert-Contains $postMergeVerifier @(
 ) 'post-merge exact-run evidence'
 Assert-Contains $codeOwners @(
   '/.github/CODEOWNERS @kismet84','/.github/workflows/ @kismet84',
-  '/.github/actions/ @kismet84','/scripts/ci/ @kismet84',
+  '/.github/actions/ @kismet84','/scripts/ci/ @kismet84','/scripts/codemap/ @kismet84',
   '/scripts/codex-autopilot/verify-pre-pr-ci.ps1 @kismet84'
 ) 'CI control-plane CODEOWNERS'
 $postMergeJobsMatch = [regex]::Match($postMergeWorkflow,'(?m)^jobs:\r?$')

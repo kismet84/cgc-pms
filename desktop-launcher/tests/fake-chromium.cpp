@@ -12,6 +12,17 @@ namespace fs = std::filesystem;
 
 constexpr wchar_t kWindowConfiguredEvent[] = L"Local\\CGCPMS.Desktop.WindowConfigured.Contract";
 
+std::wstring ContractObjectName(const wchar_t* base) {
+  wchar_t runId[64]{};
+  const DWORD length = GetEnvironmentVariableW(L"CGCPMS_CONTRACT_RUN_ID", runId, 64);
+  if (length != 32) return {};
+  for (DWORD index = 0; index < length; ++index) {
+    if (!((runId[index] >= L'0' && runId[index] <= L'9') ||
+          (runId[index] >= L'a' && runId[index] <= L'f'))) return {};
+  }
+  return std::wstring(base) + L"." + std::wstring(runId, length);
+}
+
 LONG gFixedNormalWidth = 0;
 LONG gFixedNormalHeight = 0;
 
@@ -176,7 +187,9 @@ int wmain(int argc, wchar_t** argv) {
                                CW_USEDEFAULT, CW_USEDEFAULT, 640, 480, nullptr, nullptr,
                                windowClass.hInstance, nullptr);
   if (!decoy) return 95;
-  HANDLE configuredEvent = CreateEventW(nullptr, TRUE, FALSE, kWindowConfiguredEvent);
+  const std::wstring eventName = ContractObjectName(kWindowConfiguredEvent);
+  if (eventName.empty()) return 93;
+  HANDLE configuredEvent = CreateEventW(nullptr, TRUE, FALSE, eventName.c_str());
   if (!configuredEvent) return 93;
   const bool configured = WaitForFixedFrame(window, configuredEvent, 10000);
   if (configured) {

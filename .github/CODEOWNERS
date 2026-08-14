@@ -3,6 +3,7 @@
 /.github/workflows/ @kismet84
 /.github/actions/ @kismet84
 /scripts/ci/ @kismet84
+/scripts/codemap/ @kismet84
 /scripts/check-sql-safety.ps1 @kismet84
 /scripts/codex-autopilot/verify-pre-pr-ci.ps1 @kismet84
 /scripts/codex-autopilot/codex-autopilot.config.json @kismet84

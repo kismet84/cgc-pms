@@ -49,6 +49,19 @@ constexpr wchar_t kProfileDir[] = L"profiles";
 constexpr wchar_t kLogDir[] = L"logs";
 #endif
 
+#ifdef CGCPMS_CONTRACT_TEST
+std::wstring ContractObjectName(const wchar_t* base) {
+  wchar_t runId[64]{};
+  const DWORD length = GetEnvironmentVariableW(L"CGCPMS_CONTRACT_RUN_ID", runId, 64);
+  if (length != 32) return {};
+  for (DWORD index = 0; index < length; ++index) {
+    if (!((runId[index] >= L'0' && runId[index] <= L'9') ||
+          (runId[index] >= L'a' && runId[index] <= L'f'))) return {};
+  }
+  return std::wstring(base) + L"." + std::wstring(runId, length);
+}
+#endif
+
 enum ExitCode {
   kOk = 0,
   kInvalidInvocation = 10,
@@ -89,11 +102,21 @@ std::wstring ModuleDirectory() {
 }
 
 std::wstring LocalDataRoot() {
+#ifdef CGCPMS_CONTRACT_TEST
+  wchar_t raw[32768]{};
+  const DWORD length = GetEnvironmentVariableW(L"CGCPMS_CONTRACT_DATA_ROOT", raw, 32768);
+  if (!length || length >= 32768) return {};
+  const fs::path path(std::wstring(raw, length));
+  std::error_code ec;
+  if (!path.is_absolute() || path.lexically_normal() != path || !fs::is_directory(path, ec) || ec) return {};
+  return path.wstring();
+#else
   PWSTR raw = nullptr;
   if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_CREATE, nullptr, &raw))) return {};
   fs::path path(raw);
   CoTaskMemFree(raw);
   return (path / L"CGC-PMS" / L"Desktop").wstring();
+#endif
 }
 
 std::string Utf8(const std::wstring& value) {
@@ -408,7 +431,8 @@ HWND WaitForChromiumWindow(DWORD pid, HANDLE process) {
 
 bool CompleteWindowConfiguration() {
 #ifdef CGCPMS_CONTRACT_TEST
-  UniqueHandle configuredEvent(OpenEventW(EVENT_MODIFY_STATE, FALSE, kWindowConfiguredEvent));
+  const std::wstring eventName = ContractObjectName(kWindowConfiguredEvent);
+  UniqueHandle configuredEvent(OpenEventW(EVENT_MODIFY_STATE, FALSE, eventName.c_str()));
   return configuredEvent && SetEvent(configuredEvent.value) != FALSE;
 #else
   return true;
@@ -574,7 +598,13 @@ int RunLauncher(int argc) {
   if (module.empty() || dataRoot.empty()) return kLaunchFailed;
   Log(dataRoot, "startup", "begin");
 
+#ifdef CGCPMS_CONTRACT_TEST
+  const std::wstring mutexName = ContractObjectName(kMutexName);
+  if (mutexName.empty()) return kLaunchFailed;
+  UniqueHandle mutex(CreateMutexW(nullptr, TRUE, mutexName.c_str()));
+#else
   UniqueHandle mutex(CreateMutexW(nullptr, TRUE, kMutexName));
+#endif
   if (!mutex) return kLaunchFailed;
   if (GetLastError() == ERROR_ALREADY_EXISTS) {
     Inform(L"CGC-PMS 已在运行。", MB_OK | MB_ICONINFORMATION);
