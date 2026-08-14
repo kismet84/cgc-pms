@@ -86,7 +86,7 @@ test('logs in through the existing contract and clears the password field', asyn
   await page.getByRole('button', { name: '登录' }).click()
 
   await expect(page).toHaveURL(/\/dashboard$/)
-  await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '公司老板驾驶舱' })).toBeVisible()
   await expect(page.getByRole('banner').getByText('平台管理员')).toBeVisible()
   await expect(page.getByText('local-password')).toHaveCount(0)
 })

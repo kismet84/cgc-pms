@@ -689,6 +689,7 @@ function isAbort(errorValue: unknown): boolean {
 <template>
   <section class="dashboard-page" aria-labelledby="dashboard-title">
     <V2Card
+      class="dashboard-page__persona-card"
       :title="allowedRoles.length ? `${currentPersona.label}驾驶舱` : '经营驾驶舱'"
       title-id="dashboard-title"
       :heading-level="1"
@@ -1665,6 +1666,15 @@ function isAbort(errorValue: unknown): boolean {
   text-align: center;
 }
 @media (max-width: 78.75rem) {
+  .dashboard-page__persona-card :deep(.v2-card__header) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .dashboard-page__persona-card :deep(.v2-card__actions) {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
   .health-content {
     grid-template-columns: 190px minmax(230px, 1fr);
   }

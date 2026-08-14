@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-14T04:51:50.155Z",
+  "generation_time": "2026-08-14T05:05:59.135Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 406,
-      "fingerprint": "87e7e88c9800d5ca3884952a3313965813148960bfd2638d5de57d4e7c2cf06a"
+      "fingerprint": "756afdbb23ab9de1ff8b6156e38390b58ee12800e374b70e14f0539197432a01"
     },
     {
       "id": "mobile",
@@ -134,13 +134,13 @@
       "fingerprint": "ea249f53a87e0c467de8a2cbf5f327c5d78e6d9ffb7902d22d94be654b796a9c"
     }
   ],
-  "generation_base_commit": "fb602b3af2042b4081afa2b719b955d2df01bcf2",
+  "generation_base_commit": "4419241945e66006fff0f2511a381f5c54f33e29",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "b650ac7bd4998231d5b49ffb054e8a86b4486207",
+    "previous_generation_base_commit": "fb602b3af2042b4081afa2b719b955d2df01bcf2",
     "stale_modules": [
-      "delivery_tooling"
+      "frontend_v2"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

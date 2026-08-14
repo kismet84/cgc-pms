@@ -129,6 +129,29 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
       }),
     }),
   )
+  await page.route(/\/api\/dashboard\/management(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: {
+          activeProjectCount: 0,
+          totalContractAmount: '0.00',
+          totalDynamicCost: '0.00',
+          totalExpectedProfit: '0.00',
+          totalPaidAmount: '0.00',
+          totalPendingTaskCount: 0,
+          totalRiskCount: 0,
+          projectRankings: [],
+          metricSources: [],
+          majorRisks: [],
+          overdueItems: [],
+        },
+      }),
+    }),
+  )
   await page.route(/\/api\/alerts(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -224,7 +247,12 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
   ]) {
     await page.setViewportSize(viewport)
     await page.goto('/dashboard')
-    await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '公司老板驾驶舱' })).toBeVisible()
+    const dashboardHeadingBox = await page
+      .getByRole('heading', { level: 1, name: '公司老板驾驶舱' })
+      .boundingBox()
+    expect(dashboardHeadingBox?.width).toBeGreaterThan(100)
+    expect(dashboardHeadingBox?.height).toBeLessThan(50)
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
     await expect(page.getByRole('navigation', { name: '工作区标签页' })).toHaveCount(1)
@@ -284,7 +312,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
       await page.getByRole('link', { name: '物资管理', exact: true }).click()
       await expect(page).toHaveURL(/\/inventory\/purchase-request\?desktop=1/)
       await page.goto('/dashboard?desktop=1')
-      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: '公司老板驾驶舱' })).toBeVisible()
     }
 
     await page.getByRole('button', { name: '打开通知中心' }).click()
@@ -345,7 +373,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
   }
 
   expect(businessRequests).toContain('/api/project-context/options')
-  expect(businessRequests).toContain('/api/dashboard/project-manager')
+  expect(businessRequests).toContain('/api/dashboard/management')
   expect(runtimeProblems).toEqual([])
 })
 
