@@ -2,6 +2,7 @@
 import type {
   ProjectMember,
   ProjectMemberCommand,
+  ProjectMemberOptions,
   ProjectRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -21,13 +22,13 @@ import {
   addProjectMember,
   deleteProjectMember,
   loadProject,
+  loadProjectMemberOptions,
   loadProjectMembers,
-  loadProjectUsers,
   updateProjectMember,
 } from '@/services/projects'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
-import { cleanMemberCommand, isSuperAdmin, projectRoleLabel, projectRoleOptions } from '../model'
+import { cleanMemberCommand, projectRoleLabel, projectRoleOptions } from '../model'
 import { memberStatusLabel } from './model'
 
 const route = useRoute()
@@ -39,7 +40,9 @@ const errorMessage = ref('')
 const successMessage = useToastMessage()
 const project = ref<ProjectRecord | null>(null)
 const members = ref<ProjectMember[]>([])
-const userOptions = ref<Array<{ value: string; label: string }>>([])
+const memberOptions = ref<ProjectMemberOptions>({ roles: [], users: [], usersTruncated: false })
+const candidateKeyword = ref('')
+const optionsLoading = ref(false)
 const memberOpen = ref(false)
 const editingMemberId = ref('')
 const memberForm = reactive<ProjectMemberCommand>({
@@ -54,6 +57,7 @@ const memberForm = reactive<ProjectMemberCommand>({
 const pendingRemoval = ref<ProjectMember | null>(null)
 let requestId = 0
 let controller: AbortController | null = null
+let optionsController: AbortController | null = null
 
 watch(errorMessage, (value) => {
   if (value) showToast('error', '操作未完成', value)
@@ -61,19 +65,60 @@ watch(errorMessage, (value) => {
 
 const projectId = computed(() => String(route.params.projectId ?? ''))
 const can = (code: string) => session.hasPermission(code)
-const memberName = (userId: string) =>
-  userOptions.value.find((item) => item.value === userId)?.label ?? '成员姓名缺失'
+const userOptions = computed(() =>
+  memberOptions.value.users.map((item) => ({
+    value: item.userId,
+    label: item.realName ? `${item.realName}（${item.username}）` : item.username,
+  })),
+)
+const memberName = (member: ProjectMember) =>
+  member.realName
+    ? `${member.realName}（${member.username ?? member.userId}）`
+    : (userOptions.value.find((item) => item.value === member.userId)?.label ??
+      member.username ??
+      '成员姓名缺失')
+const roleLabel = (member: ProjectMember) =>
+  member.roleName ??
+  memberOptions.value.roles.find((item) => item.roleCode === member.roleCode)?.roleName ??
+  projectRoleLabel(member.roleCode)
 const availableMemberUserOptions = computed(() => {
   const existingUserIds = new Set(members.value.map((member) => member.userId))
   return userOptions.value.filter((option) => !existingUserIds.has(option.value))
 })
-const memberRoleOptions = computed(() =>
-  projectRoleOptions(editingMemberId.value ? memberForm.roleCode : ''),
+const memberRoleOptions = computed(() => {
+  const user = memberOptions.value.users.find((item) => item.userId === memberForm.userId)
+  const allowed = new Set(user?.roleCodes ?? [])
+  const options = memberOptions.value.roles
+    .filter((item) => allowed.has(item.roleCode))
+    .map((item) => ({ value: item.roleCode, label: item.roleName }))
+  const current = editingMemberId.value ? memberForm.roleCode : ''
+  if (!current || options.some((item) => item.value === current)) return options
+  const currentOption = projectRoleOptions(current).find((item) => item.value === current)
+  return [
+    ...options,
+    {
+      value: current,
+      label: currentOption?.label ?? projectRoleLabel(current),
+      disabled: true,
+    },
+  ]
+})
+watch(
+  () => memberForm.userId,
+  () => {
+    if (
+      !editingMemberId.value &&
+      memberForm.roleCode &&
+      !memberRoleOptions.value.some((item) => item.value === memberForm.roleCode)
+    ) {
+      memberForm.roleCode = ''
+    }
+  },
 )
 const confirmationCopy = computed(() => ({
   title: '移除项目成员',
   description: pendingRemoval.value
-    ? `确认移除成员 ${memberName(pendingRemoval.value.userId)}？该成员将失去当前项目角色。`
+    ? `确认移除成员 ${memberName(pendingRemoval.value)}？该成员将失去当前项目角色。`
     : '',
   confirmText: '确认移除',
   danger: true,
@@ -99,28 +144,22 @@ async function load(preserveNotice = false): Promise<boolean> {
     const current = await loadProject(projectId.value, nextController.signal)
     if (active !== requestId) return false
     project.value = current
-    const page = await loadProjectMembers(
-      projectId.value,
-      { pageNo: 1, pageSize: 200 },
-      nextController.signal,
-    )
+    const canLoadOptions = can('project:member:add') || can('project:member:edit')
+    const [page, options] = await Promise.all([
+      loadProjectMembers(projectId.value, { pageNo: 1, pageSize: 200 }, nextController.signal),
+      canLoadOptions
+        ? loadProjectMemberOptions(projectId.value, {}, nextController.signal)
+        : Promise.resolve<ProjectMemberOptions>({ roles: [], users: [], usersTruncated: false }),
+    ])
     if (active !== requestId) return false
     members.value = page.records
-    if ((can('system:user:query') || isSuperAdmin(session.roles)) && !userOptions.value.length) {
-      const users = await loadProjectUsers(nextController.signal)
-      if (active !== requestId) return false
-      userOptions.value = users.records
-        .filter((item) => ['ACTIVE', 'ENABLE'].includes(item.status))
-        .map((item) => ({
-          value: item.id,
-          label: item.realName ? `${item.realName}（${item.username}）` : item.username,
-        }))
-    }
+    memberOptions.value = options
     return true
   } catch (error) {
     if (!nextController.signal.aborted && active === requestId) {
       project.value = null
       members.value = []
+      memberOptions.value = { roles: [], users: [], usersTruncated: false }
       errorMessage.value = message(error, '项目数据加载失败')
     }
     return false
@@ -129,8 +168,33 @@ async function load(preserveNotice = false): Promise<boolean> {
   }
 }
 
+async function refreshMemberOptions(includeUserId?: string): Promise<void> {
+  optionsController?.abort()
+  const nextController = new AbortController()
+  optionsController = nextController
+  optionsLoading.value = true
+  try {
+    memberOptions.value = await loadProjectMemberOptions(
+      projectId.value,
+      {
+        keyword: candidateKeyword.value,
+        includeUserId,
+      },
+      nextController.signal,
+    )
+  } catch (error) {
+    if (!nextController.signal.aborted) {
+      memberOptions.value = { roles: [], users: [], usersTruncated: false }
+      errorMessage.value = message(error, '候选成员加载失败')
+    }
+  } finally {
+    if (optionsController === nextController) optionsLoading.value = false
+  }
+}
+
 function openMember(member?: ProjectMember) {
   editingMemberId.value = member?.id ?? ''
+  candidateKeyword.value = ''
   Object.assign(memberForm, {
     userId: member?.userId ?? '',
     roleCode: member?.roleCode ?? '',
@@ -142,6 +206,13 @@ function openMember(member?: ProjectMember) {
   })
   memberOpen.value = true
   resetNotices()
+  void refreshMemberOptions(member?.userId)
+}
+
+function searchMemberCandidates() {
+  memberForm.userId = ''
+  memberForm.roleCode = ''
+  void refreshMemberOptions()
 }
 
 async function saveMember() {
@@ -202,7 +273,10 @@ watch(
   () => void load(),
   { immediate: true },
 )
-onBeforeUnmount(() => controller?.abort())
+onBeforeUnmount(() => {
+  controller?.abort()
+  optionsController?.abort()
+})
 </script>
 
 <template>
@@ -239,10 +313,9 @@ onBeforeUnmount(() => controller?.abort())
         <div class="project-page__members">
           <article v-for="member in members" :key="member.id">
             <div>
-              <strong>{{ memberName(member.userId) }}</strong>
+              <strong>{{ memberName(member) }}</strong>
               <p>
-                {{ projectRoleLabel(member.roleCode) }} ·
-                {{ member.positionName || '未填写岗位' }} ·
+                {{ roleLabel(member) }} · {{ member.positionName || '未填写岗位' }} ·
                 {{ memberStatusLabel(member.status) }}
               </p>
             </div>
@@ -323,19 +396,38 @@ onBeforeUnmount(() => controller?.abort())
       panel-class="v2-dialog-standard"
     >
       <form class="project-page__form project-page__form--dialog" @submit.prevent="saveMember">
+        <template v-if="!editingMemberId">
+          <V2Input
+            v-model="candidateKeyword"
+            label="搜索候选成员"
+            hint="按姓名或账号搜索，避免加载无界租户用户列表。"
+          />
+          <V2Button
+            type="button"
+            size="small"
+            :loading="optionsLoading"
+            @click="searchMemberCandidates"
+          >
+            搜索候选
+          </V2Button>
+        </template>
         <V2Select
           v-if="!editingMemberId"
           v-model="memberForm.userId"
           label="用户"
           :options="availableMemberUserOptions"
           placeholder="请选择用户"
-          :disabled="!availableMemberUserOptions.length"
+          :hint="
+            memberOptions.usersTruncated ? '结果较多，仅显示前100名；请缩小搜索词。' : undefined
+          "
+          :disabled="optionsLoading || !availableMemberUserOptions.length"
           required
         />
         <V2Select
           v-model="memberForm.roleCode"
           label="项目角色"
           :options="memberRoleOptions"
+          :disabled="optionsLoading || !memberRoleOptions.length"
           required
         />
         <V2Input v-model="memberForm.positionName" label="岗位名称" />

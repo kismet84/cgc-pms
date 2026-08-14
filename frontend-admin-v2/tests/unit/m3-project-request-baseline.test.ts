@@ -8,6 +8,7 @@ import ProjectPage from '@/pages/projects/ProjectPage.vue'
 import { PROJECT_ROLE_OPTIONS, projectRoleLabel, projectRoleOptions } from '@/pages/projects/model'
 import {
   loadProject,
+  loadProjectMemberOptions,
   loadProjectMembers,
   loadProjectOverview,
   loadProjectPage,
@@ -232,11 +233,13 @@ describe('M3 project request baseline', () => {
     await loadProject('P/1')
     await loadProjectOverview('P/1')
     await loadProjectMembers('P/1', { pageNo: 1, roleCode: 'PM' })
+    await loadProjectMemberOptions('P/1')
 
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       '/api/projects/P%2F1',
       '/api/projects/P%2F1/overview',
       '/api/projects/P%2F1/members?pageNo=1&roleCode=PM',
+      '/api/projects/P%2F1/members/options',
     ])
   })
 
@@ -286,15 +289,27 @@ describe('M3 project request baseline', () => {
           pageNo: 1,
           pageSize: 200,
         })
-      if (url === '/api/system/users?pageNo=1&pageSize=200')
+      if (url === '/api/projects/P1/members/options')
         return apiResponse({
-          records: [
-            { id: 'U1', username: 'existing', realName: '现有离岗成员', status: 'ENABLE' },
-            { id: 'U2', username: 'candidate', realName: '可选用户', status: 'ENABLE' },
+          roles: [
+            { roleCode: 'PROJECT_MANAGER', roleName: '项目经理' },
+            { roleCode: 'PROJECT_ACCOUNTANT', roleName: '项目会计' },
+            { roleCode: 'EMPLOYEE', roleName: '员工' },
           ],
-          total: 2,
-          pageNo: 1,
-          pageSize: 200,
+          users: [
+            {
+              userId: 'U1',
+              username: 'existing',
+              realName: '现有离岗成员',
+              roleCodes: ['PROJECT_MANAGER'],
+            },
+            {
+              userId: 'U2',
+              username: 'candidate',
+              realName: '可选用户',
+              roleCodes: ['PROJECT_ACCOUNTANT', 'EMPLOYEE'],
+            },
+          ],
         })
       throw new Error(`unexpected request: ${url}`)
     })
@@ -304,7 +319,7 @@ describe('M3 project request baseline', () => {
       userId: 'ADMIN',
       username: 'admin',
       roles: ['ADMIN'],
-      permissions: ['project:member:list', 'project:member:add', 'system:user:query'],
+      permissions: ['project:member:list', 'project:member:add'],
     })
     const router = createRouter({
       history: createMemoryHistory(),
@@ -329,20 +344,19 @@ describe('M3 project request baseline', () => {
         (option) => option.value,
       ),
     ).toEqual(['', 'U2'])
+    const userSelect = document.querySelector<HTMLSelectElement>('select[aria-label="用户"]')
+    if (!userSelect) throw new Error('missing user select')
+    userSelect.value = 'U2'
+    userSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
     expect(
       [...document.querySelectorAll<HTMLSelectElement>('select[aria-label="项目角色"] option')].map(
         (option) => option.value,
       ),
-    ).toEqual([
-      '',
-      'PROJECT_MANAGER',
-      'PROJECT_ACCOUNTANT',
-      'TECHNICAL_LEAD',
-      'SAFETY_LEAD',
-      'CONSTRUCTION_LEAD',
-      'PROCUREMENT_LEAD',
-      'EMPLOYEE',
-    ])
+    ).toEqual(['', 'PROJECT_ACCOUNTANT', 'EMPLOYEE'])
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).not.toContain(
+      '/api/system/users?pageNo=1&pageSize=200',
+    )
     wrapper.unmount()
   })
 

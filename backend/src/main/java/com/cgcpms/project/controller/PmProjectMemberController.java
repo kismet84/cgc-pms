@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.project.dto.CreateProjectMemberRequest;
 import com.cgcpms.project.dto.UpdateProjectMemberRequest;
 import com.cgcpms.project.service.PmProjectMemberService;
+import com.cgcpms.project.vo.PmProjectMemberOptionsVO;
 import com.cgcpms.project.vo.PmProjectMemberVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,15 @@ public class PmProjectMemberController {
             @RequestParam(required = false) String status) {
         IPage<PmProjectMemberVO> page = memberService.getPage(projectId, pageNo, pageSize, roleCode, status);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('project:member:add','project:member:edit')")
+    public ApiResponse<PmProjectMemberOptionsVO> options(
+            @PathVariable Long projectId,
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(required = false) Long includeUserId) {
+        return ApiResponse.success(memberService.getOptions(projectId, keyword, includeUserId));
     }
 
     @GetMapping("/{id}")

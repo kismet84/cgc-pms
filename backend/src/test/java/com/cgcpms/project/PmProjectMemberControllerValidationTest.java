@@ -8,11 +8,14 @@ import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,6 +26,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class PmProjectMemberControllerValidationTest {
+
+    @Test
+    void optionsUsesProjectMemberPermissionsWithoutSystemUserQuery() throws Exception {
+        PreAuthorize authorization = PmProjectMemberController.class
+                .getMethod("options", Long.class, String.class, Long.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertTrue(authorization.value().contains("project:member:add"));
+        assertTrue(authorization.value().contains("project:member:edit"));
+        assertFalse(authorization.value().contains("system:user:query"));
+    }
 
     @Test
     void createAcceptsOnlyClientWritableFields() throws Exception {

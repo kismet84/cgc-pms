@@ -4,6 +4,8 @@ import {
   type PageResult,
   type ProjectContextOption,
   type ProjectMember,
+  type ProjectMemberOptionQuery,
+  type ProjectMemberOptions,
   type ProjectMemberQuery,
   type ProjectOverview,
   type ProjectQuery,
@@ -92,6 +94,17 @@ export function loadProjectMembers(
   )
 }
 
+export function loadProjectMemberOptions(
+  projectId: string,
+  query: ProjectMemberOptionQuery = {},
+  signal?: AbortSignal,
+): Promise<ProjectMemberOptions> {
+  return apiRequest<ProjectMemberOptions>(
+    withQuery(PROJECT_API.memberOptions(requiredId(projectId)), query),
+    { signal },
+  )
+}
+
 export function loadVisibleProjects(signal?: AbortSignal): Promise<ProjectContextOption[]> {
   return apiRequest<ProjectContextOption[]>(PROJECT_API.contextOptions, { signal })
 }
@@ -172,7 +185,10 @@ export function loadProjectUsers(signal?: AbortSignal): Promise<PageResult<Proje
   })
 }
 
-function withQuery(path: string, query: ProjectQuery | ProjectMemberQuery): string {
+function withQuery(
+  path: string,
+  query: ProjectQuery | ProjectMemberQuery | ProjectMemberOptionQuery,
+): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
     if (typeof value === 'number') {

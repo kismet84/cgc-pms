@@ -16,6 +16,7 @@ import {
   loadProjectDictionary,
   loadProjectActivationReadiness,
   loadProjectCommencement,
+  loadProjectMemberOptions,
   loadProjectUsers,
   submitProject,
   saveProjectCommencement,
@@ -66,10 +67,12 @@ describe('M3 project object service', () => {
     await addProjectMember('P/1', command)
     await updateProjectMember('P/1', 'M/2', command)
     await deleteProjectMember('P/1', 'M/2')
+    await loadProjectMemberOptions('P/1', { keyword: ' 王 ', includeUserId: 'U/1' })
     expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
       ['/api/projects/P%2F1/members', 'POST'],
       ['/api/projects/P%2F1/members/M%2F2', 'PUT'],
       ['/api/projects/P%2F1/members/M%2F2', 'DELETE'],
+      ['/api/projects/P%2F1/members/options?keyword=%E7%8E%8B&includeUserId=U%2F1', 'GET'],
     ])
   })
 
