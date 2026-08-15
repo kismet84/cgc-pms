@@ -17,6 +17,7 @@ import {
   V2Badge,
   V2Button,
   V2Card,
+  V2ConfirmDialog,
   V2Dialog,
   V2Input,
   V2PageState,
@@ -115,6 +116,9 @@ const busy = ref(false)
 const errorMessage = ref('')
 const editorOpen = ref(false)
 const editOpen = ref(false)
+const deleteOpen = ref(false)
+const pendingDeleteId = ref('')
+const pendingDeleteCode = ref('')
 
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
@@ -136,6 +140,12 @@ const canSubmitSelected = computed(
   () =>
     session.hasAdminOrPermission('purchase:order:submit') &&
     selected.value?.approvalStatus === 'DRAFT',
+)
+const canDeleteSelected = computed(
+  () =>
+    session.hasAdminOrPermission('purchase:order:delete') &&
+    selected.value?.approvalStatus === 'DRAFT' &&
+    selected.value?.orderStatus === 'DRAFT',
 )
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const detailTable = computed(() => orderDetailTable(detailItems.value))
@@ -672,6 +682,45 @@ async function submitSelected(): Promise<void> {
   }
 }
 
+function openDelete(): void {
+  if (!selected.value || !canDeleteSelected.value || busy.value) return
+  pendingDeleteId.value = selected.value.id
+  pendingDeleteCode.value = orderCode(selected.value)
+  clearDetail()
+  deleteOpen.value = true
+}
+
+function closeDelete(): void {
+  if (busy.value) return
+  deleteOpen.value = false
+  pendingDeleteId.value = ''
+  pendingDeleteCode.value = ''
+}
+
+async function confirmDelete(): Promise<void> {
+  const id = pendingDeleteId.value
+  if (!id || busy.value) return
+  busy.value = true
+  try {
+    await deletePurchaseOrder(id)
+    deleteOpen.value = false
+    pendingDeleteId.value = ''
+    pendingDeleteCode.value = ''
+    await loadPage()
+    showToast('success', '采购订单已删除', '草稿订单及其明细已删除')
+  } catch (error) {
+    showToast('error', '采购订单删除失败', errorText(error, '采购订单删除失败'))
+    await loadPage()
+    const refreshed = records.value.find((record) => record.id === id)
+    if (refreshed) await selectRecord(refreshed)
+    deleteOpen.value = false
+    pendingDeleteId.value = ''
+    pendingDeleteCode.value = ''
+  } finally {
+    busy.value = false
+  }
+}
+
 async function openSourceRequest(): Promise<void> {
   if (!sourceRequest.value || !selected.value) return
   await router.push({
@@ -812,9 +861,11 @@ onBeforeUnmount(() => {
       :can-edit="canEditSelected"
       :can-manage-attachments="canSaveItems"
       :can-submit="canSubmitSelected"
+      :can-delete="canDeleteSelected"
       @close="clearDetail"
       @edit="openEdit"
       @submit="submitSelected"
+      @delete="openDelete"
       @open-source-request="openSourceRequest"
     />
 
@@ -1103,6 +1154,17 @@ onBeforeUnmount(() => {
         ></template
       >
     </V2Dialog>
+
+    <V2ConfirmDialog
+      :open="deleteOpen"
+      title="删除草稿采购订单"
+      :description="`确认删除 ${pendingDeleteCode}？仅未提交且尚未进入履约的草稿可删除；订单明细与附件将同步删除。`"
+      confirm-text="确认删除"
+      danger
+      :loading="busy"
+      @close="closeDelete"
+      @confirm="confirmDelete"
+    />
   </section>
 </template>
 

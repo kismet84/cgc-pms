@@ -40,7 +40,7 @@ WORKDIR /app
 # -XX:HeapDumpPath=/var/lib/cgc-pms/heapdumps persistent Compose volume
 # -XX:+UseContainerSupport       respect cgroup limits (default in 21)
 # ---------------------------------------------------------------------------
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=65.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/lib/cgc-pms/heapdumps"
+ENV JAVA_OPTS="-Duser.timezone=Asia/Shanghai -XX:+UseContainerSupport -XX:InitialRAMPercentage=25.0 -XX:MaxRAMPercentage=65.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/lib/cgc-pms/heapdumps"
 
 # ---------------------------------------------------------------------------
 # Spring profile (override via docker-compose or k8s for prod)

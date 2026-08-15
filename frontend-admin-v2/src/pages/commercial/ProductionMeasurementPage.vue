@@ -2,6 +2,7 @@
 import type {
   ContractRecord,
   MeasurementAmountRow,
+  MeasurementWbsTaskOption,
   MeasurementPeriodCommand,
   MeasurementSaveCommand,
   OwnerMeasurementReviewCommand,
@@ -30,6 +31,7 @@ import {
   createMeasurementPeriod,
   loadContractPage,
   loadMeasurement,
+  loadMeasurementFormOptions,
   loadMeasurementPeriods,
   loadMeasurementSettlementTrace,
   loadMeasurementSources,
@@ -47,6 +49,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 type SourceLine = {
   source: MeasurementAmountRow
   selected: boolean
+  wbsTaskId: string
   currentQuantity: string
   evidenceFile: File | null
 }
@@ -64,6 +67,7 @@ const measurements = ref<MeasurementAmountRow[]>([])
 const submissions = ref<MeasurementAmountRow[]>([])
 const expandedMeasurements = ref<Set<string>>(new Set())
 const sourceLines = ref<SourceLine[]>([])
+const wbsTasks = ref<MeasurementWbsTaskOption[]>([])
 const selected = ref<MeasurementAmountRow | null>(null)
 const trace = ref<MeasurementAmountRow | null>(null)
 const dialog = ref<Dialog>('closed')
@@ -133,6 +137,12 @@ const periodOptions = computed(() =>
       value: text(p, 'id'),
       label: text(p, 'period_name', 'periodName', 'period_code'),
     })),
+)
+const wbsTaskOptions = computed(() =>
+  wbsTasks.value.map((task) => ({
+    value: task.id,
+    label: `${task.taskCode} · ${task.taskName}`,
+  })),
 )
 const statusOptions = [
   { value: '', label: '全部状态' },
@@ -331,7 +341,18 @@ async function changeMeasurementProject(value: string) {
   Object.assign(measurementForm, { projectId: value, contractId: '', periodId: '' })
   creationPeriods.value = []
   sourceLines.value = []
-  await loadCreationContracts(value)
+  wbsTasks.value = []
+  if (!value) return
+  try {
+    const [, options] = await Promise.all([
+      loadCreationContracts(value),
+      loadMeasurementFormOptions(value),
+    ])
+    wbsTasks.value = options.wbsTasks
+  } catch (e) {
+    wbsTasks.value = []
+    errorMessage.value = errorText(e, '计量 WBS 候选加载失败')
+  }
 }
 async function changeMeasurementContract(value: string) {
   measurementForm.contractId = value
@@ -355,6 +376,7 @@ async function changeMeasurementContract(value: string) {
     sourceLines.value = sources.map((source) => ({
       source,
       selected: false,
+      wbsTaskId: '',
       currentQuantity: '',
       evidenceFile: null,
     }))
@@ -370,7 +392,18 @@ async function openMeasurement() {
   })
   creationPeriods.value = []
   sourceLines.value = []
-  await loadCreationContracts(measurementForm.projectId)
+  wbsTasks.value = []
+  if (measurementForm.projectId) {
+    try {
+      const [, options] = await Promise.all([
+        loadCreationContracts(measurementForm.projectId),
+        loadMeasurementFormOptions(measurementForm.projectId),
+      ])
+      wbsTasks.value = options.wbsTasks
+    } catch (e) {
+      errorMessage.value = errorText(e, '计量 WBS 候选加载失败')
+    }
+  }
   sourceLines.value.forEach((row) => {
     row.selected = false
     row.currentQuantity = ''
@@ -389,9 +422,9 @@ async function saveMeasurement() {
     !measurementForm.contractId ||
     !evidenceFile.value ||
     !chosen.length ||
-    chosen.some((row) => !decimal(row.currentQuantity) || !row.evidenceFile)
+    chosen.some((row) => !row.wbsTaskId || !decimal(row.currentQuantity) || !row.evidenceFile)
   ) {
-    errorMessage.value = '请选择期间、真实附件和至少一条正数计量来源'
+    errorMessage.value = '请选择期间、真实附件、WBS 和至少一条正数计量来源'
     return
   }
   const command: MeasurementSaveCommand = {
@@ -406,6 +439,7 @@ async function saveMeasurement() {
         text(row.source, 'sourceType') === 'CONTRACT_ITEM' ? text(row.source, 'sourceId') : null,
       contractChangeId:
         text(row.source, 'sourceType') === 'CONTRACT_CHANGE' ? text(row.source, 'sourceId') : null,
+      wbsTaskId: row.wbsTaskId,
       currentQuantity: row.currentQuantity,
       evidenceCount: 1,
     })),
@@ -894,6 +928,7 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="dialog === 'measurement'"
       title="新建产值计量"
+      panel-class="v2-dialog-standard v2-dialog-wide"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
@@ -915,23 +950,27 @@ onBeforeUnmount(() => {
         /><V2Input v-model="measurementForm.measureDate" label="计量日期" type="date" /><label
           >总体计量依据<input aria-label="总体计量依据" type="file" @change="selectFile"
         /></label>
-        <div
+        <section
           v-for="row in sourceLines"
           :key="text(row.source, 'sourceType') + text(row.source, 'sourceId')"
           class="source"
         >
-          <label
-            ><input v-model="row.selected" type="checkbox" />{{
-              text(row.source, 'itemName', 'item_name', 'sourceId')
-            }}</label
-          ><span>剩余 {{ formatDecimal(text(row.source, 'remainingQuantity')) }}</span
+          <label class="source__choice"
+            ><input v-model="row.selected" type="checkbox" /><span
+              :title="text(row.source, 'itemName', 'item_name', 'sourceId')"
+              >{{ text(row.source, 'itemName', 'item_name', 'sourceId') }}</span
+            ></label
+          ><V2Select v-model="row.wbsTaskId" label="WBS任务" :options="wbsTaskOptions" /><span
+            class="source__remaining"
+            >剩余 {{ formatDecimal(text(row.source, 'remainingQuantity')) }}</span
           ><V2Input v-model="row.currentQuantity" label="本次计量量" :decimal-scale="2" /><label
+            class="source__file"
             >现场完成依据<input
               :aria-label="`${text(row.source, 'itemName', 'item_name', 'sourceId')}现场完成依据`"
               type="file"
               @change="selectSourceFile(row, $event)"
           /></label>
-        </div>
+        </section>
       </form>
       <template #footer>
         <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
@@ -1156,14 +1195,34 @@ dd {
 }
 .source {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(12rem, 1.35fr) minmax(11rem, 1fr) auto minmax(9rem, 0.8fr) minmax(
+      12rem,
+      1fr
+    );
   gap: var(--v2-space-3);
   align-items: center;
-  padding-block: var(--v2-space-2);
+  min-width: 0;
+  padding-block: var(--v2-space-3);
   border-bottom: var(--v2-border-width) solid var(--v2-color-border);
 }
-.source {
-  grid-template-columns: 1fr auto minmax(10rem, 1fr);
+.source > *,
+.source input {
+  min-width: 0;
+  max-width: 100%;
+}
+.source__choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+.source__choice span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source__remaining {
+  white-space: nowrap;
 }
 pre {
   white-space: pre-wrap;

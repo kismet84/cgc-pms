@@ -194,6 +194,18 @@ const availableReferences = computed(() =>
           !overview.value.archives.some((archive) => archive.constructionReferenceId === item.id),
       ),
 )
+function qualityInspectionsForReference(referenceId: string) {
+  const reference = overview.value.constructionReferences.find((item) => item.id === referenceId)
+  if (!reference) return []
+  return overview.value.qualityInspections.filter(
+    (inspection) => inspection.wbsTaskId === reference.wbsTaskId,
+  )
+}
+const archiveableReferences = computed(() =>
+  availableReferences.value.filter(
+    (reference) => qualityInspectionsForReference(reference.id).length,
+  ),
+)
 const openRfiCount = computed(
   () => overview.value.rfis.filter((item) => !['CLOSED', 'CANCELLED'].includes(item.status)).length,
 )
@@ -322,6 +334,7 @@ const form = reactive({
   archiveLocation: '',
   remark: '',
 })
+const selectedArchiveInspections = computed(() => qualityInspectionsForReference(form.referenceId))
 
 const dialogTitle = computed(
   () =>
@@ -525,7 +538,10 @@ function show(kind: Exclude<DialogKind, null>, row?: Target): void {
   }
   if (kind === 'disclosure' && row) form.drawingVersionId = row.id
   if (kind === 'reference' && row) form.disclosureId = row.id
-  if (kind === 'archive' && row) form.referenceId = row.id
+  if (kind === 'archive' && row) {
+    form.referenceId = row.id
+    form.inspectionId = ''
+  }
 }
 function chooseEvidence(event: Event): void {
   evidence.value = (event.target as HTMLInputElement).files?.[0] ?? null
@@ -770,19 +786,15 @@ onBeforeUnmount(() => {
             <V2Button
               v-if="activeTab === 'archive' && canArchive"
               size="small"
-              :disabled="!availableReferences.length || !overview.qualityInspections.length"
+              :disabled="!archiveableReferences.length"
               :title="
                 !availableReferences.length
                   ? '暂无待归档施工依据'
-                  : !overview.qualityInspections.length
-                    ? '暂无通过的质量检查'
+                  : !archiveableReferences.length
+                    ? '待归档施工依据暂无同 WBS 通过的质量检查'
                     : undefined
               "
-              @click="
-                availableReferences.length &&
-                overview.qualityInspections.length &&
-                show('archive', availableReferences[0])
-              "
+              @click="archiveableReferences.length && show('archive', archiveableReferences[0])"
               >登记验收归档</V2Button
             >
           </div>
@@ -1232,8 +1244,14 @@ onBeforeUnmount(() => {
                     </td>
                     <td>
                       <V2Button
-                        v-if="canArchive && overview.qualityInspections.length"
+                        v-if="canArchive"
                         size="small"
+                        :disabled="!qualityInspectionsForReference(item.id).length"
+                        :title="
+                          qualityInspectionsForReference(item.id).length
+                            ? undefined
+                            : '暂无同 WBS 通过的质量检查'
+                        "
                         @click="show('archive', item)"
                         >登记验收归档</V2Button
                       >
@@ -1473,11 +1491,12 @@ onBeforeUnmount(() => {
             v-model="form.inspectionId"
             label="通过的质量检查"
             :options="
-              overview.qualityInspections.map((item) => ({
+              selectedArchiveInspections.map((item) => ({
                 value: item.id,
                 label: `${item.inspectionCode} · ${item.inspectionDate}`,
               }))
-            " />
+            "
+            required />
           <p class="technical-page__wide">档案编码由服务端自动生成</p>
           <V2Select
             v-model="form.conclusion"

@@ -39,6 +39,8 @@ public class ProjectCloseGateService {
                 WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
                   AND p.status='ACTIVE' AND p.deleted_flag=0
                   AND NOT EXISTS (SELECT 1 FROM qs_inspection_record q
+                    JOIN qs_inspection_plan qp ON qp.tenant_id=q.tenant_id AND qp.id=q.plan_id
+                      AND qp.project_id=q.project_id AND qp.inspection_type='QUALITY' AND qp.deleted_flag=0
                     WHERE q.tenant_id=w.tenant_id AND q.project_id=w.project_id AND q.wbs_task_id=w.id
                       AND q.status='SUBMITTED' AND q.conclusion='PASS' AND q.deleted_flag=0)
                 """, tenant(), projectId);

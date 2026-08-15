@@ -136,14 +136,15 @@ const canDefectVerify = computed(() => canWrite.value && can('closeout:defect:ve
 const canArchive = computed(() => canWrite.value && can('closeout:archive:maintain'))
 const canClose = computed(() => canWrite.value && can('closeout:close'))
 const blockerRoutes: Record<string, string> = {
-  WBS: '/project-schedule',
+  WBS: '/site/daily-log',
   QUALITY: '/quality-safety',
   SUBCONTRACT: '/subcontract/task',
   PROCUREMENT: '/purchase/order',
   RECEIPT: '/purchase/receipt',
   REQUISITION: '/inventory/material-requisition',
   INVENTORY: '/inventory/stock',
-  WORKFLOW: '/approval/process',
+  TECHNICAL: '/technical-management',
+  WORKFLOW: '/approval/todo',
   ACCEPTANCE: '/project-closeout',
   SETTLEMENT: '/settlement/list',
   RECEIVABLE: '/revenue',
@@ -223,16 +224,20 @@ const settlementOptions = computed(() =>
 )
 const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
 const userOptions = (value = '') => {
-  const options = currentUserId.value
-    ? [
-        {
-          value: currentUserId.value,
-          label: session.userInfo?.realName || session.userInfo?.username || '当前用户',
-        },
-      ]
-    : []
-  if (value && value !== currentUserId.value) options.push({ value, label: '已指定项目成员' })
+  const options = (overview.value?.responsibleMembers ?? []).map((member) => ({
+    value: member.userId,
+    label: `${member.realName || member.username}（${member.username}）`,
+    disabled: false,
+  }))
+  if (value && !options.some((option) => option.value === value))
+    options.push({ value, label: '历史责任人（已失效）', disabled: true })
   return options
+}
+const defaultResponsibleUserId = (preferred = '') => {
+  const members = overview.value?.responsibleMembers ?? []
+  return members.some((member) => member.userId === preferred)
+    ? preferred
+    : (members[0]?.userId ?? '')
 }
 
 const initiateForm = reactive<InitiateCloseoutCommand>({
@@ -412,7 +417,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
       warrantyAmount: retention?.originalAmount ?? '',
       warrantyStartDate: today(),
       warrantyEndDate: today(),
-      responsibleUserId: String(session.userInfo?.userId ?? ''),
+      responsibleUserId: defaultResponsibleUserId(currentUserId.value),
       remark: '',
     })
   }
@@ -421,8 +426,9 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
       defectCode: '',
       defectTitle: '',
       defectDescription: '',
-      responsibleUserId:
-        selectedWarranty.value?.responsibleUserId ?? String(session.userInfo?.userId ?? ''),
+      responsibleUserId: defaultResponsibleUserId(
+        selectedWarranty.value?.responsibleUserId ?? currentUserId.value,
+      ),
       rectificationDeadline: today(),
       remark: '',
     })
@@ -549,6 +555,15 @@ async function uploadPendingEvidence(): Promise<void> {
   pendingEvidence.value = null
 }
 
+async function hasWarrantyReleaseEvidence(warrantyId: string): Promise<boolean> {
+  const files = await listSiteFiles('CLOSEOUT_WARRANTY', warrantyId)
+  return files.some(
+    (file) =>
+      file.documentType === 'WARRANTY_RELEASE_VOUCHER' &&
+      (file.virusScanPassed === true || file.virusScanStatus === 'CLEAN'),
+  )
+}
+
 async function attachEvidence(pending: PendingEvidence): Promise<void> {
   pendingEvidence.value = pending
   await uploadPendingEvidence()
@@ -637,13 +652,15 @@ const saveDialog = () =>
       return
     }
     if (dialog.value === 'release' && selectedWarranty.value) {
-      if (!uploadFile.value) throw new Error('请上传质保释放凭证')
-      await uploadSiteFile(
-        uploadFile.value,
-        'CLOSEOUT_WARRANTY',
-        selectedWarranty.value.id,
-        'WARRANTY_RELEASE_VOUCHER',
-      )
+      if (!(await hasWarrantyReleaseEvidence(selectedWarranty.value.id))) {
+        if (!uploadFile.value) throw new Error('请上传质保释放凭证')
+        await uploadSiteFile(
+          uploadFile.value,
+          'CLOSEOUT_WARRANTY',
+          selectedWarranty.value.id,
+          'WARRANTY_RELEASE_VOUCHER',
+        )
+      }
       await releaseWarranty(selectedWarranty.value.id)
       return
     }
@@ -1501,8 +1518,11 @@ onBeforeUnmount(() => {
         <template v-else-if="dialog === 'release'">
           <p>当前质保释放只接受已登记质保责任，不在前端推导可释放条件。</p>
           <label class="closeout-page__wide"
-            >释放凭证<input type="file" required @change="pickFile"
+            >释放凭证<input type="file" @change="pickFile"
           /></label>
+          <p class="closeout-page__wide">
+            首次释放必须上传；已有有效释放凭证时，可不重复选择文件直接重试。
+          </p>
         </template>
         <template v-else-if="dialog === 'archive'">
           <V2Input

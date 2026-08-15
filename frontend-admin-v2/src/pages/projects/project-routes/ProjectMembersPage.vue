@@ -430,7 +430,11 @@ onBeforeUnmount(() => {
           :disabled="optionsLoading || !memberRoleOptions.length"
           required
         />
-        <V2Input v-model="memberForm.positionName" label="岗位名称" />
+        <V2Input
+          v-model="memberForm.positionName"
+          class="project-page__form-span"
+          label="岗位名称"
+        />
         <label>开始日期<input v-model="memberForm.startDate" type="date" /></label>
         <label>结束日期<input v-model="memberForm.endDate" type="date" /></label>
       </form>

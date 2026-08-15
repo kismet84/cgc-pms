@@ -7,6 +7,7 @@ import type {
   SubcontractMeasureItemRecord,
   SubcontractMeasureRecord,
   SubcontractTaskCommand,
+  SubcontractTaskFormOptions,
   SubcontractTaskRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -36,6 +37,7 @@ import {
   loadSubcontractMeasureItems,
   loadSubcontractMeasures,
   loadSubcontractTask,
+  loadSubcontractTaskFormOptions,
   loadSubcontractTasks,
   saveSubcontractMeasureItems,
   submitSubcontractMeasure,
@@ -59,6 +61,7 @@ const measureItems = ref<SubcontractMeasureItemRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const contractItems = ref<ContractItemRecord[]>([])
 const taskCandidates = ref<SubcontractTaskRecord[]>([])
+const wbsTasks = ref<SubcontractTaskFormOptions['wbsTasks']>([])
 const itemDrafts = ref<SubcontractMeasureItemCommand[]>([])
 const projectId = computed(() => workspace.selectedProjectId || '')
 const status = ref('')
@@ -124,6 +127,16 @@ const contractOptions = computed(() =>
       label: `${item.contractCode || '未编号'} · ${item.contractName}`,
     })),
 )
+const wbsTaskOptions = computed(() => {
+  const options: Array<{ value: string; label: string; disabled?: boolean }> = wbsTasks.value.map(
+    (item) => ({ value: item.id, label: `${item.taskCode} · ${item.taskName}` }),
+  )
+  const historicalId = form.wbsTaskId
+  if (historicalId && !options.some((item) => item.value === historicalId)) {
+    options.push({ value: historicalId, label: '历史 WBS（已失效，请重新选择）', disabled: true })
+  }
+  return options
+})
 const excludedPredecessorIds = computed(() => {
   const rootId =
     formMode.value === 'edit' && selected.value && 'taskCode' in selected.value
@@ -212,6 +225,14 @@ function required(name: string, label: string): string {
 
 function optional(name: string): string | null {
   return form[name]?.trim() || null
+}
+
+function activeWbsTaskId(): string {
+  const value = required('wbsTaskId', 'WBS任务')
+  if (!wbsTasks.value.some((item) => item.id === value)) {
+    throw new TypeError('WBS任务已失效，请重新选择')
+  }
+  return value
 }
 
 function decimal(value: string, label: string): string {
@@ -336,13 +357,20 @@ async function loadCandidates(candidateProjectId: string, contractId = ''): Prom
   contracts.value = []
   contractItems.value = []
   taskCandidates.value = []
+  wbsTasks.value = []
   if (!candidateProjectId) return
   try {
-    const contractPage = await loadContractPage(
-      { pageNo: 1, pageSize: 200, projectId: candidateProjectId, contractType: 'SUB' },
-      controller.signal,
-    )
+    const [contractPage, formOptions] = await Promise.all([
+      loadContractPage(
+        { pageNo: 1, pageSize: 200, projectId: candidateProjectId, contractType: 'SUB' },
+        controller.signal,
+      ),
+      mode.value === 'task'
+        ? loadSubcontractTaskFormOptions(candidateProjectId, controller.signal)
+        : Promise.resolve({ wbsTasks: [] }),
+    ])
     if (generation !== candidateGeneration) return
+    wbsTasks.value = formOptions.wbsTasks
     const currentContract =
       contractId && !contractPage.records.some((item) => item.id === contractId)
         ? await loadContract(contractId, controller.signal)
@@ -361,12 +389,13 @@ async function loadCandidates(candidateProjectId: string, contractId = ''): Prom
     }
   } catch (error) {
     if (!controller.signal.aborted && generation === candidateGeneration)
-      showToast('error', '业务候选读取失败', errorText(error, '合同候选读取失败'))
+      showToast('error', '业务候选读取失败', errorText(error, '表单候选读取失败'))
   }
 }
 
 async function changeProject(value: string): Promise<void> {
   form.projectId = value
+  form.wbsTaskId = ''
   form.contractId = ''
   form.partnerId = ''
   form.predecessorTaskId = ''
@@ -414,6 +443,7 @@ async function openForm(record?: RecordRow): Promise<void> {
     const task = record && 'taskCode' in record ? record : null
     Object.assign(form, {
       projectId: task?.projectId || fallbackProject,
+      wbsTaskId: task?.wbsTaskId || '',
       contractId: task?.contractId || '',
       partnerId: task?.partnerId || '',
       partnerName: task?.partnerName || '',
@@ -454,6 +484,7 @@ async function openForm(record?: RecordRow): Promise<void> {
 function taskCommand(): SubcontractTaskCommand {
   return {
     projectId: required('projectId', '项目'),
+    wbsTaskId: activeWbsTaskId(),
     contractId: required('contractId', '分包合同'),
     partnerId: required('partnerId', '分包单位'),
     predecessorTaskId: optional('predecessorTaskId'),
@@ -972,6 +1003,14 @@ onBeforeUnmount(() => {
           />
           <V2Input v-model="form.partnerName" label="分包单位" hint="由所选分包合同确定" disabled />
           <template v-if="mode === 'task'">
+            <V2Select
+              v-model="form.wbsTaskId"
+              label="WBS任务"
+              hint="仅显示当前项目生效WBS基线任务"
+              :options="wbsTaskOptions"
+              :disabled="busy || !form.projectId || !wbsTasks.length"
+              required
+            />
             <V2Select
               v-model="form.predecessorTaskId"
               label="前置任务"

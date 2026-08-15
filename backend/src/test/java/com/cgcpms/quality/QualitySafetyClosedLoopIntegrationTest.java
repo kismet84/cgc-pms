@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
@@ -294,6 +295,17 @@ class QualitySafetyClosedLoopIntegrationTest {
         assertFalse(first.getReinspectedAt().isBefore(first.getSubmittedAt()));
         approveAll("QS_RECTIFICATION", firstId);
         assertEquals("PASSED", service.trace(issue.getId()).rectifications().get(0).getStatus());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void formOptionsReturnOnlyActiveWbsForTheRequestedProject() {
+        Map<String, Object> options = service.formOptions(PROJECT);
+        List<Map<String, Object>> wbsTasks = (List<Map<String, Object>>) options.get("wbsTasks");
+
+        assertEquals(1, wbsTasks.size());
+        assertEquals(WBS, ((Number) wbsTasks.getFirst().get("id")).longValue());
+        assertEquals("QS-WBS", wbsTasks.getFirst().get("taskCode"));
     }
 
     @Test

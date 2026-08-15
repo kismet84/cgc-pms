@@ -32,6 +32,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +75,7 @@ public class MatRequisitionService {
     private final WorkflowEngine workflowEngine;
     private final MatRequisitionAssembler assembler;
     private final CodeGenerationService codeGenerationService;
+    private final JdbcTemplate jdbc;
 
     // ================================================================
     // 分页查询
@@ -421,9 +423,6 @@ public class MatRequisitionService {
         List<MatWarehouse> warehouseRows = warehouseMapper.selectList(new LambdaQueryWrapper<MatWarehouse>()
                 .eq(MatWarehouse::getTenantId, tenantId).eq(MatWarehouse::getProjectId, projectId)
                 .eq(MatWarehouse::getStatus, "ENABLE").orderByAsc(MatWarehouse::getWarehouseCode));
-        List<MdMaterial> materialRows = materialMapper.selectList(new LambdaQueryWrapper<MdMaterial>()
-                .eq(MdMaterial::getTenantId, tenantId).eq(MdMaterial::getStatus, "ENABLE")
-                .orderByAsc(MdMaterial::getMaterialCode));
         List<CtContract> contractRows = contractMapper.selectList(new LambdaQueryWrapper<CtContract>()
                 .eq(CtContract::getTenantId, tenantId).eq(CtContract::getProjectId, projectId)
                 .eq(CtContract::getContractStatus, ContractStatusConstants.STATUS_PERFORMING)
@@ -434,21 +433,68 @@ public class MatRequisitionService {
                 : partnerMapper.selectList(new LambdaQueryWrapper<MdPartner>()
                 .eq(MdPartner::getTenantId, tenantId).in(MdPartner::getId, partnerIds)
                 .eq(MdPartner::getStatus, "ENABLE").orderByAsc(MdPartner::getPartnerCode));
+        List<Map<String, Object>> wbsTaskRows = jdbc.query("""
+                SELECT task.id, task.task_code, task.task_name
+                FROM project_wbs_task task
+                JOIN project_schedule_plan schedule
+                  ON schedule.tenant_id=task.tenant_id
+                 AND schedule.id=task.schedule_plan_id
+                 AND schedule.project_id=task.project_id
+                 AND schedule.deleted_flag=0
+                 AND schedule.status='ACTIVE'
+                WHERE task.tenant_id=? AND task.project_id=? AND task.deleted_flag=0
+                ORDER BY task.sort_order, task.task_code
+                """, (result, rowNum) -> option(
+                "id", result.getLong("id"), "taskCode", result.getString("task_code"),
+                "taskName", result.getString("task_name")), tenantId, projectId);
 
         return Map.of(
                 "warehouses", warehouseRows.stream().map(row -> option(
                         "id", row.getId(), "warehouseCode", row.getWarehouseCode(),
                         "warehouseName", row.getWarehouseName(), "projectId", row.getProjectId())).toList(),
-                "materials", materialRows.stream().map(row -> option(
-                        "id", row.getId(), "materialCode", row.getMaterialCode(),
-                        "materialName", row.getMaterialName(), "specification", row.getSpecification(),
-                        "unit", row.getUnit())).toList(),
+                "materials", List.of(),
                 "partners", partnerRows.stream().map(row -> option(
                         "id", row.getId(), "partnerCode", row.getPartnerCode(),
                         "partnerName", row.getPartnerName())).toList(),
+                "wbsTasks", wbsTaskRows,
                 "contracts", contractRows.stream().map(row -> option(
                         "id", row.getId(), "contractCode", row.getContractCode(),
                         "contractName", row.getContractName(), "projectId", row.getProjectId())).toList());
+    }
+
+    public List<Map<String, Object>> materialOptions(Long projectId, Long warehouseId, String keyword) {
+        checkProjectAccess(projectId, "搜索领料物料候选");
+        Long tenantId = UserContext.getCurrentTenantId();
+        Integer warehouseCount = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM mat_warehouse
+                WHERE id=? AND tenant_id=? AND project_id=? AND status='ENABLE' AND deleted_flag=0
+                """, Integer.class, warehouseId, tenantId, projectId);
+        if (warehouseCount == null || warehouseCount != 1)
+            throw new BusinessException("REQUISITION_WAREHOUSE_INVALID", "领料仓库不存在、已停用或不属于项目");
+        String value = keyword == null ? "" : keyword.trim();
+        if (value.length() > 100)
+            throw new BusinessException("REQUISITION_MATERIAL_KEYWORD_TOO_LONG", "物料搜索关键词不能超过100个字符");
+        String pattern = "%" + value + "%";
+        return jdbc.query("""
+                SELECT material.id,material.material_code,material.material_name,
+                       material.specification,material.unit
+                FROM mat_stock stock
+                JOIN md_material material
+                  ON material.id=stock.material_id
+                 AND material.tenant_id=stock.tenant_id
+                 AND material.status='ENABLE'
+                 AND material.deleted_flag=0
+                WHERE stock.tenant_id=? AND stock.warehouse_id=? AND stock.deleted_flag=0
+                  AND stock.available_qty>0
+                  AND (?='' OR material.material_code LIKE ? OR material.material_name LIKE ?
+                       OR COALESCE(material.specification,'') LIKE ?)
+                ORDER BY material.material_code,material.id
+                LIMIT 50
+                """, (result, rowNum) -> option(
+                "id", result.getLong("id"), "materialCode", result.getString("material_code"),
+                "materialName", result.getString("material_name"),
+                "specification", result.getString("specification"), "unit", result.getString("unit")),
+                tenantId, warehouseId, value, pattern, pattern, pattern);
     }
 
     private Map<String, Object> option(Object... values) {

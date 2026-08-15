@@ -33,6 +33,7 @@ export const SUBCONTRACT_PERMISSIONS = {
 
 export const SUBCONTRACT_API = {
   tasks: "/sub-tasks",
+  taskFormOptions: "/sub-tasks/form-options",
   task: (id: string) => `/sub-tasks/${encodeURIComponent(id)}`,
   measures: "/sub-measures",
   measure: (id: string) => `/sub-measures/${encodeURIComponent(id)}`,
@@ -81,6 +82,7 @@ export interface SubcontractTaskRecord {
   id: string;
   tenantId: string;
   projectId: string;
+  wbsTaskId?: string | null;
   contractId?: string | null;
   partnerId?: string | null;
   predecessorTaskId?: string | null;
@@ -109,6 +111,7 @@ export type SubcontractTaskPage = PageResult<SubcontractTaskRecord>;
 
 export interface SubcontractTaskCommand {
   projectId: string;
+  wbsTaskId: string;
   contractId?: string | null;
   partnerId?: string | null;
   predecessorTaskId?: string | null;
@@ -121,6 +124,14 @@ export interface SubcontractTaskCommand {
   progressPercent?: SubcontractDecimalString | null;
   status?: string | null;
   remark?: string | null;
+}
+
+export interface SubcontractTaskFormOptions {
+  wbsTasks: Array<{
+    id: string;
+    taskCode: string;
+    taskName: string;
+  }>;
 }
 
 export interface SubcontractMeasureQuery {

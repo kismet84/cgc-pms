@@ -23,12 +23,14 @@ import com.cgcpms.subcontract.vo.SubTaskVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
@@ -51,6 +53,7 @@ public class SubTaskService {
     private final ProjectAccessChecker projectAccessChecker;
     private final ProjectExecutionGuard projectExecutionGuard;
     private final CodeGenerationService codeGenerationService;
+    private final JdbcTemplate jdbc;
 
     public IPage<SubTaskVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                      Long partnerId, String status, String taskCode, String taskName) {
@@ -120,6 +123,29 @@ public class SubTaskService {
         projectAccessChecker.checkAccess(task.getProjectId(), "访问分包任务");
         SubTask predecessor = loadStoredPredecessor(task);
         return toVO(task, predecessor);
+    }
+
+    public Map<String, Object> formOptions(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "读取分包任务表单选项");
+        List<Map<String, Object>> wbsTasks = jdbc.query("""
+                SELECT task.id, task.task_code, task.task_name
+                FROM project_wbs_task task
+                JOIN project_schedule_plan schedule
+                  ON schedule.tenant_id=task.tenant_id
+                 AND schedule.id=task.schedule_plan_id
+                 AND schedule.project_id=task.project_id
+                 AND schedule.deleted_flag=0
+                 AND schedule.status='ACTIVE'
+                WHERE task.tenant_id=? AND task.project_id=? AND task.deleted_flag=0
+                ORDER BY task.sort_order, task.task_code
+                """, (result, rowNum) -> {
+            Map<String, Object> option = new LinkedHashMap<>();
+            option.put("id", result.getLong("id"));
+            option.put("taskCode", result.getString("task_code"));
+            option.put("taskName", result.getString("task_name"));
+            return option;
+        }, UserContext.getCurrentTenantId(), projectId);
+        return Map.of("wbsTasks", wbsTasks);
     }
 
     @Transactional(rollbackFor = Exception.class)

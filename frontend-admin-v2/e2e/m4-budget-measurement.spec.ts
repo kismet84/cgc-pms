@@ -56,6 +56,7 @@ const measurement = {
   status: 'DRAFT',
   version: '9',
 }
+const measurementSourceName = '清单一（业主核定临建设施安全优化收入变更及现场完成确认）'
 async function fulfill(route: Route, data: unknown, status = 200) {
   await route.fulfill({
     status,
@@ -67,7 +68,13 @@ async function fulfill(route: Route, data: unknown, status = 200) {
     }),
   })
 }
-async function install(page: Page, writes: string[], identity = business, traffic: string[] = []) {
+async function install(
+  page: Page,
+  writes: string[],
+  identity = business,
+  traffic: string[] = [],
+  measurementBodies: unknown[] = [],
+) {
   await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) => fulfill(route, identity))
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
@@ -123,14 +130,19 @@ async function install(page: Page, writes: string[], identity = business, traffi
     return fulfill(route, { records: [row], total: 1, pageNo: 1, pageSize: 20 })
   })
   await page.route('**/api/production-measurements**', (route) =>
-    measurementRoute(route, writes, traffic),
+    measurementRoute(route, writes, traffic, measurementBodies),
   )
   await page.route('**/api/files/upload**', (route) => {
     writes.push(route.request().url())
     return fulfill(route, { id: 'F1', status: 'CLEAN' })
   })
 }
-async function measurementRoute(route: Route, writes: string[], traffic: string[] = []) {
+async function measurementRoute(
+  route: Route,
+  writes: string[],
+  traffic: string[] = [],
+  measurementBodies: unknown[] = [],
+) {
   const request = route.request()
   const url = new URL(request.url())
   const path = url.pathname
@@ -138,23 +150,29 @@ async function measurementRoute(route: Route, writes: string[], traffic: string[
   if (request.method() !== 'GET') writes.push(request.url())
   if (path.endsWith('/periods'))
     return fulfill(route, [{ id: 'PR1', period_name: '2026-07', status: 'OPEN', version: '2' }])
+  if (path.endsWith('/form-options'))
+    return fulfill(route, {
+      wbsTasks: [{ id: 'W1', taskCode: 'WBS-001', taskName: '主体结构' }],
+    })
   if (path.endsWith('/sources'))
     return fulfill(route, [
       {
         sourceType: 'CONTRACT_ITEM',
         sourceId: 'I1',
-        itemName: '清单一',
+        itemName: measurementSourceName,
         remainingQuantity: '9999999999999999.9999',
         unitPrice: '0.01',
       },
     ])
   if (path.endsWith('/owner-submissions/list')) return fulfill(route, [])
-  if (path === '/api/production-measurements' && request.method() === 'POST')
+  if (path === '/api/production-measurements' && request.method() === 'POST') {
+    measurementBodies.push(request.postDataJSON())
     return fulfill(route, {
       id: '9007199254740996',
       version: '0',
       lines: [{ id: 'ML-NEW-1' }],
     })
+  }
   if (path === '/api/production-measurements')
     return fulfill(route, [
       url.searchParams.get('projectId') === 'P2'
@@ -255,7 +273,8 @@ test.describe('M4 budget and measurement routes', () => {
     page,
   }) => {
     const writes: string[] = []
-    await install(page, writes)
+    const measurementBodies: unknown[] = []
+    await install(page, writes, business, [], measurementBodies)
     await audit(
       page,
       '/production-measurement?projectId=P1&contractId=C1&period=2026-07',
@@ -263,26 +282,46 @@ test.describe('M4 budget and measurement routes', () => {
     )
     await page.getByRole('button', { name: '新建计量' }).click()
     const dialog = page.getByRole('dialog', { name: '新建产值计量' })
+    await page.setViewportSize({ width: 1512, height: 1114 })
     await dialog.getByRole('combobox', { name: '业主合同' }).selectOption({ label: '业主合同' })
     await expect(dialog.getByRole('combobox', { name: '计量期间' })).toHaveValue('PR1')
     await expect(dialog.getByRole('checkbox')).toBeVisible()
     await dialog.getByRole('checkbox').check()
+    await dialog.getByRole('combobox', { name: 'WBS任务' }).selectOption('W1')
     await dialog.getByLabel('本次计量量').fill('9999999999999999.9999')
     await dialog.getByLabel('总体计量依据').setInputFiles({
       name: 'measurement.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from('controlled evidence'),
     })
-    await dialog.getByLabel('清单一现场完成依据').setInputFiles({
-      name: 'measurement-line.pdf',
+    const lineEvidence = dialog.getByLabel(`${measurementSourceName}现场完成依据`)
+    await lineEvidence.setInputFiles({
+      name: 'measurement-line-with-a-very-long-business-evidence-filename-202607.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from('controlled line evidence'),
     })
+    const source = dialog.locator('.source')
+    expect(await source.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    )
+    await expect(source.locator('.source__choice span')).toHaveCSS('text-overflow', 'ellipsis')
+    const sourceBox = await source.boundingBox()
+    const fileBox = await lineEvidence.boundingBox()
+    expect(sourceBox).not.toBeNull()
+    expect(fileBox).not.toBeNull()
+    expect((fileBox?.x ?? 0) + (fileBox?.width ?? 0)).toBeLessThanOrEqual(
+      (sourceBox?.x ?? 0) + (sourceBox?.width ?? 0),
+    )
     await dialog.getByRole('button', { name: '创建计量' }).click()
     await expect(page.getByText('产值计量草稿已创建')).toBeVisible()
     expect(
       writes.filter((url) => new URL(url).pathname === '/api/production-measurements'),
     ).toHaveLength(1)
     expect(writes.filter((url) => new URL(url).pathname === '/api/files/upload')).toHaveLength(2)
+    expect(measurementBodies).toEqual([
+      expect.objectContaining({
+        lines: [expect.objectContaining({ wbsTaskId: 'W1' })],
+      }),
+    ])
   })
 })

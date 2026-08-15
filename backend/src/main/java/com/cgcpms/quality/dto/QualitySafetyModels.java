@@ -109,5 +109,6 @@ public final class QualitySafetyModels {
             String projectId,
             String planCode,
             String planName,
+            String inspectionType,
             String status) {}
 }

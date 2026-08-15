@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createQualityInspection,
   createQualityConsequence,
+  loadQualityFormOptions,
   loadQualityIssues,
   loadQualityPlans,
   loadQualityTrace,
@@ -91,6 +93,46 @@ describe('M3 quality safety closed loop', () => {
       '/api/quality-safety/workspace?view=inspection&pageNo=2&pageSize=10&projectId=project+%2F+1&planId=plan+%2F+2',
       expect.objectContaining({ signal: controller.signal }),
     )
+  })
+
+  it('loads project-scoped WBS options and submits the selected WBS with a quality inspection', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        response({ wbsTasks: [{ id: '301', taskCode: 'WBS-001', taskName: '主体结构' }] }),
+      )
+      .mockResolvedValueOnce(
+        response({
+          id: '401',
+          planId: '201',
+          projectId: '101',
+          wbsTaskId: '301',
+          inspectionCode: 'QI-001',
+          inspectionDate: '2026-08-15',
+          location: '主体结构区',
+          inspectorUserId: '1',
+          conclusion: 'PENDING',
+          summary: '检查通过',
+          status: 'DRAFT',
+        }),
+      )
+
+    const options = await loadQualityFormOptions('project / 1')
+    const inspection = await createQualityInspection({
+      planId: '201',
+      wbsTaskId: options.wbsTasks[0]!.id,
+      inspectionDate: '2026-08-15',
+      location: '主体结构区',
+      inspectorUserId: '1',
+      summary: '检查通过',
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/quality-safety/form-options?projectId=project%20%2F%201',
+    )
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      wbsTaskId: '301',
+    })
+    expect(inspection.wbsTaskId).toBe('301')
   })
 
   it('keeps consequence decimals as strings and uses stage-specific write endpoints', async () => {
@@ -201,6 +243,9 @@ describe('M3 quality safety closed loop', () => {
   })
 
   it('keeps actions permission-separated, evidence staged and responsive semantics explicit', () => {
+    expect(pageSource).toContain(
+      "import { listSiteFiles, uploadSiteFile } from '@/services/delivery'",
+    )
     for (const permission of [
       'quality:safety:plan:maintain',
       'quality:safety:inspection:maintain',
@@ -233,6 +278,10 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain(':options="partnerOptions"')
     expect(pageSource).toContain(':options="contractOptions"')
     expect(pageSource).toContain(':options="userOptions(issueForm.responsibleUserId)"')
+    expect(pageSource).toContain('v-model="inspectionForm.wbsTaskId"')
+    expect(pageSource).toContain(':options="inspectionWbsOptions"')
+    expect(pageSource).toContain(':required="selectedPlan?.inspectionType === \'QUALITY\'"')
+    expect(pageSource).toContain("'当前项目无生效 WBS 任务，无法创建质量检查'")
     expect(pageSource).toContain("['SUPPLIER', 'SUB', 'SUBCONTRACTOR']")
     expect(pageSource).toContain("item.status === 'ENABLE'")
     expect(pageSource).toContain(

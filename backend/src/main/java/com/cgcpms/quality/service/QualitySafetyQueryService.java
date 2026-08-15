@@ -63,7 +63,7 @@ public class QualitySafetyQueryService {
                     WHERE qp.deleted_flag = 0
                 ),
                 selected_plan AS (
-                    SELECT vp.id, vp.tenant_id, vp.project_id, vp.plan_code, vp.plan_name, vp.status
+    SELECT vp.id, vp.tenant_id, vp.project_id, vp.plan_code, vp.plan_name, vp.inspection_type, vp.status
                     FROM visible_plan vp
                     %s
                     ORDER BY vp.start_date DESC, vp.created_at DESC, vp.id DESC
@@ -93,6 +93,7 @@ public class QualitySafetyQueryService {
                     ic.rectification_count, ic.reinspection_count, ic.consequence_count,
                     sp.id selected_plan_id, sp.project_id selected_project_id,
                     sp.plan_code selected_plan_code, sp.plan_name selected_plan_name,
+                    sp.inspection_type selected_inspection_type,
                     sp.status selected_plan_status
                 FROM issue_counts ic
                 LEFT JOIN selected_plan sp ON 1 = 1
@@ -103,6 +104,7 @@ public class QualitySafetyQueryService {
                     rs.getString("selected_project_id"),
                     rs.getString("selected_plan_code"),
                     rs.getString("selected_plan_name"),
+                    rs.getString("selected_inspection_type"),
                     rs.getString("selected_plan_status"));
             return new Metadata(new WorkspaceCounts(
                     rs.getLong("plan_count"),

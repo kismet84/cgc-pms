@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.math.BigDecimal;
@@ -58,7 +59,8 @@ class MatRequisitionAccessScopeTest {
             projectExecutionGuard,
             mock(WorkflowEngine.class),
             assembler,
-            new CodeGenerationService());
+            new CodeGenerationService(),
+            mock(JdbcTemplate.class));
 
     @BeforeAll
     static void initializeLambdaMetadata() {

@@ -298,7 +298,7 @@ public class PayRecordService {
     private void validateSecondGate(PayApplication app, PayRecord input) {
         PmProject project = projectMapper.selectById(app.getProjectId());
         if (project == null || !Objects.equals(project.getTenantId(), app.getTenantId())
-                || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
+                || !ProjectStatusConstants.allowsFinancialSettlement(project.getStatus())) {
             throw new BusinessException("PROJECT_NOT_ACTIVE", "项目已暂停、关闭或不存在，禁止付款");
         }
         CtContract contract = ctContractMapper.selectByIdForUpdate(app.getContractId(), app.getTenantId());

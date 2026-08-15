@@ -19,6 +19,7 @@ export interface RequisitionFormOptions {
   }>
   materials: SupplyFormMaterialOption[]
   partners: Array<{ id: string; partnerCode: string; partnerName: string }>
+  wbsTasks: Array<{ id: string; taskCode: string; taskName: string }>
   contracts: Array<{ id: string; contractCode: string; contractName: string; projectId: string }>
 }
 

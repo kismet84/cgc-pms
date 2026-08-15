@@ -82,8 +82,10 @@ public class ProjectCloseoutService {
                    JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
                    WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
                     AND p.status='ACTIVE' AND p.deleted_flag=0) wbsTasks,
-                 (SELECT COUNT(*) FROM qs_inspection_record
-                   WHERE tenant_id=? AND project_id=? AND deleted_flag=0) qualityInspections
+                 (SELECT COUNT(*) FROM qs_inspection_record q
+                   JOIN qs_inspection_plan p ON p.tenant_id=q.tenant_id AND p.id=q.plan_id
+                    AND p.project_id=q.project_id AND p.inspection_type='QUALITY' AND p.deleted_flag=0
+                   WHERE q.tenant_id=? AND q.project_id=? AND q.deleted_flag=0) qualityInspections
                 """, tenantId, projectId, tenantId, projectId, tenantId, projectId,
                 tenantId, projectId, tenantId, projectId, tenantId, projectId,
                 tenantId, projectId, tenantId, projectId, tenantId, projectId));
@@ -162,11 +164,23 @@ public class ProjectCloseoutService {
                 LIMIT ? OFFSET ?
                 """, tenantId, projectId, safePageSize, detailOffset));
         result.put("qualityInspections", jdbc.queryForList("""
-                SELECT id,wbs_task_id wbsTaskId,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
-                FROM qs_inspection_record WHERE tenant_id=? AND project_id=? AND deleted_flag=0
-                ORDER BY inspection_date DESC,id DESC
+                SELECT q.id,q.wbs_task_id wbsTaskId,q.inspection_code inspectionCode,q.inspection_date inspectionDate,
+                 q.location,q.conclusion,q.status
+                FROM qs_inspection_record q
+                JOIN qs_inspection_plan p ON p.tenant_id=q.tenant_id AND p.id=q.plan_id
+                 AND p.project_id=q.project_id AND p.inspection_type='QUALITY' AND p.deleted_flag=0
+                WHERE q.tenant_id=? AND q.project_id=? AND q.deleted_flag=0
+                ORDER BY q.inspection_date DESC,q.id DESC
                 LIMIT ? OFFSET ?
                 """, tenantId, projectId, safePageSize, detailOffset));
+        result.put("responsibleMembers", jdbc.queryForList("""
+                SELECT u.id userId,u.username,u.real_name realName,m.role_code roleCode
+                FROM pm_project_member m
+                JOIN sys_user u ON u.id=m.user_id AND u.tenant_id=m.tenant_id
+                 AND u.status='ENABLE' AND u.deleted_flag=0
+                WHERE m.tenant_id=? AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+                ORDER BY u.real_name,u.username,u.id
+                """, tenantId, projectId));
         return result;
     }
 
@@ -296,12 +310,22 @@ public class ProjectCloseoutService {
                 "CLOSEOUT_WBS_NOT_FOUND", "WBS任务不存在", command.wbsTaskId(), tenant());
         if (!projectId.equals(longValue(wbs.get("project_id"))))
             throw error("CLOSEOUT_PROJECT_MISMATCH", "WBS任务不属于当前项目");
-        Map<String, Object> inspection = queryOne("SELECT project_id,wbs_task_id,status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String, Object> inspection = queryOne("""
+                SELECT q.project_id,q.wbs_task_id,q.status,q.conclusion,p.inspection_type
+                FROM qs_inspection_record q
+                JOIN qs_inspection_plan p ON p.tenant_id=q.tenant_id AND p.id=q.plan_id
+                 AND p.project_id=q.project_id AND p.deleted_flag=0
+                WHERE q.id=? AND q.tenant_id=? AND q.deleted_flag=0
+                """,
                 "CLOSEOUT_INSPECTION_NOT_FOUND", "质量验收记录不存在", command.qualityInspectionId(), tenant());
         if (!projectId.equals(longValue(inspection.get("project_id"))))
             throw error("CLOSEOUT_PROJECT_MISMATCH", "质量验收记录不属于当前项目");
         if (!command.wbsTaskId().equals(longValueNullable(inspection.get("wbs_task_id"))))
             throw error("CLOSEOUT_WBS_MISMATCH", "质量验收记录不属于当前WBS任务");
+        if (!"QUALITY".equals(string(inspection.get("inspection_type")))
+                || !"SUBMITTED".equals(string(inspection.get("status")))
+                || !"PASS".equals(string(inspection.get("conclusion"))))
+            throw error("CLOSEOUT_QUALITY_NOT_PASSED", "只有质量类、已提交且结论通过的检查可支撑分项验收");
         Long id = IdWorker.getId();
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             try {
@@ -333,12 +357,20 @@ public class ProjectCloseoutService {
                 "CLOSEOUT_WBS_NOT_FOUND", "WBS任务不存在", row.get("wbs_task_id"), tenant());
         if (!"COMPLETED".equals(string(wbs.get("status"))))
             throw error("CLOSEOUT_WBS_NOT_COMPLETED", "对应WBS任务尚未完工，不能确认验收");
-        Map<String, Object> inspection = queryOne("SELECT wbs_task_id,status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String, Object> inspection = queryOne("""
+                SELECT q.wbs_task_id,q.status,q.conclusion,p.inspection_type
+                FROM qs_inspection_record q
+                JOIN qs_inspection_plan p ON p.tenant_id=q.tenant_id AND p.id=q.plan_id
+                 AND p.project_id=q.project_id AND p.deleted_flag=0
+                WHERE q.id=? AND q.tenant_id=? AND q.deleted_flag=0
+                """,
                 "CLOSEOUT_INSPECTION_NOT_FOUND", "质量验收记录不存在", row.get("quality_inspection_id"), tenant());
         if (!longValue(row.get("wbs_task_id")).equals(longValueNullable(inspection.get("wbs_task_id"))))
             throw error("CLOSEOUT_WBS_MISMATCH", "质量验收记录不属于当前WBS任务");
-        if (!"SUBMITTED".equals(string(inspection.get("status"))) || !"PASS".equals(string(inspection.get("conclusion"))))
-            throw error("CLOSEOUT_QUALITY_NOT_PASSED", "只有已提交且结论通过的质量验收记录可支撑分项验收");
+        if (!"QUALITY".equals(string(inspection.get("inspection_type")))
+                || !"SUBMITTED".equals(string(inspection.get("status")))
+                || !"PASS".equals(string(inspection.get("conclusion"))))
+            throw error("CLOSEOUT_QUALITY_NOT_PASSED", "只有质量类、已提交且结论通过的检查可支撑分项验收");
         if (jdbc.update("""
                 UPDATE closeout_section_acceptance SET status='ACCEPTED',confirmed_by=?,confirmed_at=CURRENT_TIMESTAMP,
                  version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP

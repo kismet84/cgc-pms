@@ -67,6 +67,12 @@ class M3ControllerPermissionIntegrationTest {
                     .andReturn().getResponse().getStatus();
             assertEquals(403, status, endpoint.method() + " " + endpoint.path());
         }
+
+        int formOptionsStatus = mockMvc.perform(request(HttpMethod.GET, "/quality-safety/form-options")
+                        .cookie(cookie)
+                        .param("projectId", "1"))
+                .andReturn().getResponse().getStatus();
+        assertEquals(403, formOptionsStatus, "GET /quality-safety/form-options");
     }
 
     private List<Endpoint> mutationEndpoints() {

@@ -10,6 +10,7 @@ import {
   loadSubcontractMeasure,
   loadSubcontractMeasureItems,
   loadSubcontractTask,
+  loadSubcontractTaskFormOptions,
   saveSubcontractMeasureItems,
   submitSubcontractMeasure,
   updateSubcontractMeasure,
@@ -25,6 +26,10 @@ const response = (data: unknown = null) =>
 
 beforeEach(() => {
   fetchMock.mockReset().mockImplementation(async (url, init) => {
+    if (String(url).includes('/api/sub-tasks/form-options'))
+      return response({
+        wbsTasks: [{ id: 'WBS1', taskCode: 'WBS-001', taskName: '主体结构' }],
+      })
     if (init?.method === 'POST' && ['/api/sub-tasks', '/api/sub-measures'].includes(String(url)))
       return response('9007199254740993')
     if (String(url).endsWith('/items')) return response([])
@@ -63,8 +68,12 @@ describe('M6 subcontract task and measure V2', () => {
   it('uses encoded endpoints and preserves decimal strings', async () => {
     const signal = new AbortController().signal
     await loadSubcontractTask('T/1', signal)
+    await expect(loadSubcontractTaskFormOptions('P/1', signal)).resolves.toEqual({
+      wbsTasks: [{ id: 'WBS1', taskCode: 'WBS-001', taskName: '主体结构' }],
+    })
     const taskId = await createSubcontractTask({
       projectId: 'P1',
+      wbsTaskId: 'WBS1',
       contractId: 'C1',
       partnerId: 'S1',
       taskName: '地下室劳务',
@@ -72,6 +81,7 @@ describe('M6 subcontract task and measure V2', () => {
     })
     await updateSubcontractTask('T/1', {
       projectId: 'P1',
+      wbsTaskId: 'WBS1',
       contractId: 'C1',
       partnerId: 'S1',
       taskName: '地下室劳务',
@@ -105,6 +115,7 @@ describe('M6 subcontract task and measure V2', () => {
     expect(measureId).toBe('9007199254740993')
     const urls = fetchMock.mock.calls.map(([url]) => String(url))
     expect(urls).toContain('/api/sub-tasks/T%2F1')
+    expect(urls).toContain('/api/sub-tasks/form-options?projectId=P%2F1')
     expect(urls).toContain('/api/sub-measures/M%2F1/items/batch')
     expect(urls).toContain('/api/sub-measures/M%2F1/submit')
     const itemWrite = fetchMock.mock.calls.find(([url]) =>
@@ -113,7 +124,11 @@ describe('M6 subcontract task and measure V2', () => {
     expect(JSON.parse(String(itemWrite?.[1]?.body))).toEqual([
       { contractItemId: 'CI1', currentQuantity: '9007199254740993.1234' },
     ])
-    expect(fetchMock.mock.calls.filter(([, init]) => init?.signal === signal)).toHaveLength(3)
+    const taskWrite = fetchMock.mock.calls.find(
+      ([url, init]) => String(url) === '/api/sub-tasks' && init?.method === 'POST',
+    )
+    expect(JSON.parse(String(taskWrite?.[1]?.body)).wbsTaskId).toBe('WBS1')
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.signal === signal)).toHaveLength(4)
   })
 
   it('binds real routes and re-reads every successful business write', () => {
@@ -156,6 +171,11 @@ describe('M6 subcontract task and measure V2', () => {
     expect(page).toContain('form.predecessorTaskId = predecessorTaskId')
     expect(page).toContain('form.subTaskId = subTaskId')
     expect(page).toContain('form.partnerId = contract?.partyBId')
+    expect(page).toContain('loadSubcontractTaskFormOptions')
+    expect(page).toContain('label="WBS任务"')
+    expect(page).toContain("required('wbsTaskId', 'WBS任务')")
+    expect(page).toContain("form.wbsTaskId = ''")
+    expect(page).toContain("wbsTaskId: task?.wbsTaskId || ''")
     expect(page).toContain('let listGeneration = 0')
     expect(page).toContain('listController?.abort()')
     expect(page).not.toMatch(/\.subcontract-workspace__facts div\s*\{[^}]*background:/)

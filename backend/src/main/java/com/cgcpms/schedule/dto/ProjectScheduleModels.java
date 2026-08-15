@@ -40,6 +40,7 @@ public final class ProjectScheduleModels {
             @NotNull Long schedulePlanId,
             @Pattern(regexp = "YEARLY|QUARTERLY|MONTHLY|WEEKLY") String periodType,
             Long parentPeriodPlanId,
+            Long replacesPeriodPlanId,
             @Size(max = 64) String periodCode,
             @NotBlank @Size(max = 200) String periodName,
             @NotNull LocalDate startDate,

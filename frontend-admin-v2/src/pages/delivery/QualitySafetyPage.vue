@@ -32,7 +32,7 @@ import {
   useToastMessage,
 } from '@/components'
 import { loadContractPage, loadPartners } from '@/services/commercial'
-import { listSiteFiles } from '@/services/delivery'
+import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   activateQualityPlan,
   completeQualityPlan,
@@ -41,6 +41,7 @@ import {
   createQualityIssue,
   createQualityPlan,
   createQualityRectification,
+  loadQualityFormOptions,
   loadQualityTrace,
   loadQualityWorkspace,
   reinspectQualityRectification,
@@ -129,6 +130,7 @@ const trace = ref<QualityTraceRecord | null>(null)
 const traceFiles = ref<Array<{ stage: string; files: SiteFileRecord[] }>>([])
 const partners = ref<PartnerRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
+const inspectionWbsOptions = ref<Array<{ value: string; label: string }>>([])
 const dialog = ref<DialogKind>(null)
 const evidence = ref<File | null>(null)
 const evidenceTarget = ref<EvidenceTarget | null>(null)
@@ -247,6 +249,7 @@ const planForm = reactive<QualityPlanCommand>({
 })
 const inspectionForm = reactive<QualityInspectionCommand>({
   planId: '',
+  wbsTaskId: '',
   inspectionCode: '',
   inspectionDate: today(),
   location: '',
@@ -416,6 +419,26 @@ async function loadCommercialOptions(): Promise<void> {
   }
 }
 
+async function loadInspectionFormOptions(): Promise<boolean> {
+  if (!projectId.value) return false
+  try {
+    const loaded = await loadQualityFormOptions(projectId.value)
+    inspectionWbsOptions.value = loaded.wbsTasks.map((task) => ({
+      value: task.id,
+      label: `${task.taskCode} · ${task.taskName}`,
+    }))
+    if (selectedPlan.value?.inspectionType === 'QUALITY' && !inspectionWbsOptions.value.length) {
+      errorMessage.value = '当前项目无生效 WBS 任务，无法创建质量检查'
+      return false
+    }
+    return true
+  } catch (error) {
+    inspectionWbsOptions.value = []
+    errorMessage.value = errorText(error, '质量检查 WBS 候选加载失败')
+    return false
+  }
+}
+
 async function show(
   kind: Exclude<DialogKind, null>,
   target?: QualityInspectionRecord | QualityIssueRecord,
@@ -423,6 +446,7 @@ async function show(
   clearNotice()
   evidence.value = null
   if (kind === 'issue' || kind === 'consequence') await loadCommercialOptions()
+  if (kind === 'inspection' && !(await loadInspectionFormOptions())) return
   dialog.value = kind
   if (kind === 'plan')
     Object.assign(planForm, {
@@ -439,6 +463,7 @@ async function show(
   if (kind === 'inspection')
     Object.assign(inspectionForm, {
       planId: selectedPlanId.value,
+      wbsTaskId: '',
       inspectionCode: '',
       inspectionDate: today(),
       location: '',
@@ -688,7 +713,10 @@ const finishPlan = (plan: QualityPlanRecord) =>
   }, '计划已完成')
 const saveInspection = () =>
   runWrite(async () => {
-    const created = await createQualityInspection(inspectionForm)
+    const created = await createQualityInspection({
+      ...inspectionForm,
+      wbsTaskId: inspectionForm.wbsTaskId || undefined,
+    })
     await uploadRequired('QS_INSPECTION', created.id, 'INSPECTION_EVIDENCE')
   }, '检查及证据已创建')
 const saveIssue = () =>
@@ -1108,6 +1136,11 @@ onBeforeUnmount(() => {
         <p class="quality-page__wide">检查编码由服务端自动生成</p>
         <label>检查日期<input v-model="inspectionForm.inspectionDate" type="date" required /></label
         ><V2Input v-model="inspectionForm.location" label="检查地点" required /><V2Select
+          v-model="inspectionForm.wbsTaskId"
+          label="WBS 任务"
+          :options="inspectionWbsOptions"
+          :required="selectedPlan?.inspectionType === 'QUALITY'"
+        /><V2Select
           v-model="inspectionForm.inspectorUserId"
           label="检查人"
           :options="userOptions(inspectionForm.inspectorUserId)"

@@ -37,6 +37,15 @@ if ($javaOpts -match '(?:^|\s)-Xmx\S+') {
 if ($javaOpts -notmatch '(?:^|\s)-XX:\+UseContainerSupport(?:\s|$)') {
   throw 'JAVA_OPTS must keep explicit container support'
 }
+if ($javaOpts -notmatch '(?:^|\s)-Duser\.timezone=Asia/Shanghai(?:\s|$)') {
+  throw 'JAVA_OPTS must keep the Asia/Shanghai business timezone'
+}
+
+$devCompose = Read-RepoText 'deploy\docker-compose.dev.yml'
+$devBackend = Get-ComposeServiceBlock $devCompose 'backend'
+if ($devBackend -notmatch '(?mi)^      JAVA_TOOL_OPTIONS:\s*["'']?-Duser\.timezone=Asia/Shanghai["'']?\s*$') {
+  throw 'Development backend service must keep the Asia/Shanghai business timezone'
+}
 
 $maxRamMatch = [regex]::Match($javaOpts, '(?:^|\s)-XX:MaxRAMPercentage=(?<value>\d+(?:\.\d+)?)(?:\s|$)')
 if (!$maxRamMatch.Success) { throw 'JAVA_OPTS must declare MaxRAMPercentage' }
@@ -77,5 +86,6 @@ if ($backend -notmatch "(?m)^      -\s*[^#\r\n]+:${escapedHeapDumpPath}(?::[a-z,
   maxRamPercentage = $maxRamPercentage
   heapDumpPath = $heapDumpPath
   backendMemoryLimit = '1G'
+  businessTimezone = 'Asia/Shanghai'
   datasourceFallback = $false
 } | ConvertTo-Json

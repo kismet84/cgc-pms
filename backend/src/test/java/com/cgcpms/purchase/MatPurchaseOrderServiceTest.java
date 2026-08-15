@@ -641,6 +641,47 @@ class MatPurchaseOrderServiceTest {
         assertThrows(BusinessException.class, () -> service.getItems(99999999L));
     }
 
+    @Test @Transactional @DisplayName("delete → soft-deletes DRAFT order and active items")
+    void deleteDraftOrderAndItems() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(30001L);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setMaterialId(1L);
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(BigDecimal.ONE);
+        item.setAmount(BigDecimal.ONE);
+        service.saveItemsBatch(id, List.of(item));
+
+        service.delete(id);
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                Integer.class, id, TENANT_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order_item WHERE order_id=? AND tenant_id=? AND deleted_flag=0",
+                Integer.class, id, TENANT_ID));
+    }
+
+    @Test @Transactional @DisplayName("delete → rejects non-DRAFT business status even when approval is DRAFT")
+    void deleteRejectsNonDraftBusinessStatus() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        jdbcTemplate.update("UPDATE mat_purchase_order SET order_status='PERFORMING' WHERE id=?", id);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.delete(id));
+
+        assertEquals("ORDER_NOT_DRAFT", error.getCode());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                Integer.class, id, TENANT_ID));
+    }
+
     @Test @Transactional @DisplayName("getItems → returns empty list")
     void testGetItems_Empty() {
         MatPurchaseOrder order = new MatPurchaseOrder();

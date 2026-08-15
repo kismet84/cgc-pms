@@ -21,6 +21,7 @@ import {
   type SubcontractMeasureQuery,
   type SubcontractMeasureRecord,
   type SubcontractTaskCommand,
+  type SubcontractTaskFormOptions,
   type SubcontractTaskPage,
   type SubcontractTaskQuery,
   type SubcontractTaskRecord,
@@ -32,6 +33,12 @@ export const loadSubcontractTasks = (query: SubcontractTaskQuery = {}, signal?: 
 
 export const loadSubcontractTask = (id: string, signal?: AbortSignal) =>
   apiRequest<SubcontractTaskRecord>(SUBCONTRACT_API.task(requiredId(id)), { signal })
+
+export const loadSubcontractTaskFormOptions = (projectId: string, signal?: AbortSignal) =>
+  apiRequest<SubcontractTaskFormOptions>(
+    withQuery(SUBCONTRACT_API.taskFormOptions, { projectId }),
+    { signal },
+  )
 
 export const createSubcontractTask = (command: SubcontractTaskCommand) =>
   apiRequest<string, SubcontractTaskCommand>(SUBCONTRACT_API.tasks, {

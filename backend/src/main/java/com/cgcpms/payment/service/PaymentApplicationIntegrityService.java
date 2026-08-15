@@ -67,8 +67,8 @@ public class PaymentApplicationIntegrityService {
         }
         PmProject project = projectMapper.selectById(app.getProjectId());
         projectAccessChecker.checkAccess(project, "校验付款申请");
-        if (!ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
-            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以提交付款申请");
+        if (!ProjectStatusConstants.allowsFinancialSettlement(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有施工中、竣工或质保阶段项目可以提交付款申请");
         }
 
         CtContract contract = contractMapper.selectById(app.getContractId());

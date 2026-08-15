@@ -21,7 +21,7 @@ import {
   saveItems,
   withQuery,
 } from './support'
-import type { RequisitionFormOptions } from './types'
+import type { RequisitionFormOptions, SupplyFormMaterialOption } from './types'
 
 export function loadRequisitions(
   query: RequisitionQuery = {},
@@ -36,6 +36,22 @@ export function loadRequisitionFormOptions(
 ): Promise<RequisitionFormOptions> {
   return apiRequest<RequisitionFormOptions>(
     withQuery(`${SUPPLY_CHAIN_API.requisitions}/form-options`, { projectId }),
+    { signal, notifyError: false },
+  )
+}
+
+export function loadRequisitionMaterialOptions(
+  projectId: string,
+  warehouseId: string,
+  keyword = '',
+  signal?: AbortSignal,
+): Promise<SupplyFormMaterialOption[]> {
+  return apiRequest<SupplyFormMaterialOption[]>(
+    withQuery(`${SUPPLY_CHAIN_API.requisitions}/material-options`, {
+      projectId,
+      warehouseId,
+      keyword: keyword.trim() || undefined,
+    }),
     { signal, notifyError: false },
   )
 }

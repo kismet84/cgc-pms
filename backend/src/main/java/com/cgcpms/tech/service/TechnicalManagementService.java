@@ -109,9 +109,18 @@ public class TechnicalManagementService {
                 ORDER BY l.report_date DESC,p.id DESC
                 """, tenant(), projectId));
         result.put("qualityInspections", jdbc.queryForList("""
-                SELECT id,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
-                FROM qs_inspection_record WHERE tenant_id=? AND project_id=? AND status='SUBMITTED'
-                 AND conclusion='PASS' AND deleted_flag=0 ORDER BY inspection_date DESC,id DESC
+                SELECT inspection.id,inspection.inspection_code inspectionCode,
+                 inspection.inspection_date inspectionDate,inspection.location,
+                 inspection.wbs_task_id wbsTaskId,inspection.conclusion,inspection.status
+                FROM qs_inspection_record inspection
+                JOIN qs_inspection_plan plan
+                  ON plan.tenant_id=inspection.tenant_id AND plan.id=inspection.plan_id
+                 AND plan.project_id=inspection.project_id AND plan.deleted_flag=0
+                 AND plan.inspection_type='QUALITY'
+                WHERE inspection.tenant_id=? AND inspection.project_id=? AND inspection.status='SUBMITTED'
+                 AND inspection.conclusion='PASS' AND inspection.wbs_task_id IS NOT NULL
+                 AND inspection.deleted_flag=0
+                ORDER BY inspection.inspection_date DESC,inspection.id DESC
                 """, tenant(), projectId));
         return result;
     }
@@ -496,11 +505,21 @@ public class TechnicalManagementService {
         Map<String, Object> reference = requireConstructionReference(command.constructionReferenceId());
         if (!projectId.equals(longValue(reference.get("project_id"))) || !"RECORDED".equals(string(reference.get("status"))))
             throw error("TECH_ARCHIVE_REFERENCE_INVALID", "验收归档必须绑定同项目有效施工引用");
-        Map<String, Object> inspection = queryOne("SELECT * FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String, Object> inspection = queryOne("""
+                SELECT inspection.*,plan.inspection_type
+                FROM qs_inspection_record inspection
+                JOIN qs_inspection_plan plan
+                  ON plan.tenant_id=inspection.tenant_id AND plan.id=inspection.plan_id
+                 AND plan.project_id=inspection.project_id AND plan.deleted_flag=0
+                WHERE inspection.id=? AND inspection.tenant_id=? AND inspection.deleted_flag=0
+                """,
                 "TECH_ARCHIVE_INSPECTION_NOT_FOUND", "质量检查记录不存在", command.qualityInspectionId(), tenant());
         if (!projectId.equals(longValue(inspection.get("project_id"))) || !"SUBMITTED".equals(string(inspection.get("status")))
-                || !"PASS".equals(string(inspection.get("conclusion"))))
-            throw error("TECH_ARCHIVE_PASSED_INSPECTION_REQUIRED", "验收归档必须绑定同项目已提交且结论通过的质量检查");
+                || !"PASS".equals(string(inspection.get("conclusion")))
+                || !"QUALITY".equals(string(inspection.get("inspection_type")))
+                || !Objects.equals(longValueNullable(reference.get("wbs_task_id")),
+                        longValueNullable(inspection.get("wbs_task_id"))))
+            throw error("TECH_ARCHIVE_PASSED_INSPECTION_REQUIRED", "验收归档必须绑定同项目、同WBS已提交且结论通过的质量检查");
         Long versionId = longValue(reference.get("drawing_version_id"));
         Map<String, Object> version = requireVersion(versionId, false);
         requireAllRfisClosed(longValue(version.get("drawing_id")));

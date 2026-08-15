@@ -535,6 +535,55 @@ class PaymentApplicationClosedLoopIntegrationTest {
     }
 
     @Test
+    @DisplayName("竣工和质保阶段允许完成既有合同付款，项目关闭后拒绝提交与支付")
+    void closeoutStagesAllowContractPaymentButClosedProjectDoesNot() {
+        jdbcTemplate.update("UPDATE pm_project SET status='COMPLETION' WHERE id=?", PROJECT_ID);
+        Long completionApplicationId = createPayment(new BigDecimal("100.00"));
+        saveDirectSource(completionApplicationId, new BigDecimal("100.00"));
+        attach("PAYMENT", completionApplicationId);
+        applicationService.submitForApproval(completionApplicationId);
+        paymentHandler.onApproved(context(instance(completionApplicationId)));
+
+        jdbcTemplate.update("UPDATE pm_project SET status='WARRANTY' WHERE id=?", PROJECT_ID);
+        PayRecord warrantyPayment = new PayRecord();
+        warrantyPayment.setPayApplicationId(completionApplicationId);
+        warrantyPayment.setPayAmount(new BigDecimal("100.00"));
+        warrantyPayment.setFundAccountId(FUND_ACCOUNT_ID);
+        warrantyPayment.setPaidAt(LocalDateTime.now().minusMinutes(1));
+        warrantyPayment.setPayMethod("BANK_TRANSFER");
+        warrantyPayment.setExternalTxnNo("PAYMENT-CLOSEOUT-WARRANTY-001");
+        assertEquals("SUCCESS", payRecordService.writeback(warrantyPayment).getPayStatus());
+
+        Long closedApplicationId = createPayment(new BigDecimal("100.00"));
+        saveDirectSource(closedApplicationId, new BigDecimal("100.00"));
+        attach("PAYMENT", closedApplicationId);
+        applicationService.submitForApproval(closedApplicationId);
+        paymentHandler.onApproved(context(instance(closedApplicationId)));
+
+        jdbcTemplate.update("UPDATE pm_project SET status='CLOSED' WHERE id=?", PROJECT_ID);
+        Long closedDraftId = createPayment(new BigDecimal("50.00"));
+        saveDirectSource(closedDraftId, new BigDecimal("50.00"));
+        attach("PAYMENT", closedDraftId);
+        BusinessException submitBlocked = assertThrows(BusinessException.class,
+                () -> applicationService.submitForApproval(closedDraftId));
+        assertEquals("PROJECT_NOT_ACTIVE", submitBlocked.getCode());
+
+        PayRecord closedPayment = new PayRecord();
+        closedPayment.setPayApplicationId(closedApplicationId);
+        closedPayment.setPayAmount(new BigDecimal("100.00"));
+        closedPayment.setFundAccountId(FUND_ACCOUNT_ID);
+        closedPayment.setPaidAt(LocalDateTime.now().minusMinutes(1));
+        closedPayment.setPayMethod("BANK_TRANSFER");
+        closedPayment.setExternalTxnNo("PAYMENT-CLOSEOUT-CLOSED-001");
+        BusinessException paymentBlocked = assertThrows(BusinessException.class,
+                () -> payRecordService.writeback(closedPayment));
+        assertEquals("PROJECT_NOT_ACTIVE", paymentBlocked.getCode());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pay_record WHERE external_txn_no='PAYMENT-CLOSEOUT-CLOSED-001'",
+                Integer.class));
+    }
+
+    @Test
     @DisplayName("预付款不确认AP，发票核验后显式确认并重分类")
     void advancePaymentUsesPrepaymentThenInvoiceReclassifiesIt() {
         Long applicationId = createPayment(new BigDecimal("300.00"), "ADVANCE");

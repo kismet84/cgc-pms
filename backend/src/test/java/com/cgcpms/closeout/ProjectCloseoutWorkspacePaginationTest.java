@@ -197,6 +197,9 @@ class ProjectCloseoutWorkspacePaginationTest {
             if (sql.contains("FROM project_closeout c")) {
                 return List.of(Map.of("id", 1001L, "projectId", 1L));
             }
+            if (sql.contains("FROM pm_project_member m")) {
+                return List.of(Map.of("userId", 1L));
+            }
             detailSql.add(sql);
             long offset = args.length == 0 || !(args[args.length - 1] instanceof Number number)
                     ? 0 : number.longValue();

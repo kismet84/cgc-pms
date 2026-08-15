@@ -68,14 +68,18 @@ const canOwnerSubmit = computed(() => session.hasPermission('variation:owner:sub
 const canOwnerReview = computed(() => session.hasPermission('variation:owner:review'))
 const canTrace = computed(() => session.hasPermission('variation:trace'))
 const isDraft = computed(() => detail.value?.approvalStatus === 'DRAFT')
+const isIncomeVariation = computed(() => detail.value?.direction === 'INCOME')
 const detailHasEditableControls = computed(
   () =>
     Boolean(detail.value) &&
     ((canEdit.value && isDraft.value) ||
       (canEditItems.value && isDraft.value) ||
       (canOwnerSubmit.value &&
+        isIncomeVariation.value &&
         ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(detail.value?.ownerStatus || '')) ||
-      (canOwnerReview.value && detail.value?.ownerStatus === 'OWNER_SUBMITTED')),
+      (canOwnerReview.value &&
+        isIncomeVariation.value &&
+        detail.value?.ownerStatus === 'OWNER_SUBMITTED')),
 )
 const latestSubmission = computed<VariationOwnerSubmissionRecord | null>(
   () => detail.value?.ownerSubmissions?.at(-1) ?? null,
@@ -604,6 +608,7 @@ onBeforeUnmount(() => {
       <section
         v-if="
           canOwnerSubmit &&
+          isIncomeVariation &&
           ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(detail.ownerStatus || '')
         "
         class="v2-detail-dialog__section"
@@ -628,7 +633,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section
-        v-if="canOwnerReview && detail.ownerStatus === 'OWNER_SUBMITTED'"
+        v-if="canOwnerReview && isIncomeVariation && detail.ownerStatus === 'OWNER_SUBMITTED'"
         class="v2-detail-dialog__section"
       >
         <div class="v2-detail-dialog__section-heading"><h3>登记业主回复</h3></div>

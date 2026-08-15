@@ -54,7 +54,7 @@ const txns = [
     amount: '32.50',
     sourceType: 'MAT_RECEIPT',
     sourceId: 'RC1',
-    createdTime: '2026-07-24 20:00:00',
+    createdTime: '2026-07-24T20:00:00.123456789',
   },
 ]
 
@@ -172,7 +172,7 @@ async function install(page: Page, granted = permissions, rejectTransfer = false
       return fulfill(route, {
         window30Start: '2026-06-25',
         window90Start: '2026-04-26',
-        cutoffAt: '2026-07-24T22:00:00',
+        cutoffAt: '2026-07-24T22:00:00.123456789',
         grossIssued30: '5.0000',
         returned30: '1.0000',
         netIssued30: '4.0000',
@@ -278,6 +278,9 @@ test.describe('M5 inventory workspace V2', () => {
     await expect(drawer.getByText('¥260.00', { exact: true })).toBeVisible()
     await expect(page.getByText(/PO-001 · 20.00/)).toBeVisible()
     await expect(page.getByText(/30日 4.0000；90日 10.0000/)).toBeVisible()
+    await expect(drawer.getByText(/截止 2026-07-24 22:00/)).toBeVisible()
+    await expect(drawer.getByText('2026-07-24 20:00', { exact: true })).toBeVisible()
+    await expect(drawer).not.toContainText('123456789')
   })
 
   test('uses ten-row server paging and shows project in all-project stock view', async ({
@@ -296,14 +299,23 @@ test.describe('M5 inventory workspace V2', () => {
     await expect.poll(() => stockRequests.some((url) => url.includes('pageSize=10'))).toBe(true)
   })
 
-  test('stock-list-only role skips material dictionary traffic', async ({ page }) => {
+  test('uses server keyword search without material dictionary preload', async ({ page }) => {
     const materialRequests: string[] = []
+    const stockRequests: string[] = []
     page.on('request', (request) => {
       if (new URL(request.url()).pathname === '/api/materials') materialRequests.push(request.url())
+      if (new URL(request.url()).pathname === '/api/inventory/stock')
+        stockRequests.push(request.url())
     })
-    await install(page, ['inventory:stock:list'])
+    await install(page)
     await page.goto('/inventory/stock?projectId=P1')
     await expect(page.getByRole('button', { name: 'MAT-001', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: '物料' })).toHaveCount(0)
+    await page.getByRole('searchbox', { name: '物料关键词' }).fill('钢筋 HRB400')
+    await page.getByRole('button', { name: '查询', exact: true }).click()
+    await expect
+      .poll(() => stockRequests.some((url) => url.includes('keyword=%E9%92%A2%E7%AD%8B+HRB400')))
+      .toBe(true)
     expect(materialRequests).toEqual([])
   })
 

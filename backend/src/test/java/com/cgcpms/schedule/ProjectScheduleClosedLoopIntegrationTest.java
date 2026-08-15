@@ -130,14 +130,14 @@ class ProjectScheduleClosedLoopIntegrationTest {
         jdbc.update("UPDATE pm_project SET status='ACTIVE' WHERE id=?", PROJECT);
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
         BusinessException monthError = assertThrows(BusinessException.class, () -> service.createPeriodPlan(new PeriodPlanRequest(
-                schedule, "WEEKLY", null, "W-NO-MONTH", "无月计划周计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
+                schedule, "WEEKLY", null, null, "W-NO-MONTH", "无月计划周计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
         assertEquals("PROJECT_PERIOD_PARENT_REQUIRED", monthError.getCode());
 
         long quarter = createAndApproveQuarter(schedule, "ROLLBACK", LocalDate.of(2099, 7, 1),
                 LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
         long year = jdbc.queryForObject("SELECT parent_period_plan_id FROM project_period_plan WHERE id=?", Long.class, quarter);
         BusinessException directParent = assertThrows(BusinessException.class, () -> service.createPeriodPlan(
-                new PeriodPlanRequest(schedule, "MONTHLY", year, "M-WRONG-PARENT", "错误直属父级月计划",
+                new PeriodPlanRequest(schedule, "MONTHLY", year, null, "M-WRONG-PARENT", "错误直属父级月计划",
                         LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
         assertEquals("PROJECT_PERIOD_PARENT_NOT_APPROVED", directParent.getCode());
         long month = createAndApprovePeriod(schedule, quarter, "MONTHLY", "M-ROLLBACK",
@@ -181,7 +181,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long quarter = createAndApproveQuarter(schedule, "STALE", LocalDate.of(2099, 7, 1),
                 LocalDate.of(2099, 7, 31), taskId, new BigDecimal("50"));
         Map<String, Object> period = service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", quarter,
-                "M-STALE", "并发保护月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null));
+                null, "M-STALE", "并发保护月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null));
         long periodId = id(period);
         service.replacePeriodItems(periodId, new PeriodItemBatch(0,
                 List.of(new PeriodItemRequest(taskId, new BigDecimal("50"), null))));
@@ -228,6 +228,48 @@ class ProjectScheduleClosedLoopIntegrationTest {
     }
 
     @Test
+    void approvedWeeklyPlanCanBeAtomicallyReplacedWithoutRewritingHistory() {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject(
+                "SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long month = createAndApproveMonth(schedule, "M-REPLACE",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
+        long original = createAndApprovePeriod(schedule, month, "WEEKLY", "W-REPLACE-ORIGINAL",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), taskId, new BigDecimal("50"));
+
+        jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-02','原周计划历史进度','DRAFT',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DAILY_LOG, PROJECT);
+        service.replaceDailyProgress(DAILY_LOG, new DailyProgressBatch(List.of(
+                new DailyProgressRequest(taskId, new BigDecimal("10"), new BigDecimal("10"), "原周计划历史进度"))));
+
+        BusinessException dateMismatch = assertThrows(BusinessException.class, () -> service.createPeriodPlan(
+                new PeriodPlanRequest(schedule, "WEEKLY", month, original, null, "错误日期替代周计划",
+                        LocalDate.of(2099, 7, 2), LocalDate.of(2099, 7, 7), null)));
+        assertEquals("PROJECT_PERIOD_REPLACEMENT_DATES_MISMATCH", dateMismatch.getCode());
+
+        long replacement = id(service.createPeriodPlan(new PeriodPlanRequest(
+                schedule, "WEEKLY", month, original, null, "修订替代周计划",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
+        service.replacePeriodItems(replacement, new PeriodItemBatch(0,
+                List.of(new PeriodItemRequest(taskId, new BigDecimal("100"), new BigDecimal("100")))));
+        service.submitPeriodPlan(replacement);
+        approveAll("PROJECT_PERIOD_PLAN", replacement);
+
+        assertEquals("SUPERSEDED", jdbc.queryForObject(
+                "SELECT status FROM project_period_plan WHERE id=?", String.class, original));
+        assertEquals("APPROVED", jdbc.queryForObject(
+                "SELECT status FROM project_period_plan WHERE id=?", String.class, replacement));
+        assertEquals(original, jdbc.queryForObject(
+                "SELECT weekly_plan_id FROM site_daily_progress WHERE daily_log_id=?", Long.class, DAILY_LOG));
+
+        long laterDailyLog = DAILY_LOG + 1;
+        jdbc.update("INSERT INTO site_daily_log(id,tenant_id,project_id,report_date,construction_content,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'2099-07-03','替代计划进度','DRAFT',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", laterDailyLog, PROJECT);
+        service.replaceDailyProgress(laterDailyLog, new DailyProgressBatch(List.of(
+                new DailyProgressRequest(taskId, new BigDecimal("20"), new BigDecimal("20"), "替代计划进度"))));
+        assertEquals(replacement, jdbc.queryForObject(
+                "SELECT weekly_plan_id FROM site_daily_progress WHERE daily_log_id=?", Long.class, laterDailyLog));
+    }
+
+    @Test
     void concurrentOverlappingWeeklyApprovalAllowsOnlyOne() throws Exception {
         long schedule = createAndActivateBaseline();
         long taskId = jdbc.queryForObject(
@@ -235,9 +277,9 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long month = createAndApproveMonth(schedule, "M-CONCURRENT-OVERLAP",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), taskId, new BigDecimal("100"));
         long first = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
-                null, "W-CONCURRENT-1", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
+                null, null, "W-CONCURRENT-1", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 7), null)));
         long second = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "WEEKLY", month,
-                null, "W-CONCURRENT-2", LocalDate.of(2099, 7, 7), LocalDate.of(2099, 7, 14), null)));
+                null, null, "W-CONCURRENT-2", LocalDate.of(2099, 7, 7), LocalDate.of(2099, 7, 14), null)));
         jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id IN (?,?)", first, second);
 
         CountDownLatch ready = new CountDownLatch(2);
@@ -343,7 +385,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         long quarter = createAndApproveQuarter(schedule, "CONCURRENT", LocalDate.of(2099, 7, 1),
                 LocalDate.of(2099, 7, 31), taskId, new BigDecimal("50"));
         long periodId = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", quarter,
-                "M-CONCURRENT", "并发提交月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+                null, "M-CONCURRENT", "并发提交月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
         service.replacePeriodItems(periodId, new PeriodItemBatch(0,
                 List.of(new PeriodItemRequest(taskId, new BigDecimal("50"), null))));
         CountDownLatch ready = new CountDownLatch(2);
@@ -484,7 +526,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
     }
 
     private void assertOverlapRejected(long schedule, Long parent, String type, String code, String expectedCode) {
-        long overlapping = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code,
+        long overlapping = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, null, code, code,
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
         jdbc.update("UPDATE project_period_plan SET status='PENDING' WHERE id=?", overlapping);
         BusinessException exception = assertThrows(BusinessException.class, () -> service.onPeriodApproved(overlapping));
@@ -502,7 +544,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
 
     private long createAndApprovePeriod(long schedule, Long parent, String type, String code,
                                         LocalDate start, LocalDate end, long task, BigDecimal target) {
-        long id = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code, start, end, null)));
+        long id = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, null, code, code, start, end, null)));
         assertTrue(jdbc.queryForObject("SELECT period_code FROM project_period_plan WHERE id=?",
                 String.class, id).matches("SPD-\\d{8}-\\d{3}"));
         service.replacePeriodItems(id, new PeriodItemBatch(0, List.of(new PeriodItemRequest(task, target, target))));
@@ -549,7 +591,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM project_progress_snapshot WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM site_daily_progress WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM project_period_plan_item WHERE period_plan_id IN(SELECT id FROM project_period_plan WHERE project_id=?)", PROJECT);
-        jdbc.update("UPDATE project_period_plan SET parent_period_plan_id=NULL WHERE project_id=?", PROJECT);
+        jdbc.update("UPDATE project_period_plan SET parent_period_plan_id=NULL,replaces_period_plan_id=NULL WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM project_period_plan WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM site_daily_log WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM project_wbs_task WHERE project_id=?", PROJECT);

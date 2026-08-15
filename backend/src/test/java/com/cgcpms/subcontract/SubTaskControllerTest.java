@@ -13,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.List;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -244,6 +245,7 @@ class SubTaskControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.id").exists())
                 .andExpect(jsonPath("$.data.taskCode", startsWith("SUB-")))
+                .andExpect(jsonPath("$.data.wbsTaskId").value(String.valueOf(WBS_ID)))
                 .andExpect(jsonPath("$.data.workArea").value("1.1 地基施工"))
                 .andExpect(jsonPath("$.data.plannedStartDate").value("2026-07-01"))
                 .andExpect(jsonPath("$.data.plannedEndDate").value("2026-07-15"))
@@ -306,6 +308,18 @@ class SubTaskControllerTest {
         mockMvc.perform(d("/sub-tasks/" + predecessorTaskId).cookie(adminCookie())).andExpect(status().isOk());
         mockMvc.perform(d("/sub-tasks/" + taskId).cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(15) @DisplayName("GET /sub-tasks/form-options returns only active project WBS tasks")
+    void testFormOptions() throws Exception {
+        mockMvc.perform(g("/sub-tasks/form-options").cookie(adminCookie())
+                        .param("projectId", String.valueOf(PROJECT_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.wbsTasks", hasSize(1)))
+                .andExpect(jsonPath("$.data.wbsTasks[0].id").value(String.valueOf(WBS_ID)))
+                .andExpect(jsonPath("$.data.wbsTasks[0].taskCode").value("SUBTASK-WBS"))
+                .andExpect(jsonPath("$.data.wbsTasks[0].taskName").value("分包任务WBS"));
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

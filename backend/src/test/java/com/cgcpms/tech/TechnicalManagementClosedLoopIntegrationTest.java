@@ -49,6 +49,8 @@ class TechnicalManagementClosedLoopIntegrationTest {
     private static final long MEMBER_ONE = 99190012L;
     private static final long MEMBER_TWO = 99190013L;
     private static final long MEMBER_DISABLED = 99190014L;
+    private static final long SAFETY_PLAN = 99190015L;
+    private static final long SAFETY_INSPECTION = 99190016L;
     private static final AtomicLong FILE_ID = new AtomicLong(99190100L);
 
     @Autowired TechnicalManagementService service;
@@ -104,11 +106,22 @@ class TechnicalManagementClosedLoopIntegrationTest {
                 VALUES(?,0,?,'TECH-QP','主体结构验收计划','QUALITY','SINGLE',?,?,1,'ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, QUALITY_PLAN, PROJECT, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
         jdbc.update("""
-                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,inspection_code,inspection_date,location,
+                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,wbs_task_id,inspection_code,inspection_date,location,
+                  inspector_user_id,conclusion,summary,status,submitted_by,submitted_at,version,
+                  created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'TECH-QI',?,'1号楼',1,'PASS','主体结构按批准图纸验收通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, QUALITY_INSPECTION, QUALITY_PLAN, PROJECT, WBS, LocalDate.now());
+        jdbc.update("""
+                INSERT INTO qs_inspection_plan(id,tenant_id,project_id,plan_code,plan_name,inspection_type,frequency_type,
+                 start_date,end_date,owner_user_id,status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,'TECH-SP','安全检查计划','SAFETY','SINGLE',?,?,1,'ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SAFETY_PLAN, PROJECT, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
+        jdbc.update("""
+                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,wbs_task_id,inspection_code,inspection_date,location,
                  inspector_user_id,conclusion,summary,status,submitted_by,submitted_at,version,
                  created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES(?,0,?,?,'TECH-QI',?,'1号楼',1,'PASS','主体结构按批准图纸验收通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
-                """, QUALITY_INSPECTION, QUALITY_PLAN, PROJECT, LocalDate.now());
+                VALUES(?,0,?,?,?,'TECH-SI',?,'1号楼',1,'PASS','安全检查通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SAFETY_INSPECTION, SAFETY_PLAN, PROJECT, WBS, LocalDate.now());
     }
 
     @AfterEach
@@ -183,6 +196,13 @@ class TechnicalManagementClosedLoopIntegrationTest {
         service.confirmDisclosure(disclosureId);
         long referenceId = id(service.createConstructionReference(PROJECT, new ConstructionReferenceCommand(
                 disclosureId, DAILY_LOG, WBS, LocalDate.now(), "1号楼", "主体结构施工引用B版图纸", null)));
+        List<?> qualityCandidates = (List<?>) service.overview(PROJECT).get("qualityInspections");
+        assertEquals(1, qualityCandidates.size());
+        assertEquals(WBS, ((Number) ((Map<?, ?>) qualityCandidates.get(0)).get("WBSTASKID")).longValue());
+        BusinessException safetyInspection = assertThrows(BusinessException.class, () -> service.createArchive(
+                PROJECT, new ArchiveCommand(referenceId, SAFETY_INSPECTION, "TA-SAFETY", LocalDate.now(),
+                        "PASS", "项目技术档案/主体结构", null)));
+        assertEquals("TECH_ARCHIVE_PASSED_INSPECTION_REQUIRED", safetyInspection.getCode());
         long archiveId = id(service.createArchive(PROJECT, new ArchiveCommand(referenceId, QUALITY_INSPECTION,
                 "TA-001", LocalDate.now(), "PASS", "项目技术档案/主体结构", null)));
         assertGeneratedCode("tech_acceptance_archive", "archive_code", archiveId, "TAR", "TA-001");
@@ -324,8 +344,8 @@ class TechnicalManagementClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM wf_node_instance WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type='TECHNICAL_SCHEME')", PROJECT);
         jdbc.update("DELETE FROM wf_cc WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type='TECHNICAL_SCHEME')", PROJECT);
         jdbc.update("DELETE FROM wf_instance WHERE project_id=? AND business_type='TECHNICAL_SCHEME'", PROJECT);
-        jdbc.update("DELETE FROM qs_inspection_record WHERE id=?", QUALITY_INSPECTION);
-        jdbc.update("DELETE FROM qs_inspection_plan WHERE id=?", QUALITY_PLAN);
+        jdbc.update("DELETE FROM qs_inspection_record WHERE id IN (?,?)", QUALITY_INSPECTION, SAFETY_INSPECTION);
+        jdbc.update("DELETE FROM qs_inspection_plan WHERE id IN (?,?)", QUALITY_PLAN, SAFETY_PLAN);
         jdbc.update("DELETE FROM site_daily_progress WHERE id=?", DAILY_PROGRESS);
         jdbc.update("DELETE FROM site_daily_log WHERE id=?", DAILY_LOG);
         jdbc.update("DELETE FROM project_period_plan WHERE id=?", WEEKLY_PLAN);

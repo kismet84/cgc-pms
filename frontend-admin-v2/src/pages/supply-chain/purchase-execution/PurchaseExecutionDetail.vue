@@ -19,6 +19,7 @@ defineProps<{
   canEdit: boolean
   canManageAttachments: boolean
   canSubmit: boolean
+  canDelete?: boolean
   canReturn?: boolean
   amount?: string | null
   sourceRequest?: { id: string; code: string } | null
@@ -28,6 +29,7 @@ defineEmits<{
   close: []
   edit: []
   submit: []
+  delete: []
   return: []
   openSourceRequest: []
 }>()
@@ -138,6 +140,9 @@ defineEmits<{
         登记供应商退货
       </V2Button>
       <V2Button v-if="canSubmit" type="button" @click="$emit('submit')">提交审批</V2Button>
+      <V2Button v-if="canDelete" type="button" variant="danger" @click="$emit('delete')">
+        删除草稿
+      </V2Button>
     </template>
   </V2Dialog>
 </template>

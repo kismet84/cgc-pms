@@ -23,6 +23,16 @@ export function dismissToast(id: number): void {
 }
 
 export function showToast(type: V2ToastType, title: string, message: string): number {
+  const duplicate = toastItems.find((item) => item.type === type && item.message === message)
+  if (duplicate) {
+    duplicate.title = title
+    clearTimeout(timers.get(duplicate.id))
+    timers.set(
+      duplicate.id,
+      setTimeout(() => dismissToast(duplicate.id), V2_TOAST_DURATION_MS),
+    )
+    return duplicate.id
+  }
   const id = ++nextId
   toastItems.push({ id, type, title, message })
   timers.set(

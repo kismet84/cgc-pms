@@ -35,8 +35,8 @@ const domainModules = {
 } as const
 
 const runtimeExportHashes = {
-  commercial: 'dd15ebb41ba453d71eb1c477afac53f73e8d786a149f2629984b291fc66c13c7',
-  'supply-chain': 'd0eb4ffea7da146d4c9978211d474fe1d9f09ea866b57523cb1e1f923d7f3367',
+  commercial: 'bb9aaf1406c228e7231246efb440d0e060c38876b11016d6e7fff1d73ad71ee1',
+  'supply-chain': 'e548592d2a6465aed7839d569119e5ae7871a9ecc464c4a6e3e393bcea9a5c78',
   finance: '332a5bf8c6e237c720b1353d1b110aa2e3c73cab70349ae384747b00e1d359d3',
   'system-management': 'd0f17314a8d9d61d2765e77d5ae3a781b453bff1acc4c4b5a18425cfadf6381a',
 } as const
@@ -49,8 +49,8 @@ const typeExportHashes = {
 } as const
 
 const requestSurfaceHashes = {
-  commercial: '012fac32046fa776a2fbf0a90c7ef7953ef16659ad01f5629367065e393352eb',
-  'supply-chain': '1de67349b89976eef8cdb7bdb5e11f2c2d758e5dca1040d7d257e648b31667fc',
+  commercial: 'feedbb0e660149d81577edbe33f3492ccd689a8705579e6cbc1936d9b99eb479',
+  'supply-chain': '1731f8c4bafd410bc6b98b5d8ead39b5df300346c0f83684a2c847db35669fe6',
   finance: 'a3125c665893601f79f9ed09c6abe8f47484d685c93b1ab1d1e7bfe218e6759d',
   'system-management': 'd589588c009b1d6021783ca81ef2b48ccb89f7740dbd9fef9aa2d3e503151350',
 } as const

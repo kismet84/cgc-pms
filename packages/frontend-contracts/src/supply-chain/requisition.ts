@@ -17,6 +17,7 @@ export interface RequisitionQuery {
 export interface RequisitionItemRecord {
   id?: string | null;
   requisitionId?: string | null;
+  wbsTaskId?: string | null;
   materialId?: string | null;
   materialName?: string | null;
   specification?: string | null;

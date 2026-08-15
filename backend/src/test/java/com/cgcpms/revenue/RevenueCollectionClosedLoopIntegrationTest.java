@@ -195,6 +195,30 @@ class RevenueCollectionClosedLoopIntegrationTest {
     }
 
     @Test
+    void closeoutStagesAllowExistingReceivableCollectionButClosedProjectDoesNot() {
+        long receivableId = createReceivable("CLOSEOUT", new BigDecimal("300"));
+
+        jdbc.update("UPDATE pm_project SET status='COMPLETION' WHERE id=?", PROJECT);
+        assertNotNull(service.createCollection(new CollectionRequest(PROJECT, CONTRACT, CUSTOMER, ACCOUNT,
+                "BANK-REV-COMPLETION", LocalDateTime.now(), new BigDecimal("100"), "测试业主", 1,
+                List.of(new AmountAllocation(receivableId, new BigDecimal("100"))), "竣工阶段回款")).get("id"));
+
+        jdbc.update("UPDATE pm_project SET status='WARRANTY' WHERE id=?", PROJECT);
+        assertNotNull(service.createCollection(new CollectionRequest(PROJECT, CONTRACT, CUSTOMER, ACCOUNT,
+                "BANK-REV-WARRANTY", LocalDateTime.now(), new BigDecimal("100"), "测试业主", 1,
+                List.of(new AmountAllocation(receivableId, new BigDecimal("100"))), "质保阶段回款")).get("id"));
+
+        jdbc.update("UPDATE pm_project SET status='CLOSED' WHERE id=?", PROJECT);
+        BusinessException closed = assertThrows(BusinessException.class, () -> service.createCollection(
+                new CollectionRequest(PROJECT, CONTRACT, CUSTOMER, ACCOUNT, "BANK-REV-CLOSED",
+                        LocalDateTime.now(), new BigDecimal("100"), "测试业主", 1,
+                        List.of(new AmountAllocation(receivableId, new BigDecimal("100"))), "关闭后回款")));
+        assertEquals("REVENUE_PROJECT_NOT_ACTIVE", closed.getCode());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM collection_record WHERE external_txn_no='BANK-REV-CLOSED'", Integer.class));
+    }
+
+    @Test
     void rejectsInvalidSalesInvoiceType() {
         BusinessException exception = assertThrows(BusinessException.class, () ->
                 service.createSalesInvoice(new SalesInvoiceRequest(PROJECT, CONTRACT, CUSTOMER, null,

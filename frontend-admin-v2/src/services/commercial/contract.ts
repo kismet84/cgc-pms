@@ -153,6 +153,19 @@ export function submitContract(id: string, version?: string | number | null): Pr
   })
 }
 
+export function settleContract(
+  id: string,
+  version: string | number | null | undefined,
+): Promise<void> {
+  const normalizedVersion = String(version ?? '').trim()
+  if (!normalizedVersion) throw new TypeError('合同版本不能为空')
+  const params = new URLSearchParams({ version: normalizedVersion })
+  return apiRequest<void>(
+    `${COMMERCIAL_API.contractSettle(requiredId(id, '合同ID'))}?${params.toString()}`,
+    { method: WRITE_METHOD.submit },
+  )
+}
+
 export function deleteContract(id: string): Promise<void> {
   return apiRequest<void>(COMMERCIAL_API.contract(requiredId(id, '合同ID')), {
     method: WRITE_METHOD.remove,

@@ -28,6 +28,7 @@ import {
   loadMaterialReturnItems,
   loadRequisition,
   loadRequisitionFormOptions,
+  loadRequisitionMaterialOptions,
   loadRequisitionItems,
   loadRequisitions,
   loadRequisitionTrace,
@@ -46,6 +47,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 
 interface EditorItem {
   key: string
+  wbsTaskId: string
   materialId: string
   materialName: string
   quantity: string
@@ -66,8 +68,10 @@ const warehouses = ref<RequisitionFormOptions['warehouses']>([])
 const materials = ref<RequisitionFormOptions['materials']>([])
 const partners = ref<RequisitionFormOptions['partners']>([])
 const contracts = ref<RequisitionFormOptions['contracts']>([])
+const wbsTasks = ref<RequisitionFormOptions['wbsTasks']>([])
 const stocks = ref<StockRecord[]>([])
 const stockFilterReady = ref(false)
+const materialKeyword = ref('')
 const editorItems = ref<EditorItem[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -228,6 +232,23 @@ const contractOptions = computed(() => {
   }
   return options
 })
+const wbsTaskOptions = computed(() => {
+  const options = wbsTasks.value.map((item) => ({
+    value: item.id,
+    label: [item.taskCode, item.taskName].filter(Boolean).join(' · '),
+    disabled: false,
+  }))
+  for (const [index, item] of editorItems.value.entries()) {
+    if (item.wbsTaskId && !options.some((option) => option.value === item.wbsTaskId)) {
+      options.push({
+        value: item.wbsTaskId,
+        label: `WBS 名称缺失（第 ${index + 1} 行，历史值）`,
+        disabled: true,
+      })
+    }
+  }
+  return options
+})
 
 function hasPermission(code: string): boolean {
   return (
@@ -277,6 +298,15 @@ function nonNegativeDecimal(value: string, label: string): string {
   return normalized
 }
 
+function activeWbsTaskId(value: string, index: number): string {
+  const normalized = value.trim()
+  if (!normalized) throw new TypeError(`第${index + 1}条明细WBS任务不能为空`)
+  if (!wbsTasks.value.some((item) => item.id === normalized)) {
+    throw new TypeError(`第${index + 1}条明细必须选择当前生效WBS任务`)
+  }
+  return normalized
+}
+
 function statusLabel(status?: string | null): string {
   return (
     {
@@ -312,6 +342,7 @@ function transactionTypeLabel(type?: string | null): string {
 function newEditorItem(source?: RequisitionItemRecord): EditorItem {
   return {
     key: crypto.randomUUID(),
+    wbsTaskId: source?.wbsTaskId || '',
     materialId: source?.materialId || '',
     materialName: source?.materialName || '',
     quantity: source?.quantity || '',
@@ -443,6 +474,7 @@ async function loadEditorCandidates(candidateProjectId: string): Promise<void> {
   materials.value = []
   partners.value = []
   contracts.value = []
+  wbsTasks.value = []
   if (!candidateProjectId) return
   busy.value = true
   try {
@@ -451,6 +483,7 @@ async function loadEditorCandidates(candidateProjectId: string): Promise<void> {
     materials.value = options.materials
     partners.value = options.partners
     contracts.value = options.contracts
+    wbsTasks.value = options.wbsTasks ?? []
     await loadWarehouseStocks(candidateProjectId, form.warehouseId)
   } catch (error) {
     errorMessage.value = errorText(error, '领料候选读取失败')
@@ -472,6 +505,23 @@ async function loadWarehouseStocks(candidateProjectId: string, warehouseId: stri
   })
   stocks.value = page.records
   stockFilterReady.value = (page.total ?? 0) <= page.records.length
+}
+
+async function searchMaterialOptions(): Promise<void> {
+  materials.value = []
+  if (!form.projectId || !form.warehouseId) return
+  busy.value = true
+  try {
+    materials.value = await loadRequisitionMaterialOptions(
+      form.projectId,
+      form.warehouseId,
+      materialKeyword.value,
+    )
+  } catch (error) {
+    showToast('error', '物料候选读取失败', errorText(error, '无法搜索所选仓库物料'))
+  } finally {
+    busy.value = false
+  }
 }
 
 function changeMaterial(row: EditorItem, value: string): void {
@@ -500,6 +550,9 @@ async function changeEditorProject(value: string): Promise<void> {
   form.contractId = ''
   form.warehouseId = ''
   form.partnerId = ''
+  editorItems.value.forEach((item) => {
+    item.wbsTaskId = ''
+  })
   stocks.value = []
   stockFilterReady.value = false
   await loadEditorCandidates(value)
@@ -507,8 +560,9 @@ async function changeEditorProject(value: string): Promise<void> {
 
 async function changeWarehouse(value: string): Promise<void> {
   form.warehouseId = value
+  materialKeyword.value = ''
   try {
-    await loadWarehouseStocks(form.projectId, value)
+    await Promise.all([loadWarehouseStocks(form.projectId, value), searchMaterialOptions()])
     if (stockFilterReady.value) {
       editorItems.value.forEach((item) => {
         if (!item.materialId || stockedMaterialIds.value.has(item.materialId)) return
@@ -584,6 +638,7 @@ async function saveEditor(submitAfter = false): Promise<void> {
       remark: optional('remark'),
     }
     const itemCommands = editorItems.value.map((item, index) => ({
+      wbsTaskId: activeWbsTaskId(item.wbsTaskId, index),
       materialId:
         item.materialId.trim() ||
         (() => {
@@ -887,7 +942,7 @@ onBeforeUnmount(() => {
       :open="editorOpen"
       :title="editingId ? '编辑领料申请' : '发起领料申请'"
       description="先保存完整草稿，再按权限提交审批。"
-      panel-class="v2-dialog-standard"
+      panel-class="v2-dialog-standard v2-dialog-wide"
       :close-on-backdrop="false"
       :close-disabled="busy"
       @close="closeEditor"
@@ -953,6 +1008,25 @@ onBeforeUnmount(() => {
             >添加物料</V2Button
           >
         </div>
+        <div class="requisition-page__material-search">
+          <V2Input
+            v-model="materialKeyword"
+            type="search"
+            label="搜索可领物料"
+            placeholder="输入物料编码、名称或规格"
+            :disabled="busy || !form.warehouseId"
+            hint="仅返回所选仓库有可用库存的前 50 条候选。"
+            @keyup.enter="searchMaterialOptions"
+          />
+          <V2Button
+            type="button"
+            variant="secondary"
+            :disabled="busy || !form.warehouseId"
+            @click="searchMaterialOptions"
+          >
+            搜索候选
+          </V2Button>
+        </div>
         <div class="requisition-page__lines">
           <article
             v-for="(row, index) in editorItems"
@@ -960,6 +1034,13 @@ onBeforeUnmount(() => {
             class="requisition-page__line"
           >
             <div class="requisition-page__line-number">{{ index + 1 }}</div>
+            <V2Select
+              v-model="row.wbsTaskId"
+              label="WBS任务"
+              :options="wbsTaskOptions"
+              :disabled="busy"
+              required
+            />
             <V2Select
               :model-value="row.materialId"
               label="物料"
@@ -1384,11 +1465,18 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-3);
 }
+.requisition-page__material-search {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) auto;
+  gap: var(--v2-space-2);
+  align-items: end;
+  max-width: 42rem;
+}
 .requisition-page__line {
   display: grid;
   grid-template-columns:
-    auto minmax(12rem, 1.6fr) minmax(7rem, 0.7fr) minmax(7rem, 0.7fr) minmax(9rem, 1fr)
-    minmax(9rem, 1fr) auto;
+    auto minmax(10rem, 1.2fr) minmax(12rem, 1.5fr) minmax(6rem, 0.7fr) minmax(6rem, 0.7fr)
+    minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
   gap: var(--v2-space-2);
   align-items: end;
   padding: var(--v2-space-3);
@@ -1438,6 +1526,7 @@ onBeforeUnmount(() => {
   .requisition-page__return-form,
   .requisition-page__facts,
   .requisition-page__timeline,
+  .requisition-page__material-search,
   .requisition-page__line {
     grid-template-columns: 1fr;
   }

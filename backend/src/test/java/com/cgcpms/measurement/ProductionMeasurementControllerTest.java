@@ -33,11 +33,16 @@ class ProductionMeasurementControllerTest {
     private static final long PARTNER=99194005L,CONTRACT=99194006L,OUT_CONTRACT=99194007L;
     private static final long PERIOD=99194008L,OUT_PERIOD=99194009L,MEASUREMENT=99194010L,OUT_MEASUREMENT=99194011L;
     private static final long SUBMISSION=99194012L,SETTLEMENT=99194013L,IN_SUBMISSION=99194014L,TRACE_SUBMISSION=99194015L,IN_SETTLEMENT=99194016L;
+    private static final long SCHEDULE=99194017L,WBS=99194018L,DRAFT_SCHEDULE=99194019L,DRAFT_WBS=99194020L;
+    private static final long OUT_SCHEDULE=99194021L,OUT_WBS=99194022L,SECOND_ACTIVE_SCHEDULE=99194023L;
     @Autowired MockMvc mockMvc;@Autowired JwtHttpTestTokenFactory jwtUtils;@Autowired JdbcTemplate jdbc;
 
     @BeforeEach void setup(){
         cleanup();
         project(PROJECT,"MEASURE-HTTP-IN",USER);project(OUTSIDE,"MEASURE-HTTP-OUT",OTHER);
+        schedule(SCHEDULE,PROJECT,"MEASURE-HTTP-SP","ACTIVE");wbs(WBS,PROJECT,SCHEDULE,"MEASURE-HTTP-WBS","有效WBS");
+        schedule(DRAFT_SCHEDULE,PROJECT,"MEASURE-HTTP-DRAFT-SP","DRAFT");wbs(DRAFT_WBS,PROJECT,DRAFT_SCHEDULE,"MEASURE-HTTP-DRAFT-WBS","草稿WBS");
+        schedule(OUT_SCHEDULE,OUTSIDE,"MEASURE-HTTP-OUT-SP","ACTIVE");wbs(OUT_WBS,OUTSIDE,OUT_SCHEDULE,"MEASURE-HTTP-OUT-WBS","外部WBS");
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'MEASURE-HTTP-P','业主','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",PARTNER);
         contract(CONTRACT,PROJECT,"MEASURE-HTTP-C");contract(OUT_CONTRACT,OUTSIDE,"MEASURE-HTTP-OC");
         period(PERIOD,PROJECT,CONTRACT,"HTTP-P","2026-07-01","2026-07-20");period(OUT_PERIOD,OUTSIDE,OUT_CONTRACT,"HTTP-OP","2026-07-01","2026-07-20");
@@ -60,6 +65,28 @@ class ProductionMeasurementControllerTest {
         mockMvc.perform(get("/production-measurements").param("projectId",String.valueOf(PROJECT)).cookie(reader)).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
         mockMvc.perform(post("/production-measurements/periods").cookie(reader).contentType(MediaType.APPLICATION_JSON).content(periodBody("HTTP-NEW"))).andExpect(status().isForbidden());
         mockMvc.perform(post("/production-measurements/periods").cookie(cookie(USER,"MEASUREMENT_USER","measurement:maintain")).contentType(MediaType.APPLICATION_JSON).content(periodBody("HTTP-NEW"))).andExpect(status().isOk());
+    }
+
+    @Test void formOptionsRequireMaintainAndOnlyExposeActiveProjectWbs()throws Exception{
+        mockMvc.perform(get("/production-measurements/form-options").param("projectId",String.valueOf(PROJECT)).cookie(cookie(USER,"MEASUREMENT_USER","measurement:query")))
+                .andExpect(status().isForbidden());
+        Cookie maintainer=cookie(USER,"MEASUREMENT_USER","measurement:maintain");
+        mockMvc.perform(get("/production-measurements/form-options").param("projectId",String.valueOf(PROJECT)).cookie(maintainer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.wbsTasks.length()").value(1))
+                .andExpect(jsonPath("$.data.wbsTasks[0].id").value(String.valueOf(WBS)))
+                .andExpect(jsonPath("$.data.wbsTasks[0].taskCode").value("MEASURE-HTTP-WBS"))
+                .andExpect(jsonPath("$.data.wbsTasks[0].taskName").value("有效WBS"));
+        mockMvc.perform(get("/production-measurements/form-options").param("projectId",String.valueOf(OUTSIDE)).cookie(maintainer))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void formOptionsRequireUniqueActiveSchedule()throws Exception{
+        schedule(SECOND_ACTIVE_SCHEDULE,PROJECT,"MEASURE-HTTP-SP-2","ACTIVE");
+        mockMvc.perform(get("/production-measurements/form-options").param("projectId",String.valueOf(PROJECT))
+                        .cookie(cookie(USER,"MEASUREMENT_USER","measurement:maintain")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_ACTIVE_SCHEDULE_REQUIRED"));
     }
 
     @Test void reportParamsBindAndFilterPeriodAndMeasureDates()throws Exception{
@@ -90,6 +117,7 @@ class ProductionMeasurementControllerTest {
         expectAllowed(get("/production-measurements/trace/settlements/"+IN_SETTLEMENT),query);
 
         Cookie maintain=cookie(USER,"MEASUREMENT_USER","measurement:maintain");
+        expectAllowed(get("/production-measurements/form-options").param("projectId",String.valueOf(PROJECT)),maintain);
         expectAllowed(post("/production-measurements/periods").contentType(MediaType.APPLICATION_JSON).content(periodBody(PROJECT,CONTRACT,"HTTP-AUTH-P")),maintain);
         expectAllowed(post("/production-measurements/periods/"+PERIOD+"/close").param("version","0"),maintain);
         expectAllowed(post("/production-measurements").contentType(MediaType.APPLICATION_JSON).content(measurementBody(PROJECT,CONTRACT,PERIOD)),maintain);
@@ -149,10 +177,12 @@ class ProductionMeasurementControllerTest {
     private String ownerSubmissionBody(){return "{\"externalDocumentNo\":\"HTTP-OWNER\",\"attachmentCount\":1}";}
     private String returnReviewBody(){return "{\"decision\":\"RETURNED\",\"reviewerName\":\"HTTP业主\",\"reviewComment\":\"退回\"}";}
     private void project(long id,String code,long owner){jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'计量HTTP项目','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,code,owner,owner);}
+    private void schedule(long id,long project,String code,String status){jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'计量HTTP计划','BASELINE',?,'2026-01-01','2026-12-31',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,project,code,(int)(id%1000),status,USER,USER);}
+    private void wbs(long id,long project,long schedule,String code,String name){jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,'2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,project,schedule,code,name,USER,USER);}
     private void contract(long id,long project,String code){jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,'计量HTTP合同','MAIN',?,?,1000,1000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",id,project,code,PARTNER,PARTNER);}
     private void period(long id,long project,long contract,String code,String start,String end){jdbc.update("INSERT INTO measurement_period(id,tenant_id,project_id,contract_id,period_code,period_name,start_date,end_date,cutoff_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,'HTTP期间',?,?,?,'OPEN',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,project,contract,code,start,end,end,USER,USER);}
     private void measurement(long id,long project,long contract,long period,String code,String date){jdbc.update("INSERT INTO production_measurement(id,tenant_id,project_id,contract_id,period_id,measure_code,measure_date,current_reported_amount,cumulative_reported_amount,status,approval_status,attachment_count,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,?,100,100,'DRAFT','DRAFT',0,'PRODUCTION_MEASUREMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,project,contract,period,code,date,USER,USER);}
     private void submission(long id,long project,long contract,long measurement,String code,String status,long user){int revision=id==TRACE_SUBMISSION?2:1;jdbc.update("INSERT INTO owner_measurement_submission(id,tenant_id,project_id,contract_id,measurement_id,submission_code,revision_no,submitted_at,submitted_amount,confirmed_amount,deducted_amount,status,attachment_count,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,?,CURRENT_TIMESTAMP,100,100,0,?,1,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,project,contract,measurement,code,revision,status,user,user);}
     private void settlement(long id,long project,long contract,long measurement,long submission,String code,long user){jdbc.update("INSERT INTO owner_settlement(id,tenant_id,project_id,contract_id,settlement_code,settlement_period,settlement_date,gross_amount,tax_amount,retention_amount,net_receivable_amount,due_date,customer_id,status,attachment_count,version,created_by,created_at,updated_by,updated_at,deleted_flag,production_measurement_id,owner_submission_id,reported_amount,deducted_amount) VALUES(?,0,?,?,?,'2026-07','2026-07-20',100,0,0,100,'2026-08-20',?,'DRAFT',1,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?,?,100,0)",id,project,contract,code,PARTNER,user,user,measurement,submission);}
-    private void cleanup(){jdbc.update("DELETE FROM account_receivable WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_settlement WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_measurement_review_line WHERE submission_id IN (SELECT id FROM owner_measurement_submission WHERE project_id IN (?,?))",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_measurement_submission WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM production_measurement_line WHERE measurement_id IN (SELECT id FROM production_measurement WHERE project_id IN (?,?))",PROJECT,OUTSIDE);jdbc.update("DELETE FROM production_measurement WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM measurement_period WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM ct_contract_item WHERE contract_id IN (?,?)",CONTRACT,OUT_CONTRACT);jdbc.update("DELETE FROM ct_contract WHERE id IN (?,?)",CONTRACT,OUT_CONTRACT);jdbc.update("DELETE FROM md_partner WHERE id=?",PARTNER);jdbc.update("DELETE FROM pm_project WHERE id IN (?,?)",PROJECT,OUTSIDE);}
+    private void cleanup(){jdbc.update("DELETE FROM account_receivable WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_settlement WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_measurement_review_line WHERE submission_id IN (SELECT id FROM owner_measurement_submission WHERE project_id IN (?,?))",PROJECT,OUTSIDE);jdbc.update("DELETE FROM owner_measurement_submission WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM production_measurement_line WHERE measurement_id IN (SELECT id FROM production_measurement WHERE project_id IN (?,?))",PROJECT,OUTSIDE);jdbc.update("DELETE FROM production_measurement WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM measurement_period WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM ct_contract_item WHERE contract_id IN (?,?)",CONTRACT,OUT_CONTRACT);jdbc.update("DELETE FROM ct_contract WHERE id IN (?,?)",CONTRACT,OUT_CONTRACT);jdbc.update("DELETE FROM md_partner WHERE id=?",PARTNER);jdbc.update("DELETE FROM project_wbs_task WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM project_schedule_plan WHERE project_id IN (?,?)",PROJECT,OUTSIDE);jdbc.update("DELETE FROM pm_project WHERE id IN (?,?)",PROJECT,OUTSIDE);}
 }

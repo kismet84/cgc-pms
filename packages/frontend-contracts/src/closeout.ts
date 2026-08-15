@@ -222,7 +222,15 @@ export interface CloseoutOverview {
   wbsReadiness: CloseoutWbsReadiness;
   wbsTasks: CloseoutWbsTask[];
   qualityInspections: CloseoutQualityInspection[];
+  responsibleMembers: CloseoutResponsibleMember[];
   stageGates: CloseoutStageGates;
+}
+
+export interface CloseoutResponsibleMember {
+  userId: string;
+  username: string;
+  realName?: string | null;
+  roleCode: string;
 }
 
 export interface CloseoutGateBlocker {

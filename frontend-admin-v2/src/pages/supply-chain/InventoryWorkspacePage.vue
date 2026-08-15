@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type {
-  MaterialRecord,
   StockConsumptionBaselineRecord,
   StockIncomingSupplyRecord,
   StockLedger,
@@ -28,7 +27,6 @@ import {
   createStockTransfer,
   createWarehouse,
   deleteWarehouse,
-  loadMaterials,
   loadStockConsumptionBaseline,
   loadStockIncomingSupplies,
   loadStockLedger,
@@ -49,9 +47,9 @@ type Mode = 'warehouse' | 'stock'
 const route = useRoute()
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
-const dateTimeLabel = (value?: string) => (value ? value.replace('T', ' ').slice(0, 16) : '-')
+const dateTimeLabel = (value?: string | null) =>
+  value ? value.replace('T', ' ').slice(0, 16) : '-'
 const warehouses = ref<WarehouseRecord[]>([])
-const materials = ref<MaterialRecord[]>([])
 const stocks = ref<StockRecord[]>([])
 const warehouseTotal = ref(0)
 const stockTotal = ref(0)
@@ -73,7 +71,7 @@ const warehouseDialog = ref(false)
 const stockDialog = ref<'settings' | 'transfer' | null>(null)
 const deleteTarget = ref<WarehouseRecord | null>(null)
 const editingWarehouseId = ref('')
-const filter = reactive({ warehouseId: '', materialId: '', keyword: '' })
+const filter = reactive({ warehouseId: '', keyword: '' })
 const transactionKeyword = ref('')
 const warehouseForm = reactive<WarehouseCommand>({
   projectId: '',
@@ -103,7 +101,6 @@ const canWarehouseAdd = computed(() => session.hasPermission('inventory:warehous
 const canWarehouseEdit = computed(() => session.hasPermission('inventory:warehouse:edit'))
 const canWarehouseDelete = computed(() => session.hasPermission('inventory:warehouse:delete'))
 const canReadStock = computed(() => session.hasPermission('inventory:stock:list'))
-const canReadMaterials = computed(() => session.hasPermission('material:dict:list'))
 const canStockEdit = computed(() => session.hasPermission('inventory:stock:edit'))
 const canTransfer = computed(
   () => canStockEdit.value && session.hasPermission('inventory:transaction:add'),
@@ -122,13 +119,6 @@ const warehouseOptions = computed(() => [
   ...warehouses.value.map((item) => ({
     value: item.id,
     label: `${item.warehouseCode} · ${item.warehouseName}`,
-  })),
-])
-const materialOptions = computed(() => [
-  { value: '', label: '全部物料' },
-  ...materials.value.map((item) => ({
-    value: item.id,
-    label: [item.materialCode, item.materialName, item.specification].filter(Boolean).join(' · '),
   })),
 ])
 const candidateOptions = computed(() =>
@@ -202,18 +192,14 @@ async function loadPage(): Promise<void> {
       return
     }
 
-    const [warehousePage, materialPage, stockPage] = await Promise.all([
+    const [warehousePage, stockPage] = await Promise.all([
       loadWarehouses(
         { pageNo: 1, pageSize: 200, projectId: projectId.value || undefined, status: 'ENABLE' },
         current.signal,
       ),
-      canReadMaterials.value
-        ? loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' }, current.signal)
-        : Promise.resolve({ records: [], total: 0, pageNo: 1, pageSize: 200 }),
       loadStocks(
         {
           warehouseId: filter.warehouseId || undefined,
-          materialId: filter.materialId || undefined,
           projectId: projectId.value || undefined,
           keyword: filter.keyword || undefined,
           pageNo: pageNo.value,
@@ -224,7 +210,6 @@ async function loadPage(): Promise<void> {
     ])
     if (currentGeneration !== generation) return
     warehouses.value = warehousePage.records
-    materials.value = materialPage.records
     stocks.value = stockPage.records
     stockTotal.value = Number(stockPage.total ?? 0)
     if (selectedStock.value) {
@@ -316,7 +301,6 @@ function search(): void {
 
 function resetSearch(): void {
   filter.warehouseId = ''
-  filter.materialId = ''
   filter.keyword = ''
   search()
 }
@@ -484,7 +468,6 @@ watch(
   () => {
     pageNo.value = 1
     filter.warehouseId = ''
-    filter.materialId = ''
     filter.keyword = ''
     clearStockDetail()
     void loadPage()
@@ -516,15 +499,6 @@ onBeforeUnmount(() => {
             placeholder="全部仓库"
             allow-empty
             :options="warehouseOptions"
-            @update:model-value="search"
-          />
-          <V2Select
-            v-model="filter.materialId"
-            label="物料"
-            hide-label
-            placeholder="全部物料"
-            allow-empty
-            :options="materialOptions"
             @update:model-value="search"
           />
           <V2Input
@@ -786,7 +760,7 @@ onBeforeUnmount(() => {
             <h3 id="inventory-baseline-title">历史净领料</h3>
             <p v-if="baseline">
               30日 {{ baseline.netIssued30 }}；90日 {{ baseline.netIssued90 }}；截止
-              {{ baseline.cutoffAt }}
+              {{ dateTimeLabel(baseline.cutoffAt) }}
             </p>
             <p v-else>暂无消耗基线</p>
           </section>
@@ -831,7 +805,7 @@ onBeforeUnmount(() => {
               </thead>
               <tbody>
                 <tr v-for="item in ledger.txns.records" :key="item.id">
-                  <td>{{ item.createdTime || '-' }}</td>
+                  <td>{{ dateTimeLabel(item.createdTime) }}</td>
                   <td>{{ transactionTypeLabel(item.txnType) }}</td>
                   <td>{{ formatDecimal(item.quantity) }}</td>
                   <td>{{ item.availableAfter }}</td>
@@ -986,7 +960,7 @@ onBeforeUnmount(() => {
 }
 .inventory-workspace-page__toolbar {
   display: grid;
-  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.25fr) minmax(14rem, 1.4fr) auto auto;
+  grid-template-columns: minmax(10rem, 1fr) minmax(14rem, 1.4fr) auto auto;
   width: min(72vw, 76rem);
 }
 .inventory-workspace-page dt {

@@ -28,6 +28,7 @@ import {
   loadContractComposite,
   loadContractProjectOptions,
   saveContractBudgetAllocations,
+  settleContract,
   submitContract,
 } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
@@ -41,6 +42,7 @@ const session = useSessionStore()
 const loading = ref(false)
 const submitting = ref(false)
 const deleting = ref(false)
+const settling = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
 const detail = ref<ContractCompositeRecord | null>(null)
@@ -52,6 +54,7 @@ const allocationEditing = ref(false)
 const allocationSaving = ref(false)
 const pendingDelete = ref(false)
 const pendingSubmit = ref(false)
+const pendingSettle = ref(false)
 
 let detailGeneration = 0
 let detailController: AbortController | null = null
@@ -69,6 +72,12 @@ const canUploadFile = computed(() => session.hasPermission('file:upload'))
 const canDeleteFile = computed(() => session.hasPermission('file:delete'))
 const currentContract = computed(() => detail.value?.contract ?? null)
 const currentContractIsDraft = computed(() => currentContract.value?.approvalStatus === 'DRAFT')
+const canSettle = computed(
+  () =>
+    session.hasAdminOrPermission('contract:edit') &&
+    currentContract.value?.approvalStatus === 'APPROVED' &&
+    currentContract.value?.contractStatus === 'PERFORMING',
+)
 const currentContractAttachmentsEditable = computed(() =>
   ['DRAFT', 'REJECTED'].includes(currentContract.value?.approvalStatus ?? ''),
 )
@@ -220,6 +229,24 @@ async function submitCurrentContract(): Promise<void> {
   }
 }
 
+async function settleCurrentContract(): Promise<void> {
+  const contract = currentContract.value
+  if (!contract || settling.value) return
+  settling.value = true
+  resetNotices()
+  try {
+    await settleContract(contract.id, contract.version)
+    await loadDetail(true)
+    successMessage.value = '合同履约已结清。'
+  } catch (error) {
+    errorMessage.value = errorText(error, '合同结清失败')
+    await loadDetail(true)
+  } finally {
+    settling.value = false
+    pendingSettle.value = false
+  }
+}
+
 async function confirmDelete(): Promise<void> {
   if (!contractId.value || deleting.value) return
   deleting.value = true
@@ -280,7 +307,7 @@ onBeforeUnmount(() => {
       :title="currentContract?.contractName || '合同详情'"
       description="查看合同台账详情。"
       close-on-backdrop
-      :close-disabled="submitting || deleting"
+      :close-disabled="submitting || deleting || settling"
       panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
       @close="backToLedger"
     >
@@ -575,7 +602,7 @@ onBeforeUnmount(() => {
         <V2Button
           type="button"
           variant="secondary"
-          :disabled="submitting || deleting"
+          :disabled="submitting || deleting || settling"
           @click="backToLedger"
           >关闭</V2Button
         >
@@ -592,6 +619,14 @@ onBeforeUnmount(() => {
           :loading="submitting"
           @click="pendingSubmit = true"
           >提交审批</V2Button
+        >
+        <V2Button
+          v-if="canSettle"
+          type="button"
+          variant="secondary"
+          :loading="settling"
+          @click="pendingSettle = true"
+          >结清履约</V2Button
         >
         <V2Button
           v-if="canDelete && currentContractIsDraft"
@@ -625,6 +660,16 @@ onBeforeUnmount(() => {
       :loading="submitting"
       @close="pendingSubmit = false"
       @confirm="submitCurrentContract"
+    />
+
+    <V2ConfirmDialog
+      :open="pendingSettle"
+      title="结清合同履约"
+      description="服务端将核验结算、订单及付款终局事实；结清后合同不可继续履约。"
+      confirm-text="确认结清"
+      :loading="settling"
+      @close="pendingSettle = false"
+      @confirm="settleCurrentContract"
     />
 
     <V2ConfirmDialog
