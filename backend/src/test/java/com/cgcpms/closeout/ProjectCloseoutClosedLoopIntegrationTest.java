@@ -61,6 +61,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long DAILY_LOG = 99191022L;
     private static final long TECH_REFERENCE = 99191023L;
     private static final long TECH_ARCHIVE = 99191024L;
+    private static final long SAFETY_PLAN = 99191025L;
+    private static final long SAFETY_INSPECTION = 99191026L;
     private static final AtomicLong IDS = new AtomicLong(99191100L);
 
     @Autowired ProjectCloseoutService service;
@@ -114,6 +116,18 @@ class ProjectCloseoutClosedLoopIntegrationTest {
                  1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, QUALITY_INSPECTION, QUALITY_PLAN, PROJECT, WBS, LocalDate.now());
         jdbc.update("""
+                INSERT INTO qs_inspection_plan(id,tenant_id,project_id,plan_code,plan_name,inspection_type,frequency_type,
+                 start_date,end_date,owner_user_id,status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,'SP-CLOSEOUT','收尾安全检查计划','SAFETY','SINGLE',?,?,1,'COMPLETED',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SAFETY_PLAN, PROJECT, LocalDate.now().minusDays(2), LocalDate.now());
+        jdbc.update("""
+                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,wbs_task_id,inspection_code,inspection_date,location,
+                 inspector_user_id,conclusion,summary,status,submitted_by,submitted_at,version,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'SI-CLOSEOUT',?,'全场',1,'PASS','安全检查通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,
+                 1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SAFETY_INSPECTION, SAFETY_PLAN, PROJECT, WBS, LocalDate.now());
+        jdbc.update("""
                 INSERT INTO owner_settlement(id,tenant_id,project_id,contract_id,settlement_code,settlement_period,
                  settlement_date,gross_amount,tax_amount,retention_amount,net_receivable_amount,due_date,customer_id,status,
                  attachment_count,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag)
@@ -151,8 +165,16 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         Map<String, Object> overview = service.overview(PROJECT);
         assertEquals(1, ((List<?>) overview.get("settlements")).size());
         assertEquals(2, ((List<?>) overview.get("receivables")).size());
-        Map<?, ?> inspection = (Map<?, ?>) ((List<?>) overview.get("qualityInspections")).get(0);
+        List<?> qualityInspections = (List<?>) overview.get("qualityInspections");
+        assertEquals(1, qualityInspections.size());
+        Map<?, ?> inspection = (Map<?, ?>) qualityInspections.get(0);
         assertEquals(WBS, ((Number) inspection.get("wbsTaskId")).longValue());
+        List<?> responsibleMembers = (List<?>) overview.get("responsibleMembers");
+        assertEquals(1, responsibleMembers.size());
+        Map<?, ?> responsibleMember = (Map<?, ?>) responsibleMembers.getFirst();
+        assertEquals(RESPONSIBLE_USER, ((Number) responsibleMember.get("userId")).longValue());
+        assertEquals("收尾责任人", responsibleMember.get("realName"));
+        assertEquals(1L, ((Number) ((Map<?, ?>) overview.get("detailTotals")).get("qualityInspections")).longValue());
         assertNull(overview.get("closeout"));
     }
 
@@ -165,6 +187,10 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-001", LocalDate.now(), "启动收尾")));
         assertTrue(jdbc.queryForObject("SELECT closeout_code FROM project_closeout WHERE id=?", String.class, closeoutId)
                 .matches("PC-\\d{8}-\\d{3}"));
+        BusinessException safetyInspection = assertThrows(BusinessException.class,
+                () -> service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
+                        WBS, SAFETY_INSPECTION, "SA-SAFETY", "安全检查不得冒充质量验收", LocalDate.now(), "PASS", null)));
+        assertEquals("CLOSEOUT_QUALITY_NOT_PASSED", safetyInspection.getCode());
         long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
                 WBS, QUALITY_INSPECTION, "SA-001", "单位工程分部分项验收", LocalDate.now(), "PASS", null)));
         assertTrue(jdbc.queryForObject("SELECT acceptance_code FROM closeout_section_acceptance WHERE id=?", String.class, sectionId)
@@ -172,6 +198,10 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         assertEquals("CLOSEOUT_ATTACHMENT_REQUIRED", assertThrows(BusinessException.class,
                 () -> service.confirmSectionAcceptance(sectionId)).getCode());
         evidence("CLOSEOUT_SECTION_ACCEPTANCE", sectionId, "SECTION_ACCEPTANCE_RECORD");
+        jdbc.update("UPDATE closeout_section_acceptance SET quality_inspection_id=? WHERE id=?", SAFETY_INSPECTION, sectionId);
+        assertEquals("CLOSEOUT_QUALITY_NOT_PASSED", assertThrows(BusinessException.class,
+                () -> service.confirmSectionAcceptance(sectionId)).getCode());
+        jdbc.update("UPDATE closeout_section_acceptance SET quality_inspection_id=? WHERE id=?", QUALITY_INSPECTION, sectionId);
         service.confirmSectionAcceptance(sectionId);
 
         long finalId = id(service.createFinalAcceptance(closeoutId, new FinalAcceptanceCommand(
@@ -349,6 +379,13 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     @Test
+    void safetyInspectionCannotSatisfyConstructionQualityGate() {
+        assertFalse(gateCodes().contains("CONSTRUCTION_QUALITY_ACCEPTANCE_MISSING"));
+        jdbc.update("UPDATE qs_inspection_record SET deleted_flag=1 WHERE id=?", QUALITY_INSPECTION);
+        assertTrue(gateCodes().contains("CONSTRUCTION_QUALITY_ACCEPTANCE_MISSING"));
+    }
+
+    @Test
     void ignoresSupersededScheduleTasksInCloseoutReadiness() {
         long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-SUPERSEDED", LocalDate.now(), null)));
         long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
@@ -472,8 +509,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM owner_settlement WHERE id=?", SETTLEMENT);
         jdbc.update("DELETE FROM fund_account WHERE id=?", FUND_ACCOUNT);
         jdbc.update("DELETE FROM qs_issue WHERE project_id=?", PROJECT);
-        jdbc.update("DELETE FROM qs_inspection_record WHERE id=?", QUALITY_INSPECTION);
-        jdbc.update("DELETE FROM qs_inspection_plan WHERE id=?", QUALITY_PLAN);
+        jdbc.update("DELETE FROM qs_inspection_record WHERE id IN(?,?)", QUALITY_INSPECTION, SAFETY_INSPECTION);
+        jdbc.update("DELETE FROM qs_inspection_plan WHERE id IN(?,?)", QUALITY_PLAN, SAFETY_PLAN);
         jdbc.update("DELETE FROM project_wbs_task WHERE id IN(?,?)", WBS, SUPERSEDED_WBS);
         jdbc.update("DELETE FROM project_schedule_plan WHERE id IN(?,?)", SCHEDULE, SUPERSEDED_SCHEDULE);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);

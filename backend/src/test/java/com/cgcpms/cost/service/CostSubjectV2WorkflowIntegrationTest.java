@@ -366,12 +366,12 @@ class CostSubjectV2WorkflowIntegrationTest {
         jdbc.update("""
                 INSERT INTO pm_project_member
                 (id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES (?,0,?,?,'FIN','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
+                VALUES (?,0,?,?,'PROJECT_ACCOUNTANT','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
                 """, PROJECT_MEMBER_A, PROJECT_A, ACCOUNTANT_USER, ACCOUNTANT_USER, ACCOUNTANT_USER);
         jdbc.update("""
                 INSERT INTO pm_project_member
                 (id,tenant_id,project_id,user_id,role_code,status,created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES (?,0,?,?,'FIN','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
+                VALUES (?,0,?,?,'PROJECT_ACCOUNTANT','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
                 """, PROJECT_MEMBER_B, PROJECT_B, ACCOUNTANT_USER, ACCOUNTANT_USER, ACCOUNTANT_USER);
     }
 

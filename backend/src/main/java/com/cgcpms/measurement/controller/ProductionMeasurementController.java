@@ -40,6 +40,10 @@ public class ProductionMeasurementController {
     @PreAuthorize("hasAuthority('measurement:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<Map<String,Object>>> sources(@RequestParam Long projectId,@RequestParam Long contractId) { return ApiResponse.success(service.sources(projectId,contractId)); }
 
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAuthority('measurement:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String,Object>> formOptions(@RequestParam Long projectId) { return ApiResponse.success(service.formOptions(projectId)); }
+
     @PostMapping
     @AuditedOperation(type="CREATE",businessType="PRODUCTION_MEASUREMENT",businessIdExpression="#request.projectId")
     @PreAuthorize("hasAuthority('measurement:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")

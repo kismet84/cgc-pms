@@ -4,6 +4,7 @@ import {
   type QualityConsequenceRecord,
   type FieldQualityIssueCommand,
   type FieldQualityRectificationCommand,
+  type QualityFormOptions,
   type QualityInspectionCommand,
   type QualityInspectionRecord,
   type QualityIssueRecord,
@@ -45,6 +46,12 @@ export function loadQualityWorkspace(
   if (query.projectId?.trim()) params.set('projectId', query.projectId.trim())
   if (query.planId?.trim()) params.set('planId', query.planId.trim())
   return apiRequest<QualityWorkspace>(`${QUALITY_API.workspace}?${params.toString()}`, { signal })
+}
+
+export function loadQualityFormOptions(projectId: string, signal?: AbortSignal) {
+  return apiRequest<QualityFormOptions>(`${QUALITY_API.formOptions}?projectId=${id(projectId)}`, {
+    signal,
+  })
 }
 
 export function loadQualityPlans(projectId: string, signal?: AbortSignal) {

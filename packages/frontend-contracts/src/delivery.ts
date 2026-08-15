@@ -57,6 +57,7 @@ export interface PeriodPlanRecord {
   projectId: string;
   schedulePlanId: string;
   parentPeriodPlanId?: string | null;
+  replacesPeriodPlanId?: string | null;
   periodType: PeriodType;
   periodCode: string;
   periodName: string;
@@ -156,6 +157,7 @@ export interface PeriodPlanCommand {
   schedulePlanId: string;
   periodType: PeriodType;
   parentPeriodPlanId?: string;
+  replacesPeriodPlanId?: string;
   periodCode?: string;
   periodName: string;
   startDate: string;

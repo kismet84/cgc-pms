@@ -11,6 +11,7 @@ import {
   loadContractPage,
   loadContractProjectOptions,
   loadPartners,
+  settleContract,
   submitContract,
   updateContractComposite,
 } from '@/services/commercial'
@@ -42,6 +43,7 @@ vi.mock('@/services/commercial', () => ({
   loadContractPage: vi.fn(),
   loadContractProjectOptions: vi.fn(),
   loadPartners: vi.fn(),
+  settleContract: vi.fn(),
   submitContract: vi.fn(),
   updateContractComposite: vi.fn(),
 }))
@@ -222,6 +224,7 @@ beforeEach(() => {
   vi.mocked(loadContractComposite).mockReset().mockResolvedValue(contractDetail)
   vi.mocked(createContractComposite).mockReset()
   vi.mocked(updateContractComposite).mockReset()
+  vi.mocked(settleContract).mockReset()
   vi.mocked(submitContract).mockReset()
   vi.mocked(deleteContract).mockReset()
 })
@@ -713,6 +716,70 @@ describe('M4 contracts page', () => {
 
     expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('操作完成')
+  })
+
+  it('settles only an approved performing contract with authoritative id and version', async () => {
+    const performing = {
+      ...contractDetail,
+      contract: {
+        ...contractDetail.contract,
+        approvalStatus: 'APPROVED' as const,
+        contractStatus: 'PERFORMING' as const,
+      },
+    }
+    vi.mocked(loadContractComposite)
+      .mockResolvedValueOnce(performing)
+      .mockResolvedValueOnce({
+        ...performing,
+        contract: { ...performing.contract, contractStatus: 'SETTLED' as const, version: '2' },
+      })
+
+    const { wrapper } = await mountPage('/contract/9', ['contract:query', 'contract:edit'])
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('结清履约'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('确认结清'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(settleContract).toHaveBeenCalledWith('9', '1')
+    expect(loadContractComposite).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('结清履约')
+  })
+
+  it('re-reads authoritative contract when settlement facts are incomplete', async () => {
+    const performing = {
+      ...contractDetail,
+      contract: {
+        ...contractDetail.contract,
+        approvalStatus: 'APPROVED' as const,
+        contractStatus: 'PERFORMING' as const,
+      },
+    }
+    vi.mocked(loadContractComposite).mockResolvedValue(performing)
+    vi.mocked(settleContract).mockRejectedValueOnce(
+      apiError('合同尚未满足结清条件', 409, 'CONTRACT_SETTLEMENT_FACT_REQUIRED'),
+    )
+
+    const { wrapper } = await mountPage('/contract/9', ['contract:query', 'contract:edit'])
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('结清履约'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('确认结清'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(loadContractComposite).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('结清履约')
+    expect(wrapper.text()).not.toContain('合同履约已结清。')
   })
 
   it('hides edit, submit and delete on non-draft detail', async () => {

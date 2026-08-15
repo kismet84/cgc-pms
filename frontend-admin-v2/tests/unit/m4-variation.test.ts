@@ -509,6 +509,7 @@ describe('M4 variation page', () => {
   it('uploads owner evidence before one guarded submission and rereads authority', async () => {
     const pending = deferred<VariationOwnerSubmissionRecord>()
     vi.mocked(submitVariationToOwner).mockReturnValueOnce(pending.promise)
+    vi.mocked(loadVariation).mockResolvedValue({ ...baseRecord, direction: 'INCOME' })
     const { wrapper } = await mountPage('/variation/order?mode=detail&id=9', [
       'variation:order:query',
       'variation:owner:submit',
@@ -530,6 +531,17 @@ describe('M4 variation page', () => {
     pending.resolve({ id: 'S1' })
     await flushPromises()
     expect(loadVariation).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides owner submission actions for cost variations', async () => {
+    const { wrapper } = await mountPage('/variation/order?mode=detail&id=9', [
+      'variation:order:query',
+      'variation:owner:submit',
+      'variation:owner:review',
+    ])
+
+    expect(button(wrapper, '提交业主申报')).toBeUndefined()
+    expect(button(wrapper, '登记业主回复')).toBeUndefined()
   })
 
   it('uploads selected site evidence before internal approval submission', async () => {
@@ -556,6 +568,7 @@ describe('M4 variation page', () => {
   it('passes owner confirmed amounts as strings and does not mutate contract authority', async () => {
     vi.mocked(loadVariation).mockResolvedValue({
       ...baseRecord,
+      direction: 'INCOME',
       ownerStatus: 'OWNER_SUBMITTED',
       ownerSubmissions: [
         {
@@ -590,6 +603,7 @@ describe('M4 variation page', () => {
   it('normalizes numeric owner amounts before an unchanged confirmation is submitted', async () => {
     vi.mocked(loadVariation).mockResolvedValue({
       ...baseRecord,
+      direction: 'INCOME',
       ownerStatus: 'OWNER_SUBMITTED',
       ownerSubmissions: [
         {

@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import type { PeriodType } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 import {
+  createPeriodPlan,
   loadSchedule,
   loadSchedules,
   loadScheduleTrace,
@@ -53,6 +54,8 @@ describe('M3 delivery request and service contracts', () => {
     expect(scheduleSource).toContain("WEEKLY: 'MONTHLY'")
     expect(scheduleSource).toContain('approvedParentPlans')
     expect(scheduleSource).toContain('v-model="periodForm.parentPeriodPlanId"')
+    expect(scheduleSource).toContain('v-model="periodForm.replacesPeriodPlanId"')
+    expect(scheduleSource).toContain('replaceableWeeklyPlans')
     expect(dailySource).toContain("session.hasPermission('site:daily:self')")
     expect(dailySource).toContain("session.hasPermission('schedule:daily-progress:self')")
   })
@@ -63,6 +66,45 @@ describe('M3 delivery request and service contracts', () => {
     await loadSchedules()
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/project-schedules')
+  })
+
+  it('sends approved weekly replacement identity without changing its dates', async () => {
+    fetchMock.mockResolvedValueOnce(
+      apiResponse({
+        id: 'period-2',
+        project_id: '22',
+        schedule_plan_id: '11',
+        parent_period_plan_id: 'month-1',
+        replaces_period_plan_id: 'period-1',
+        period_type: 'WEEKLY',
+        period_code: 'SPD-20260815-001',
+        period_name: '修订替代周计划',
+        start_date: '2026-08-14',
+        end_date: '2026-08-20',
+        status: 'DRAFT',
+        version: 0,
+      }),
+    )
+
+    await expect(
+      createPeriodPlan('11', {
+        schedulePlanId: '11',
+        periodType: 'WEEKLY',
+        parentPeriodPlanId: 'month-1',
+        replacesPeriodPlanId: 'period-1',
+        periodName: '修订替代周计划',
+        startDate: '2026-08-14',
+        endDate: '2026-08-20',
+      }),
+    ).resolves.toMatchObject({ replacesPeriodPlanId: 'period-1' })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/project-schedules/11/period-plans')
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      parentPeriodPlanId: 'month-1',
+      replacesPeriodPlanId: 'period-1',
+      startDate: '2026-08-14',
+      endDate: '2026-08-20',
+    })
   })
 
   it('shows delivery statuses and choices as business labels', () => {

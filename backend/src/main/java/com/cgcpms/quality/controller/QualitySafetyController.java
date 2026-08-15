@@ -15,6 +15,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/quality-safety")
@@ -32,6 +33,12 @@ public class QualitySafetyController {
                                             @RequestParam(required = false) Long projectId,
                                             @RequestParam(required = false) Long planId) {
         return ApiResponse.success(queryService.workspace(view, pageNo, pageSize, projectId, planId));
+    }
+
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('quality:safety:inspection:maintain')")
+    public ApiResponse<Map<String, Object>> formOptions(@RequestParam Long projectId) {
+        return ApiResponse.success(service.formOptions(projectId));
     }
 
     @GetMapping("/plans")

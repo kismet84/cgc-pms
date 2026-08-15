@@ -207,15 +207,16 @@ public class ProjectScheduleService {
         if (request.startDate().isBefore(localDate(schedule.get("planned_start_date"))) || request.endDate().isAfter(localDate(schedule.get("planned_end_date"))))
             throw error("PROJECT_PERIOD_OUTSIDE_SCHEDULE", "周期计划日期必须位于项目计划周期内");
         validatePeriodParent(request, schedule);
+        validatePeriodReplacement(request, schedule);
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             Long id = IdWorker.getId();
             String periodCode = businessCodeGenerator.next(BusinessCodeGenerator.Rule.SCHEDULE_PERIOD, projectId, attempt);
             try {
                 jdbc.update("""
-                        INSERT INTO project_period_plan(id,tenant_id,project_id,schedule_plan_id,parent_period_plan_id,period_type,
+                        INSERT INTO project_period_plan(id,tenant_id,project_id,schedule_plan_id,parent_period_plan_id,replaces_period_plan_id,period_type,
                          period_code,period_name,start_date,end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                        """, id, tenant(), projectId, request.schedulePlanId(), request.parentPeriodPlanId(), request.periodType(),
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, request.schedulePlanId(), request.parentPeriodPlanId(), request.replacesPeriodPlanId(), request.periodType(),
                         periodCode, request.periodName().trim(), request.startDate(), request.endDate(), user(), user(), request.remark());
                 return periodPlan(id);
             } catch (DuplicateKeyException ignored) {
@@ -228,6 +229,7 @@ public class ProjectScheduleService {
     public List<Map<String, Object>> periodPlans(Long scheduleId) {
         return jdbc.queryForList("""
                 SELECT p.id,p.project_id projectId,p.schedule_plan_id schedulePlanId,p.parent_period_plan_id parentPeriodPlanId,
+                 p.replaces_period_plan_id replacesPeriodPlanId,
                  p.period_type periodType,p.period_code periodCode,p.period_name periodName,p.start_date startDate,p.end_date endDate,
                  p.status,p.approval_instance_id approvalInstanceId,p.remark
                 FROM project_period_plan p WHERE p.tenant_id=? AND p.schedule_plan_id=? AND p.deleted_flag=0
@@ -293,16 +295,27 @@ public class ProjectScheduleService {
             throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
         }
         requireSchedule(longValue(period.get("schedule_plan_id")), true);
+        Long replacementId = longValueNullable(period.get("replaces_period_plan_id"));
+        Map<String, Object> replaced = null;
+        if (replacementId != null) {
+            replaced = requirePeriod(replacementId, true);
+            validatePeriodReplacement(period, replaced);
+        }
         Integer overlaps = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM project_period_plan
                 WHERE tenant_id=? AND schedule_plan_id=? AND period_type=? AND status='APPROVED'
-                  AND deleted_flag=0 AND id<>? AND start_date<=? AND end_date>=?
+                  AND deleted_flag=0 AND id<>? AND id<>? AND start_date<=? AND end_date>=?
                 """, Integer.class, tenant(), period.get("schedule_plan_id"), period.get("period_type"), id,
+                replacementId == null ? -1L : replacementId,
                 period.get("end_date"), period.get("start_date"));
         if (overlaps != null && overlaps > 0) {
             boolean weekly = "WEEKLY".equals(string(period.get("period_type")));
             throw error(weekly ? "PROJECT_WEEKLY_PLAN_OVERLAP" : "PROJECT_PERIOD_PLAN_OVERLAP",
                     weekly ? "同一计划内已存在日期重叠的已审批周计划" : "同一计划内已存在日期重叠的同级已审批周期计划");
+        }
+        if (replaced != null && jdbc.update("UPDATE project_period_plan SET status='SUPERSEDED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='APPROVED'",
+                user(), replacementId, tenant()) != 1) {
+            throw error("PROJECT_PERIOD_REPLACEMENT_NOT_APPROVED", "被替代周计划必须仍为已审批状态");
         }
         if (jdbc.update("UPDATE project_period_plan SET status='APPROVED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1)
             throw error("PROJECT_PERIOD_APPROVAL_STATE_INVALID", "月周计划审批状态不正确");
@@ -690,6 +703,35 @@ public class ProjectScheduleService {
             throw error("PROJECT_PERIOD_PARENT_MISMATCH", "上下级周期计划必须属于同一项目计划");
         if (request.startDate().isBefore(localDate(parent.get("start_date"))) || request.endDate().isAfter(localDate(parent.get("end_date"))))
             throw error("PROJECT_PERIOD_OUTSIDE_PARENT", "周期计划日期必须位于上级计划周期内");
+    }
+
+    private void validatePeriodReplacement(PeriodPlanRequest request, Map<String, Object> schedule) {
+        if (request.replacesPeriodPlanId() == null) return;
+        if (!"WEEKLY".equals(request.periodType()))
+            throw error("PROJECT_PERIOD_REPLACEMENT_WEEKLY_ONLY", "仅周计划支持替代已审批计划");
+        Map<String, Object> replaced = requirePeriod(request.replacesPeriodPlanId());
+        if (!"APPROVED".equals(string(replaced.get("status"))))
+            throw error("PROJECT_PERIOD_REPLACEMENT_NOT_APPROVED", "被替代周计划必须为已审批状态");
+        if (!"WEEKLY".equals(string(replaced.get("period_type")))
+                || !Objects.equals(longValue(replaced.get("schedule_plan_id")), longValue(schedule.get("id")))
+                || !Objects.equals(longValueNullable(replaced.get("parent_period_plan_id")), request.parentPeriodPlanId()))
+            throw error("PROJECT_PERIOD_REPLACEMENT_MISMATCH", "替代计划必须与原周计划属于同一计划和同一上级月计划");
+        if (!Objects.equals(localDate(replaced.get("start_date")), request.startDate())
+                || !Objects.equals(localDate(replaced.get("end_date")), request.endDate()))
+            throw error("PROJECT_PERIOD_REPLACEMENT_DATES_MISMATCH", "替代计划必须保持原周计划起止日期");
+    }
+
+    private void validatePeriodReplacement(Map<String, Object> replacement, Map<String, Object> replaced) {
+        if (!"WEEKLY".equals(string(replacement.get("period_type")))
+                || !"WEEKLY".equals(string(replaced.get("period_type")))
+                || !Objects.equals(longValue(replacement.get("schedule_plan_id")), longValue(replaced.get("schedule_plan_id")))
+                || !Objects.equals(longValueNullable(replacement.get("parent_period_plan_id")), longValueNullable(replaced.get("parent_period_plan_id"))))
+            throw error("PROJECT_PERIOD_REPLACEMENT_MISMATCH", "替代计划必须与原周计划属于同一计划和同一上级月计划");
+        if (!"APPROVED".equals(string(replaced.get("status"))))
+            throw error("PROJECT_PERIOD_REPLACEMENT_NOT_APPROVED", "被替代周计划必须仍为已审批状态");
+        if (!Objects.equals(localDate(replacement.get("start_date")), localDate(replaced.get("start_date")))
+                || !Objects.equals(localDate(replacement.get("end_date")), localDate(replaced.get("end_date"))))
+            throw error("PROJECT_PERIOD_REPLACEMENT_DATES_MISMATCH", "替代计划必须保持原周计划起止日期");
     }
 
     private void requireDailyLogOwner(Map<String, Object> log, String fullAuthority) {

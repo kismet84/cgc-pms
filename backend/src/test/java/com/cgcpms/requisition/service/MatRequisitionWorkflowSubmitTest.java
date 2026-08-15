@@ -44,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -63,6 +64,7 @@ class MatRequisitionWorkflowSubmitTest {
     private static final long APPROVAL_MATERIAL_ID = 93030002L;
     private static final long SCHEDULE_ID = 93030003L;
     private static final long WBS_ID = 93030004L;
+    private static final long PROJECT_MANAGER_APPROVER_ID = 93030005L;
 
     @Autowired
     private MatRequisitionService requisitionService;
@@ -105,8 +107,85 @@ class MatRequisitionWorkflowSubmitTest {
                 .build());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "admin", "n/a", List.of(new SimpleGrantedAuthority("business:amount:view"))));
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'req-project-manager-approver','test','领料项目经理审批人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PROJECT_MANAGER_APPROVER_ID);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(93030007,0,?,?,'PROJECT_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT_ID, PROJECT_MANAGER_APPROVER_ID);
         jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'REQ-WBS-SP','领料测试基线','BASELINE',9303,'2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SCHEDULE_ID, PROJECT_ID);
         jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'REQ-WBS','领料测试WBS','2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_ID, PROJECT_ID, SCHEDULE_ID);
+    }
+
+    @Test
+    @Transactional
+    void formOptionsIncludeActiveWbsTasks() {
+        Map<String, Object> options = requisitionService.formOptions(PROJECT_ID);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tasks = (List<Map<String, Object>>) options.get("wbsTasks");
+        assertTrue(tasks.stream().anyMatch(task ->
+                ((Number) task.get("id")).longValue() == WBS_ID
+                        && "REQ-WBS".equals(task.get("taskCode"))
+                        && "领料测试WBS".equals(task.get("taskName"))));
+        assertEquals(List.of(), options.get("materials"));
+    }
+
+    @Test
+    @Transactional
+    void materialOptionsAreProjectWarehouseScopedPositiveStockAndBounded() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setId(APPROVAL_WAREHOUSE_ID);
+        warehouse.setTenantId(TENANT_ID);
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-REQ-OPTIONS");
+        warehouse.setWarehouseName("领料候选仓");
+        warehouse.setStatus("ENABLE");
+        warehouseMapper.insert(warehouse);
+
+        MdMaterial available = new MdMaterial();
+        available.setId(APPROVAL_MATERIAL_ID);
+        available.setTenantId(TENANT_ID);
+        available.setMaterialCode("MAT-REQ-AVAILABLE");
+        available.setMaterialName("领料候选有库存物料");
+        available.setSpecification("A型");
+        available.setUnit("件");
+        available.setStatus("ENABLE");
+        materialMapper.insert(available);
+        MdMaterial empty = new MdMaterial();
+        empty.setId(APPROVAL_MATERIAL_ID + 1);
+        empty.setTenantId(TENANT_ID);
+        empty.setMaterialCode("MAT-REQ-EMPTY");
+        empty.setMaterialName("领料候选零库存物料");
+        empty.setUnit("件");
+        empty.setStatus("ENABLE");
+        materialMapper.insert(empty);
+
+        MatStock availableStock = new MatStock();
+        availableStock.setTenantId(TENANT_ID);
+        availableStock.setWarehouseId(APPROVAL_WAREHOUSE_ID);
+        availableStock.setMaterialId(APPROVAL_MATERIAL_ID);
+        availableStock.setAvailableQty(BigDecimal.TEN);
+        availableStock.setInventoryValue(BigDecimal.TEN);
+        availableStock.setAverageUnitCost(BigDecimal.ONE);
+        availableStock.setVersion(0);
+        matStockMapper.insert(availableStock);
+        MatStock emptyStock = new MatStock();
+        emptyStock.setTenantId(TENANT_ID);
+        emptyStock.setWarehouseId(APPROVAL_WAREHOUSE_ID);
+        emptyStock.setMaterialId(APPROVAL_MATERIAL_ID + 1);
+        emptyStock.setAvailableQty(BigDecimal.ZERO);
+        emptyStock.setInventoryValue(BigDecimal.ZERO);
+        emptyStock.setAverageUnitCost(BigDecimal.ZERO);
+        emptyStock.setVersion(0);
+        matStockMapper.insert(emptyStock);
+
+        List<Map<String, Object>> options = requisitionService.materialOptions(
+                PROJECT_ID, APPROVAL_WAREHOUSE_ID, "候选");
+        assertEquals(1, options.size());
+        assertEquals(APPROVAL_MATERIAL_ID, ((Number) options.getFirst().get("id")).longValue());
+        assertEquals(List.of(), requisitionService.materialOptions(
+                PROJECT_ID, APPROVAL_WAREHOUSE_ID, "不存在的物料"));
+
+        BusinessException invalidWarehouse = assertThrows(BusinessException.class,
+                () -> requisitionService.materialOptions(PROJECT_ID, APPROVAL_WAREHOUSE_ID + 99, ""));
+        assertEquals("REQUISITION_WAREHOUSE_INVALID", invalidWarehouse.getCode());
     }
 
     @AfterEach

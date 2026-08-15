@@ -51,4 +51,19 @@ describe('V2 toast', () => {
     expect(wrapper.get('.v2-toast').text()).toContain('数据已保存')
     wrapper.unmount()
   })
+
+  it('keeps one current toast when request and page layers report the same error', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(V2ToastHost, { attachTo: document.body })
+
+    const requestToastId = showToast('error', '请求未完成', '整改责任人不能复验本人提交的整改')
+    const pageToastId = showToast('error', '操作未完成', '整改责任人不能复验本人提交的整改')
+    await nextTick()
+
+    expect(pageToastId).toBe(requestToastId)
+    expect(wrapper.findAll('.v2-toast')).toHaveLength(1)
+    expect(wrapper.get('.v2-toast').text()).toContain('操作未完成')
+
+    wrapper.unmount()
+  })
 })

@@ -9,6 +9,11 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import {
+  collectionCommand,
+  salesInvoiceCommand,
+  type RevenueEditor,
+} from '@/pages/finance/receivables-workspace/model'
+import {
   createFundAccount,
   loadApprovedContractRevenues,
   loadCashForecastCycles,
@@ -44,6 +49,31 @@ const controlSource = () =>
   ])
 
 describe('M6 finance workspace contract', () => {
+  const revenueEditor: RevenueEditor = {
+    projectId: 'P1',
+    contractId: 'C1',
+    customerId: 'CUS1',
+    revenueId: 'REV1',
+    settlementPeriod: '2026-08',
+    settlementDate: '2026-08-15',
+    grossAmount: '4750.00',
+    taxAmount: '300.00',
+    retentionAmount: '250.00',
+    dueDate: '2026-09-15',
+    invoiceNo: 'SINV-001',
+    invoiceType: 'VAT_SPECIAL',
+    invoiceDate: '2026-08-15',
+    amountWithoutTax: '4450.00',
+    receivableId: 'AR1',
+    allocationAmount: '4750.00',
+    fundAccountId: 'FA1',
+    externalTxnNo: 'BANK-001',
+    collectedAt: '2026-08-15T10:00',
+    collectionAmount: '4750.00',
+    payerName: '建设单位',
+    remark: '',
+  }
+
   it('keeps finance endpoints and decimal fields stable', () => {
     expect(FINANCE_API.revenueSettlements).toBe('/revenue-operations/settlements')
     expect(FINANCE_API.contractRevenues).toBe('/revenue-operations/settlement-revenue-options')
@@ -166,6 +196,8 @@ describe('M6 finance workspace contract', () => {
     expect(pages).toContain("'SALES_INVOICE',")
     expect(pages).toContain("'ELECTRONIC_INVOICE'")
     expect(pages).not.toContain('allocations: []')
+    expect(salesInvoiceCommand(revenueEditor).attachmentCount).toBe(1)
+    expect(collectionCommand(revenueEditor).attachmentCount).toBe(1)
   })
   it('binds owner settlements to an approved contract revenue fact', () => {
     const pages = receivablesSource()

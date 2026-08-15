@@ -8,6 +8,7 @@ import com.cgcpms.audit.service.MandatoryAuditService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
 import com.cgcpms.revenue.vo.RevenueOperationsVOs.*;
 import com.cgcpms.system.dict.service.SysDictDataService;
@@ -746,7 +747,9 @@ public class RevenueOperationsService {
                  FOR UPDATE
                 """, contractId, tenant());
         if (row == null || !Objects.equals(longValue(row.get("project_id")), projectId)) throw error("REVENUE_CONTRACT_PROJECT_MISMATCH", "业主合同不属于所选项目");
-        if (!"ACTIVE".equals(row.get("project_status"))) throw error("REVENUE_PROJECT_NOT_ACTIVE", "只有 ACTIVE 项目可以办理收入业务");
+        if (!ProjectStatusConstants.allowsFinancialSettlement(string(row.get("project_status")))) {
+            throw error("REVENUE_PROJECT_NOT_ACTIVE", "只有施工中、竣工或质保阶段项目可以办理收入业务");
+        }
         if (!"MAIN".equals(row.get("contract_type")) || !"APPROVED".equals(row.get("approval_status")) || !"PERFORMING".equals(row.get("contract_status"))) {
             throw error("REVENUE_CONTRACT_NOT_PERFORMING", "只有已审批且履约中的 MAIN 业主合同可以办理收入业务");
         }

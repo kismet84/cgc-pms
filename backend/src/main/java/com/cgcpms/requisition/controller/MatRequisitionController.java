@@ -114,4 +114,12 @@ public class MatRequisitionController {
     public ApiResponse<Map<String, Object>> formOptions(@RequestParam Long projectId) {
         return ApiResponse.success(requisitionService.formOptions(projectId));
     }
+
+    @GetMapping("/material-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('requisition:add','requisition:self')")
+    public ApiResponse<List<Map<String, Object>>> materialOptions(@RequestParam Long projectId,
+                                                                  @RequestParam Long warehouseId,
+                                                                  @RequestParam(required = false) String keyword) {
+        return ApiResponse.success(requisitionService.materialOptions(projectId, warehouseId, keyword));
+    }
 }

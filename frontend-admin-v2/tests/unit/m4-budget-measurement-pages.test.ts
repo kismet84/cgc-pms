@@ -16,6 +16,7 @@ vi.mock('@/services/commercial', () => ({
   createMeasurementPeriod: vi.fn(),
   loadContractPage: vi.fn(),
   loadMeasurement: vi.fn(),
+  loadMeasurementFormOptions: vi.fn(),
   loadMeasurementPeriods: vi.fn(),
   loadMeasurementSettlementTrace: vi.fn(),
   loadMeasurementSources: vi.fn(),
@@ -133,12 +134,20 @@ beforeEach(() => {
         version: '2',
       },
     ])
+  vi.mocked(commercial.loadMeasurementFormOptions)
+    .mockReset()
+    .mockResolvedValue({
+      wbsTasks: [{ id: 'W1', taskCode: 'WBS-001', taskName: '主体结构' }],
+    })
   vi.mocked(commercial.loadMeasurements).mockReset().mockResolvedValue([measurement])
   vi.mocked(commercial.loadMeasurement)
     .mockReset()
     .mockResolvedValue({ ...measurement, lines: [{ id: 'ML1', item_name: '主体结构' }] })
   vi.mocked(commercial.loadOwnerMeasurementSubmissions).mockReset().mockResolvedValue([])
   vi.mocked(commercial.loadMeasurementSources).mockReset().mockResolvedValue([])
+  vi.mocked(commercial.createMeasurement)
+    .mockReset()
+    .mockResolvedValue({ id: 'M2', lines: [{ id: 'ML2' }] })
   vi.mocked(commercial.submitMeasurement).mockReset().mockResolvedValue({})
   vi.mocked(uploadSiteFile).mockReset().mockResolvedValue({ id: 'F1' })
 })
@@ -229,6 +238,57 @@ describe('M4 production measurement page', () => {
     await button(wrapper, '新建计量')!.trigger('click')
     await flushPromises()
     expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
+    expect(wrapper.get('[role="dialog"]').classes()).toContain('v2-dialog-wide')
+  })
+
+  it('requires and submits one active WBS for every selected measurement source', async () => {
+    vi.mocked(commercial.loadMeasurementSources).mockResolvedValueOnce([
+      {
+        sourceType: 'CONTRACT_CHANGE',
+        sourceId: 'CC1',
+        itemName: '业主核定变更清单',
+        remainingQuantity: '1',
+      },
+    ])
+    const { wrapper } = await mountPage('/production-measurement?projectId=P1', [
+      'measurement:query',
+      'measurement:maintain',
+      'file:upload',
+    ])
+    await button(wrapper, '新建计量')!.trigger('click')
+    await flushPromises()
+    const dialog = wrapper.get('[role="dialog"]')
+    await dialog.get('select[aria-label="业主合同"]').setValue('C1')
+    await flushPromises()
+    await dialog.get('input[type="checkbox"]').setValue(true)
+    await dialog.get('select[aria-label="WBS任务"]').setValue('W1')
+    await dialog.get('input[aria-label="本次计量量"]').setValue('1')
+    const generalFile = new File(['general'], 'measurement-general.pdf', {
+      type: 'application/pdf',
+    })
+    const lineFile = new File(['line'], 'measurement-line.pdf', { type: 'application/pdf' })
+    const generalInput = dialog.get('input[aria-label="总体计量依据"]')
+    Object.defineProperty(generalInput.element, 'files', {
+      configurable: true,
+      value: [generalFile],
+    })
+    await generalInput.trigger('change')
+    const lineInput = dialog.get('input[aria-label="业主核定变更清单现场完成依据"]')
+    Object.defineProperty(lineInput.element, 'files', { configurable: true, value: [lineFile] })
+    await lineInput.trigger('change')
+    await dialog.get('#measurement-form').trigger('submit')
+    await flushPromises()
+    expect(commercial.createMeasurement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [
+          expect.objectContaining({
+            contractChangeId: 'CC1',
+            wbsTaskId: 'W1',
+            currentQuantity: '1',
+          }),
+        ],
+      }),
+    )
   })
 
   it('recovers draft evidence using server document types', async () => {

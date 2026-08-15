@@ -41,7 +41,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("293", flyway.info().current().getVersion().getVersion());
+        assertEquals("299", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
@@ -72,8 +72,8 @@ class BaselineMySqlSmokeTest {
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM wf_template WHERE deleted_flag=0") > 0);
-        assertEquals(21, count("SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(45, count("SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id "
+        assertEquals(30, count("SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(65, count("SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id "
                 + "WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0"));
         assertEquals(8, count("""
                 SELECT COUNT(*) FROM sys_role_menu rm

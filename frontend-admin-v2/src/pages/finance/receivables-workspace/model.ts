@@ -311,6 +311,7 @@ export function salesInvoiceCommand(value: RevenueEditor): SalesInvoiceCommand {
     invoiceDate: required(value.invoiceDate, '开票日期'),
     amountWithoutTax: required(value.amountWithoutTax, '不含税金额'),
     taxAmount: required(value.taxAmount, '税额'),
+    attachmentCount: 1,
     allocations: [
       {
         receivableId: required(value.receivableId, '应收款'),
@@ -331,6 +332,7 @@ export function collectionCommand(value: RevenueEditor): CollectionCommand {
     collectedAt: required(value.collectedAt, '到账时间'),
     amount: required(value.collectionAmount, '回款金额'),
     payerName: required(value.payerName, '付款单位'),
+    attachmentCount: 1,
     allocations: [
       {
         receivableId: required(value.receivableId, '应收款'),

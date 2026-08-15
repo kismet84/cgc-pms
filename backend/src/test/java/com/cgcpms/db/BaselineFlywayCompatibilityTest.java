@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("293", flyway.info().current().getVersion().getVersion());
+        assertEquals("299", flyway.info().current().getVersion().getVersion());
         assertUnifiedAuditColumns(flyway);
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
@@ -183,8 +183,22 @@ class BaselineFlywayCompatibilityTest {
                 role_id=(SELECT id FROM sys_role WHERE role_code='EMPLOYEE' AND deleted_flag=0)
                 AND menu_id=(SELECT id FROM sys_menu WHERE perms='business:amount:view' AND deleted_flag=0)
                 """));
-        assertEquals(21, count(flyway, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(45, count(flyway, "wf_template_node", """
+        assertEquals(7, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='TECHNICAL_LEAD' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('technical:drawing:receive','technical:drawing:review','technical:rfi:raise',
+                   'technical:rfi:respond','technical:rfi:accept','technical:disclosure:maintain',
+                   'technical:archive:confirm'))
+                """));
+        assertEquals(2, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='CONSTRUCTION_LEAD' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('site:daily:self','schedule:daily-progress:self'))
+                """));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='project_period_plan' AND COLUMN_NAME='replaces_period_plan_id'"));
+        assertEquals(30, count(flyway, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(65, count(flyway, "wf_template_node", """
                 deleted_flag=0 AND template_id IN
                     (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));
@@ -220,7 +234,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("293", current.info().current().getVersion().getVersion());
+        assertEquals("299", current.info().current().getVersion().getVersion());
         assertUnifiedAuditColumns(current);
         assertEquals(9, count(current, "sys_menu", """
                 perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
@@ -238,8 +252,22 @@ class BaselineFlywayCompatibilityTest {
                     WHERE tenant_id=0 AND perms='material:dict:list' AND deleted_flag=0)
                 """));
         assertEquals(10, count(current, "sys_role", "status='ENABLE' AND deleted_flag=0"));
-        assertEquals(21, count(current, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(45, count(current, "wf_template_node", """
+        assertEquals(7, count(current, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='TECHNICAL_LEAD' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('technical:drawing:receive','technical:drawing:review','technical:rfi:raise',
+                   'technical:rfi:respond','technical:rfi:accept','technical:disclosure:maintain',
+                   'technical:archive:confirm'))
+                """));
+        assertEquals(2, count(current, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='CONSTRUCTION_LEAD' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('site:daily:self','schedule:daily-progress:self'))
+                """));
+        assertEquals(1, count(current, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='project_period_plan' AND COLUMN_NAME='replaces_period_plan_id'"));
+        assertEquals(30, count(current, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(65, count(current, "wf_template_node", """
                 deleted_flag=0 AND template_id IN
                     (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));

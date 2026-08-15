@@ -547,6 +547,12 @@ class MatPurchaseOrderControllerTest {
         mockMvc.perform(getWithApi("/purchase-orders/" + orderId)
                         .cookie(adminCookie()))
                 .andExpect(status().isBadRequest());
+        Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                Integer.class, orderId, TENANT_ID));
+        Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order_item WHERE order_id=? AND tenant_id=? AND deleted_flag=0",
+                Integer.class, orderId, TENANT_ID));
     }
 
     // ═══════════════════════════════════════════════════════════════

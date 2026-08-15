@@ -106,7 +106,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("293", current.info().current().getVersion().getVersion());
+        assertEquals("299", current.info().current().getVersion().getVersion());
         assertEquals(20, count(current, """
                 SELECT COUNT(*) FROM information_schema.columns
                 WHERE table_schema=DATABASE()
@@ -140,9 +140,9 @@ class BaselineMySqlUpgradeTest {
                 """));
         assertEquals(10, count(current,
                 "SELECT COUNT(*) FROM sys_role WHERE status='ENABLE' AND deleted_flag=0"));
-        assertEquals(21, count(current,
+        assertEquals(30, count(current,
                 "SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(45, count(current, """
+        assertEquals(65, count(current, """
                 SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id
                 WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0
                 """));

@@ -58,6 +58,14 @@ describe('M3 closeout closed loop', () => {
             status: 'SUBMITTED',
           },
         ],
+        responsible_members: [
+          {
+            user_id: 10,
+            username: 'project.member',
+            real_name: '项目成员',
+            role_code: 'PROJECT_MANAGER',
+          },
+        ],
       }),
     )
     const controller = new AbortController()
@@ -69,6 +77,11 @@ describe('M3 closeout closed loop', () => {
     )
     expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal)
     expect(overview.qualityInspections[0]).toMatchObject({ id: '9', wbsTaskId: '8' })
+    expect(overview.responsibleMembers[0]).toMatchObject({
+      userId: '10',
+      username: 'project.member',
+      realName: '项目成员',
+    })
     expect(() => loadCloseoutTrace('   ')).toThrow('ID不能为空')
   })
 
@@ -232,6 +245,12 @@ describe('M3 closeout closed loop', () => {
       expect(pageSource).toContain(stage)
     expect(pageSource).toContain('const pendingEvidence = ref<PendingEvidence | null>(null)')
     expect(pageSource).toContain('await uploadPendingEvidence()')
+    expect(pageSource).toContain('async function hasWarrantyReleaseEvidence(')
+    expect(pageSource).toContain(
+      'if (!(await hasWarrantyReleaseEvidence(selectedWarranty.value.id)))',
+    )
+    expect(pageSource).toContain("file.virusScanStatus === 'CLEAN'")
+    expect(pageSource).toContain('已有有效释放凭证时，可不重复选择文件直接重试。')
     expect(pageSource).toContain('projectController?.abort()')
     expect(pageSource).toContain('traceController?.abort()')
     expect(pageSource).toContain('await loadProject(true)')
@@ -245,7 +264,12 @@ describe('M3 closeout closed loop', () => {
     expect(pageSource).not.toContain(':subtitle="`共 ${scopedOverviews.length} 个项目`"')
     expect(pageSource).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
     expect(pageSource).toContain(':options="userOptions(warrantyForm.responsibleUserId)"')
+    expect(pageSource).toContain('overview.value?.responsibleMembers ?? []')
+    expect(pageSource).toContain("label: '历史责任人（已失效）', disabled: true")
     expect(pageSource).toContain("showToast('error', '操作未完成', value)")
+    expect(pageSource).toContain("WBS: '/site/daily-log'")
+    expect(pageSource).toContain("TECHNICAL: '/technical-management'")
+    expect(pageSource).toContain("WORKFLOW: '/approval/todo'")
     expect(pageSource).toContain('@media (max-width: 64rem)')
     expect(pageSource).toContain('@media (max-width: 40rem)')
   })

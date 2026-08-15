@@ -29,6 +29,10 @@ class SubcontractPermissionContractTest {
                 new Class<?>[]{Long.class, List.class}, "subcontract:measure:edit");
         assertAuthority(SubMeasureController.class, "submit",
                 new Class<?>[]{Long.class}, "subcontract:measure:submit");
+        PreAuthorize formOptions = SubTaskController.class.getMethod("formOptions", Long.class)
+                .getAnnotation(PreAuthorize.class);
+        assertTrue(formOptions.value().contains("'subtask:add'"));
+        assertTrue(formOptions.value().contains("'subtask:edit'"));
     }
 
     private void assertAuthority(Class<?> type, String method, Class<?>[] parameters, String authority)

@@ -63,7 +63,7 @@ abstract class BidProjectScopeDataTestSupport {
         jdbc.update("""
                 INSERT INTO pm_project_member
                     (id, tenant_id, project_id, user_id, role_code, status, deleted_flag)
-                VALUES (?, ?, ?, ?, 'OTH', 'ACTIVE', 0)
+                VALUES (?, ?, ?, ?, 'PROJECT_MANAGER', 'ACTIVE', 0)
                 """, 7_202_031L, TENANT, ALLOWED_PROJECT, USER);
         insertBid(UNBOUND_BID, TENANT, null, "M72-BID-UNBOUND", "72未绑定投标");
         insertBid(ALLOWED_BID, TENANT, ALLOWED_PROJECT, "M72-BID-ALLOWED", "72授权投标");

@@ -1,6 +1,7 @@
 import {
   COMMERCIAL_API,
   type MeasurementAmountRow,
+  type MeasurementFormOptions,
   type MeasurementPeriodCommand,
   type MeasurementSaveCommand,
   type OwnerMeasurementReviewCommand,
@@ -25,6 +26,15 @@ export function loadMeasurementSources(
     withSearchParams(COMMERCIAL_API.measurementSources, {
       projectId: requiredId(projectId, '项目ID'),
       contractId: requiredId(contractId, '合同ID'),
+    }),
+    { signal },
+  )
+}
+
+export function loadMeasurementFormOptions(projectId: string, signal?: AbortSignal) {
+  return apiRequest<MeasurementFormOptions>(
+    withSearchParams(COMMERCIAL_API.measurementFormOptions, {
+      projectId: requiredId(projectId, '项目ID'),
     }),
     { signal },
   )

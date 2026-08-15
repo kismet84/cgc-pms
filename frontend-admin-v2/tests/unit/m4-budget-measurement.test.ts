@@ -10,6 +10,7 @@ import {
   loadBudgetAvailability,
   loadBudgetPage,
   loadCostSubjectOptions,
+  loadMeasurementFormOptions,
   loadMeasurementPeriods,
   loadMeasurements,
   reviewOwnerMeasurement,
@@ -44,6 +45,7 @@ describe('M4 budget and measurement contracts', () => {
       signal,
     )
     await loadCostSubjectOptions(signal)
+    await loadMeasurementFormOptions('9007199254740993', signal)
     await loadMeasurementPeriods(
       {
         projectId: '9007199254740993',
@@ -65,6 +67,7 @@ describe('M4 budget and measurement contracts', () => {
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       '/api/project-budgets?pageNo=2&pageSize=20&projectId=9007199254740993&startDate=2026-07-01&endDate=2026-07-31',
       '/api/cost-subjects?category=COST',
+      '/api/production-measurements/form-options?projectId=9007199254740993',
       '/api/production-measurements/periods?projectId=9007199254740993&contractId=8&startDate=2026-07-01&endDate=2026-07-31',
       '/api/production-measurements?projectId=9007199254740993&status=DRAFT&startDate=2026-07-01&endDate=2026-07-31',
     ])
@@ -130,6 +133,7 @@ describe('M4 budget and measurement contracts', () => {
         {
           contractItemId: '5',
           contractChangeId: null,
+          wbsTaskId: '7',
           currentQuantity: '9999999999999999.9999',
           evidenceCount: 1,
         },
@@ -153,6 +157,9 @@ describe('M4 budget and measurement contracts', () => {
       '/api/production-measurements/6/owner-submissions?version=9',
       '/api/production-measurements/owner-submissions/8/review?version=11',
     ])
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      lines: [{ wbsTaskId: '7' }],
+    })
   })
   it('preserves DecimalString and quantity strings without arithmetic coercion', async () => {
     fetchMock.mockImplementationOnce(async () =>

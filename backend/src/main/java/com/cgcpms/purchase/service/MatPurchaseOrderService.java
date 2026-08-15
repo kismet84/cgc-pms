@@ -483,6 +483,12 @@ public class MatPurchaseOrderService {
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可删除");
+        if (!"DRAFT".equals(order.getOrderStatus()))
+            throw new BusinessException("ORDER_NOT_DRAFT", "采购订单已进入履约，不可删除");
+
+        matPurchaseOrderItemMapper.delete(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId())
+                .eq(MatPurchaseOrderItem::getOrderId, id));
 
         fileLifecycleGateway.deleteAllForBusinessCascade("PURCHASE_ORDER", id);
 

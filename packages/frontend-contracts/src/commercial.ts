@@ -31,6 +31,7 @@ export const COMMERCIAL_API = {
   contractBudgetAllocations: (id: string) =>
     `/contracts/${encodeURIComponent(id)}/budget-allocations`,
   contractSubmit: (id: string) => `/contracts/${encodeURIComponent(id)}/submit`,
+  contractSettle: (id: string) => `/contracts/${encodeURIComponent(id)}/settle`,
   contractCompositeCreate: "/contracts/composite",
   contractCompositeUpdate: (id: string) =>
     `/contracts/${encodeURIComponent(id)}/composite`,
@@ -111,6 +112,7 @@ export const COMMERCIAL_API = {
   measurementPeriodClose: (id: string) =>
     `/production-measurements/periods/${encodeURIComponent(id)}/close`,
   measurementSources: "/production-measurements/sources",
+  measurementFormOptions: "/production-measurements/form-options",
   ownerMeasurementSubmissions:
     "/production-measurements/owner-submissions/list",
   ownerMeasurementSubmission: (id: string) =>

@@ -86,6 +86,7 @@ describe('M94 project route boundaries', () => {
     expect(page).toContain('loadProjectMemberOptions')
     expect(page).toContain('projectRoleOptions')
     expect(page).toContain('new Set(members.value.map((member) => member.userId))')
+    expect(page).toContain('class="project-page__form-span"')
     expect(page).not.toContain('loadProjectUsers')
     expect(page).not.toContain('system:user:query')
     expect(page).not.toMatch(

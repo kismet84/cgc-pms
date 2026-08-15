@@ -11,6 +11,7 @@ import {
   loadContractPage,
   loadCostSummaryHistory,
   loadPartners,
+  settleContract,
 } from '@/services/commercial'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -92,6 +93,14 @@ describe('M4 commercial contract baseline', () => {
     for (const [, options] of fetchMock.mock.calls) {
       expect(options).toMatchObject({ method: 'GET', body: undefined, signal })
     }
+  })
+
+  it('posts contract settlement with encoded id and required authoritative version', async () => {
+    await settleContract(' C/1 ', ' 7 ')
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/contracts/C%2F1/settle?version=7')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: undefined })
+    expect(() => settleContract('C1', ' ')).toThrow('合同版本不能为空')
   })
 
   it('rejects empty ids before sending requests', () => {

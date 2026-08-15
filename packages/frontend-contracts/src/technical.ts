@@ -123,6 +123,7 @@ export interface ConstructionFact {
 }
 export interface QualityInspectionFact {
   id: string;
+  wbsTaskId: string;
   inspectionCode: string;
   inspectionDate: string;
   location?: string | null;

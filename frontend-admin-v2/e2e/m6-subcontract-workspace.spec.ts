@@ -20,6 +20,7 @@ const task = {
   tenantId: 'TENANT1',
   projectId: 'P1',
   projectName: '示范项目',
+  wbsTaskId: 'WBS1',
   contractId: 'C1',
   contractName: '主体劳务分包合同',
   partnerId: 'S1',
@@ -168,6 +169,10 @@ async function install(page: Page, granted = permissions) {
     const path = new URL(request.url()).pathname.replace('/api', '')
     const body = request.postDataJSON() as Record<string, unknown> | undefined
     if (request.method() !== 'GET') writes.push(`${request.method()} ${path}`)
+    if (request.method() === 'GET' && path === '/sub-tasks/form-options')
+      return fulfill(route, {
+        wbsTasks: [{ id: 'WBS1', taskCode: 'WBS-001', taskName: '主体结构' }],
+      })
     if (request.method() === 'GET' && path === '/sub-tasks')
       return fulfill(route, { records: tasks, total: tasks.length, pageNo: 1, pageSize: 10 })
     if (request.method() === 'GET')
@@ -314,9 +319,13 @@ test.describe('M6 subcontract task and measure V2', () => {
     await selectOption(page, dialog, /^分包合同$/, /SUB-001 · 主体劳务分包合同/)
     await expect(dialog.getByLabel('分包单位')).toHaveValue('劳务公司甲')
     await dialog.getByLabel('任务名称').fill('二次结构劳务')
+    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    expect(state.writes.filter((item) => item === 'POST /sub-tasks')).toHaveLength(0)
+    await selectOption(page, dialog, /^WBS任务$/, /WBS-001 · 主体结构/)
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('ST-002', { exact: true }).first()).toBeVisible()
     expect(state.writes.filter((item) => item === 'POST /sub-tasks')).toHaveLength(1)
+    expect(state.tasks.find((item) => item.id === 'T2')?.wbsTaskId).toBe('WBS1')
   })
 
   test('creates measure, saves server-derived items, uploads and submits once', async ({

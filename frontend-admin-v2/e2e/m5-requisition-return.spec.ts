@@ -55,6 +55,7 @@ const items = [
   {
     id: 'RI1',
     requisitionId: 'R1',
+    wbsTaskId: 'WBS1',
     materialId: 'M1',
     materialName: `钢筋${'超长'.repeat(20)}`,
     quantity: '10.0000',
@@ -194,6 +195,7 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
           },
         ],
         partners: [{ id: 'S1', partnerCode: 'SUP-001', partnerName: '供应商甲' }],
+        wbsTasks: [{ id: 'WBS1', taskCode: 'WBS-001', taskName: '基础施工' }],
         contracts: [
           {
             id: 'C1',
@@ -203,6 +205,16 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
           },
         ],
       })
+    if (path === '/requisitions/material-options' && method === 'GET')
+      return fulfill(route, [
+        {
+          id: 'M1',
+          materialCode: 'MAT-001',
+          materialName: '钢筋',
+          specification: 'HRB400',
+          unit: '吨',
+        },
+      ])
     if (path === '/requisitions' && method === 'GET')
       return fulfill(route, {
         records: requisitions,
@@ -447,6 +459,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     const editor = page.getByRole('dialog', { name: '发起领料申请' })
     await selectBusinessOption(page, editor, /^合同$/, /CT-001 · 示范项目材料合同/)
     await selectBusinessOption(page, editor, /^领用仓库$/, /WH-001 · 主仓/)
+    await selectBusinessOption(page, editor, /^WBS任务$/, /WBS-001 · 基础施工/)
     await selectBusinessOption(page, editor, /^物料$/, /MAT-001 · 钢筋/)
     await editor.getByLabel('领用数量').fill('9007199254740993.1234')
     await editor.getByLabel('参考单价').fill('3.25')
@@ -455,6 +468,9 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     expect(writes.filter((item) => item.path === 'POST /requisitions')).toHaveLength(1)
     expect(writes.filter((item) => item.path.endsWith('/items/batch'))).toHaveLength(1)
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
+    expect(writes.find((item) => item.path.endsWith('/items/batch'))?.body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ wbsTaskId: 'WBS1' })]),
+    )
   })
 
   test('stock-out follows approved server state and re-reads trace', async ({ page }) => {

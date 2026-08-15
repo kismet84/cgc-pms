@@ -42,6 +42,7 @@ class QualitySafetyServiceContractTest {
             "activatePlan(Long)->QualityInspectionPlan",
             "completePlan(Long)->QualityInspectionPlan",
             "listInspections(Long)->List",
+            "formOptions(Long)->Map",
             "createInspection(InspectionCommand)->QualityInspectionRecord",
             "createIssue(Long,IssueCommand)->QualitySafetyIssue",
             "submitInspection(Long)->QualityInspectionRecord",
@@ -65,6 +66,7 @@ class QualitySafetyServiceContractTest {
     private static final Set<String> QUERY_SIGNATURES = Set.of(
             "listPlans(Long)->List",
             "listInspections(Long)->List",
+            "formOptions(Long)->Map",
             "listIssues(Long,String)->List",
             "trace(Long)->Trace");
 

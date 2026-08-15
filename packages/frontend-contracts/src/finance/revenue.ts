@@ -122,6 +122,7 @@ export interface SalesInvoiceCommand {
   invoiceDate: string;
   amountWithoutTax: FinanceDecimalString;
   taxAmount: FinanceDecimalString;
+  attachmentCount: number;
   allocations: AmountAllocation[];
   remark?: string;
 }
@@ -134,6 +135,7 @@ export interface CollectionCommand {
   collectedAt: string;
   amount: FinanceDecimalString;
   payerName: string;
+  attachmentCount: number;
   allocations?: AmountAllocation[];
   remark?: string;
 }

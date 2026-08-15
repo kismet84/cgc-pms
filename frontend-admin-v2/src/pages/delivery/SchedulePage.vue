@@ -96,6 +96,7 @@ const periodForm = reactive<
   schedulePlanId: '',
   periodType: 'MONTHLY',
   parentPeriodPlanId: '',
+  replacesPeriodPlanId: '',
   periodCode: '',
   periodName: '',
   startDate: '',
@@ -165,6 +166,24 @@ const approvedParentPlans = computed(
     detail.value?.periodPlans.filter(
       (item) => item.periodType === parentPeriodType.value && item.status === 'APPROVED',
     ) ?? [],
+)
+const replaceableWeeklyPlans = computed(
+  () =>
+    detail.value?.periodPlans.filter(
+      (item) => item.periodType === 'WEEKLY' && item.status === 'APPROVED',
+    ) ?? [],
+)
+
+watch(
+  () => periodForm.replacesPeriodPlanId,
+  (id) => {
+    if (!id) return
+    const replaced = replaceableWeeklyPlans.value.find((item) => item.id === id)
+    if (!replaced) return
+    periodForm.parentPeriodPlanId = replaced.parentPeriodPlanId ?? ''
+    periodForm.startDate = replaced.startDate
+    periodForm.endDate = replaced.endDate
+  },
 )
 
 function periodPlanLabel(id?: string | null): string {
@@ -374,6 +393,7 @@ function openPeriod(periodType: PeriodType): void {
     schedulePlanId: detail.value.id,
     periodType,
     parentPeriodPlanId: '',
+    replacesPeriodPlanId: '',
     periodCode: '',
     periodName: `${periodTypeLabels[periodType]}计划`,
     startDate: today,
@@ -605,6 +625,7 @@ function cleanPeriodCommand(
     schedulePlanId: form.schedulePlanId.trim(),
     periodType: form.periodType,
     parentPeriodPlanId: form.parentPeriodPlanId?.trim() || undefined,
+    replacesPeriodPlanId: form.replacesPeriodPlanId?.trim() || undefined,
     periodCode: form.periodCode?.trim() || undefined,
     periodName: form.periodName.trim(),
     startDate: form.startDate,
@@ -1064,6 +1085,19 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       panel-class="v2-dialog-standard"
     >
       <form id="schedule-period-form" class="schedule-page__form" @submit.prevent="savePeriod">
+        <V2Select
+          v-if="periodForm.periodType === 'WEEKLY'"
+          v-model="periodForm.replacesPeriodPlanId"
+          label="替代已批准周计划"
+          :options="
+            replaceableWeeklyPlans.map((item: PeriodPlanRecord) => ({
+              value: item.id,
+              label: `${item.periodCode} ${item.periodName}（${item.startDate} 至 ${item.endDate}）`,
+            }))
+          "
+          hint="可选；选择后沿用原周计划周期，审批通过时原计划自动标记为已替代。"
+          placeholder="不替代，创建普通周计划"
+        />
         <V2Select
           v-if="parentPeriodType"
           v-model="periodForm.parentPeriodPlanId"

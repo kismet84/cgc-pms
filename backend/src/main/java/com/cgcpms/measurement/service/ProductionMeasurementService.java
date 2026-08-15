@@ -109,6 +109,30 @@ public class ProductionMeasurementService {
         return moneyPayload(result);
     }
 
+    public Map<String, Object> formOptions(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "读取产值计量表单选项");
+        projectExecutionGuard.requireActiveSchedule(projectId, "读取产值计量表单选项");
+        List<Map<String, Object>> wbsTasks = jdbc.query("""
+                SELECT task.id,task.task_code,task.task_name
+                FROM project_wbs_task task
+                JOIN project_schedule_plan schedule
+                  ON schedule.tenant_id=task.tenant_id
+                 AND schedule.id=task.schedule_plan_id
+                 AND schedule.project_id=task.project_id
+                 AND schedule.deleted_flag=0
+                 AND schedule.status='ACTIVE'
+                WHERE task.tenant_id=? AND task.project_id=? AND task.deleted_flag=0
+                ORDER BY task.sort_order,task.task_code
+                """, (result, rowNum) -> {
+            Map<String, Object> option = new LinkedHashMap<>();
+            option.put("id", result.getLong("id"));
+            option.put("taskCode", result.getString("task_code"));
+            option.put("taskName", result.getString("task_name"));
+            return option;
+        }, tenant(), projectId);
+        return Map.of("wbsTasks", wbsTasks);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createMeasurement(MeasurementRequest request) {
         requireMainContract(request.projectId(), request.contractId());

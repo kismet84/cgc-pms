@@ -10,6 +10,7 @@ import {
   loadMaterialReturnItems,
   loadRequisition,
   loadRequisitionFormOptions,
+  loadRequisitionMaterialOptions,
   loadRequisitionItems,
   loadRequisitions,
   loadRequisitionTrace,
@@ -63,7 +64,7 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).not.toContain('data-master-detail="true"')
     expect(source).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
     expect(source).toContain(':close-on-backdrop="true"')
-    expect(source).toContain('panel-class="v2-dialog-standard"')
+    expect(source).toContain('panel-class="v2-dialog-standard v2-dialog-wide"')
     expect(source).toContain(':close-on-backdrop="false"')
     expect(source).toContain('tabindex="0"')
     expect(source).toContain('<th v-if="!projectId">项目</th>')
@@ -73,6 +74,8 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain('dateTo: reportPeriod.value?.endDate')
     expect(source).toContain('editorItems')
     expect(source).toContain('loadRequisitionFormOptions')
+    expect(source).toContain('loadRequisitionMaterialOptions')
+    expect(source).toContain('仅返回所选仓库有可用库存的前 50 条候选。')
     expect(source).toContain('loadStocks({')
     expect(source).toContain('stockedMaterialIds')
     expect(source).toContain("hasPermission('inventory:stock:list')")
@@ -92,6 +95,9 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain('!requisitionSelfOnly.value && item.unitPrice.trim()')
     expect(source).toContain(':options="warehouseOptions"')
     expect(source).toContain(':options="materialOptions"')
+    expect(source).toContain(':options="wbsTaskOptions"')
+    expect(source).toContain('activeWbsTaskId(item.wbsTaskId, index)')
+    expect(source).toContain('必须选择当前生效WBS任务')
     expect(source).not.toContain('class="requisition-page__filters"')
     expect(source).not.toContain("{{ item.warehouseId || '-' }}")
     expect(source).not.toMatch(/label="[^"]*ID/)
@@ -106,6 +112,7 @@ describe('M5 requisition, stock-out and return contract', () => {
       warehouses: [{ id: 'W1', warehouseCode: 'WH-1', warehouseName: '项目仓', projectId: 'P1' }],
       materials: [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }],
       partners: [{ id: 'S1', partnerCode: 'SUP-1', partnerName: '供应商' }],
+      wbsTasks: [{ id: 'WBS1', taskCode: 'WBS-001', taskName: '基础施工' }],
       contracts: [{ id: 'C1', contractCode: 'CT-1', contractName: '采购合同', projectId: 'P1' }],
     }
     fetchMock.mockResolvedValueOnce(response(options))
@@ -114,6 +121,18 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/requisitions/form-options?projectId=P%2F1',
       expect.objectContaining({ method: 'GET', headers: expect.any(Headers), signal }),
+    )
+  })
+
+  it('searches bounded in-stock material candidates through requisition authority', async () => {
+    const materials = [{ id: 'M1', materialCode: 'MAT-1', materialName: '钢筋', unit: '吨' }]
+    fetchMock.mockResolvedValueOnce(response(materials))
+
+    await expect(loadRequisitionMaterialOptions('P/1', 'W/1', ' 钢 筋 ')).resolves.toEqual(
+      materials,
+    )
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/requisitions/material-options?projectId=P%2F1&warehouseId=W%2F1&keyword=%E9%92%A2+%E7%AD%8B',
     )
   })
 
@@ -150,6 +169,7 @@ describe('M5 requisition, stock-out and return contract', () => {
     await saveRequisitionItems('R/1', [
       {
         requisitionId: 'R/1',
+        wbsTaskId: 'WBS1',
         materialId: 'M1',
         quantity: '9007199254740993.1234',
         unitPrice: '3.25',
@@ -183,6 +203,7 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(calls.map(([url]) => String(url))).toContain('/api/material-returns/MR%2F1/items')
     const itemWrite = calls.find(([url]) => String(url).endsWith('/requisitions/R%2F1/items/batch'))
     expect(JSON.parse(String(itemWrite?.[1]?.body))[0].quantity).toBe('9007199254740993.1234')
+    expect(JSON.parse(String(itemWrite?.[1]?.body))[0].wbsTaskId).toBe('WBS1')
   })
 
   it('propagates duplicate stock-out without client retry', async () => {

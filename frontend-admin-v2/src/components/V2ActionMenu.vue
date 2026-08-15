@@ -25,6 +25,14 @@ function closeFromOutside(event: PointerEvent): void {
   if (event.target instanceof Node && !root.value?.contains(event.target)) close()
 }
 
+function closeFromAction(event: MouseEvent): void {
+  const target = event.target
+  if (target instanceof Element && target.closest('label')?.querySelector('input[type="file"]')) {
+    return
+  }
+  close()
+}
+
 onMounted(() => document.addEventListener('pointerdown', closeFromOutside))
 onBeforeUnmount(() => document.removeEventListener('pointerdown', closeFromOutside))
 </script>
@@ -39,7 +47,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeFromOutsi
     <summary class="v2-action-menu__trigger" :aria-label="label">
       <slot name="trigger">{{ triggerText }}</slot>
     </summary>
-    <div class="v2-action-menu__content" role="group" :aria-label="label" @click="close()">
+    <div
+      class="v2-action-menu__content"
+      role="group"
+      :aria-label="label"
+      @click="closeFromAction"
+      @change="close()"
+    >
       <slot />
     </div>
   </details>

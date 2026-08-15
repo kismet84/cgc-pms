@@ -24,6 +24,7 @@ export interface QualityInspectionRecord {
   id: string;
   planId: string;
   projectId: string;
+  wbsTaskId?: string | null;
   inspectionCode: string;
   inspectionDate: string;
   location: string;
@@ -112,8 +113,18 @@ export interface QualityWorkspaceCounts {
 
 export type QualityPlanRef = Pick<
   QualityPlanRecord,
-  "id" | "projectId" | "planCode" | "planName" | "status"
+  "id" | "projectId" | "planCode" | "planName" | "inspectionType" | "status"
 >;
+
+export interface QualityWbsTaskOption {
+  id: string;
+  taskCode: string;
+  taskName: string;
+}
+
+export interface QualityFormOptions {
+  wbsTasks: QualityWbsTaskOption[];
+}
 
 export interface QualityWorkspace {
   view: QualityWorkspaceView;
@@ -138,6 +149,7 @@ export interface QualityPlanCommand {
 
 export interface QualityInspectionCommand {
   planId: string;
+  wbsTaskId?: string;
   inspectionCode?: string;
   inspectionDate: string;
   location: string;
@@ -195,6 +207,7 @@ export interface QualityConsequenceCommand {
 
 export const QUALITY_API = {
   workspace: "/quality-safety/workspace",
+  formOptions: "/quality-safety/form-options",
   plans: "/quality-safety/plans",
   plan: (id: string) => `/quality-safety/plans/${id}`,
   activatePlan: (id: string) => `/quality-safety/plans/${id}/activate`,

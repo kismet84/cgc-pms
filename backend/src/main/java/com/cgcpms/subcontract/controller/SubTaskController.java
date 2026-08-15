@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/sub-tasks")
 @RequiredArgsConstructor
@@ -32,6 +34,12 @@ public class SubTaskController {
         IPage<SubTaskVO> page = subTaskService.getPage(pageNo, pageSize, projectId, contractId,
                 partnerId, status, taskCode, taskName);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('subtask:add','subtask:edit')")
+    public ApiResponse<Map<String, Object>> formOptions(@RequestParam Long projectId) {
+        return ApiResponse.success(subTaskService.formOptions(projectId));
     }
 
     @GetMapping("/{id}")

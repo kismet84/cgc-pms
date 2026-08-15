@@ -34,8 +34,19 @@ export interface MeasurementPeriodCommand {
 export interface MeasurementLineCommand {
   contractItemId?: string | null;
   contractChangeId?: string | null;
+  wbsTaskId: string;
   currentQuantity: DecimalString;
   evidenceCount: number;
+}
+
+export interface MeasurementWbsTaskOption {
+  id: string;
+  taskCode: string;
+  taskName: string;
+}
+
+export interface MeasurementFormOptions {
+  wbsTasks: MeasurementWbsTaskOption[];
 }
 
 export interface MeasurementSaveCommand {

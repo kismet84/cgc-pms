@@ -326,6 +326,7 @@ function normalizePeriodPlan(row: Record<string, unknown>): PeriodPlanRecord {
     projectId: requiredString(row, 'projectId', 'project_id'),
     schedulePlanId: requiredString(row, 'schedulePlanId', 'schedule_plan_id'),
     parentPeriodPlanId: optionalString(row, 'parentPeriodPlanId', 'parent_period_plan_id'),
+    replacesPeriodPlanId: optionalString(row, 'replacesPeriodPlanId', 'replaces_period_plan_id'),
     periodType: requiredString(row, 'periodType', 'period_type') as PeriodPlanRecord['periodType'],
     periodCode: requiredString(row, 'periodCode', 'period_code'),
     periodName: requiredString(row, 'periodName', 'period_name'),
