@@ -46,6 +46,24 @@ export interface PaymentScheduleRecord {
   paidAmount: FinanceDecimalString;
   status: string;
 }
+export interface FinanceContractOption {
+  id: string;
+  contractCode: string;
+  contractName: string;
+  contractType: string;
+}
+export interface FinanceOperationsFormOptions {
+  contracts: FinanceContractOption[];
+}
+export interface PaymentScheduleCommand {
+  projectId: string;
+  contractId: string;
+  payApplicationId?: string;
+  scheduleName: string;
+  plannedDate: string;
+  plannedAmount: FinanceDecimalString;
+  reminderDays: number;
+}
 export interface FinanceAlertRecord {
   id: string;
   projectId?: string | null;

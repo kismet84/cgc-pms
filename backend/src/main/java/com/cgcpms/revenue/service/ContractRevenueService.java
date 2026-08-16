@@ -424,10 +424,14 @@ public class ContractRevenueService {
         item.setProjectId(revenue.getProjectId());
         item.setContractId(revenue.getContractId());
         item.setCostSubjectId(subjectId);
+        item.setClassificationStatus("CLASSIFIED");
+        item.setRecognitionRole("NON_COST");
         item.setCostType(COST_TYPE_REVENUE_CONFIRMED);
-        item.setAmount(revenue.getRevenueAmount() != null ? revenue.getRevenueAmount() : BigDecimal.ZERO);
-        item.setTaxAmount(revenue.getRevenueTax() != null ? revenue.getRevenueTax() : BigDecimal.ZERO);
-        item.setAmountWithoutTax(revenue.getRevenueAmount() != null ? revenue.getRevenueAmount() : BigDecimal.ZERO);
+        BigDecimal amountWithoutTax = revenue.getRevenueAmount() != null ? revenue.getRevenueAmount() : BigDecimal.ZERO;
+        BigDecimal taxAmount = revenue.getRevenueTax() != null ? revenue.getRevenueTax() : BigDecimal.ZERO;
+        item.setAmount(amountWithoutTax.add(taxAmount));
+        item.setTaxAmount(taxAmount);
+        item.setAmountWithoutTax(amountWithoutTax);
         item.setSourceType(SOURCE_TYPE_CT_REVENUE);
         item.setSourceId(revenue.getId());
         item.setSourceItemId(0L);
@@ -461,11 +465,20 @@ public class ContractRevenueService {
     }
 
     private boolean sameRevenueCostItem(CostItem item, ContractRevenue revenue) {
+        BigDecimal net = revenue.getRevenueAmount() == null ? BigDecimal.ZERO : revenue.getRevenueAmount();
+        BigDecimal tax = revenue.getRevenueTax() == null ? BigDecimal.ZERO : revenue.getRevenueTax();
+        Long subjectId = resolveRevenueSubjectId(revenue.getTenantId());
         return item != null
+                && Objects.equals(item.getTenantId(), revenue.getTenantId())
                 && Objects.equals(item.getProjectId(), revenue.getProjectId())
                 && Objects.equals(item.getContractId(), revenue.getContractId())
-                && sameMoney(item.getAmount(), revenue.getRevenueAmount())
-                && sameMoney(item.getTaxAmount(), revenue.getRevenueTax())
+                && Objects.equals(item.getCostSubjectId(), subjectId)
+                && Objects.equals(item.getSourceType(), SOURCE_TYPE_CT_REVENUE)
+                && Objects.equals(item.getSourceId(), revenue.getId())
+                && Objects.equals(item.getSourceItemId(), 0L)
+                && sameMoney(item.getAmount(), net.add(tax))
+                && sameMoney(item.getAmountWithoutTax(), net)
+                && sameMoney(item.getTaxAmount(), tax)
                 && Objects.equals(item.getCostType(), COST_TYPE_REVENUE_CONFIRMED);
     }
 

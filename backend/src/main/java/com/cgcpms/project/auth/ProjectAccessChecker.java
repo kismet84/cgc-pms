@@ -212,6 +212,10 @@ public class ProjectAccessChecker {
         throw new BusinessException("PROJECT_ALL_SCOPE_REQUIRED", "无权" + action + "全租户项目数据");
     }
 
+    public boolean hasAllScope() {
+        return "ALL".equals(resolveEffectiveDataScope());
+    }
+
     private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope,
                                  Set<Long> memberProjectIds) {
         if (roles.contains(SystemRoleContract.HIDDEN_SUPER_ADMIN)) return true;

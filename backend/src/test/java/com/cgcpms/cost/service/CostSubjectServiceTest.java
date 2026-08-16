@@ -18,10 +18,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Date;
 import java.util.List;
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,6 +34,10 @@ class CostSubjectServiceTest {
 
     private static final long USER_ID = 1L;
     private static final long TENANT_ID = 0L;
+    private static final AtomicLong FINANCE_ID_SEQUENCE = new AtomicLong(994_891_000_000L);
+
+    private long financeUserId;
+    private long financeRoleLinkId;
 
     @Autowired
     private CostSubjectService costSubjectService;
@@ -48,14 +54,35 @@ class CostSubjectServiceTest {
     @Autowired
     private CostTargetMapper costTargetMapper;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @BeforeEach
     void setUp() {
+        financeUserId = FINANCE_ID_SEQUENCE.incrementAndGet();
+        financeRoleLinkId = FINANCE_ID_SEQUENCE.incrementAndGet();
+        Long financeRoleId = jdbc.queryForObject("""
+                SELECT id FROM sys_role
+                WHERE tenant_id=? AND role_code='COMPANY_FINANCE'
+                  AND status='ENABLE' AND deleted_flag=0
+                """, Long.class, TENANT_ID);
+        assertNotNull(financeRoleId, "测试基线应提供公司财务角色");
+        jdbc.update("""
+                INSERT INTO sys_user(id, tenant_id, username, password, real_name, status,
+                    is_admin, created_at, updated_at, deleted_flag)
+                VALUES (?, ?, ?, 'x', '成本科目测试财务', 'ENABLE', 0,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                """, financeUserId, TENANT_ID, "cost-subject-finance-" + financeUserId);
+        jdbc.update("""
+                INSERT INTO sys_user_role(id, tenant_id, user_id, role_id)
+                VALUES (?, ?, ?, ?)
+                """, financeRoleLinkId, TENANT_ID, financeUserId, financeRoleId);
         var claims = Jwts.claims()
-                .subject("admin")
-                .add("userId", USER_ID)
-                .add("username", "admin")
+                .subject("company-finance")
+                .add("userId", financeUserId)
+                .add("username", "company-finance")
                 .add("tenantId", TENANT_ID)
-                .add("roleCodes", List.of("ADMIN"))
+                .add("roleCodes", List.of("COMPANY_FINANCE"))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
                 .build();
@@ -65,6 +92,8 @@ class CostSubjectServiceTest {
     @AfterEach
     void tearDown() {
         UserContext.clear();
+        jdbc.update("DELETE FROM sys_user_role WHERE id=?", financeRoleLinkId);
+        jdbc.update("DELETE FROM sys_user WHERE id=?", financeUserId);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -305,7 +334,7 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("create：子科目可覆盖 accountCategory")
+    @DisplayName("create：子科目拒绝覆盖父科目 accountCategory")
     void createChildSubjectOverrideAccountCategory() {
         String parentCode = "TSTCP2_" + System.nanoTime();
         String childCode = "TSTCC2_" + System.nanoTime();
@@ -320,9 +349,9 @@ class CostSubjectServiceTest {
         child.setStatus("ENABLE");
         child.setParentId(parent.getId());
 
-        Long id = costSubjectService.create(child);
-        CostSubject saved = costSubjectMapper.selectById(id);
-        assertEquals("REVENUE", saved.getAccountCategory(), "显式设置的 accountCategory 应保留");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.create(child));
+        assertEquals("ACCOUNT_CATEGORY_PARENT_MISMATCH", error.getCode());
     }
 
     @Test
@@ -345,7 +374,7 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("create：父科目属于其他租户抛 PARENT_NOT_FOUND")
+    @DisplayName("create：跨租户非财务调用先被实时角色门禁拒绝")
     void createParentCrossTenantThrowsException() {
         String parentCode = "TSTCPXT_" + System.nanoTime();
         String childCode = "TSTCCXT_" + System.nanoTime();
@@ -370,7 +399,7 @@ class CostSubjectServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.create(child));
-        assertEquals("PARENT_NOT_FOUND", ex.getCode());
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", ex.getCode());
     }
 
     @Test
@@ -397,7 +426,6 @@ class CostSubjectServiceTest {
     @Transactional
     @DisplayName("create：逻辑删除后可用相同编码创建新科目（deleted_flag 区分唯一键）")
     void createDuplicateCodeOccupiedByDeletedSubject() {
-        setAdminContext();
         String code = "TSTCDELDUP_" + System.nanoTime();
         CostSubject deletedSubject = new CostSubject();
         deletedSubject.setTenantId(TENANT_ID);
@@ -470,7 +498,7 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("update：跨租户更新抛 COST_SUBJECT_NOT_FOUND")
+    @DisplayName("update：跨租户非财务调用先被实时角色门禁拒绝")
     void updateCrossTenantThrowsException() {
         String code = "TSTUPXT_" + System.nanoTime();
         CostSubject entity = createSubject(code, "租户科目", 0L, "COST", 1, 1);
@@ -490,7 +518,7 @@ class CostSubjectServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.update(update));
-        assertEquals("COST_SUBJECT_NOT_FOUND", ex.getCode());
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", ex.getCode());
     }
 
     @Test
@@ -528,6 +556,145 @@ class CostSubjectServiceTest {
 
         CostSubject saved = costSubjectMapper.selectById(entity.getId());
         assertEquals("改名后的自身", saved.getSubjectName());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update：被成本事实引用的启用科目不能绕过 toggle 直接停用")
+    void updateCannotDisableReferencedSubject() {
+        String code = "TSTUPREF_" + System.nanoTime();
+        CostSubject subject = createSubject(code, "被引用科目", 0L, "COST", 1, 1);
+        CostItem costItem = referencedCostItem(subject.getId(), 11L);
+        costItemMapper.insert(costItem);
+
+        CostSubject update = new CostSubject();
+        update.setId(subject.getId());
+        update.setSubjectCode(code);
+        update.setSubjectName(subject.getSubjectName());
+        update.setStatus("DISABLE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(update));
+        assertEquals("COST_SUBJECT_REFERENCED", error.getCode());
+        assertEquals("ENABLE", costSubjectMapper.selectById(subject.getId()).getStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update：被成本事实引用的科目不能改写编码或会计分类")
+    void updateCannotRewriteReferencedSubjectSemantics() {
+        String code = "TSTUPSEM_" + System.nanoTime();
+        CostSubject subject = createSubject(code, "历史事实科目", 0L, "COST", 1, 1);
+        costItemMapper.insert(referencedCostItem(subject.getId(), 13L));
+
+        CostSubject update = new CostSubject();
+        update.setId(subject.getId());
+        update.setSubjectCode(code + "_NEW");
+        update.setAccountCategory("REVENUE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(update));
+        assertEquals("COST_SUBJECT_REFERENCED", error.getCode());
+        CostSubject unchanged = costSubjectMapper.selectById(subject.getId());
+        assertEquals(code, unchanged.getSubjectCode());
+        assertEquals("COST", unchanged.getAccountCategory());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update：不能把科目重挂到已有治理引用的末级科目下")
+    void updateCannotTurnReferencedLeafIntoParent() {
+        CostSubject referencedParent = createSubject("TSTNEWPAR_" + System.nanoTime(),
+                "已有引用的末级科目", 0L, "COST", 1, 1);
+        costItemMapper.insert(referencedCostItem(referencedParent.getId(), 14L));
+        CostSubject moving = createSubject("TSTMOVE_" + System.nanoTime(),
+                "待调整科目", 0L, "COST", 1, 2);
+
+        CostSubject update = new CostSubject();
+        update.setId(moving.getId());
+        update.setSubjectCode(moving.getSubjectCode());
+        update.setSubjectName(moving.getSubjectName());
+        update.setSubjectType(moving.getSubjectType());
+        update.setAccountCategory("COST");
+        update.setStatus("ENABLE");
+        update.setParentId(referencedParent.getId());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(update));
+        assertEquals("COST_SUBJECT_REFERENCED", error.getCode());
+        assertEquals(0L, costSubjectMapper.selectById(moving.getId()).getParentId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update：存在子科目的父级不能改变会计分类")
+    void updateCannotChangeCategoryWhenChildrenExist() {
+        CostSubject parent = createSubject("TSTPARCAT_" + System.nanoTime(),
+                "成本父科目", 0L, "COST", 1, 1);
+        CostSubject child = createSubject("TSTCHDCAT_" + System.nanoTime(),
+                "成本子科目", parent.getId(), "COST", 2, 1);
+        costItemMapper.insert(referencedCostItem(child.getId(), 15L));
+
+        CostSubject update = new CostSubject();
+        update.setId(parent.getId());
+        update.setSubjectCode(parent.getSubjectCode());
+        update.setSubjectName(parent.getSubjectName());
+        update.setSubjectType(parent.getSubjectType());
+        update.setAccountCategory("REVENUE");
+        update.setStatus("ENABLE");
+        update.setParentId(0L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(update));
+        assertEquals("ACCOUNT_CATEGORY_CHILDREN_MISMATCH", error.getCode());
+        assertEquals("COST", costSubjectMapper.selectById(parent.getId()).getAccountCategory());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("治理快照引用：科目不能停用或删除")
+    void classificationSnapshotProtectsSubjectLifecycle() {
+        String code = "TSTSNAP_" + System.nanoTime();
+        CostSubject subject = createSubject(code, "冻结归类科目", 0L, "COST", 1, 1);
+        jdbc.update("""
+                INSERT INTO cost_classification_snapshot
+                    (id,tenant_id,source_type,source_id,source_item_id,project_id,
+                     original_cost_subject_id,matched_cost_subject_id,created_by)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """, FINANCE_ID_SEQUENCE.incrementAndGet(), TENANT_ID, "TEST", 1L, 0L, 1L,
+                subject.getId(), subject.getId(), financeUserId);
+
+        BusinessException disable = assertThrows(BusinessException.class,
+                () -> costSubjectService.toggleStatus(subject.getId()));
+        assertEquals("COST_SUBJECT_REFERENCED", disable.getCode());
+        BusinessException delete = assertThrows(BusinessException.class,
+                () -> costSubjectService.delete(subject.getId()));
+        assertEquals("COST_SUBJECT_REFERENCED", delete.getCode());
+        assertNotNull(costSubjectMapper.selectById(subject.getId()));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("create：被事实引用的末级科目不能通过新增子节点改变治理语义")
+    void createCannotTurnReferencedLeafIntoParent() {
+        String parentCode = "TSTPREF_" + System.nanoTime();
+        CostSubject parent = createSubject(parentCode, "被引用末级", 0L, "COST", 1, 1);
+        costItemMapper.insert(referencedCostItem(parent.getId(), 12L));
+
+        CostSubject child = new CostSubject();
+        child.setParentId(parent.getId());
+        child.setSubjectCode("TSTCREF_" + System.nanoTime());
+        child.setSubjectName("禁止创建子科目");
+        child.setSubjectType("MATERIAL");
+        child.setSortOrder(1);
+        child.setStatus("ENABLE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.create(child));
+        assertEquals("COST_SUBJECT_REFERENCED", error.getCode());
+        assertEquals(0L, costSubjectMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, TENANT_ID)
+                .eq(CostSubject::getParentId, parent.getId())));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -573,7 +740,7 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("toggleStatus：跨租户切换抛 COST_SUBJECT_NOT_FOUND")
+    @DisplayName("toggleStatus：跨租户非财务调用先被实时角色门禁拒绝")
     void toggleStatusCrossTenantThrowsException() {
         String code = "TSTTOGXT_" + System.nanoTime();
         CostSubject entity = createSubject(code, "跨租户科目", 0L, "COST", 1, 1);
@@ -589,7 +756,7 @@ class CostSubjectServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.toggleStatus(entity.getId()));
-        assertEquals("COST_SUBJECT_NOT_FOUND", ex.getCode());
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -620,7 +787,7 @@ class CostSubjectServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("delete：跨租户删除抛 COST_SUBJECT_NOT_FOUND")
+    @DisplayName("delete：跨租户非财务调用先被实时角色门禁拒绝")
     void deleteCrossTenantThrowsException() {
         String code = "TSTDELXT_" + System.nanoTime();
         CostSubject entity = createSubject(code, "跨租户删除", 0L, "COST", 1, 1);
@@ -636,7 +803,7 @@ class CostSubjectServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.delete(entity.getId()));
-        assertEquals("COST_SUBJECT_NOT_FOUND", ex.getCode());
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", ex.getCode());
     }
 
     @Test
@@ -794,6 +961,70 @@ class CostSubjectServiceTest {
         assertEquals("TARGET_COST_SUBJECT_GOVERNED", error.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("标准总账科目进入统一目录且仅允许维护名称与排序")
+    void governedAccountingSubjectUsesUnifiedCatalog() {
+        CostSubject subject = findSubjectByCode("1122-AR");
+        if (subject == null) {
+            subject = createSubject("1122-AR", "应收账款", 0L, "ASSET", 1, 20);
+            subject.setSubjectType("GENERAL_LEDGER");
+            costSubjectMapper.updateById(subject);
+        }
+        assertNotNull(subject);
+        assertEquals("ASSET", subject.getAccountCategory());
+        subject.setSubjectName("项目应收账款");
+        subject.setSortOrder(subject.getSortOrder() + 1);
+        costSubjectService.update(subject);
+        assertEquals("项目应收账款", findSubjectByCode("1122-AR").getSubjectName());
+
+        subject.setSubjectCode("1122-AR-CHANGED");
+        CostSubject governedSubject = subject;
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(governedSubject));
+        assertEquals("ACCOUNTING_SUBJECT_GOVERNED", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("新增会计科目拒绝未定义分类")
+    void createRejectsUnknownAccountCategory() {
+        CostSubject subject = new CostSubject();
+        subject.setParentId(0L);
+        subject.setSubjectCode("TST-UNKNOWN-" + System.nanoTime());
+        subject.setSubjectName("非法分类");
+        subject.setSubjectType("GENERAL_LEDGER");
+        subject.setAccountCategory("UNKNOWN");
+        subject.setSortOrder(1);
+        subject.setStatus("ENABLE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.create(subject));
+        assertEquals("ACCOUNT_CATEGORY_INVALID", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("科目治理写操作要求实时公司财务角色，管理员不可绕过")
+    void accountingSubjectWritesRequireLiveCompanyFinanceRole() {
+        setAdminContext();
+        String code = "TST-FIN-GUARD-" + System.nanoTime();
+        CostSubject subject = new CostSubject();
+        subject.setParentId(0L);
+        subject.setSubjectCode(code);
+        subject.setSubjectName("管理员越权测试科目");
+        subject.setSubjectType("GENERAL_LEDGER");
+        subject.setAccountCategory("COST");
+        subject.setSortOrder(1);
+        subject.setStatus("ENABLE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.create(subject));
+
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", error.getCode());
+        assertNull(findSubjectByCode(code));
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 辅助方法
     // ═══════════════════════════════════════════════════════════════
@@ -829,6 +1060,20 @@ class CostSubjectServiceTest {
         subject.setStatus("ENABLE");
         costSubjectMapper.insert(subject);
         return subject;
+    }
+
+    private CostItem referencedCostItem(Long subjectId, Long sourceId) {
+        CostItem costItem = new CostItem();
+        costItem.setTenantId(TENANT_ID);
+        costItem.setProjectId(10001L);
+        costItem.setOrgId(1L);
+        costItem.setCostSubjectId(subjectId);
+        costItem.setCostType("MATERIAL");
+        costItem.setSourceType("MAT_RECEIPT");
+        costItem.setSourceId(sourceId);
+        costItem.setCostDate(java.time.LocalDate.now());
+        costItem.setDeletedFlag(0);
+        return costItem;
     }
 
     private CostSubject findSubjectByCode(String code) {

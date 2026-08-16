@@ -12,12 +12,15 @@ export interface CostSubjectRecord {
   children?: CostSubjectRecord[]
 }
 
+export type AccountCategory =
+  'ASSET' | 'LIABILITY' | 'EQUITY' | 'COST' | 'REVENUE' | 'SETTLEMENT' | 'RECEIVABLE'
+
 export interface CostSubjectCommand {
   parentId: string
   subjectCode: string
   subjectName: string
   subjectType: string
-  accountCategory: 'COST'
+  accountCategory: AccountCategory
   sortOrder: number
   status: 'ENABLE' | 'DISABLE'
 }
@@ -44,6 +47,17 @@ export interface MappingVersionCommand {
     targetSubjectId: string | null
     historicalDisplayName: string
     mappingReason: string
+  }>
+  rules?: Array<{
+    ruleCode: string
+    sourceType: string
+    businessCategory: string
+    projectId: string | null
+    costSubjectId: string
+    priority: number
+    effectiveFrom: string | null
+    effectiveTo: string | null
+    remark: string
   }>
 }
 
@@ -138,7 +152,7 @@ export interface BidTransferRequestCommand {
   projectId: string
   targetId: string
   mappingVersionId: string
-  idempotencyKey: string
+  idempotencyKey?: string
   remark: string
 }
 
@@ -169,7 +183,135 @@ export interface FinanceAllocationRequestCommand {
   allocationBasis: string
   accountingPeriod: string
   costSubjectId: string
-  idempotencyKey: string
+  idempotencyKey?: string
   remark: string
   lines: Array<{ projectId: string; basisValue: string }>
+}
+
+export interface GovernanceProjectOption {
+  id: string
+  projectCode: string
+  projectName: string
+  projectStatus: string
+}
+
+export interface GovernanceSubjectOption {
+  id: string
+  subjectCode: string
+  subjectName: string
+  subjectType: string
+  status: string
+  overheadRuleStatus?: 'ENABLE' | 'DISABLE' | null
+}
+
+export interface GovernancePlanOption {
+  id: string
+  versionCode: string
+  versionName: string
+  status: string
+  effectiveDate?: string | null
+}
+
+export interface BidCostOption {
+  id: string
+  bidCode: string
+  bidProjectName: string
+  projectId: string
+  projectCode: string
+  projectName: string
+}
+
+export interface TargetVersionOption {
+  id: string
+  projectId: string
+  projectCode: string
+  projectName: string
+  versionNo: string
+  versionName: string
+  totalTargetAmount: string
+  status: string
+  approvalStatus: string
+}
+
+export interface FinanceSourceOption {
+  sourceType: string
+  sourceId: string
+  projectId?: string | null
+  sourceCode: string
+  sourceName?: string | null
+  remainingAmount: string
+}
+
+export interface GovernanceFormOptions {
+  projects: GovernanceProjectOption[]
+  costSubjects: GovernanceSubjectOption[]
+  rulePlans: GovernancePlanOption[]
+  bidCosts: BidCostOption[]
+  targetVersions: TargetVersionOption[]
+  financeSources: FinanceSourceOption[]
+  pendingClassifications: CostSubjectAuditRow[]
+}
+
+export interface ClassificationOverrideCommand {
+  caseId: string | null
+  snapshotId: string | null
+  costSubjectId: string
+  reason: string
+}
+
+export interface ProjectConfigurationRecord {
+  project: CostSubjectAuditRow
+  subjects: CostSubjectAuditRow[]
+  requests: CostSubjectAuditRow[]
+}
+
+export interface ProjectConfigCommand {
+  projectId: string
+  reason: string
+  lines: Array<{
+    costSubjectId: string
+    enabled: boolean
+    effectiveFrom: string | null
+    effectiveTo: string | null
+  }>
+}
+
+export interface RecalculationCommand {
+  projectId: string | null
+  ruleVersionId: string
+  cutoffAt: string | null
+  batchType: 'HISTORY_RECALCULATION' | 'POST_CLOSE_ADJUSTMENT'
+  reason: string
+  idempotencyKey?: string
+}
+
+export interface ReversalCommand {
+  targetType: 'BID_TRANSFER' | 'FINANCE_ALLOCATION' | 'RECALCULATION'
+  targetId: string
+  reason: string
+  idempotencyKey?: string
+}
+
+export interface OverheadAllocationRuleRecord {
+  id: string
+  costSubjectId: string
+  allocationBasis: 'DIRECT_LABOR' | 'CONTRACT_AMOUNT' | 'USAGE'
+  allocationCycle: 'MONTHLY' | 'PER_OCCURRENCE'
+  status: 'ENABLE' | 'DISABLE'
+}
+
+export interface OverheadAllocationRuleCommand {
+  costSubjectId: string
+  allocationBasis: 'DIRECT_LABOR' | 'CONTRACT_AMOUNT'
+  allocationCycle: 'MONTHLY'
+}
+
+export interface OverheadAllocationExecutionResult {
+  period: string
+  ruleCount: number
+  createdRunCount: number
+  duplicateRunCount: number
+  costItemCount: number
+  allocatedAmount: string
+  idempotent: boolean
 }

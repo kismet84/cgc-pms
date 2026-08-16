@@ -64,6 +64,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
         UserContext.set(Jwts.claims().subject("admin").add("userId",1L).add("username","admin")
                 .add("tenantId",0L).add("roleCodes", List.of("ADMIN")).build());
         cleanup();
+        seedAccountingSubjects();
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'REV-IT-P','收入闭环测试项目','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-CUSTOMER','测试业主','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CUSTOMER);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-CONTRACTOR','测试承包方','CONTRACTOR','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACTOR);
@@ -496,5 +497,26 @@ class RevenueCollectionClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM md_partner WHERE id=?", CUSTOMER);
         jdbc.update("DELETE FROM md_partner WHERE id=?", CONTRACTOR);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
+        jdbc.update("DELETE FROM cost_subject WHERE remark='REVENUE_CLOSED_LOOP_FIXTURE'");
+    }
+
+    private void seedAccountingSubjects() {
+        Object[][] subjects = {
+                {99171020L, "1002-BANK", "银行存款", "ASSET", 10},
+                {99171021L, "1122-AR", "应收账款", "ASSET", 20},
+                {99171022L, "1123-PREPAY", "预付账款", "ASSET", 30},
+                {99171023L, "2202-AP", "应付账款", "LIABILITY", 40},
+                {99171024L, "2203-ADVANCE", "预收账款", "LIABILITY", 50}
+        };
+        for (Object[] subject : subjects) {
+            jdbc.update("""
+                    INSERT INTO cost_subject
+                      (id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,
+                       level,sort_order,status,remark,created_at,updated_at,deleted_flag)
+                    SELECT ?,0,0,?,?, 'GENERAL_LEDGER',?,1,?,'ENABLE','REVENUE_CLOSED_LOOP_FIXTURE',
+                           CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                    WHERE NOT EXISTS(SELECT 1 FROM cost_subject WHERE tenant_id=0 AND subject_code=? AND deleted_flag=0)
+                    """, subject[0], subject[1], subject[2], subject[3], subject[4], subject[1]);
+        }
     }
 }

@@ -89,7 +89,8 @@ class QualitySafetyServiceContractTest {
                 "QualityRectificationMapper", "QualityConsequenceMapper", "QualityPartnerEvaluationMapper",
                 "ProjectAccessChecker", "ProjectExecutionGuard", "PmProjectMapper", "MdPartnerMapper",
                 "CtContractMapper", "SysFileMapper", "CostItemMapper", "CostSubjectV2Service",
-                "BusinessCodeGenerator", "JdbcTemplate", "WorkflowEngine"),
+                "CostSubjectResolver", "BusinessCodeGenerator", "JdbcTemplate", "WorkflowEngine",
+                "AccountingPeriodGuard"),
                 Arrays.stream(constructor.getParameterTypes()).map(Class::getSimpleName).toList());
         assertNotNull(QualitySafetyService.class.getAnnotation(Service.class));
 

@@ -3,11 +3,15 @@ import {
   type AccountingEntryPage,
   type AccountingEntryQuery,
   type CashForecastCycleRecord,
+  type CashForecastCycleCommand,
   type CashForecastTrace,
+  type FinanceOperationsFormOptions,
   type FinanceOperationsWorkspace,
+  type FinancePeriodCommand,
   type FinancePeriodRecord,
   type FinancialCloseTrace,
   type FinancialStatement,
+  type PaymentScheduleCommand,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 import { requiredId, withQuery } from './support'
@@ -22,6 +26,13 @@ export const loadFinanceOperationsWorkspace = (projectId?: string, signal?: Abor
     withQuery('/finance-operations/workspace', { projectId }),
     { signal },
   )
+export const loadFinanceOperationsFormOptions = (projectId: string, signal?: AbortSignal) =>
+  apiRequest<FinanceOperationsFormOptions>(
+    withQuery('/finance-operations/form-options', { projectId: requiredId(projectId) }),
+    { signal },
+  )
+export const createPaymentSchedule = (body: PaymentScheduleCommand) =>
+  apiRequest<void>('/finance-operations/schedules', { method: 'POST', body })
 export const rebuildFinanceSnapshot = (projectId: string) =>
   apiRequest<void>(`/finance-operations/snapshots/${requiredId(projectId)}/rebuild`, {
     method: 'POST',
@@ -40,6 +51,8 @@ export const loadCashForecastCycles = (projectId?: string, signal?: AbortSignal)
   })
 export const loadCashForecastTrace = (id: string, signal?: AbortSignal) =>
   apiRequest<CashForecastTrace>(`/cash-forecasts/workspace/${requiredId(id)}`, { signal })
+export const createCashForecast = (body: CashForecastCycleCommand) =>
+  apiRequest<void>('/cash-forecasts/cycles', { method: 'POST', body })
 export const regenerateCashForecast = (id: string) =>
   apiRequest<void>(`/cash-forecasts/cycles/${requiredId(id)}/regenerate`, { method: 'POST' })
 export const submitCashForecast = (id: string) =>
@@ -69,6 +82,8 @@ export const reverseAccountingEntry = (id: string, reason: string) =>
 
 export const loadFinancePeriods = (year?: number, signal?: AbortSignal) =>
   apiRequest<FinancePeriodRecord[]>(withQuery('/financial-close/workspace', { year }), { signal })
+export const createFinancePeriod = (body: FinancePeriodCommand) =>
+  apiRequest<void>('/financial-close/periods', { method: 'POST', body })
 export const loadFinancialCloseTrace = (id: string, signal?: AbortSignal) =>
   apiRequest<FinancialCloseTrace>(`/financial-close/workspace/${requiredId(id)}`, { signal })
 export const loadFinancialStatement = (year: number, month: number, signal?: AbortSignal) =>

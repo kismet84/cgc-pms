@@ -21,13 +21,23 @@ import {
   loadCostSubjectTree,
   toggleCostSubjectStatus,
   updateCostSubject,
+  type AccountCategory,
   type CostSubjectCommand,
   type CostSubjectRecord,
 } from '@/services/cost-subject'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
-import { isGovernedSubject, statusOptions, subjectTypeLabel } from './model'
+import {
+  accountCategoryLabel,
+  accountCategoryOptions,
+  isGovernedSubject,
+  statusOptions,
+  subjectTypeLabel,
+} from './model'
 import './styles.css'
+
+type CategoryFilter = 'ALL' | AccountCategory
+type FlatSubject = { subject: CostSubjectRecord; depth: number }
 
 const session = useSessionStore()
 const loading = ref(false)
@@ -41,22 +51,37 @@ const canSubjectEdit = computed(() => can('cost:edit'))
 const canSubjectDelete = computed(() => can('cost:delete'))
 
 const subjects = ref<CostSubjectRecord[]>([])
-const selectedFirstLevelId = ref('')
+const categoryFilter = ref<CategoryFilter>('ALL')
 const selectedSubjectId = ref('')
-const standardCostRoot = computed(
-  () => subjects.value.find((item) => item.subjectCode === '5401') ?? null,
+const categoryFilters: Array<{ value: CategoryFilter; label: string }> = [
+  { value: 'ALL', label: '全部科目' },
+  ...accountCategoryOptions,
+]
+
+function flatten(items: CostSubjectRecord[], depth = 0): FlatSubject[] {
+  return items.flatMap((subject) => [
+    { subject, depth },
+    ...flatten(subject.children ?? [], depth + 1),
+  ])
+}
+
+const allSubjects = computed(() =>
+  flatten(subjects.value.filter((subject) => subject.accountCategory !== 'ROOT')),
 )
-const firstLevelSubjects = computed(() => standardCostRoot.value?.children ?? [])
-const selectedFirstLevel = computed(
-  () => firstLevelSubjects.value.find((item) => item.id === selectedFirstLevelId.value) ?? null,
+const visibleSubjects = computed(() =>
+  categoryFilter.value === 'ALL'
+    ? allSubjects.value
+    : allSubjects.value.filter(({ subject }) => subject.accountCategory === categoryFilter.value),
 )
-const secondLevelSubjects = computed(() => selectedFirstLevel.value?.children ?? [])
 const selectedSubject = computed(
-  () => secondLevelSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
+  () =>
+    allSubjects.value.find(({ subject }) => subject.id === selectedSubjectId.value)?.subject ??
+    null,
 )
 const editingGovernedSubject = computed(
   () => subjectMode.value === 'edit' && isGovernedSubject(selectedSubject.value),
 )
+
 const subjectDialog = ref(false)
 const subjectMode = ref<'create' | 'edit'>('create')
 const subjectDeleteTarget = ref<CostSubjectRecord | null>(null)
@@ -65,7 +90,8 @@ const subjectForm = reactive({
   parentId: '0',
   subjectCode: '',
   subjectName: '',
-  subjectType: 'MATERIAL',
+  subjectType: 'GENERAL_LEDGER',
+  accountCategory: 'ASSET' as AccountCategory,
   sortOrder: '0',
   status: 'ENABLE',
 })
@@ -75,33 +101,33 @@ function messageOf(value: unknown): string {
 }
 
 function normalizeSelection(): void {
-  if (!firstLevelSubjects.value.some((item) => item.id === selectedFirstLevelId.value)) {
-    selectedFirstLevelId.value = firstLevelSubjects.value[0]?.id ?? ''
-  }
-  if (!secondLevelSubjects.value.some((item) => item.id === selectedSubjectId.value)) {
-    selectedSubjectId.value = secondLevelSubjects.value[0]?.id ?? ''
+  if (!visibleSubjects.value.some(({ subject }) => subject.id === selectedSubjectId.value)) {
+    selectedSubjectId.value = visibleSubjects.value[0]?.subject.id ?? ''
   }
 }
 
-function selectFirstLevel(subject: CostSubjectRecord): void {
-  selectedFirstLevelId.value = subject.id
-  selectedSubjectId.value = subject.children?.[0]?.id ?? ''
+function selectCategory(value: CategoryFilter): void {
+  categoryFilter.value = value
+  normalizeSelection()
 }
 
-function clearSubjectForm(): void {
+function clearSubjectForm(category: AccountCategory): void {
   Object.assign(subjectForm, {
     parentId: '0',
     subjectCode: '',
     subjectName: '',
-    subjectType: 'MATERIAL',
+    subjectType: category === 'COST' ? 'MATERIAL' : 'GENERAL_LEDGER',
+    accountCategory: category,
     sortOrder: '0',
     status: 'ENABLE',
   })
 }
 
 function openSubjectCreate(parent?: CostSubjectRecord): void {
+  const category =
+    parent?.accountCategory ?? (categoryFilter.value === 'ALL' ? 'ASSET' : categoryFilter.value)
   subjectMode.value = 'create'
-  clearSubjectForm()
+  clearSubjectForm(category as AccountCategory)
   subjectForm.parentId = parent?.id ?? '0'
   subjectDialog.value = true
 }
@@ -115,6 +141,7 @@ function openSubjectEdit(): void {
     subjectCode: current.subjectCode,
     subjectName: current.subjectName,
     subjectType: current.subjectType,
+    accountCategory: current.accountCategory as AccountCategory,
     sortOrder: String(current.sortOrder ?? 0),
     status: current.status,
   })
@@ -137,8 +164,8 @@ function subjectCommand(): CostSubjectCommand | null {
     parentId: subjectForm.parentId || '0',
     subjectCode,
     subjectName,
-    subjectType: subjectForm.subjectType.trim() || 'MATERIAL',
-    accountCategory: 'COST',
+    subjectType: subjectForm.subjectType.trim() || 'GENERAL_LEDGER',
+    accountCategory: subjectForm.accountCategory,
     sortOrder,
     status: subjectForm.status as 'ENABLE' | 'DISABLE',
   }
@@ -157,11 +184,12 @@ async function saveSubject(): Promise<void> {
     const currentId = subjectMode.value === 'edit' ? selectedSubjectId.value : ''
     const savedId = currentId || String(await createCostSubject(command))
     if (currentId) await updateCostSubject(currentId, command)
-    await loadCostSubject(savedId)
+    const saved = await loadCostSubject(savedId)
     subjectDialog.value = false
+    categoryFilter.value = 'ALL'
     await loadTaxonomy()
-    selectedSubjectId.value = savedId
-    showToast('success', '成本科目已保存', '科目树已刷新。')
+    selectedSubjectId.value = saved.id
+    showToast('success', '会计科目已保存', '科目目录已刷新。')
   } catch (value) {
     showToast('error', '保存失败', messageOf(value))
   } finally {
@@ -194,7 +222,7 @@ async function confirmSubjectDelete(): Promise<void> {
     subjectDeleteTarget.value = null
     selectedSubjectId.value = ''
     await loadTaxonomy()
-    showToast('success', '成本科目已删除', '科目树已刷新。')
+    showToast('success', '会计科目已删除', '科目目录已刷新。')
   } catch (value) {
     showToast('error', '删除失败', messageOf(value))
   } finally {
@@ -229,144 +257,112 @@ onBeforeUnmount(() => controller?.abort())
 
 <template>
   <V2Stack class="cost-subject-page" :gap="4">
-    <V2Card title="成本科目体系" :heading-level="1">
+    <V2Card title="会计科目" :heading-level="1">
       <template #actions>
         <V2Button size="small" variant="secondary" @click="refreshTaxonomy">刷新</V2Button>
       </template>
     </V2Card>
 
-    <V2PageState
-      v-if="loading"
-      kind="loading"
-      title="正在读取成本科目事实"
-      description="请稍候。"
-    />
-    <V2PageState v-else-if="error" kind="error" title="成本科目加载失败" :description="error">
+    <V2PageState v-if="loading" kind="loading" title="正在读取会计科目" description="请稍候。" />
+    <V2PageState v-else-if="error" kind="error" title="会计科目加载失败" :description="error">
       <template #actions><V2Button @click="loadPage">重试</V2Button></template>
     </V2PageState>
 
     <V2Card v-else>
       <div class="cost-subject-page__columns cost-subject-page__taxonomy">
-        <section aria-labelledby="cost-subject-first-level-title">
+        <section aria-labelledby="account-category-title">
           <div class="cost-subject-page__section-heading">
             <span>
-              <h3 id="cost-subject-first-level-title">1. 一级科目</h3>
-              <small>5401.xx · 共 {{ firstLevelSubjects.length }} 个</small>
+              <h3 id="account-category-title">1. 科目大类</h3>
+              <small>统一目录 · {{ allSubjects.length }} 个</small>
             </span>
-            <V2Button
-              v-if="canSubjectAdd && standardCostRoot"
-              size="small"
-              @click="openSubjectCreate(standardCostRoot)"
-            >
+            <V2Button v-if="canSubjectAdd" size="small" @click="openSubjectCreate()">
               新增一级科目
             </V2Button>
           </div>
-          <V2PageState
-            v-if="!standardCostRoot"
-            kind="empty"
-            title="缺少标准成本根科目"
-            description="未读取到 5401 标准成本体系。"
-          />
           <div class="cost-subject-page__list">
             <div
-              v-for="subject in firstLevelSubjects"
-              :key="subject.id"
+              v-for="category in categoryFilters"
+              :key="category.value"
               class="cost-subject-page__list-item"
-              :class="{ 'is-selected': selectedFirstLevelId === subject.id }"
-              @click="selectFirstLevel(subject)"
+              :class="{ 'is-selected': categoryFilter === category.value }"
             >
               <button
                 type="button"
                 class="cost-subject-page__select"
-                :aria-pressed="selectedFirstLevelId === subject.id"
-                @click="selectFirstLevel(subject)"
+                :aria-pressed="categoryFilter === category.value"
+                @click="selectCategory(category.value)"
               >
                 <span>
-                  <strong>{{ subject.subjectName }}</strong>
-                  <small>{{ subject.subjectCode }}</small>
+                  <strong>{{ category.label }}</strong>
+                  <small v-if="category.value !== 'ALL'">
+                    {{
+                      allSubjects.filter(
+                        ({ subject }) => subject.accountCategory === category.value,
+                      ).length
+                    }}
+                    个
+                  </small>
                 </span>
               </button>
-              <V2StatusToggle
-                :enabled="subject.status === 'ENABLE'"
-                :disabled="!canSubjectEdit || saving || isGovernedSubject(subject)"
-                :aria-label="`${subject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${subject.subjectName}`"
-                @toggle="subjectStatusTarget = subject"
-              />
             </div>
           </div>
         </section>
 
-        <section aria-labelledby="cost-subject-second-level-title">
+        <section aria-labelledby="account-subject-catalog-title">
           <div class="cost-subject-page__section-heading">
             <span>
-              <h3 id="cost-subject-second-level-title">2. 二级科目</h3>
-              <small>5401.xx.xx · 共 {{ secondLevelSubjects.length }} 个</small>
+              <h3 id="account-subject-catalog-title">2. 科目目录</h3>
+              <small>共 {{ visibleSubjects.length }} 个</small>
             </span>
-            <V2Button
-              v-if="
-                canSubjectAdd && selectedFirstLevel && selectedFirstLevel.subjectCode !== '5401.03'
-              "
-              size="small"
-              @click="openSubjectCreate(selectedFirstLevel)"
-            >
-              新增二级科目
-            </V2Button>
           </div>
           <V2PageState
-            v-if="!selectedFirstLevel"
+            v-if="!visibleSubjects.length"
             kind="empty"
-            title="请选择一级科目"
-            description="选择后读取所属二级科目。"
+            title="当前分类暂无科目"
+            description="可新增一级科目。"
           />
-          <V2PageState
-            v-else-if="!secondLevelSubjects.length"
-            kind="empty"
-            title="暂无二级科目"
-            description="可在当前一级科目下新增。"
-          />
-          <div v-else class="cost-subject-page__list">
+          <div v-else class="cost-subject-page__list cost-subject-page__catalog">
             <div
-              v-for="subject in secondLevelSubjects"
-              :key="subject.id"
+              v-for="item in visibleSubjects"
+              :key="item.subject.id"
               class="cost-subject-page__list-item"
-              :class="{ 'is-selected': selectedSubjectId === subject.id }"
-              @click="selectedSubjectId = subject.id"
+              :class="{ 'is-selected': selectedSubjectId === item.subject.id }"
             >
               <button
                 type="button"
                 class="cost-subject-page__select"
-                :aria-pressed="selectedSubjectId === subject.id"
-                @click="selectedSubjectId = subject.id"
+                :aria-pressed="selectedSubjectId === item.subject.id"
+                :style="{ paddingLeft: `${item.depth * 16}px` }"
+                @click="selectedSubjectId = item.subject.id"
               >
                 <span>
-                  <strong>{{ subject.subjectName }}</strong>
+                  <strong>{{ item.subject.subjectName }}</strong>
                   <small>
-                    {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType)
-                    }}<template v-if="subject.defaultTargetRatio != null">
-                      · {{ formatDecimal(subject.defaultTargetRatio) }}%</template
-                    >
+                    {{ item.subject.subjectCode }} ·
+                    {{ accountCategoryLabel(item.subject.accountCategory) }}
                   </small>
                 </span>
               </button>
               <V2StatusToggle
-                :enabled="subject.status === 'ENABLE'"
-                :disabled="!canSubjectEdit || saving || isGovernedSubject(subject)"
-                :aria-label="`${subject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${subject.subjectName}`"
-                @toggle="subjectStatusTarget = subject"
+                :enabled="item.subject.status === 'ENABLE'"
+                :disabled="!canSubjectEdit || saving || isGovernedSubject(item.subject)"
+                :aria-label="`${item.subject.status === 'ENABLE' ? '停用' : '启用'}会计科目 ${item.subject.subjectName}`"
+                @toggle="subjectStatusTarget = item.subject"
               />
             </div>
           </div>
         </section>
 
-        <section aria-labelledby="cost-subject-detail-title">
+        <section aria-labelledby="account-subject-detail-title">
           <div class="cost-subject-page__section-heading">
-            <h3 id="cost-subject-detail-title">3. 科目详情</h3>
+            <h3 id="account-subject-detail-title">3. 科目详情</h3>
             <template v-if="isGovernedSubject(selectedSubject)">
               <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit">编辑</V2Button>
               <V2StatusToggle
-                :enabled="selectedSubject.status === 'ENABLE'"
+                :enabled="selectedSubject?.status === 'ENABLE'"
                 disabled
-                :aria-label="`成本科目 ${selectedSubject.subjectName} 状态由系统维护`"
+                :aria-label="`会计科目 ${selectedSubject?.subjectName} 状态由系统维护`"
               />
             </template>
             <V2Cluster v-else-if="selectedSubject">
@@ -382,7 +378,7 @@ onBeforeUnmount(() => controller?.abort())
               <V2StatusToggle
                 :enabled="selectedSubject.status === 'ENABLE'"
                 :disabled="!canSubjectEdit || saving"
-                :aria-label="`${selectedSubject.status === 'ENABLE' ? '停用' : '启用'}成本科目 ${selectedSubject.subjectName}`"
+                :aria-label="`${selectedSubject.status === 'ENABLE' ? '停用' : '启用'}会计科目 ${selectedSubject.subjectName}`"
                 @toggle="subjectStatusTarget = selectedSubject"
               />
               <V2Button
@@ -403,6 +399,10 @@ onBeforeUnmount(() => controller?.abort())
             <div>
               <dt>名称</dt>
               <dd>{{ selectedSubject.subjectName }}</dd>
+            </div>
+            <div>
+              <dt>科目大类</dt>
+              <dd>{{ accountCategoryLabel(selectedSubject.accountCategory) }}</dd>
             </div>
             <div>
               <dt>类型</dt>
@@ -432,8 +432,8 @@ onBeforeUnmount(() => controller?.abort())
 
     <V2Dialog
       :open="subjectDialog"
-      :title="subjectMode === 'edit' ? '编辑成本科目' : '新增成本科目'"
-      description="层级、租户、唯一性和引用保护由系统校验。"
+      :title="subjectMode === 'edit' ? '编辑会计科目' : '新增会计科目'"
+      description="层级、租户、分类、唯一性和引用保护由系统校验。"
       :close-disabled="saving"
       :close-on-backdrop="false"
       @close="subjectDialog = false"
@@ -446,6 +446,13 @@ onBeforeUnmount(() => controller?.abort())
           :disabled="editingGovernedSubject"
         />
         <V2Input v-model="subjectForm.subjectName" label="科目名称" required />
+        <V2Select
+          v-model="subjectForm.accountCategory"
+          :options="accountCategoryOptions"
+          label="科目大类"
+          required
+          :disabled="subjectMode === 'edit' || subjectForm.parentId !== '0'"
+        />
         <V2Input
           v-model="subjectForm.subjectType"
           label="科目类型"
@@ -455,7 +462,7 @@ onBeforeUnmount(() => controller?.abort())
         <V2Input
           v-model="subjectForm.parentId"
           label="父科目标识"
-          :disabled="editingGovernedSubject"
+          :disabled="subjectMode === 'edit'"
         />
         <V2Input v-model="subjectForm.sortOrder" label="排序" />
         <V2Select
@@ -476,7 +483,7 @@ onBeforeUnmount(() => controller?.abort())
 
     <V2ConfirmDialog
       :open="Boolean(subjectStatusTarget)"
-      title="更新成本科目状态"
+      title="更新会计科目状态"
       :description="
         subjectStatusTarget
           ? `确认${subjectStatusTarget.status === 'ENABLE' ? '停用' : '启用'}“${subjectStatusTarget.subjectName}”？存在引用时系统会拒绝停用。`
@@ -490,7 +497,7 @@ onBeforeUnmount(() => controller?.abort())
 
     <V2ConfirmDialog
       :open="Boolean(subjectDeleteTarget)"
-      title="删除成本科目"
+      title="删除会计科目"
       :description="
         subjectDeleteTarget
           ? `确认删除“${subjectDeleteTarget.subjectName}”？子科目或任何业务引用存在时系统会拒绝。`

@@ -2,6 +2,7 @@ import type {
   AssignmentRuleRecord,
   BidTransferRequestRecord,
   CostSubjectAuditRow,
+  AccountCategory,
   CostSubjectRecord,
   FinanceAllocationRequestRecord,
   SubjectImpactRecord,
@@ -15,6 +16,16 @@ export const statusOptions = [
 export const enabledOptions = [
   { value: 'true', label: '启用' },
   { value: 'false', label: '停用' },
+]
+
+export const accountCategoryOptions: Array<{ value: AccountCategory; label: string }> = [
+  { value: 'ASSET', label: '资产类' },
+  { value: 'LIABILITY', label: '负债类' },
+  { value: 'EQUITY', label: '权益类' },
+  { value: 'COST', label: '成本类' },
+  { value: 'REVENUE', label: '收入类' },
+  { value: 'SETTLEMENT', label: '结算类' },
+  { value: 'RECEIVABLE', label: '应收类' },
 ]
 
 export const sourceTypeOptions = [
@@ -61,10 +72,12 @@ const subjectTypeLabels: Record<string, string> = {
   SPECIAL: '其他专项成本',
   FINANCE_TAX: '财务及税费',
   RISK_RESERVE: '风险准备',
+  GENERAL_LEDGER: '总账科目',
 }
 
 const statusLabels: Record<string, string> = {
   ACTIVE: '已启用',
+  CANCELLED: '已取消',
   DISABLE: '停用',
   DRAFT: '草稿',
   ENABLE: '启用',
@@ -80,12 +93,27 @@ export function pageSlice<T>(items: T[], pageNo: number, pageSize = 10): T[] {
 }
 
 export function subjectTypeLabel(value?: string): string {
-  return subjectTypeLabels[value ?? ''] ?? '其他成本'
+  return subjectTypeLabels[value ?? ''] ?? '其他科目'
 }
+
+export function accountCategoryLabel(value?: string): string {
+  return accountCategoryOptions.find((item) => item.value === value)?.label ?? value ?? '未分类'
+}
+
+const governedAccountingCodes = new Set([
+  '1002-BANK',
+  '1122-AR',
+  '1123-PREPAY',
+  '2202-AP',
+  '2203-ADVANCE',
+])
 
 export function isGovernedSubject(subject?: CostSubjectRecord | null): boolean {
   return Boolean(
-    subject && (subject.subjectCode === '5401.03' || subject.subjectCode.startsWith('5401.03.')),
+    subject &&
+    (subject.subjectCode === '5401.03' ||
+      subject.subjectCode.startsWith('5401.03.') ||
+      governedAccountingCodes.has(subject.subjectCode)),
   )
 }
 

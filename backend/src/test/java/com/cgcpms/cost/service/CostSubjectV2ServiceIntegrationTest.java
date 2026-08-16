@@ -19,8 +19,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:cgcpms_cost_v301_service;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;LOCK_TIMEOUT=300000",
+        "spring.flyway.locations=classpath:db/migration-h2,filesystem:src/main/resources/db/migration-h2-legacy,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class"
+})
 @ActiveProfiles("local")
 @Transactional
 class CostSubjectV2ServiceIntegrationTest {
@@ -51,10 +55,18 @@ class CostSubjectV2ServiceIntegrationTest {
     @BeforeEach
     void setUp() {
         TestUserContext.setAdmin(0L, 1L);
+        jdbc.update("""
+                INSERT INTO pm_project
+                (id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,
+                 status,approval_status,created_by,updated_by,deleted_flag)
+                VALUES (?,0,'V2-IT-PROJECT','V2成本治理集成测试项目',100000,80000,1,
+                        'ACTIVE','APPROVED',1,1,0)
+                """, PROJECT_ID);
         insertSubject(SOURCE_SUBJECT_ID, "V2-IT-SOURCE", "投标费用来源");
         insertSubject(GLOBAL_SUBJECT_ID, "V2-IT-GLOBAL", "全局兜底成本");
         insertSubject(EXACT_SUBJECT_ID, "V2-IT-EXACT", "精确分类成本");
         insertSubject(PROJECT_SUBJECT_ID, "V2-IT-PROJECT", "项目专用成本");
+        jdbc.update("UPDATE cost_subject_mapping_version SET status='RETIRED' WHERE tenant_id=0 AND status='ACTIVE'");
         jdbc.update("""
                 INSERT INTO cost_subject_mapping_version
                 (id,tenant_id,version_code,version_name,status,effective_date,created_by)
@@ -96,27 +108,56 @@ class CostSubjectV2ServiceIntegrationTest {
     }
 
     @Test
+    void listsGovernanceRequestsForAllScopeWithoutProjectPlaceholderDrift() {
+        assertEquals(List.of(), service.reversalRequests());
+        assertEquals(List.of(), service.recalculationBatches());
+    }
+
+    @Test
+    void formOptionsExposeOnlyEditableTargetCostVersionsForBidTransfer() {
+        long draftTarget = 99351021L;
+        long activeTarget = 99351022L;
+        jdbc.update("""
+                INSERT INTO cost_target
+                (id,tenant_id,project_id,version_no,version_name,total_target_amount,total_bid_cost_amount,
+                 total_responsibility_amount,is_active,approval_status,status,created_by,deleted_flag)
+                VALUES (?,0,?,'V2-DRAFT','待转入目标成本',0,0,0,0,'DRAFT','DRAFT',1,0),
+                       (?,0,?,'V2-ACTIVE','已生效目标成本',0,0,0,1,'APPROVED','ACTIVE',1,0)
+                """, draftTarget, PROJECT_ID, activeTarget, PROJECT_ID);
+
+        List<?> targetVersions = (List<?>) service.governanceFormOptions().get("targetVersions");
+        assertEquals(1, targetVersions.size());
+        assertTrue(targetVersions.stream().anyMatch(row ->
+                draftTarget == ((Number) ((Map<?, ?>) row).get("id")).longValue()));
+    }
+
+    @Test
     void rejectsProjectScopedOperationsOutsideCurrentUserDataScope() {
         TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
 
         assertProjectDenied(() -> service.scopes(PROJECT_ID));
         assertProjectDenied(() -> service.reconciliation(PROJECT_ID));
         assertProjectDenied(() -> service.resolveRule("V2_RULE_TEST", "QUALITY", PROJECT_ID));
-        assertProjectDenied(() -> service.upsertScope(new CostSubjectV2Service.ScopeCommand(
+        assertCompanyFinanceRequired(() -> service.upsertScope(new CostSubjectV2Service.ScopeCommand(
                 PROJECT_ID, PROJECT_SUBJECT_ID, true, null, null, "unauthorized")));
-        assertProjectDenied(() -> service.transferBidCost(new CostSubjectV2Service.TransferCommand(
-                BID_ID, PROJECT_ID, TARGET_ID, VERSION_ID, TRANSFER_APPROVAL_ID,
-                "unauthorized-transfer", "unauthorized")));
-        assertProjectDenied(() -> service.allocateFinanceCost(
-                new CostSubjectV2Service.FinanceAllocationCommand(
-                        "ACCOUNTING_ENTRY_LINE", ACCOUNTING_LINE_ID, "DIRECT_PROJECT", "2026-07",
-                        PROJECT_SUBJECT_ID, ALLOCATION_APPROVAL_ID, "unauthorized-allocation",
-                        "unauthorized", List.of(
-                        new CostSubjectV2Service.AllocationLine(PROJECT_ID, BigDecimal.ONE)))));
+        assertProjectDenied(() -> service.projectConfiguration(PROJECT_ID));
+        assertCompanyFinanceRequired(() -> service.createProjectConfig(new CostSubjectV2Service.ProjectConfigCommand(
+                PROJECT_ID, "unauthorized", List.of(new CostSubjectV2Service.ProjectConfigLine(
+                PROJECT_SUBJECT_ID, false, null, null)))));
     }
 
     @Test
-    void transfersBidCostOncePerTargetVersionAndAllowsRetransferAfterReversal() {
+    void requiresGovernedWorkflowForLegacyBidTransferAndReversalEntrypoints() {
+        BusinessException transfer = assertThrows(BusinessException.class,
+                () -> service.transferBidCost(new CostSubjectV2Service.TransferCommand(
+                        BID_ID, PROJECT_ID, TARGET_ID, VERSION_ID, TRANSFER_APPROVAL_ID,
+                        "legacy-transfer", "legacy")));
+        assertEquals("WORKFLOW_REQUIRED", transfer.getCode());
+        BusinessException reversal = assertThrows(BusinessException.class,
+                () -> service.reverseBidTransfer(BID_ID, REVERSAL_APPROVAL_ID,
+                        "legacy-reversal", "legacy"));
+        assertEquals("WORKFLOW_REQUIRED", reversal.getCode());
+        /* Historical direct-entry fixture retained below as migration context only.
         jdbc.update("""
                 INSERT INTO cost_subject_mapping_item
                 (id,tenant_id,mapping_version_id,source_subject_id,target_group_code,target_subject_id,
@@ -192,10 +233,23 @@ class CostSubjectV2ServiceIntegrationTest {
                 "v2-it-transfer-3", "冲销后重新转入"));
         assertEquals(0, new BigDecimal("1000.00").compareTo(jdbc.queryForObject(
                 "SELECT total_target_amount FROM cost_target WHERE id=?", BigDecimal.class, TARGET_ID)));
+        */
     }
 
     @Test
-    void allocatesFinanceCostByProjectAndKeepsReversalAsNegativeFacts() {
+    void requiresGovernedWorkflowForLegacyFinanceAllocationAndReversalEntrypoints() {
+        CostSubjectV2Service.FinanceAllocationCommand command = new CostSubjectV2Service.FinanceAllocationCommand(
+                "ACCOUNTING_ENTRY_LINE", ACCOUNTING_LINE_ID, "DIRECT_PROJECT", "2026-07",
+                PROJECT_SUBJECT_ID, ALLOCATION_APPROVAL_ID, "legacy-allocation", "legacy",
+                List.of(new CostSubjectV2Service.AllocationLine(PROJECT_ID, BigDecimal.ONE)));
+        BusinessException allocation = assertThrows(BusinessException.class,
+                () -> service.allocateFinanceCost(command));
+        assertEquals("WORKFLOW_REQUIRED", allocation.getCode());
+        BusinessException reversal = assertThrows(BusinessException.class,
+                () -> service.reverseFinanceAllocation(ACCOUNTING_LINE_ID, ALLOCATION_REVERSAL_APPROVAL_ID,
+                        "legacy-reversal", "legacy"));
+        assertEquals("WORKFLOW_REQUIRED", reversal.getCode());
+        /* Historical direct-entry fixture retained below as migration context only.
         jdbc.update("""
                 INSERT INTO pm_project
                 (id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,
@@ -269,6 +323,7 @@ class CostSubjectV2ServiceIntegrationTest {
                 "ACCOUNTING_ENTRY_LINE", ACCOUNTING_LINE_ID, "DIRECT_PROJECT", "2026-07",
                 PROJECT_SUBJECT_ID, ALLOCATION_APPROVAL_ID, "v2-it-allocation-3", "冲销后重新分摊",
                 List.of(new CostSubjectV2Service.AllocationLine(PROJECT_ID, BigDecimal.ONE))));
+        */
     }
 
     private void insertSubject(long id, String code, String name) {
@@ -283,6 +338,11 @@ class CostSubjectV2ServiceIntegrationTest {
     private void assertProjectDenied(org.junit.jupiter.api.function.Executable operation) {
         BusinessException exception = assertThrows(BusinessException.class, operation);
         assertEquals("PROJECT_ACCESS_DENIED", exception.getCode());
+    }
+
+    private void assertCompanyFinanceRequired(org.junit.jupiter.api.function.Executable operation) {
+        BusinessException exception = assertThrows(BusinessException.class, operation);
+        assertEquals("COST_COMPANY_FINANCE_REQUIRED", exception.getCode());
     }
 
     private void insertRule(long id, String code, String sourceType, String category,

@@ -5,6 +5,7 @@ import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.project.service.OwnerContractFactService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -26,6 +27,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
 
     private final CtContractMapper contractMapper;
     private final CostGenerationService costGenerationService;
+    private final CostClassificationGuard costClassificationGuard;
     private final ContractBudgetAllocationService contractBudgetAllocationService;
     private final OwnerContractFactService ownerContractFactService;
 
@@ -45,6 +47,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
         Long contractId = resolveContractId(instance);
         log.info("合同提交/重提审批，进入审批中 contractId={}", contractId);
         contractBudgetAllocationService.validateForContractSubmit(contractId);
+        costClassificationGuard.requireClassified("CT_CONTRACT", contractId);
 
         int updated = contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
                 .eq(CtContract::getId, contractId)
@@ -95,6 +98,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
                 .eq(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING)
                 .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_REJECTED));
         requireSingleStatusTransition(updated, contractId, "审批驳回");
+        costClassificationGuard.voidPending("CT_CONTRACT", contractId);
     }
 
     @Override
@@ -109,6 +113,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
                 .eq(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING)
                 .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_DRAFT));
         requireSingleStatusTransition(updated, contractId, "审批撤回");
+        costClassificationGuard.voidPending("CT_CONTRACT", contractId);
     }
 
     private Long resolveContractId(WfInstance instance) {

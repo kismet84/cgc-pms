@@ -36,6 +36,12 @@ public class FinanceOperationsController {
                 analytics.latestSnapshots(projectId).stream().map(FinanceSnapshotVO::from).toList()));
     }
 
+    @GetMapping("/form-options")
+    @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String,Object>> formOptions(@RequestParam Long projectId) {
+        return ApiResponse.success(operations.formOptions(projectId));
+    }
+
     @PostMapping("/budgets/adjust") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> adjust(@Valid @RequestBody BudgetAdjustmentRequest r){return ApiResponse.success(operations.adjustBudget(r));}
     @PostMapping("/budgets/transfer") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")

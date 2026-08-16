@@ -4,6 +4,7 @@ import { V2ActionMenu, V2Button, V2Card, V2PageState, V2Pagination } from '@/com
 import { showToast } from '@/components/toast'
 import {
   closeFinancePeriod,
+  createFinancePeriod,
   loadFinancePeriods,
   loadFinancialCloseTrace,
   loadFinancialStatement,
@@ -23,7 +24,7 @@ type PeriodAction = 'check' | 'close' | 'reopen'
 const pageSize = 10
 const session = useSessionStore()
 const canQuery = computed(() => session.hasPermission('finance:close:query'))
-const can = (permission: string) => session.hasPermission(permission)
+const can = (permission: string) => session.hasAdminOrPermission(permission)
 const periods = ref<FinancePeriodRecord[]>([])
 const pageNo = ref(1)
 const trace = ref<FinancialCloseTrace | null>(null)
@@ -33,6 +34,18 @@ const busy = ref(false)
 const errorMessage = ref('')
 let controller: AbortController | null = null
 const pagedPeriods = computed(() => pageSlice(periods.value, pageNo.value))
+const currentDate = new Date()
+const currentYear = currentDate.getFullYear()
+const currentMonth = currentDate.getMonth() + 1
+const currentPeriodMissing = computed(
+  () =>
+    !periods.value.some(
+      (row) => row.fiscalYear === currentYear && row.fiscalMonth === currentMonth,
+    ),
+)
+const bankIssueCount = computed(
+  () => trace.value?.checks.find((row) => row.checkType === 'BANK_RECONCILIATION')?.issueCount ?? 0,
+)
 
 async function load(): Promise<void> {
   if (!canQuery.value) return
@@ -104,6 +117,13 @@ async function actPeriod(row: FinancePeriodRecord, action: PeriodAction): Promis
   )
 }
 
+async function createCurrentPeriod(): Promise<void> {
+  await run(
+    () => createFinancePeriod({ fiscalYear: currentYear, fiscalMonth: currentMonth }),
+    `当前账期 ${currentYear}-${String(currentMonth).padStart(2, '0')} 已创建`,
+  )
+}
+
 void load()
 onBeforeUnmount(() => controller?.abort())
 </script>
@@ -120,6 +140,13 @@ onBeforeUnmount(() => controller?.abort())
       <V2Card title="财务月结" :heading-level="1">
         <template #actions>
           <div class="finance-control__actions">
+            <V2Button
+              v-if="currentPeriodMissing && can('finance:close:check')"
+              size="small"
+              :loading="busy"
+              @click="createCurrentPeriod"
+              >创建当前账期</V2Button
+            >
             <V2Button size="small" variant="secondary" :loading="loading" @click="refreshWorkspace">
               刷新
             </V2Button>
@@ -239,13 +266,10 @@ onBeforeUnmount(() => controller?.abort())
               <span>检查项</span><strong>{{ trace.checks.length }}</strong>
             </div>
             <div>
-              <span>银行对账异常</span
-              ><strong>{{
-                trace.bankReconciliations.filter((row) => row.status === 'EXCEPTION').length
-              }}</strong>
+              <span>银行对账异常</span><strong>{{ bankIssueCount }}</strong>
             </div>
           </div>
-          <h3>试算平衡</h3>
+          <h3>试算平衡（会计科目）</h3>
           <div
             class="finance-control__table-wrap"
             role="region"
@@ -255,8 +279,8 @@ onBeforeUnmount(() => controller?.abort())
             <table class="v2-table finance-control__table">
               <thead>
                 <tr>
-                  <th>科目编码</th>
-                  <th>科目名称</th>
+                  <th>会计科目编码</th>
+                  <th>会计科目名称</th>
                   <th>借方</th>
                   <th>贷方</th>
                 </tr>

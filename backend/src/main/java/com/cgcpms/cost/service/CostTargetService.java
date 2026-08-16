@@ -499,11 +499,14 @@ public class CostTargetService {
                 SELECT COUNT(*) FROM cost_subject s
                 WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
                   AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id AND c.parent_id=s.id AND c.deleted_flag=0)
-                  AND (NOT EXISTS (SELECT 1 FROM project_cost_subject_scope p WHERE p.tenant_id=s.tenant_id AND p.project_id=?)
-                       OR EXISTS (SELECT 1 FROM project_cost_subject_scope p WHERE p.tenant_id=s.tenant_id AND p.project_id=?
-                         AND p.cost_subject_id=s.id AND p.enabled=1 AND p.effective_from<=CURRENT_DATE
-                         AND (p.effective_to IS NULL OR p.effective_to>=CURRENT_DATE)))
-                """, Integer.class, UserContext.getCurrentTenantId(), subjectId, projectId, projectId);
+                  AND NOT EXISTS (SELECT 1 FROM project_cost_subject_scope_history h
+                    WHERE h.tenant_id=s.tenant_id AND h.project_id=? AND h.cost_subject_id=s.id AND h.enabled=0
+                      AND h.configuration_version=(
+                        SELECT MAX(latest.configuration_version) FROM project_cost_subject_scope_history latest
+                        WHERE latest.tenant_id=h.tenant_id AND latest.project_id=h.project_id
+                          AND latest.cost_subject_id=h.cost_subject_id AND latest.effective_from<=CURRENT_DATE
+                          AND (latest.effective_to IS NULL OR latest.effective_to>=CURRENT_DATE)))
+                """, Integer.class, UserContext.getCurrentTenantId(), subjectId, projectId);
         if (valid == null || valid != 1) {
             throw new BusinessException("COST_TARGET_SUBJECT_INVALID", "目标成本必须使用项目适用范围内的启用末级成本科目");
         }

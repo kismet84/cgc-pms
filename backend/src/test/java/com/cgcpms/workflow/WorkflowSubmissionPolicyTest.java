@@ -40,7 +40,12 @@ class WorkflowSubmissionPolicyTest {
             entry(WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER, "cost:subject:transfer:submit"),
             entry(WorkflowBusinessTypes.FINANCE_COST_ALLOCATION, "cost:subject:allocation:submit"),
             entry(WorkflowBusinessTypes.QS_RECTIFICATION, "quality:rectification:submit"),
-            entry(WorkflowBusinessTypes.QS_CONSEQUENCE, "quality:consequence:submit"));
+            entry(WorkflowBusinessTypes.QS_CONSEQUENCE, "quality:consequence:submit"),
+            entry(WorkflowBusinessTypes.COST_RULE_PLAN, "cost:rule-plan:submit"),
+            entry(WorkflowBusinessTypes.COST_PROJECT_CONFIG, "cost:project-config:submit"),
+            entry(WorkflowBusinessTypes.COST_RECALCULATION, "cost:recalculation:submit"),
+            entry(WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT, "cost:post-close:submit"),
+            entry(WorkflowBusinessTypes.COST_REVERSAL, "cost:reversal:submit"));
 
     @Test
     void registryIsCompleteImmutableAndKeepsPermissionContract() {
@@ -65,7 +70,12 @@ class WorkflowSubmissionPolicyTest {
                 WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER,
                 WorkflowBusinessTypes.FINANCE_COST_ALLOCATION,
                 WorkflowBusinessTypes.QS_RECTIFICATION,
-                WorkflowBusinessTypes.QS_CONSEQUENCE}) {
+                WorkflowBusinessTypes.QS_CONSEQUENCE,
+                WorkflowBusinessTypes.COST_RULE_PLAN,
+                WorkflowBusinessTypes.COST_PROJECT_CONFIG,
+                WorkflowBusinessTypes.COST_RECALCULATION,
+                WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT,
+                WorkflowBusinessTypes.COST_REVERSAL}) {
             BusinessException error = assertThrows(BusinessException.class,
                     () -> WorkflowSubmissionPolicy.requireGenericEntryAllowed(businessType));
             assertEquals("DEDICATED_WORKFLOW_REQUIRED", error.getCode());

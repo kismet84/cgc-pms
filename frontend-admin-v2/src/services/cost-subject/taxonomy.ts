@@ -3,8 +3,8 @@ import { normalizeSubject, requiredId } from './normalize'
 import type { CostSubjectCommand, CostSubjectRecord } from './types'
 
 export function loadCostSubjectTree(signal?: AbortSignal): Promise<CostSubjectRecord[]> {
-  return apiRequest<CostSubjectRecord[]>('/cost-subjects/tree?category=COST', { signal }).then(
-    (rows) => rows.map(normalizeSubject),
+  return apiRequest<CostSubjectRecord[]>('/cost-subjects/tree', { signal }).then((rows) =>
+    rows.map(normalizeSubject),
   )
 }
 

@@ -28,6 +28,9 @@ public class BusinessReferenceService {
             Map.entry("STOCK_TRANSFER", new Reference("mat_stock_transfer", "idempotency_key")),
             Map.entry("MATERIAL_RETURN", new Reference("mat_material_return", "return_code")),
             Map.entry("MATERIAL_RETURN_REVERSAL", new Reference("mat_material_return", "return_code")),
+            Map.entry("COST_RECALCULATION_NEGATIVE", new Reference("cost_recalculation_batch", "batch_code")),
+            Map.entry("COST_RECALCULATION_POSITIVE", new Reference("cost_recalculation_batch", "batch_code")),
+            Map.entry("COST_RECALCULATION_REVERSAL", new Reference("cost_recalculation_batch", "batch_code")),
             Map.entry("EXPENSE_APPLICATION", new Reference("expense_application", "expense_code")),
             Map.entry("QS_ISSUE", new Reference("qs_issue", "issue_code"))
     );

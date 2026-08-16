@@ -27,6 +27,7 @@ export const FINANCE_API = {
   revenueReceivables: "/revenue-operations/receivables",
   revenueSalesInvoices: "/revenue-operations/sales-invoices",
   revenueCollections: "/revenue-operations/collections",
+  revenueSchedules: "/revenue-operations/schedules",
   schedules: "/finance-operations/schedules",
   journal: "/cash-journal-entries",
   forecastCycles: "/cash-forecasts/cycles",

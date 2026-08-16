@@ -1,5 +1,6 @@
 package com.cgcpms.contract.change.strategy;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static com.cgcpms.common.util.BigDecimalUtils.nvl;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -37,6 +39,7 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
     private final CtContractMapper contractMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -73,13 +76,21 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
             return;
         }
 
+        if (costSubjectResolver.costFactExists(change.getTenantId(), SOURCE_TYPE,
+                changeId, 0L, COST_TYPE)) {
+            change.setCostGeneratedFlag(1);
+            changeMapper.updateById(change);
+            return;
+        }
+
         // Look up the associated contract for partner/org info
         CtContract contract = contractMapper.selectById(change.getContractId());
 
-        // Resolve cost subject: try "变更" type → "合同" type → root → any
-        Long costSubjectId = costSubjectResolver.resolveForChange(change.getTenantId());
-
         LocalDate today = LocalDate.now();
+        accountingPeriodGuard.assertWritable(today);
+        CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                change.getTenantId(), change.getProjectId(), SOURCE_TYPE,
+                "*", sourceId, 0L, null, today);
 
         CostItem cost = new CostItem();
         cost.setTenantId(change.getTenantId());
@@ -88,22 +99,33 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
         cost.setContractId(change.getContractId());
         cost.setPartnerId(contract != null ? null /* partnerId removed — use partyAId/partyBId */ : null);
         cost.setCostType(COST_TYPE);
-        cost.setCostSubjectId(costSubjectId);
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setClassificationBusinessCategory("*");
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
         cost.setAmount(nvl(change.getChangeAmount()));
+        cost.setTaxAmount(BigDecimal.ZERO);
+        cost.setAmountWithoutTax(nvl(change.getChangeAmount()));
         cost.setSourceType(SOURCE_TYPE);
         cost.setSourceId(changeId);
-        cost.setSourceItemId(null);
+        cost.setSourceItemId(0L);
         cost.setCostDate(today);
         cost.setCostStatus(COST_STATUS_CONFIRMED);
         cost.setGeneratedFlag(1);
 
         try {
             costItemMapper.insert(cost);
+            costSubjectResolver.markSnapshotPosted(decision);
         } catch (DuplicateKeyException e) {
             // uk_cost_source_item already present — idempotent skip.
             // Re-query to get the current costGeneratedFlag (may have been set by another thread).
             CtContractChange fresh = changeMapper.selectById(changeId);
             if (fresh != null && Integer.valueOf(1).equals(fresh.getCostGeneratedFlag())) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 log.info("成本已存在且 flag 已置，幂等跳过 changeId={}", changeId);
                 return;
             }

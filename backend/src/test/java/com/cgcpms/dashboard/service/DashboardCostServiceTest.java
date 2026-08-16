@@ -1,5 +1,6 @@
 package com.cgcpms.dashboard.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
@@ -276,6 +277,8 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
         variationCost.setTenantId(TENANT_ID);
         variationCost.setProjectId(sr.projectId);
         variationCost.setCostSubjectId(subject.getId());
+        variationCost.setClassificationStatus("CLASSIFIED");
+        variationCost.setRecognitionRole("ACTUAL");
         variationCost.setCostType("VARIATION");
         variationCost.setAmount(new BigDecimal("30000.00"));
         variationCost.setTaxAmount(BigDecimal.ZERO);
@@ -299,6 +302,30 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
         assertTrue(vo.getLedgerRows().stream()
                 .anyMatch(row -> subject.getId().toString().equals(row.getCostSubjectId())
                         && "30000.00".equals(row.getActualAmount())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.1f Cost view: fallback uses classified ACTUAL COST facts only")
+    void testCostView_FallbackSeparatesRecognitionRoles() {
+        SeedResult sr = seed("COST_ROLE_FALLBACK");
+        costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, sr.projectId);
+        CostSubject subject = costSubjectMapper.selectList(
+                        new LambdaQueryWrapper<CostSubject>()
+                                .eq(CostSubject::getTenantId, TENANT_ID)
+                                .eq(CostSubject::getSubjectCode, "SUBJ-COST_ROLE_FALLBACK"))
+                .stream().findFirst().orElseThrow();
+
+        insertDashboardCostFact(sr.projectId, subject.getId(), "ACTUAL", "CLASSIFIED", "20.00", 201L);
+        insertDashboardCostFact(sr.projectId, subject.getId(), "COMMITTED", "CLASSIFIED", "100.00", 202L);
+        insertDashboardCostFact(sr.projectId, subject.getId(), "NON_COST", "CLASSIFIED", "150.00", 203L);
+        insertDashboardCostFact(sr.projectId, subject.getId(), "ACTUAL", "UNCLASSIFIED", "30.00", 204L);
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId);
+        CostManagerDashboardVO.SubjectRanking ranking = vo.getSubjectRankings().stream()
+                .filter(item -> subject.getId().toString().equals(item.getCostSubjectId()))
+                .findFirst().orElseThrow();
+        assertEquals("20.00", ranking.getActualCost());
     }
 
     @Test
@@ -371,6 +398,27 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
     void testCostService_DoesNotRetainFinanceAggregateHelper() {
         assertFalse(Arrays.stream(DashboardCostService.class.getDeclaredMethods())
                 .anyMatch(method -> "getFinanceViewAllProjects".equals(method.getName())));
+    }
+
+    private void insertDashboardCostFact(Long projectId, Long subjectId, String recognitionRole,
+                                         String classificationStatus, String amount, long sourceItemId) {
+        CostItem item = new CostItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(projectId);
+        item.setCostSubjectId(subjectId);
+        item.setClassificationStatus(classificationStatus);
+        item.setRecognitionRole(recognitionRole);
+        item.setCostType("ROLE_TEST");
+        item.setAmount(new BigDecimal(amount));
+        item.setTaxAmount(BigDecimal.ZERO);
+        item.setAmountWithoutTax(new BigDecimal(amount));
+        item.setSourceType("FINANCE_COST_ALLOCATION");
+        item.setSourceId(sourceItemId);
+        item.setSourceItemId(sourceItemId);
+        item.setCostDate(LocalDate.now());
+        item.setCostStatus("CONFIRMED");
+        item.setGeneratedFlag(1);
+        costItemMapper.insert(item);
     }
 
     @Test

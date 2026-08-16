@@ -55,4 +55,14 @@ public final class WorkflowBusinessTypes {
     public static final String QS_RECTIFICATION = "QS_RECTIFICATION";
     /** 质量安全金额后果审批 */
     public static final String QS_CONSEQUENCE = "QS_CONSEQUENCE";
+    /** 成本规则方案审批 */
+    public static final String COST_RULE_PLAN = "COST_RULE_PLAN";
+    /** 项目成本配置审批 */
+    public static final String COST_PROJECT_CONFIG = "COST_PROJECT_CONFIG";
+    /** 全量历史重算审批 */
+    public static final String COST_RECALCULATION = "COST_RECALCULATION";
+    /** 关闭项目后的财务调整审批 */
+    public static final String COST_POST_CLOSE_ADJUSTMENT = "COST_POST_CLOSE_ADJUSTMENT";
+    /** 投标转入、财务分摊或重算冲销审批 */
+    public static final String COST_REVERSAL = "COST_REVERSAL";
 }

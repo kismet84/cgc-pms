@@ -198,6 +198,7 @@ class MatRequisitionWorkflowSubmitTest {
     @Transactional
     @DisplayName("submitForApproval -> MATERIAL_REQUISITION 模板存在时进入 APPROVING 并生成待办")
     void submitForApprovalCreatesRunningWorkflow() {
+        activateMaterialRequisitionRule();
         MatRequisition requisition = new MatRequisition();
         requisition.setProjectId(PROJECT_ID);
         requisition.setContractId(CONTRACT_ID);
@@ -237,6 +238,7 @@ class MatRequisitionWorkflowSubmitTest {
     @Transactional
     @DisplayName("M2: 领料审批与仓管实际出库分离，出库逐行幂等且不重复确认材料成本")
     void approvedRequisitionRequiresExplicitStockOut() {
+        activateMaterialRequisitionRule();
         MatWarehouse warehouse = new MatWarehouse();
         warehouse.setId(APPROVAL_WAREHOUSE_ID);
         warehouse.setTenantId(TENANT_ID);
@@ -359,6 +361,7 @@ class MatRequisitionWorkflowSubmitTest {
                 .eq(CostItem::getSourceType, "MATERIAL_RETURN")
                 .eq(CostItem::getSourceId, returnId));
         assertNotNull(reversal);
+        assertEquals(WBS_ID, reversal.getWbsTaskId());
         assertEquals(0, new BigDecimal("-37.50").compareTo(reversal.getAmount()));
         assertEquals(1L, matStockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
                 .eq(MatStockTxn::getSourceType, "MATERIAL_RETURN")
@@ -384,6 +387,7 @@ class MatRequisitionWorkflowSubmitTest {
                 .eq(CostItem::getSourceType, "MATERIAL_RETURN_REVERSAL")
                 .eq(CostItem::getSourceId, returnId));
         assertNotNull(reversalUndo);
+        assertEquals(WBS_ID, reversalUndo.getWbsTaskId());
         assertEquals(0, new BigDecimal("37.50").compareTo(reversalUndo.getAmount()));
 
         Long fullReturnId = materialReturnService.confirm(new MaterialReturnRequest(
@@ -392,5 +396,31 @@ class MatRequisitionWorkflowSubmitTest {
         assertNotNull(fullReturnId, "已冲销退料不应继续占用累计可退数量");
         assertEquals(0, new BigDecimal("20.0000")
                 .compareTo(matStockMapper.selectById(stock.getId()).getAvailableQty()));
+    }
+
+    private void activateMaterialRequisitionRule() {
+        Long subjectId = jdbc.queryForObject("""
+                SELECT MIN(s.id) FROM cost_subject s
+                WHERE s.tenant_id=? AND s.account_category='COST' AND s.status='ENABLE'
+                  AND s.deleted_flag=0 AND NOT EXISTS(
+                    SELECT 1 FROM cost_subject child
+                    WHERE child.tenant_id=s.tenant_id AND child.parent_id=s.id AND child.deleted_flag=0)
+                """, Long.class, TENANT_ID);
+        assertNotNull(subjectId, "测试基线应提供启用末级成本科目");
+        jdbc.update("""
+                INSERT INTO cost_subject_mapping_version
+                    (id,tenant_id,version_code,version_name,status,effective_date,version,
+                     created_by,created_at,updated_by,updated_at,remark)
+                VALUES(93030008,?,'REQ-RULE-PLAN','领料闭环测试规则方案','ACTIVE',CURRENT_DATE,
+                       0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,'test fixture')
+                """, TENANT_ID, USER_ADMIN, USER_ADMIN);
+        jdbc.update("""
+                INSERT INTO cost_subject_assignment_rule
+                    (id,tenant_id,mapping_version_id,rule_code,source_type,business_category,
+                     project_id,cost_subject_id,priority,status,effective_from,version,
+                     created_by,created_at,updated_by,updated_at,remark)
+                VALUES(93030009,?,93030008,'REQ-MAT-RULE','MAT_REQUISITION','*',NULL,?,100,
+                       'ACTIVE',CURRENT_DATE,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,'test fixture')
+                """, TENANT_ID, subjectId, USER_ADMIN, USER_ADMIN);
     }
 }

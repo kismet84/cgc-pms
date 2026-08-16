@@ -38,28 +38,28 @@ export const masterDataDomain: NavigationDomain = {
     },
     {
       id: 'finance-data',
-      label: '成本科目',
+      label: '会计科目',
       defaultPath: '/cost/subject/taxonomy',
       matchPrefixes: ['/cost/subject'],
       tabs: [
         {
           path: '/cost/subject/taxonomy',
-          label: '科目体系',
+          label: '科目目录',
           permission: 'cost:query',
         },
         {
           path: '/cost/subject/rules',
-          label: '归集规则',
+          label: '成本规则方案',
           permission: 'cost:subject:rule:query',
         },
         {
           path: '/cost/subject/scope',
-          label: '项目适用与目标成本',
+          label: '项目成本配置',
           permission: 'cost:subject:scope:query',
         },
         {
           path: '/cost/subject/trace',
-          label: '影响与转入追踪',
+          label: '成本追溯与转入',
           permission: 'cost:subject:audit:query',
         },
       ],

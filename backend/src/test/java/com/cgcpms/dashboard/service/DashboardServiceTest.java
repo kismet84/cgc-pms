@@ -465,6 +465,8 @@ abstract class DashboardServiceTestSupport {
         costItem.setProjectId(projectId);
         costItem.setContractId(contractId);
         costItem.setCostSubjectId(subjectId);
+        costItem.setClassificationStatus("CLASSIFIED");
+        costItem.setRecognitionRole("COMMITTED");
         costItem.setCostType("CT_LABOR");
         costItem.setAmount(new BigDecimal("1500000.00"));
         costItem.setTaxAmount(BigDecimal.ZERO);

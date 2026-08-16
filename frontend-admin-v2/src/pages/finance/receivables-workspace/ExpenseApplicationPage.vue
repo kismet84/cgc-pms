@@ -87,6 +87,10 @@ const traceError = ref('')
 let controller: AbortController | null = null
 let dictionariesLoaded = false
 
+function canOpenPaymentTrace(row: ExpenseApplicationRecord): boolean {
+  return Number(row.convertedAmount) > 0
+}
+
 const hasRows = computed(() => rows.value.length > 0)
 const projectOptions = computed(() =>
   workspace.projects.filter(
@@ -350,13 +354,19 @@ onBeforeUnmount(() => controller?.abort())
               <tr v-for="(row, index) in rows" :key="row.id">
                 <td>
                   <button
-                    v-if="canTrace"
+                    v-if="canTrace && canOpenPaymentTrace(row)"
                     type="button"
                     class="v2-table__record-link"
                     @click="openTrace(row)"
                   >
                     {{ row.expenseCode }}</button
-                  ><span v-else>{{ row.expenseCode }}</span>
+                  ><span
+                    v-else
+                    :title="
+                      canTrace && !canOpenPaymentTrace(row) ? '费用申请尚未形成付款链' : undefined
+                    "
+                    >{{ row.expenseCode }}</span
+                  >
                 </td>
                 <td>
                   {{

@@ -1,6 +1,7 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
@@ -35,6 +36,7 @@ public class ContractCostStrategy implements CostGenerationStrategy {
     private final CtContractItemMapper contractItemMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -65,12 +67,14 @@ public class ContractCostStrategy implements CostGenerationStrategy {
         }
 
         LocalDate today = LocalDate.now();
-
-        // Resolve default cost subject for CONTRACT_LOCKED type
-        Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(contract.getTenantId(), "合同");
+        accountingPeriodGuard.assertWritable(today);
 
         int generated = 0;
         for (CtContractItem item : items) {
+            if (costSubjectResolver.costFactExists(contract.getTenantId(), SOURCE_TYPE_CONTRACT,
+                    contractId, item.getId(), DEFAULT_COST_TYPE)) {
+                continue;
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(contract.getTenantId());
             cost.setOrgId(contract.getOrgId());
@@ -80,7 +84,12 @@ public class ContractCostStrategy implements CostGenerationStrategy {
             // party fields are now resolved at the contract level via partyAId/partyBId.
             cost.setPartnerId(null);
             cost.setCostType(DEFAULT_COST_TYPE);
-            cost.setCostSubjectId(defaultSubjectId);
+            cost.setRecognitionRole("COMMITTED");
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    contract.getTenantId(), contract.getProjectId(), SOURCE_TYPE_CONTRACT,
+                    contract.getContractType(), contractId, item.getId(), null, today);
+            applyDecision(cost, decision);
+            cost.setClassificationBusinessCategory(contract.getContractType());
             cost.setAmount(nvl(item.getAmount()));
             cost.setTaxAmount(nvl(item.getTaxAmount()));
             cost.setAmountWithoutTax(nvl(item.getAmountWithoutTax()));
@@ -93,8 +102,10 @@ public class ContractCostStrategy implements CostGenerationStrategy {
 
             try {
                 costItemMapper.insert(cost);
+                costSubjectResolver.markSnapshotPosted(decision);
                 generated++;
             } catch (DuplicateKeyException e) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 // uk_cost_source_item already present — idempotent skip.
                 log.info("成本已存在，跳过 contractId={}, itemId={}", contractId, item.getId());
             }
@@ -104,6 +115,16 @@ public class ContractCostStrategy implements CostGenerationStrategy {
         contractMapper.updateById(contract);
 
         log.info("生成锁定成本完成 contractId={}, 明细数={}, 新增={}", contractId, items.size(), generated);
+    }
+
+    private static void applyDecision(CostItem cost, CostSubjectResolver.Decision decision) {
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
     }
 
 }

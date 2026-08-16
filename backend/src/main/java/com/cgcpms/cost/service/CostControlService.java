@@ -449,15 +449,19 @@ public class CostControlService {
     }
 
     private Map<Long, Map<String, Object>> costSourcesBySubject(Long projectId, LocalDate date) {
-        Integer unclassified = jdbc.queryForObject("SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND cost_subject_id IS NULL AND amount<>0 AND (cost_date IS NULL OR cost_date<=?)", Integer.class, tenant(), projectId, date);
+        Integer unclassified = jdbc.queryForObject("SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND classification_status='UNCLASSIFIED' AND cost_status IN ('CONFIRMED','POSTED') AND amount<>0 AND (cost_date IS NULL OR cost_date<=?)", Integer.class, tenant(), projectId, date);
         if (unclassified != null && unclassified > 0) throw error("COST_FORECAST_UNCLASSIFIED_COST", "项目存在未归类成本，无法生成可靠完工预测");
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT ci.cost_subject_id,
-                SUM(CASE WHEN ci.source_type='CT_CONTRACT' AND ci.cost_status='CONFIRMED'
+                SUM(CASE WHEN ci.recognition_role='COMMITTED' AND ci.cost_status='CONFIRMED'
                     AND NOT EXISTS (SELECT 1 FROM ct_contract c WHERE c.id=ci.contract_id AND c.tenant_id=ci.tenant_id AND c.contract_type='MAIN' AND c.deleted_flag=0)
                     THEN ci.amount ELSE 0 END) committed_amount,
-                SUM(CASE WHEN ci.source_type IN ('MAT_RECEIPT','MAT_REQUISITION','SUB_MEASURE','VAR_ORDER','CT_CHANGE','BID_COST','BID_COST_TRANSFERRED','OVERHEAD_ALLOCATION') AND ci.cost_status IN('CONFIRMED','POSTED') THEN ci.amount ELSE 0 END) actual_amount
-                FROM cost_item ci WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0 AND ci.cost_subject_id IS NOT NULL AND (ci.cost_date IS NULL OR ci.cost_date<=?)
+                SUM(CASE WHEN ci.recognition_role='ACTUAL' AND ci.cost_status IN('CONFIRMED','POSTED')
+                    AND ci.classification_status<>'UNCLASSIFIED' THEN ci.amount ELSE 0 END) actual_amount
+                FROM cost_item ci
+                JOIN cost_subject cs ON cs.tenant_id=ci.tenant_id AND cs.id=ci.cost_subject_id
+                  AND cs.deleted_flag=0 AND cs.account_category='COST'
+                WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0 AND (ci.cost_date IS NULL OR ci.cost_date<=?)
                 GROUP BY ci.cost_subject_id
                 HAVING committed_amount<>0 OR actual_amount<>0
                 """, tenant(), projectId, date);
@@ -531,13 +535,20 @@ public class CostControlService {
                 LEFT JOIN cost_target_item t ON t.cost_subject_id=s.id AND t.tenant_id=s.tenant_id AND t.target_id=? AND t.deleted_flag=0
                 LEFT JOIN (
                     SELECT ci.cost_subject_id,
-                    SUM(CASE WHEN ci.source_type='CT_CONTRACT' AND ci.cost_status='CONFIRMED'
+                    SUM(CASE WHEN ci.recognition_role='COMMITTED' AND ci.cost_status='CONFIRMED'
                         AND NOT EXISTS (SELECT 1 FROM ct_contract mc WHERE mc.id=ci.contract_id AND mc.tenant_id=ci.tenant_id AND mc.contract_type='MAIN' AND mc.deleted_flag=0)
                         THEN ci.amount ELSE 0 END) committed_amount,
-                    SUM(CASE WHEN ci.source_type IN ('MAT_RECEIPT','MAT_REQUISITION','SUB_MEASURE','VAR_ORDER','CT_CHANGE','BID_COST','BID_COST_TRANSFERRED','OVERHEAD_ALLOCATION') AND ci.cost_status IN('CONFIRMED','POSTED') THEN ci.amount ELSE 0 END) actual_amount
-                    FROM cost_item ci WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0 AND ci.cost_subject_id IS NOT NULL AND (ci.cost_date IS NULL OR ci.cost_date<=?) GROUP BY ci.cost_subject_id
+                    SUM(CASE WHEN ci.recognition_role='ACTUAL' AND ci.cost_status IN('CONFIRMED','POSTED')
+                        AND ci.classification_status<>'UNCLASSIFIED' THEN ci.amount ELSE 0 END) actual_amount
+                    FROM cost_item ci
+                    JOIN cost_subject actual_subject ON actual_subject.tenant_id=ci.tenant_id
+                      AND actual_subject.id=ci.cost_subject_id AND actual_subject.deleted_flag=0
+                      AND actual_subject.account_category='COST'
+                    WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
+                      AND (ci.cost_date IS NULL OR ci.cost_date<=?) GROUP BY ci.cost_subject_id
                 ) c ON c.cost_subject_id=s.id
-                WHERE s.tenant_id=? AND s.deleted_flag=0 AND (t.id IS NOT NULL OR c.cost_subject_id IS NOT NULL)
+                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST'
+                  AND (t.id IS NOT NULL OR c.cost_subject_id IS NOT NULL)
                 ORDER BY s.subject_code,s.id
                 """, targetId, tenant(), projectId, date, tenant());
     }

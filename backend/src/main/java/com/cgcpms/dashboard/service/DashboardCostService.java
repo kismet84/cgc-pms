@@ -570,22 +570,28 @@ public class DashboardCostService extends DashboardSharedSupport {
         }
         List<CostItem> items = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getTenantId, tenantId)
-                .in(CostItem::getProjectId, projectIds));
+                .in(CostItem::getProjectId, projectIds)
+                .eq(CostItem::getRecognitionRole, "ACTUAL")
+                .in(CostItem::getCostStatus, List.of("CONFIRMED", "POSTED"))
+                .ne(CostItem::getClassificationStatus, "UNCLASSIFIED"));
         if (CollectionUtils.isEmpty(items)) {
             return Collections.emptyList();
         }
 
+        Map<Long, CostSubject> subjectMap = loadCostSubjects(items.stream()
+                .map(CostItem::getCostSubjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
         Map<Long, CostSummaryAccumulator> bySubject = new HashMap<>();
         for (CostItem item : items) {
             Long subjectId = item.getCostSubjectId();
             BigDecimal amount = item.getAmount() != null ? item.getAmount() : BigDecimal.ZERO;
+            CostSubject subject = subjectMap.get(subjectId);
+            if (!isActualCostItem(item, subject)) continue;
             CostSummaryAccumulator acc = bySubject.computeIfAbsent(subjectId, key -> new CostSummaryAccumulator());
-            if (isActualCostItem(item)) {
-                acc.actualCost = acc.actualCost.add(amount);
-            }
+            acc.actualCost = acc.actualCost.add(amount);
         }
 
-        Map<Long, CostSubject> subjectMap = loadCostSubjects(bySubject.keySet());
         BigDecimal actualTotal = bySubject.values().stream()
                 .map(acc -> acc.actualCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -620,17 +626,13 @@ public class DashboardCostService extends DashboardSharedSupport {
                 .collect(Collectors.toList());
     }
 
-    private boolean isActualCostItem(CostItem item) {
-        if (item == null) {
-            return false;
-        }
-        return "MAT_RECEIPT".equals(item.getSourceType())
-                || "SUB_MEASURE".equals(item.getSourceType())
-                || "VAR_ORDER".equals(item.getSourceType())
-                || "CT_CHANGE".equals(item.getSourceType())
-                || "BID_COST".equals(item.getSourceType())
-                || "BID_COST_TRANSFERRED".equals(item.getSourceType())
-                || "OVERHEAD_ALLOCATION".equals(item.getSourceType());
+    private boolean isActualCostItem(CostItem item, CostSubject subject) {
+        return item != null
+                && subject != null
+                && "COST".equals(subject.getAccountCategory())
+                && "ACTUAL".equals(item.getRecognitionRole())
+                && !"UNCLASSIFIED".equals(item.getClassificationStatus())
+                && Set.of("CONFIRMED", "POSTED").contains(item.getCostStatus());
     }
 
     private Map<Long, CtContract> loadContracts(List<PayRecord> payRecords) {

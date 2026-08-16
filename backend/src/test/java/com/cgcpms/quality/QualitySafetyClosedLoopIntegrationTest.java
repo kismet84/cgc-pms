@@ -180,10 +180,16 @@ class QualitySafetyClosedLoopIntegrationTest {
                 () -> service.postConsequence(consequenceId)).getCode());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM cost_item WHERE source_type='QUALITY_SAFETY_CONSEQUENCE' AND source_id=?", Integer.class, consequenceId));
 
-        jdbc.update("UPDATE cost_subject_assignment_rule SET status='RETIRED' WHERE id=?", ASSIGNMENT_RULE);
+        jdbc.update("""
+                UPDATE cost_subject_assignment_rule SET status='RETIRED'
+                WHERE id=? OR (tenant_id=0 AND rule_code='M96-LEGACY-QUALITY_SAFETY_CONSEQUENCE')
+                """, ASSIGNMENT_RULE);
         assertEquals("COST_SUBJECT_UNCLASSIFIED", assertThrows(BusinessException.class,
                 () -> service.submitConsequence(consequenceId)).getCode());
-        jdbc.update("UPDATE cost_subject_assignment_rule SET status='ACTIVE' WHERE id=?", ASSIGNMENT_RULE);
+        jdbc.update("""
+                UPDATE cost_subject_assignment_rule SET status='ACTIVE'
+                WHERE id=? OR (tenant_id=0 AND rule_code='M96-LEGACY-QUALITY_SAFETY_CONSEQUENCE')
+                """, ASSIGNMENT_RULE);
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'QS-COST-AMBIGUOUS','质量安全返工歧义科目','质量安全','COST',1,2,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", AMBIGUOUS_SUBJECT);
         jdbc.update("INSERT INTO cost_subject_assignment_rule(id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,cost_subject_id,priority,status,effective_from,created_by) VALUES(?,0,?,'QS-REWORK-AMBIGUOUS','QUALITY_SAFETY_CONSEQUENCE','SAFETY',NULL,?,1,'ACTIVE',CURRENT_DATE,1)", AMBIGUOUS_RULE, MAPPING_VERSION, AMBIGUOUS_SUBJECT);
         assertEquals("COST_SUBJECT_RULE_AMBIGUOUS", assertThrows(BusinessException.class,

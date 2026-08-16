@@ -2,6 +2,7 @@ package com.cgcpms.supplierreturn.service;
 
 import static com.cgcpms.common.util.BigDecimalUtils.nvl;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.audit.service.MandatoryAuditService;
@@ -9,6 +10,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
 import com.cgcpms.inventory.entity.MatStockTxn;
 import com.cgcpms.inventory.mapper.MatStockTxnMapper;
 import com.cgcpms.inventory.service.MatStockService;
@@ -55,11 +57,13 @@ public class MatSupplierReturnService {
     private final MatPurchaseOrderItemMapper orderItemMapper;
     private final MatStockTxnMapper stockTxnMapper;
     private final CostItemMapper costItemMapper;
+    private final CostFactLineageResolver costFactLineageResolver;
     private final MatStockService stockService;
     private final ProjectAccessChecker projectAccessChecker;
     private final ContractProcurementPayableService payableService;
     private final PurchaseOrderReceiptStateService orderReceiptStateService;
     private final MandatoryAuditService mandatoryAuditService;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Long confirm(SupplierReturnRequest request) {
@@ -109,6 +113,7 @@ public class MatSupplierReturnService {
             limit = disposition.getRejectedQuantity();
             unitCost = nvl(receiptItem.getUnitPrice());
         } else if ("DIRECT_CONSUMPTION".equals(receipt.getReceiptMode())) {
+            accountingPeriodGuard.assertWritable(request.returnDate());
             originalCost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
                     .eq(CostItem::getTenantId, tenantId)
                     .eq(CostItem::getSourceType, "MAT_RECEIPT")
@@ -118,6 +123,7 @@ public class MatSupplierReturnService {
             if (originalCost == null) {
                 throw new BusinessException("SUPPLIER_RETURN_ORIGINAL_COST_NOT_FOUND", "原直耗验收成本不存在");
             }
+            originalCost = costFactLineageResolver.requireCurrentLeaf(tenantId, originalCost.getId());
             limit = receiptItem.getQualifiedQuantity();
             unitCost = divideUnitCost(originalCost.getAmount(), receiptItem.getQualifiedQuantity());
         } else {
@@ -215,6 +221,7 @@ public class MatSupplierReturnService {
             throw new BusinessException("SUPPLIER_RETURN_REVERSAL_REASON_INVALID", "冲销原因不能为空且最多500字");
         }
         Long tenantId = UserContext.getCurrentTenantId();
+        accountingPeriodGuard.assertWritable(LocalDate.now());
         MatSupplierReturn supplierReturn = returnMapper.selectForUpdate(returnId, tenantId);
         if (supplierReturn == null) {
             throw new BusinessException("SUPPLIER_RETURN_NOT_FOUND", "供应商退货单不存在");
@@ -267,10 +274,15 @@ public class MatSupplierReturnService {
                 stockService.stockInValued(original.getWarehouseId(), item.getMaterialId(), item.getQuantity(),
                         item.getUnitCost(), "SUPPLIER_RETURN_REVERSAL", returnId, item.getId());
             } else {
-                CostItem originalCost = costItemMapper.selectById(item.getOriginalCostItemId());
-                if (originalCost == null || !tenantId.equals(originalCost.getTenantId())) {
-                    throw new BusinessException("SUPPLIER_RETURN_ORIGINAL_COST_NOT_FOUND", "原直耗验收成本不存在");
+                CostItem returnCost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, tenantId)
+                        .eq(CostItem::getSourceType, "SUPPLIER_RETURN")
+                        .eq(CostItem::getSourceId, returnId)
+                        .eq(CostItem::getSourceItemId, item.getId()));
+                if (returnCost == null) {
+                    throw new BusinessException("SUPPLIER_RETURN_ORIGINAL_COST_NOT_FOUND", "供应商退货成本事实不存在");
                 }
+                CostItem originalCost = costFactLineageResolver.requireCurrentLeaf(tenantId, returnCost.getId());
                 insertCostFact(receipt, originalCost, returnId, item.getId(), item.getAmount(),
                         LocalDate.now(), "SUPPLIER_RETURN_REVERSAL", "冲销供应商退货");
             }
@@ -389,12 +401,25 @@ public class MatSupplierReturnService {
 
     private void insertCostFact(MatReceipt receipt, CostItem original, Long sourceId, Long sourceItemId,
                                 BigDecimal amount, LocalDate costDate, String sourceType, String remark) {
+        accountingPeriodGuard.assertWritable(costDate);
         CostItem fact = new CostItem();
         fact.setTenantId(receipt.getTenantId());
         fact.setProjectId(receipt.getProjectId());
+        fact.setWbsTaskId(original.getWbsTaskId());
         fact.setContractId(receipt.getContractId());
         fact.setPartnerId(receipt.getPartnerId());
         fact.setCostSubjectId(original.getCostSubjectId());
+        fact.setClassificationStatus("REVERSAL");
+        fact.setClassificationBusinessCategory(original.getClassificationBusinessCategory());
+        fact.setRecognitionRole(original.getRecognitionRole());
+        fact.setRootSourceType(original.getRootSourceType() == null
+                ? original.getSourceType() : original.getRootSourceType());
+        fact.setMappingVersionId(original.getMappingVersionId());
+        fact.setAssignmentRuleId(original.getAssignmentRuleId());
+        fact.setOriginalCostSubjectId(original.getOriginalCostSubjectId());
+        fact.setClassificationOverrideId(original.getClassificationOverrideId());
+        fact.setClassificationSnapshotId(original.getClassificationSnapshotId());
+        fact.setOriginalCostItemId(original.getId());
         fact.setCostType("MATERIAL");
         fact.setAmount(amount);
         fact.setTaxAmount(BigDecimal.ZERO);

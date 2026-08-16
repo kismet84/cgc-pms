@@ -50,15 +50,18 @@ class CostSummaryAssembler {
 
     boolean isActualCostSource(CostItem item) {
         if (item == null) return false;
-        String sourceType = item.getSourceType();
-        return "MAT_RECEIPT".equals(sourceType)
-                || "MAT_REQUISITION".equals(sourceType)
-                || "SUB_MEASURE".equals(sourceType)
-                || "VAR_ORDER".equals(sourceType)
-                || "CT_CHANGE".equals(sourceType)
-                || "BID_COST".equals(sourceType)
-                || "BID_COST_TRANSFERRED".equals(sourceType)
-                || "OVERHEAD_ALLOCATION".equals(sourceType);
+        String role = item.getRecognitionRole() == null
+                ? ("CT_CONTRACT".equals(item.getSourceType()) ? "COMMITTED" : "ACTUAL")
+                : item.getRecognitionRole();
+        return "ACTUAL".equals(role)
+                && !"UNCLASSIFIED".equals(item.getClassificationStatus())
+                && ("CONFIRMED".equals(item.getCostStatus()) || "POSTED".equals(item.getCostStatus()));
+    }
+
+    boolean isCommittedCostSource(CostItem item) {
+        if (item == null) return false;
+        return "COMMITTED".equals(item.getRecognitionRole())
+                || (item.getRecognitionRole() == null && "CT_CONTRACT".equals(item.getSourceType()));
     }
 
     PmProject requireProjectInTenant(Long tenantId, Long projectId) {

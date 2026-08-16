@@ -6,6 +6,8 @@ import com.cgcpms.workflow.WorkflowSecurityPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
+import com.cgcpms.system.mapper.SysUserMapper;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +22,11 @@ import java.time.LocalDateTime;
 public class WorkflowApprovalService {
 
     private static final ObjectMapper POLICY_MAPPER = new ObjectMapper();
-
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
+    private final SysUserMapper sysUserMapper;
     private final WorkflowNotificationAlertService workflowNotificationAlertService;
 
     @Transactional(rollbackFor = Exception.class)
@@ -42,6 +44,7 @@ public class WorkflowApprovalService {
     private void approve(Long taskId, Long userId, String username,
                          String comment, String idempotencyKey, boolean purchaseRequestDedicated) {
         ApprovalRoute route = lockApprovalRoute(taskId, userId);
+        requireFinanceApprover(route.instance(), userId);
         WfTask routeTask = route.task();
         if (routeTask != null && com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST
                 .equals(routeTask.getBusinessType()) && !purchaseRequestDedicated) {
@@ -53,7 +56,8 @@ public class WorkflowApprovalService {
         WfInstance instance = route.instance();
         WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
                 POLICY_MAPPER, instance.getSecurityPolicyJson());
-        if (policy.preventInitiatorApproval() && instance.getInitiatorId().equals(userId)) {
+        if ((policy.preventInitiatorApproval() || WorkflowSecurityPolicy.requiresFinanceSeparation(instance.getBusinessType()))
+                && instance.getInitiatorId().equals(userId)) {
             throw new BusinessException("WORKFLOW_INITIATOR_APPROVAL_FORBIDDEN", "发起人不得审批本流程");
         }
         if (core.approvedCount(instance.getTenantId(), instance.getId(), userId, task.getRoundNo())
@@ -116,6 +120,12 @@ public class WorkflowApprovalService {
     public void reject(Long taskId, Long userId, String username,
                        String comment, String idempotencyKey) {
         ApprovalRoute route = lockApprovalRoute(taskId, userId);
+        WfInstance routeInstance = route.instance();
+        requireFinanceApprover(routeInstance, userId);
+        if (routeInstance != null && WorkflowSecurityPolicy.requiresFinanceSeparation(routeInstance.getBusinessType())
+                && routeInstance.getInitiatorId().equals(userId)) {
+            throw new BusinessException("WORKFLOW_INITIATOR_APPROVAL_FORBIDDEN", "发起人不得驳回本流程");
+        }
         WfTask task = validateAndCasUpdateTask(route.task(), userId, idempotencyKey,
                 WorkflowConstants.ACTION_REJECT, WorkflowConstants.TASK_REJECTED, comment);
 
@@ -154,6 +164,14 @@ public class WorkflowApprovalService {
     }
 
     // ──────────────────────── Extracted helpers ────────────────────────
+
+    private void requireFinanceApprover(WfInstance instance, Long userId) {
+        if (instance == null || !WorkflowSecurityPolicy.requiresFinanceSeparation(instance.getBusinessType())) return;
+        if (!sysUserMapper.selectEnabledRoleCodesByTenantAndUserId(instance.getTenantId(), userId)
+                .contains(SystemRoleContract.COMPANY_FINANCE)) {
+            throw new BusinessException("WORKFLOW_FINANCE_APPROVER_REQUIRED", "仅公司财务可审批本流程");
+        }
+    }
 
     private ApprovalRoute lockApprovalRoute(Long taskId, Long userId) {
         WfTask task = wfTaskMapper.selectByIdIgnoringTenant(taskId);

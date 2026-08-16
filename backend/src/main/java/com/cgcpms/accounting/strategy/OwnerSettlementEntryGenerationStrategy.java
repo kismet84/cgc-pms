@@ -4,6 +4,8 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
+import com.cgcpms.cost.entity.CostSubject;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,6 +23,7 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
     public static final String ENTRY_TYPE = "AR_CONFIRMATION";
 
     private final JdbcTemplate jdbc;
+    private final AccountingSubjectResolver subjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -49,14 +52,8 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
                 """, BigDecimal.class, tenantId, sourceId);
         requirePositive(amount, "OWNER_SETTLEMENT_AR_AMOUNT_INVALID", "业主结算有效应收金额必须大于0");
 
-        Map<String, Object> revenueSubject = one("""
-                SELECT id,subject_name
-                  FROM cost_subject
-                 WHERE tenant_id IN (?,0) AND subject_code='6001.01'
-                   AND account_category='REVENUE' AND status='ENABLE' AND deleted_flag=0
-                 ORDER BY CASE WHEN tenant_id=? THEN 0 ELSE 1 END
-                 LIMIT 1
-                """, tenantId, tenantId, "REVENUE_SUBJECT_NOT_FOUND", "未找到当前租户或公共启用收入科目6001.01");
+        CostSubject receivableSubject = subjectResolver.require(AccountingSubjectCatalog.RECEIVABLE, "ASSET");
+        CostSubject revenueSubject = subjectResolver.requireWithPublicFallback("6001.01", "REVENUE");
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode("AR-CONF-" + sourceId);
@@ -65,10 +62,10 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
         entry.setProjectId(number(settlement.get("project_id")));
         entry.setContractId(number(settlement.get("contract_id")));
         entry.setLines(List.of(
-                line("DEBIT", "1122-AR", "应收账款", null, amount,
+                line("DEBIT", receivableSubject.getSubjectCode(), receivableSubject.getSubjectName(), null, amount,
                         "业主结算确认应收：" + settlement.get("settlement_code")),
-                line("CREDIT", "6001.01", String.valueOf(revenueSubject.get("subject_name")),
-                        number(revenueSubject.get("id")), amount,
+                line("CREDIT", revenueSubject.getSubjectCode(), revenueSubject.getSubjectName(),
+                        revenueSubject.getId(), amount,
                         "业主结算确认收入：" + settlement.get("settlement_code"))));
         return entry;
     }

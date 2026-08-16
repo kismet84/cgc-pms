@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class WfInstanceVO {
@@ -29,6 +30,7 @@ public class WfInstanceVO {
     private String initiatorId;
     private String initiatorName;
     private String businessSummary;
+    private Map<String, Object> businessDetails;
     private String startedAt;
     private String endedAt;
     private List<String> availableActions;

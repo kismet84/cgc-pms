@@ -6,11 +6,14 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 abstract class CostSubjectV2Support {
+
+    protected static final int APPROVAL_DETAIL_ROW_LIMIT = 1000;
 
     protected final JdbcTemplate jdbc;
     protected final ProjectAccessChecker projectAccessChecker;
@@ -49,30 +52,65 @@ abstract class CostSubjectV2Support {
     }
 
     protected void requireMappingVersion(Long id, String status) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM cost_subject_mapping_version WHERE tenant_id=? AND id=? AND status=?",
-                Integer.class, tenantId(), id, status);
-        if (count == null || count != 1) throw new BusinessException("COST_SUBJECT_MAPPING_VERSION_INVALID", "成本科目映射版本不存在或状态不符");
+        List<String> statuses = jdbc.query("""
+                SELECT status FROM cost_subject_mapping_version
+                WHERE tenant_id=? AND id=? FOR UPDATE
+                """, (rs, rowNum) -> rs.getString(1), tenantId(), id);
+        if (statuses.size() != 1 || !status.equals(statuses.getFirst())) {
+            throw new BusinessException("COST_SUBJECT_MAPPING_VERSION_INVALID", "成本科目映射版本不存在或状态不符");
+        }
     }
 
     protected void requireSubject(Long id, boolean leaf) {
         if (id == null) throw new BusinessException("COST_SUBJECT_REQUIRED", "成本科目不能为空");
-        Integer count = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM cost_subject s WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0
-                  AND (?=0 OR (s.status='ENABLE' AND s.account_category='COST' AND NOT EXISTS (
-                    SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id AND c.parent_id=s.id AND c.deleted_flag=0)))
-                """, Integer.class, tenantId(), id, leaf ? 1 : 0);
-        if (count == null || count != 1) throw new BusinessException("COST_SUBJECT_NOT_LEAF", leaf ? "成本归集必须使用启用的成本域末级科目" : "成本科目不存在");
+        if (!leaf) {
+            Integer count = jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM cost_subject
+                    WHERE tenant_id=? AND id=? AND deleted_flag=0
+                    """, Integer.class, tenantId(), id);
+            if (count == null || count != 1) {
+                throw new BusinessException("COST_SUBJECT_NOT_LEAF", "成本科目不存在");
+            }
+            return;
+        }
+        List<Map<String, Object>> subjects = jdbc.queryForList("""
+                SELECT id,status,account_category FROM cost_subject
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, tenantId(), id);
+        Integer children = subjects.size() == 1 ? jdbc.queryForObject("""
+                SELECT COUNT(*) FROM cost_subject
+                WHERE tenant_id=? AND parent_id=? AND deleted_flag=0
+                """, Integer.class, tenantId(), id) : null;
+        if (subjects.size() != 1
+                || !"ENABLE".equals(String.valueOf(subjects.getFirst().get("status")))
+                || !"COST".equals(String.valueOf(subjects.getFirst().get("account_category")))
+                || children == null || children != 0) {
+            throw new BusinessException("COST_SUBJECT_NOT_LEAF", "成本归集必须使用启用的成本域末级科目");
+        }
+    }
+
+    protected void requireLeafSubjects(List<Long> ids) {
+        if (ids == null) return;
+        ids.stream().filter(Objects::nonNull).distinct().sorted()
+                .forEach(id -> requireSubject(id, true));
     }
 
     protected void requireScope(Long projectId, Long subjectId) {
-        Integer scoped = jdbc.queryForObject("SELECT COUNT(*) FROM project_cost_subject_scope WHERE tenant_id=? AND project_id=?",
-                Integer.class, tenantId(), projectId);
-        if (scoped != null && scoped > 0) {
-            Integer allowed = jdbc.queryForObject("""
-                    SELECT COUNT(*) FROM project_cost_subject_scope WHERE tenant_id=? AND project_id=? AND cost_subject_id=?
-                      AND enabled=1 AND effective_from<=CURRENT_DATE AND (effective_to IS NULL OR effective_to>=CURRENT_DATE)
-                    """, Integer.class, tenantId(), projectId, subjectId);
-            if (allowed == null || allowed != 1) throw new BusinessException("COST_SUBJECT_NOT_IN_PROJECT_SCOPE", "成本科目不在项目适用范围内");
+        requireScopeAt(projectId, subjectId, LocalDate.now());
+    }
+
+    protected void requireScopeAt(Long projectId, Long subjectId, LocalDate asOfDate) {
+        Integer excluded = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_cost_subject_scope_history h
+                WHERE h.tenant_id=? AND h.project_id=? AND h.cost_subject_id=? AND h.enabled=0
+                  AND h.configuration_version=(
+                    SELECT MAX(latest.configuration_version) FROM project_cost_subject_scope_history latest
+                    WHERE latest.tenant_id=h.tenant_id AND latest.project_id=h.project_id
+                      AND latest.cost_subject_id=h.cost_subject_id AND latest.effective_from<=?
+                      AND (latest.effective_to IS NULL OR latest.effective_to>=?))
+                """, Integer.class, tenantId(), projectId, subjectId, asOfDate, asOfDate);
+        if (excluded != null && excluded > 0) {
+            throw new BusinessException("COST_SUBJECT_NOT_IN_PROJECT_SCOPE", "成本科目已被当前项目排除");
         }
     }
 
@@ -81,6 +119,27 @@ abstract class CostSubjectV2Support {
                 Integer.class, tenantId(), projectId);
         if (count == null || count != 1) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         projectAccessChecker.checkAccess(projectId, "访问成本科目项目数据");
+    }
+
+    protected void requireProjectOpenForNormalCostGovernance(Long projectId) {
+        List<String> statuses = jdbc.query("""
+                SELECT status FROM pm_project
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
+                """, (rs, rowNum) -> rs.getString(1), tenantId(), projectId);
+        if (statuses.size() != 1) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        projectAccessChecker.checkAccess(projectId, "访问成本科目项目数据");
+        if ("CLOSED".equals(statuses.getFirst())) {
+            throw new BusinessException("COST_GOVERNANCE_PROJECT_CLOSED",
+                    "已关闭项目禁止普通成本配置、转入或分摊；请使用关闭后财务调整/冲销流程");
+        }
+    }
+
+    protected void requireProjectsOpenForNormalCostGovernance(List<Long> projectIds) {
+        if (projectIds == null) return;
+        projectIds.stream().filter(Objects::nonNull).distinct().sorted()
+                .forEach(this::requireProjectOpenForNormalCostGovernance);
     }
 
 
@@ -106,6 +165,13 @@ abstract class CostSubjectV2Support {
         return value;
     }
 
+    protected void requireCurrentUserCreated(Object createdBy, String businessName) {
+        if (!Objects.equals(longValue(createdBy), userId())) {
+            throw new BusinessException("COST_REQUEST_CREATOR_REQUIRED",
+                    businessName + "只能由原申请人提交；审批人必须使用另一账号");
+        }
+    }
+
     protected static String textOrDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
@@ -125,5 +191,12 @@ abstract class CostSubjectV2Support {
 
     protected static int intValue(Object value) {
         return value == null ? 0 : ((Number) value).intValue();
+    }
+
+    protected static LocalDate localDate(Object value) {
+        if (value == null) return null;
+        if (value instanceof LocalDate date) return date;
+        if (value instanceof java.sql.Date date) return date.toLocalDate();
+        return LocalDate.parse(String.valueOf(value));
     }
 }

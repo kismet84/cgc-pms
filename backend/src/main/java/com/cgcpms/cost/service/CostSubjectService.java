@@ -3,11 +3,13 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
 import com.cgcpms.cost.constant.TargetCostSubjectCatalog;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
+import com.cgcpms.system.role.SystemRoleContract;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +32,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CostSubjectService {
+
+    private static final Set<String> ACCOUNT_CATEGORIES = Set.of(
+            "ASSET", "LIABILITY", "EQUITY", "COST", "REVENUE", "SETTLEMENT", "RECEIVABLE");
 
     private final CostSubjectMapper costSubjectMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -120,21 +125,26 @@ public class CostSubjectService {
     public CostSubjectVO getById(Long id) {
         CostSubject subject = costSubjectMapper.selectById(id);
         if (subject == null) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         if (!subject.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         return toVO(subject);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CostSubject subject) {
+        requireCompanyFinanceOperator();
+        subject.setId(null);
+        subject.setTenantId(UserContext.getCurrentTenantId());
+        subject.setDeletedFlag(0);
+        assertStandardAccountingSubjectNotCreated(subject.getSubjectCode());
         assertGenericStructureEditable(subject.getSubjectCode());
         validateParentForSave(subject, null);
         // Validate parent exists if not root
         if (subject.getParentId() != null && subject.getParentId() != 0L) {
-            CostSubject parent = costSubjectMapper.selectById(subject.getParentId());
+            CostSubject parent = selectSubjectForUpdate(subject.getParentId());
             if (parent == null) {
                 throw new BusinessException("PARENT_NOT_FOUND", "父科目不存在");
             }
@@ -142,21 +152,31 @@ public class CostSubjectService {
                 throw new BusinessException("PARENT_NOT_FOUND", "父科目不存在");
             }
             assertGenericStructureEditable(parent.getSubjectCode());
+            assertAccountingStructureEditable(parent.getSubjectCode());
+            Long childCount = costSubjectMapper.selectCount(new LambdaQueryWrapper<CostSubject>()
+                    .eq(CostSubject::getTenantId, parent.getTenantId())
+                    .eq(CostSubject::getParentId, parent.getId()));
+            if (childCount == 0) {
+                assertNoActiveReferences(parent, "新增子科目");
+            }
             // Auto-set level and account category from parent
             subject.setLevel(parent.getLevel() + 1);
-            if (subject.getAccountCategory() == null || subject.getAccountCategory().isEmpty()) {
-                subject.setAccountCategory(parent.getAccountCategory());
+            if (subject.getAccountCategory() != null
+                    && !subject.getAccountCategory().isEmpty()
+                    && !Objects.equals(subject.getAccountCategory(), parent.getAccountCategory())) {
+                throw new BusinessException("ACCOUNT_CATEGORY_PARENT_MISMATCH", "子科目分类必须与父科目一致");
             }
+            subject.setAccountCategory(parent.getAccountCategory());
         } else {
             // Root node
             subject.setParentId(0L);
             subject.setLevel(1);
         }
+        validateAccountCategory(subject.getAccountCategory());
 
         // Validate unique subject_code within tenant among active rows only.
         Long count = costSubjectMapper.countByTenantAndCode(
-                UserContext.getCurrentTenantId(), subject.getSubjectCode(),
-                subject.getAccountCategory(), null);
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(), null);
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }
@@ -167,21 +187,37 @@ public class CostSubjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CostSubject subject) {
-        CostSubject existing = costSubjectMapper.selectById(subject.getId());
+        requireCompanyFinanceOperator();
+        CostSubject existing = selectSubjectForUpdate(subject.getId());
         if (existing == null) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
+        subject.setTenantId(existing.getTenantId());
+        if (subject.getAccountCategory() == null || subject.getAccountCategory().isEmpty()) {
+            subject.setAccountCategory(existing.getAccountCategory());
+        }
+        if (subject.getParentId() == null) {
+            subject.setParentId(existing.getParentId());
+        }
+        validateAccountCategory(subject.getAccountCategory());
         assertGovernedMetadataUpdate(existing, subject);
+        assertAccountingMetadataUpdate(existing, subject);
+        if (changesReferencedStructure(existing, subject)) {
+            assertNoActiveReferences(existing, "修改编码、层级、类型或分类");
+        }
+        if ("ENABLE".equals(existing.getStatus()) && "DISABLE".equals(subject.getStatus())) {
+            assertNoActiveReferences(existing, "停用");
+        }
 
         validateParentForSave(subject, existing.getId());
+        validateHierarchyForUpdate(subject, existing);
 
         // Validate unique subject_code within tenant among active rows only.
         Long count = costSubjectMapper.countByTenantAndCode(
-                UserContext.getCurrentTenantId(), subject.getSubjectCode(),
-                subject.getAccountCategory(), subject.getId());
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(), subject.getId());
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }
@@ -189,20 +225,28 @@ public class CostSubjectService {
         costSubjectMapper.updateById(subject);
     }
 
+    private CostSubject selectSubjectForUpdate(Long id) {
+        return costSubjectMapper.selectOne(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getId, id)
+                .eq(CostSubject::getTenantId, UserContext.getCurrentTenantId())
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void toggleStatus(Long id) {
-        CostSubject existing = costSubjectMapper.selectById(id);
+        requireCompanyFinanceOperator();
+        CostSubject existing = selectSubjectForUpdate(id);
         if (existing == null) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         assertGenericStructureEditable(existing.getSubjectCode());
 
         String newStatus = "ENABLE".equals(existing.getStatus()) ? "DISABLE" : "ENABLE";
         if ("DISABLE".equals(newStatus)) {
-            assertNoActiveReferences(id, existing.getTenantId(), "停用");
+            assertNoActiveReferences(existing, "停用");
         }
         existing.setStatus(newStatus);
         costSubjectMapper.updateById(existing);
@@ -210,14 +254,16 @@ public class CostSubjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        CostSubject existing = costSubjectMapper.selectById(id);
+        requireCompanyFinanceOperator();
+        CostSubject existing = selectSubjectForUpdate(id);
         if (existing == null) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
+            throw new BusinessException("COST_SUBJECT_NOT_FOUND", "会计科目不存在");
         }
         assertGenericStructureEditable(existing.getSubjectCode());
+        assertAccountingStructureEditable(existing.getSubjectCode());
 
         // Check no children exist
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
@@ -228,7 +274,7 @@ public class CostSubjectService {
             throw new BusinessException("HAS_CHILDREN", "该科目下存在子科目，无法删除");
         }
 
-        assertNoActiveReferences(id, existing.getTenantId(), "删除");
+        assertNoActiveReferences(existing, "删除");
 
         // 检查是否已存在相同编码的已删除记录，避免唯一键冲突
         long existingDeletedCount = costSubjectMapper.selectCount(
@@ -246,6 +292,7 @@ public class CostSubjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public List<CostSubjectVO> updateTargetRatios(List<TargetRatio> ratios) {
+        requireCompanyFinanceOperator();
         if (ratios == null || ratios.size() != TargetCostSubjectCatalog.ITEMS.size()) {
             throw new BusinessException("TARGET_COST_RATIO_SET_INVALID", "必须一次提交全部10类目标成本比例");
         }
@@ -288,6 +335,21 @@ public class CostSubjectService {
         }
     }
 
+    private void requireCompanyFinanceOperator() {
+        Integer matches = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM sys_user u
+                JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+                JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
+                WHERE u.tenant_id=? AND u.id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                  AND r.role_code=? AND r.status='ENABLE' AND r.deleted_flag=0
+                """, Integer.class, UserContext.getCurrentTenantId(), UserContext.getCurrentUserId(),
+                SystemRoleContract.COMPANY_FINANCE);
+        if (matches == null || matches == 0) {
+            throw new BusinessException("COST_COMPANY_FINANCE_REQUIRED", "仅公司财务可维护会计科目与成本治理配置");
+        }
+    }
+
     private static void assertGenericStructureEditable(String subjectCode) {
         if (subjectCode != null && (subjectCode.equals(TargetCostSubjectCatalog.PARENT_CODE)
                 || subjectCode.startsWith(TargetCostSubjectCatalog.PARENT_CODE + "."))) {
@@ -314,10 +376,53 @@ public class CostSubjectService {
                 || subjectCode.startsWith(TargetCostSubjectCatalog.PARENT_CODE + "."));
     }
 
-    private void assertNoActiveReferences(Long subjectId, Long tenantId, String action) {
+    private static void validateAccountCategory(String accountCategory) {
+        if (accountCategory == null || accountCategory.isBlank() || !ACCOUNT_CATEGORIES.contains(accountCategory)) {
+            throw new BusinessException("ACCOUNT_CATEGORY_INVALID", "会计科目分类不合法");
+        }
+    }
+
+    private static void assertStandardAccountingSubjectNotCreated(String subjectCode) {
+        if (subjectCode != null && AccountingSubjectCatalog.GOVERNED_CODES.contains(subjectCode)) {
+            throw new BusinessException("ACCOUNTING_SUBJECT_GOVERNED", "系统记账科目已由迁移统一建立");
+        }
+    }
+
+    private static void assertAccountingStructureEditable(String subjectCode) {
+        if (subjectCode != null && AccountingSubjectCatalog.GOVERNED_CODES.contains(subjectCode)) {
+            throw new BusinessException("ACCOUNTING_SUBJECT_GOVERNED", "系统记账科目只允许编辑名称和排序");
+        }
+    }
+
+    private static void assertAccountingMetadataUpdate(CostSubject existing, CostSubject requested) {
+        if (!AccountingSubjectCatalog.GOVERNED_CODES.contains(existing.getSubjectCode())) return;
+        if (!Objects.equals(existing.getSubjectCode(), requested.getSubjectCode())
+                || !Objects.equals(existing.getParentId(), requested.getParentId())
+                || !Objects.equals(existing.getSubjectType(), requested.getSubjectType())
+                || !Objects.equals(existing.getAccountCategory(), requested.getAccountCategory())
+                || !Objects.equals(existing.getStatus(), requested.getStatus())) {
+            throw new BusinessException("ACCOUNTING_SUBJECT_GOVERNED", "系统记账科目只允许编辑名称和排序");
+        }
+    }
+
+    private static boolean changesReferencedStructure(CostSubject existing, CostSubject requested) {
+        return requested.getSubjectCode() != null
+                    && !Objects.equals(existing.getSubjectCode(), requested.getSubjectCode())
+                || requested.getParentId() != null
+                    && !Objects.equals(existing.getParentId(), requested.getParentId())
+                || requested.getSubjectType() != null
+                    && !Objects.equals(existing.getSubjectType(), requested.getSubjectType())
+                || requested.getAccountCategory() != null
+                    && !Objects.equals(existing.getAccountCategory(), requested.getAccountCategory());
+    }
+
+    private void assertNoActiveReferences(CostSubject subject, String action) {
+        Long subjectId = subject.getId();
+        Long tenantId = subject.getTenantId();
         Map<String, Long> referenceCounts = new LinkedHashMap<>();
         referenceCounts.put("成本明细", countReference(
-                "SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+                "SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND (cost_subject_id=? OR original_cost_subject_id=?) AND deleted_flag=0",
+                tenantId, subjectId, subjectId));
         referenceCounts.put("目标成本明细", countReference(
                 "SELECT COUNT(*) FROM cost_target_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
         referenceCounts.put("完工成本预测", countReference(
@@ -330,14 +435,49 @@ public class CostSubjectService {
                 "SELECT COUNT(*) FROM expense_application WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
         referenceCounts.put("结算明细", countReference(
                 "SELECT COUNT(*) FROM stl_settlement_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
-        referenceCounts.put("会计凭证明细", countReference(
-                "SELECT COUNT(*) FROM accounting_entry_line WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        Long accountingLines = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM accounting_entry_line WHERE tenant_id=? AND deleted_flag=0 AND (cost_subject_id=? OR account_code=?)",
+                Long.class, tenantId, subjectId, subject.getSubjectCode());
+        referenceCounts.put("会计凭证明细", accountingLines == null ? 0L : accountingLines);
         referenceCounts.put("V2历史映射", countReference(
-                "SELECT COUNT(*) FROM cost_subject_mapping_item WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)", tenantId, subjectId));
+                "SELECT COUNT(*) FROM cost_subject_mapping_item WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)",
+                tenantId, subjectId, subjectId));
         referenceCounts.put("V2归集规则", countReference(
                 "SELECT COUNT(*) FROM cost_subject_assignment_rule WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
         referenceCounts.put("项目适用范围", countReference(
                 "SELECT COUNT(*) FROM project_cost_subject_scope WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("项目配置历史", countReference(
+                "SELECT COUNT(*) FROM project_cost_subject_scope_history WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("项目配置申请", countReference(
+                "SELECT COUNT(*) FROM cost_project_config_request_line WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("归类冻结快照", countReference(
+                "SELECT COUNT(*) FROM cost_classification_snapshot WHERE tenant_id=? AND (original_cost_subject_id=? OR matched_cost_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("待归类业务", countReference(
+                "SELECT COUNT(*) FROM cost_unclassified_case WHERE tenant_id=? AND original_cost_subject_id=?",
+                tenantId, subjectId));
+        referenceCounts.put("财务归类覆盖", countReference(
+                "SELECT COUNT(*) FROM cost_classification_override WHERE tenant_id=? AND (original_cost_subject_id=? OR matched_cost_subject_id=? OR override_cost_subject_id=?)",
+                tenantId, subjectId, subjectId, subjectId));
+        referenceCounts.put("历史重算明细", countReference(
+                "SELECT COUNT(*) FROM cost_recalculation_line WHERE tenant_id=? AND (old_cost_subject_id=? OR new_cost_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("投标转入申请", countReference(
+                "SELECT COUNT(*) FROM bid_cost_target_transfer_request_line WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("投标转入事实", countReference(
+                "SELECT COUNT(*) FROM bid_cost_target_transfer_line WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("财务分摊申请", countReference(
+                "SELECT COUNT(*) FROM finance_cost_allocation_request WHERE tenant_id=? AND (cost_subject_id=? OR matched_cost_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("财务分摊申请明细", countReference(
+                "SELECT COUNT(*) FROM finance_cost_allocation_request_line WHERE tenant_id=? AND (matched_cost_subject_id=? OR selected_cost_subject_id=?)",
+                tenantId, subjectId, subjectId));
+        referenceCounts.put("间接费分摊规则", countReference(
+                "SELECT COUNT(*) FROM overhead_allocation_rule WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("成本汇总", countReference(
+                "SELECT COUNT(*) FROM cost_summary WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
         referenceCounts.put("质量安全后果", countReference(
                 "SELECT COUNT(*) FROM qs_consequence WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
         referenceCounts.put("财务费用分摊", countReference(
@@ -349,15 +489,11 @@ public class CostSubjectService {
                 .toList();
         if (!references.isEmpty()) {
             throw new BusinessException("COST_SUBJECT_REFERENCED",
-                    "该成本科目被" + String.join("、", references) + "引用，无法" + action);
+                    "该会计科目被" + String.join("、", references) + "引用，无法" + action);
         }
     }
 
-    private long countReference(String sql, Long tenantId, Long subjectId) {
-        int placeholders = sql.length() - sql.replace("?", "").length();
-        Object[] args = placeholders == 3
-                ? new Object[]{tenantId, subjectId, subjectId}
-                : new Object[]{tenantId, subjectId};
+    private long countReference(String sql, Object... args) {
         Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
         return count == null ? 0L : count;
     }
@@ -376,6 +512,53 @@ public class CostSubjectService {
         if (currentId != null) {
             assertParentDoesNotCreateCycle(parentId, currentId);
         }
+    }
+
+    private void validateHierarchyForUpdate(CostSubject requested, CostSubject existing) {
+        Long parentId = requested.getParentId();
+        Long childCount = costSubjectMapper.selectCount(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, existing.getTenantId())
+                .eq(CostSubject::getParentId, existing.getId()));
+        boolean parentChanged = requested.getParentId() != null
+                && !Objects.equals(existing.getParentId(), requested.getParentId());
+        if (childCount > 0 && !Objects.equals(existing.getAccountCategory(), requested.getAccountCategory())) {
+            throw new BusinessException("ACCOUNT_CATEGORY_CHILDREN_MISMATCH", "存在子科目的会计科目不能变更分类");
+        }
+        if (childCount > 0 && parentChanged) {
+            throw new BusinessException("COST_SUBJECT_WITH_CHILDREN_REPARENT_FORBIDDEN", "存在子科目的会计科目不能调整父级");
+        }
+
+        Map<Long, CostSubject> lockedParents = new LinkedHashMap<>();
+        if (parentChanged) {
+            java.util.stream.Stream.of(existing.getParentId(), parentId)
+                    .filter(id -> id != null && id != 0L)
+                    .distinct().sorted()
+                    .forEach(id -> lockedParents.put(id, selectSubjectForUpdate(id)));
+        }
+        if (parentId == null || parentId == 0L) {
+            requested.setParentId(0L);
+            requested.setLevel(1);
+            return;
+        }
+        CostSubject parent = parentChanged ? lockedParents.get(parentId) : costSubjectMapper.selectById(parentId);
+        if (parent == null || !Objects.equals(parent.getTenantId(), existing.getTenantId())) {
+            throw new BusinessException("PARENT_NOT_FOUND", "父科目不存在");
+        }
+        if (parentChanged) {
+            Long newParentChildCount = costSubjectMapper.selectCount(new LambdaQueryWrapper<CostSubject>()
+                    .eq(CostSubject::getTenantId, existing.getTenantId())
+                    .eq(CostSubject::getParentId, parentId));
+            if (newParentChildCount == 0) {
+                assertNoActiveReferences(parent, "新增子科目");
+            }
+        }
+        boolean historicalRelationshipUnchanged = Objects.equals(existing.getParentId(), parentId)
+                && Objects.equals(existing.getAccountCategory(), requested.getAccountCategory());
+        if (!historicalRelationshipUnchanged
+                && !Objects.equals(parent.getAccountCategory(), requested.getAccountCategory())) {
+            throw new BusinessException("ACCOUNT_CATEGORY_PARENT_MISMATCH", "子科目分类必须与父科目一致");
+        }
+        requested.setLevel(parent.getLevel() + 1);
     }
 
     private void assertParentDoesNotCreateCycle(Long parentId, Long currentId) {

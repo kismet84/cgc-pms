@@ -1,6 +1,7 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.requisition.entity.MatRequisition;
@@ -29,6 +30,7 @@ public class MaterialRequisitionCostStrategy implements CostGenerationStrategy {
     private final MatRequisitionItemMapper requisitionItemMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -44,13 +46,17 @@ public class MaterialRequisitionCostStrategy implements CostGenerationStrategy {
                 new LambdaQueryWrapper<MatRequisitionItem>()
                         .eq(MatRequisitionItem::getTenantId, requisition.getTenantId())
                         .eq(MatRequisitionItem::getRequisitionId, requisitionId));
-        Long subjectId = costSubjectResolver.resolveDefaultSubjectId(requisition.getTenantId(), "材料");
         LocalDate costDate = requisition.getRequisitionDate() != null
                 ? requisition.getRequisitionDate() : LocalDate.now();
+        accountingPeriodGuard.assertWritable(costDate);
         for (MatRequisitionItem item : items) {
             if (nvl(item.getAmount()).signum() <= 0) continue;
             if (item.getWbsTaskId() == null) {
                 throw new IllegalStateException("领料明细未关联WBS任务，禁止生成成本 itemId=" + item.getId());
+            }
+            if (costSubjectResolver.costFactExists(requisition.getTenantId(), "MAT_REQUISITION",
+                    requisitionId, item.getId(), "MATERIAL")) {
+                continue;
             }
             CostItem cost = new CostItem();
             cost.setTenantId(requisition.getTenantId());
@@ -59,7 +65,11 @@ public class MaterialRequisitionCostStrategy implements CostGenerationStrategy {
             cost.setContractId(requisition.getContractId());
             cost.setPartnerId(requisition.getPartnerId());
             cost.setCostType("MATERIAL");
-            cost.setCostSubjectId(subjectId);
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    requisition.getTenantId(), requisition.getProjectId(), "MAT_REQUISITION",
+                    "*", requisitionId, item.getId(), null, costDate);
+            applyDecision(cost, decision);
+            cost.setClassificationBusinessCategory("*");
             cost.setAmount(nvl(item.getAmount()));
             cost.setTaxAmount(BigDecimal.ZERO);
             cost.setAmountWithoutTax(nvl(item.getAmount()));
@@ -71,9 +81,21 @@ public class MaterialRequisitionCostStrategy implements CostGenerationStrategy {
             cost.setGeneratedFlag(1);
             try {
                 costItemMapper.insert(cost);
+                costSubjectResolver.markSnapshotPosted(decision);
             } catch (DuplicateKeyException ignored) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 log.info("领料成本已存在，跳过 requisitionId={}, itemId={}", requisitionId, item.getId());
             }
         }
+    }
+
+    private static void applyDecision(CostItem cost, CostSubjectResolver.Decision decision) {
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
     }
 }

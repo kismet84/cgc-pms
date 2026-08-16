@@ -4,6 +4,8 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
+import com.cgcpms.cost.entity.CostSubject;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,6 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CollectionRecordEntryGenerationStrategy implements EntryGenerationStrategy {
     private final JdbcTemplate jdbc;
+    private final AccountingSubjectResolver subjectResolver;
 
     @Override public String supportSourceType() { return "COLLECTION_RECORD"; }
 
@@ -46,11 +49,19 @@ public class CollectionRecordEntryGenerationStrategy implements EntryGenerationS
         entry.setContractId(((Number) record.get("contract_id")).longValue());
         entry.setCollectionRecordId(sourceId);
 
-        AccountingEntryLine debit = line("DEBIT", "1002-BANK-" + record.get("fund_account_id"), "银行存款", amount, "项目回款：" + record.get("external_txn_no"));
+        CostSubject bankSubject = subjectResolver.require(AccountingSubjectCatalog.BANK, "ASSET");
+        AccountingEntryLine debit = line("DEBIT", bankSubject.getSubjectCode() + "-" + record.get("fund_account_id"),
+                bankSubject.getSubjectName(), amount, "项目回款：" + record.get("external_txn_no"));
         java.util.ArrayList<AccountingEntryLine> lines = new java.util.ArrayList<>();
         lines.add(debit);
-        if (allocated.signum() > 0) lines.add(line("CREDIT", "1122-AR", "应收账款", allocated, "核销项目应收"));
-        if (unallocated.signum() > 0) lines.add(line("CREDIT", "2203-ADVANCE", "预收账款", unallocated, "未分配项目回款"));
+        if (allocated.signum() > 0) {
+            CostSubject receivable = subjectResolver.require(AccountingSubjectCatalog.RECEIVABLE, "ASSET");
+            lines.add(line("CREDIT", receivable.getSubjectCode(), receivable.getSubjectName(), allocated, "核销项目应收"));
+        }
+        if (unallocated.signum() > 0) {
+            CostSubject advanceReceipt = subjectResolver.require(AccountingSubjectCatalog.ADVANCE_RECEIPT, "LIABILITY");
+            lines.add(line("CREDIT", advanceReceipt.getSubjectCode(), advanceReceipt.getSubjectName(), unallocated, "未分配项目回款"));
+        }
         entry.setLines(lines);
         return entry;
     }

@@ -36,6 +36,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CostLedgerService {
 
+    private static final String CLASSIFIED_COST_SUBJECT = """
+            COALESCE(classification_status,'UNCLASSIFIED')<>'UNCLASSIFIED'
+            AND EXISTS (SELECT 1 FROM cost_subject cs
+                        WHERE cs.tenant_id=cost_item.tenant_id
+                          AND cs.id=cost_item.cost_subject_id
+                          AND cs.account_category='COST')
+            """;
+    private static final String ACTUAL_COST_FACT = "recognition_role='ACTUAL' "
+            + "AND cost_status IN ('CONFIRMED','POSTED') AND " + CLASSIFIED_COST_SUBJECT;
+
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
@@ -83,8 +93,13 @@ public class CostLedgerService {
         QueryWrapper<CostItem> totalWrapper = buildSummaryFilterWrapper(
                 projectId, contractId, partnerId, costSubjectId,
                 costType, sourceType, costStatus, startDate, endDate, keyword);
-        totalWrapper.select("COALESCE(SUM(amount), 0) AS total_amount",
-                "COALESCE(SUM(tax_amount), 0) AS total_tax_amount");
+        totalWrapper.select(
+                "COALESCE(SUM(CASE WHEN " + ACTUAL_COST_FACT + " THEN amount ELSE 0 END),0) AS total_amount",
+                "COALESCE(SUM(CASE WHEN " + ACTUAL_COST_FACT + " THEN tax_amount ELSE 0 END),0) AS total_tax_amount",
+                "COALESCE(SUM(CASE WHEN recognition_role='COMMITTED' AND cost_status IN ('CONFIRMED','POSTED') AND "
+                        + CLASSIFIED_COST_SUBJECT + " THEN amount ELSE 0 END),0) AS committed_amount",
+                "COALESCE(SUM(CASE WHEN recognition_role='NON_COST' AND cost_status IN ('CONFIRMED','POSTED') "
+                        + "THEN amount ELSE 0 END),0) AS non_cost_amount");
         Map<String, Object> totalRow = firstMap(costItemMapper.selectMaps(totalWrapper));
 
         Map<String, BigDecimal> bySourceType = selectGroupedAmounts(
@@ -114,6 +129,8 @@ public class CostLedgerService {
         CostLedgerSummaryVO summary = new CostLedgerSummaryVO();
         summary.setTotalAmount(toBigDecimal(totalRow, "totalAmount", "total_amount").toPlainString());
         summary.setTotalTaxAmount(toBigDecimal(totalRow, "totalTaxAmount", "total_tax_amount").toPlainString());
+        summary.setCommittedAmount(toBigDecimal(totalRow, "committedAmount", "committed_amount").toPlainString());
+        summary.setNonCostAmount(toBigDecimal(totalRow, "nonCostAmount", "non_cost_amount").toPlainString());
         summary.setBySourceType(convertToStringMap(bySourceType));
         summary.setByProject(convertToStringMap(byProject));
         summary.setByCostType(convertToStringMap(byCostType));
@@ -252,6 +269,7 @@ public class CostLedgerService {
         QueryWrapper<CostItem> wrapper = buildSummaryFilterWrapper(
                 projectId, contractId, partnerId, costSubjectId,
                 costType, sourceType, costStatus, startDate, endDate, keyword);
+        wrapper.apply(ACTUAL_COST_FACT);
         wrapper.select(groupExpression + " AS group_key", "COALESCE(SUM(amount), 0) AS total_amount")
                 .groupBy(groupExpression);
         Map<String, BigDecimal> result = new LinkedHashMap<>();
@@ -356,6 +374,8 @@ public class CostLedgerService {
         vo.setAmount(item.getAmount() != null ? item.getAmount().toPlainString() : null);
         vo.setTaxAmount(item.getTaxAmount() != null ? item.getTaxAmount().toPlainString() : null);
         vo.setAmountWithoutTax(item.getAmountWithoutTax() != null ? item.getAmountWithoutTax().toPlainString() : null);
+        vo.setClassificationStatus(item.getClassificationStatus());
+        vo.setRecognitionRole(item.getRecognitionRole());
         vo.setSourceType(item.getSourceType());
         vo.setSourceId(item.getSourceId() != null ? item.getSourceId().toString() : null);
         vo.setSourceItemId(item.getSourceItemId() != null ? item.getSourceItemId().toString() : null);

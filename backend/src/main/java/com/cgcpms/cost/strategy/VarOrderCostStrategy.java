@@ -1,6 +1,7 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.variation.entity.VarOrder;
@@ -37,6 +38,7 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
     private final VarOrderItemMapper varOrderItemMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -63,8 +65,13 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
         }
 
         LocalDate today = LocalDate.now();
+        accountingPeriodGuard.assertWritable(today);
         int generated = 0;
         for (VarOrderItem item : items) {
+            if (costSubjectResolver.costFactExists(varOrder.getTenantId(), SOURCE_TYPE,
+                    varOrderId, item.getId(), COST_TYPE)) {
+                continue;
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(varOrder.getTenantId());
             cost.setOrgId(null);
@@ -73,11 +80,11 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
             cost.setContractId(varOrder.getContractId());
             cost.setPartnerId(varOrder.getPartnerId());
             cost.setCostType(COST_TYPE);
-            // 优先使用明细中的 costSubjectId，为空时通过 Resolver 统一解析
-            cost.setCostSubjectId(
-                    item.getCostSubjectId() != null
-                            ? item.getCostSubjectId()
-                            : costSubjectResolver.resolveDefaultSubjectId(varOrder.getTenantId(), "变更"));
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    varOrder.getTenantId(), varOrder.getProjectId(), SOURCE_TYPE,
+                    "*", varOrderId, item.getId(), item.getCostSubjectId(), today);
+            applyDecision(cost, decision);
+            cost.setClassificationBusinessCategory("*");
             cost.setAmount(nvl(item.getAmount()));
             // Source item does not provide tax breakdown; assume full amount without tax
             cost.setTaxAmount(BigDecimal.ZERO);
@@ -91,8 +98,10 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
 
             try {
                 costItemMapper.insert(cost);
+                costSubjectResolver.markSnapshotPosted(decision);
                 generated++;
             } catch (DuplicateKeyException e) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 log.info("成本已存在，跳过 varOrderId={}, itemId={}", varOrderId, item.getId());
             }
         }
@@ -102,6 +111,16 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
         varOrderMapper.updateById(varOrder);
 
         log.info("生成变更成本完成 varOrderId={}, 明细数={}, 新增={}", varOrderId, items.size(), generated);
+    }
+
+    private static void applyDecision(CostItem cost, CostSubjectResolver.Decision decision) {
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
     }
 
 }

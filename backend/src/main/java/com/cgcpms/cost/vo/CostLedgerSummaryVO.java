@@ -9,11 +9,17 @@ import java.util.Map;
  */
 @Data
 public class CostLedgerSummaryVO {
-    /** Total cost amount across all matching items */
+    /** Actual cost amount across matching classified COST facts. */
     private String totalAmount;
 
-    /** Total tax amount across all matching items */
+    /** Actual cost tax amount across matching classified COST facts. */
     private String totalTaxAmount;
+
+    /** Committed COST amount, kept separate from actual cost. */
+    private String committedAmount;
+
+    /** Non-cost fact amount, exposed for reconciliation only. */
+    private String nonCostAmount;
 
     /** Aggregated amount by source type, e.g. "CT_CONTRACT" -> "123456.78" */
     private Map<String, String> bySourceType;

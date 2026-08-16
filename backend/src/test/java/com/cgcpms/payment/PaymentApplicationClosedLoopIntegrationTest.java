@@ -143,6 +143,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 anyString(), nullable(String.class), anyString(), anyString());
         setContext();
         hardCleanup();
+        seedAccountingSubjects();
         seedBusinessContext();
         doAnswer(invocation -> {
             WfInstance instance = new WfInstance();
@@ -1316,6 +1317,26 @@ class PaymentApplicationClosedLoopIntegrationTest {
         fundAccountMapper.insert(account);
     }
 
+    private void seedAccountingSubjects() {
+        Object[][] subjects = {
+                {98300120L, "1002-BANK", "银行存款", "ASSET", 10},
+                {98300121L, "1122-AR", "应收账款", "ASSET", 20},
+                {98300122L, "1123-PREPAY", "预付账款", "ASSET", 30},
+                {98300123L, "2202-AP", "应付账款", "LIABILITY", 40},
+                {98300124L, "2203-ADVANCE", "预收账款", "LIABILITY", 50}
+        };
+        for (Object[] subject : subjects) {
+            jdbcTemplate.update("""
+                    INSERT INTO cost_subject
+                      (id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,
+                       level,sort_order,status,remark,created_at,updated_at,deleted_flag)
+                    SELECT ?,0,0,?,?, 'GENERAL_LEDGER',?,1,?,'ENABLE','PAYMENT_CLOSED_LOOP_FIXTURE',
+                           CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                    WHERE NOT EXISTS(SELECT 1 FROM cost_subject WHERE tenant_id=0 AND subject_code=? AND deleted_flag=0)
+                    """, subject[0], subject[1], subject[2], subject[3], subject[4], subject[1]);
+        }
+    }
+
     private void attach(String businessType, Long businessId) {
         attachCashJournal(businessId, switch (businessType) {
             case "INVOICE" -> "ELECTRONIC_INVOICE";
@@ -1445,5 +1466,6 @@ class PaymentApplicationClosedLoopIntegrationTest {
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM md_partner WHERE id = ?", PARTNER_ID);
         jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", SUBJECT_ID);
+        jdbcTemplate.update("DELETE FROM cost_subject WHERE remark = 'PAYMENT_CLOSED_LOOP_FIXTURE'");
     }
 }

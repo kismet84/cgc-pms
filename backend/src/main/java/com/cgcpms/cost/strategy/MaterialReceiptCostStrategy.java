@@ -3,6 +3,7 @@ package com.cgcpms.cost.strategy;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
@@ -36,6 +37,7 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
     private final MatReceiptItemMapper matReceiptItemMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -62,23 +64,30 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
         }
 
         LocalDate costDate = receipt.getReceiptDate() != null ? receipt.getReceiptDate() : LocalDate.now();
-
-        // Resolve default cost subject for MATERIAL type
-        Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(receipt.getTenantId(), "材料");
+        accountingPeriodGuard.assertWritable(costDate);
 
         int generated = 0;
         for (MatReceiptItem item : items) {
             if (nvl(item.getAmount()).signum() <= 0) {
                 continue;
             }
+            if (costSubjectResolver.costFactExists(receipt.getTenantId(), SOURCE_TYPE,
+                    receiptId, item.getId(), COST_TYPE)) {
+                continue;
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(receipt.getTenantId());
             cost.setOrgId(null);
             cost.setProjectId(receipt.getProjectId());
+            cost.setWbsTaskId(item.getWbsTaskId());
             cost.setContractId(receipt.getContractId());
             cost.setPartnerId(receipt.getPartnerId());
             cost.setCostType(COST_TYPE);
-            cost.setCostSubjectId(defaultSubjectId);
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    receipt.getTenantId(), receipt.getProjectId(), SOURCE_TYPE,
+                    receipt.getReceiptMode(), receiptId, item.getId(), null, costDate);
+            applyDecision(cost, decision);
+            cost.setClassificationBusinessCategory(receipt.getReceiptMode());
             cost.setAmount(nvl(item.getAmount()));
             // Source item does not provide tax breakdown; assume full amount without tax
             cost.setTaxAmount(BigDecimal.ZERO);
@@ -92,8 +101,10 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
 
             try {
                 costItemMapper.insert(cost);
+                costSubjectResolver.markSnapshotPosted(decision);
                 generated++;
             } catch (DuplicateKeyException e) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 log.info("成本已存在，跳过 receiptId={}, itemId={}", receiptId, item.getId());
             }
         }
@@ -103,6 +114,16 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
         matReceiptMapper.updateById(receipt);
 
         log.info("生成材料成本完成 receiptId={}, 明细数={}, 新增={}", receiptId, items.size(), generated);
+    }
+
+    private static void applyDecision(CostItem cost, CostSubjectResolver.Decision decision) {
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
     }
 
 }

@@ -1,5 +1,6 @@
 package com.cgcpms.quality.service;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
@@ -11,6 +12,7 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostSubjectV2Service;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -67,9 +69,11 @@ public class QualitySafetyService {
     private final SysFileMapper fileMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectV2Service costSubjectV2Service;
+    private final CostSubjectResolver costSubjectResolver;
     private final BusinessCodeGenerator businessCodeGenerator;
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     public List<QualityInspectionPlan> listPlans(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询质量安全检查计划");
@@ -758,7 +762,19 @@ public class QualitySafetyService {
         cost.setPartnerId(consequence.getPartnerId());
         QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
         cost.setWbsTaskId(requireInspection(issue.getInspectionId()).getWbsTaskId());
-        cost.setCostSubjectId(requireConsequenceCostSubject(consequence));
+        Long originalSubjectId = requireConsequenceCostSubject(consequence);
+        LocalDate costDate = LocalDate.now();
+        CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                tenantId(), consequence.getProjectId(), SOURCE_TYPE, issue.getIssueType(),
+                consequence.getId(), 0L, originalSubjectId, costDate);
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setClassificationBusinessCategory(issue.getIssueType());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
         cost.setCostType(COST_TYPE);
         cost.setAmount(consequence.getReworkCostAmount());
         cost.setTaxAmount(BigDecimal.ZERO);
@@ -766,18 +782,23 @@ public class QualitySafetyService {
         cost.setSourceType(SOURCE_TYPE);
         cost.setSourceId(consequence.getId());
         cost.setSourceItemId(0L);
-        cost.setCostDate(LocalDate.now());
+        accountingPeriodGuard.assertWritable(costDate);
+        cost.setCostDate(costDate);
         cost.setCostStatus("CONFIRMED");
         cost.setGeneratedFlag(1);
         cost.setRemark("质量安全问题返工成本，问题单=" + consequence.getIssueId());
         try {
             costItemMapper.insert(cost);
+            costSubjectResolver.markSnapshotPosted(decision);
             return cost.getId();
         } catch (DuplicateKeyException e) {
             existing = first(costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
                     .eq(CostItem::getTenantId, tenantId()).eq(CostItem::getSourceType, SOURCE_TYPE)
                     .eq(CostItem::getSourceId, consequence.getId()).eq(CostItem::getSourceItemId, 0L)));
-            if (existing != null) return existing.getId();
+            if (existing != null) {
+                costSubjectResolver.markSnapshotPosted(decision);
+                return existing.getId();
+            }
             throw e;
         }
     }

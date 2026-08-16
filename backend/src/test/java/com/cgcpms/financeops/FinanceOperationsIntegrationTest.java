@@ -58,6 +58,7 @@ class FinanceOperationsIntegrationTest {
 
     @Test
     void p1BudgetScheduleAlertAndReconciliationAreExecutable() {
+        assertEquals(2, ((List<?>) operations.formOptions(PROJECT).get("contracts")).size());
         var adjusted=operations.adjustBudget(new BudgetAdjustmentRequest(LINE1,new BigDecimal("100"),"追加人工费","IT-ADJUST"));
         assertEquals("ADJUST",adjusted.get("operation_type"));
         operations.transferBudget(new BudgetTransferRequest(LINE1,LINE2,new BigDecimal("50"),"调拨材料费","IT-TRANSFER"));

@@ -39,6 +39,16 @@ export interface CashForecastCycleRecord {
   previousCycleId?: string | null;
   sourceCutoffAt?: string | null;
 }
+export interface CashForecastCycleCommand {
+  projectId: string;
+  forecastName: string;
+  asOfDate: string;
+  horizonStart: string;
+  horizonEnd: string;
+  scenario: "BASE" | "OPTIMISTIC" | "CONSERVATIVE";
+  openingBalance: FinanceDecimalString;
+  previousCycleId?: string;
+}
 export interface CashForecastLineRecord {
   id: string;
   cycleId: string;
@@ -110,6 +120,10 @@ export interface FinancePeriodRecord {
   reopenedAt?: string | null;
   reopenReason?: string | null;
   version: number;
+}
+export interface FinancePeriodCommand {
+  fiscalYear: number;
+  fiscalMonth: number;
 }
 export interface PeriodCheckRecord {
   id: string;

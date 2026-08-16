@@ -1,6 +1,7 @@
 import {
   FINANCE_API,
   type CollectionCommand,
+  type CollectionScheduleCommand,
   type CollectionRecord,
   type ContractRevenuePage,
   type OwnerSettlementCommand,
@@ -49,6 +50,8 @@ export const confirmSalesInvoice = (id: string, allocations: SalesInvoiceCommand
   })
 export const createCollection = (body: CollectionCommand) =>
   apiRequest<CollectionRecord>(FINANCE_API.revenueCollections, { method: 'POST', body })
+export const createCollectionSchedule = (body: CollectionScheduleCommand) =>
+  apiRequest<void>(FINANCE_API.revenueSchedules, { method: 'POST', body })
 export const confirmCollection = (
   id: string,
   allocations: NonNullable<CollectionCommand['allocations']>,

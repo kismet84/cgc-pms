@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Handles submit and resubmit workflow operations.
@@ -23,6 +24,21 @@ import java.util.List;
 public class WorkflowSubmitService {
 
     private static final ObjectMapper POLICY_MAPPER = new ObjectMapper();
+    private static final String COST_GOVERNANCE_ROUTE = "COST_GOVERNANCE";
+    private static final Set<String> COST_GOVERNANCE_TYPES = Set.of(
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_RULE_PLAN,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_PROJECT_CONFIG,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_RECALCULATION,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_REVERSAL);
+    private static final Set<String> FINANCE_SAFE_RESUBMIT_TYPES = Set.of(
+            com.cgcpms.workflow.WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER,
+            com.cgcpms.workflow.WorkflowBusinessTypes.FINANCE_COST_ALLOCATION,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_RULE_PLAN,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_PROJECT_CONFIG,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_RECALCULATION,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT,
+            com.cgcpms.workflow.WorkflowBusinessTypes.COST_REVERSAL);
 
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
@@ -168,6 +184,17 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.QS_CONSEQUENCE);
     }
 
+    public WfInstance submitCostGovernance(Long userId, String username, Long tenantId,
+                                            String businessType, Long businessId, String title,
+                                            java.math.BigDecimal amount, Long projectId, Long contractId,
+                                            String businessSummary, String variables, List<Long> ccUserIds) {
+        if (!COST_GOVERNANCE_TYPES.contains(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "成本治理专用提交不支持该业务类型");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds, COST_GOVERNANCE_ROUTE);
+    }
+
     private WfInstance submitProtected(Long userId, String username, Long tenantId,
                                        String businessType, Long businessId, String title,
                                        java.math.BigDecimal amount, Long projectId, Long contractId,
@@ -206,9 +233,11 @@ public class WorkflowSubmitService {
         WfTemplate template = core.findTemplate(businessType, tenantId, amount, businessId,
                 businessAccess.getContractId());
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(businessType, templateNodes, POLICY_MAPPER);
         WorkflowSecurityPolicy policy = template.getConditionRule() == null || template.getConditionRule().isBlank()
                 ? WorkflowSecurityPolicy.legacy()
                 : WorkflowSecurityPolicy.parse(POLICY_MAPPER, template.getConditionRule());
+        policy = WorkflowSecurityPolicy.enforceBusinessMinimum(businessType, policy);
         core.validateApproverPlan(templateNodes, tenantId, businessAccess.getProjectId(), userId, policy);
 
         // Create instance
@@ -332,6 +361,10 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.QS_CONSEQUENCE);
     }
 
+    public WfInstance resubmitCostGovernance(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username, COST_GOVERNANCE_ROUTE);
+    }
+
     private WfInstance resubmit(Long instanceId, Long userId, String username,
                                 String dedicatedBusinessType) {
 
@@ -345,7 +378,8 @@ public class WorkflowSubmitService {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
         rejectGenericProtectedRoute(instance.getBusinessType(), dedicatedBusinessType);
-        if (dedicatedBusinessType != null && !dedicatedBusinessType.equals(instance.getBusinessType())) {
+        if (dedicatedBusinessType != null
+                && !isDedicatedRoute(instance.getBusinessType(), dedicatedBusinessType)) {
             throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "专用重提业务类型不匹配");
         }
         if (!WorkflowConstants.INSTANCE_REJECTED.equals(instance.getInstanceStatus())
@@ -368,19 +402,36 @@ public class WorkflowSubmitService {
         // Cancel any stale pending tasks from previous rounds
         core.cancelAllPendingTasks(instanceId);
 
-        // Clone the submitted snapshot; template edits affect new instances only.
-        List<WfNodeInstance> previousNodes = wfNodeInstanceMapper.selectList(
-                new LambdaQueryWrapper<WfNodeInstance>()
-                        .eq(WfNodeInstance::getInstanceId, instanceId)
-                        .eq(WfNodeInstance::getRoundNo, newRound - 1)
-                        .orderByAsc(WfNodeInstance::getNodeOrder));
-        if (previousNodes.isEmpty()) {
-            throw new BusinessException("WORKFLOW_SNAPSHOT_MISSING", "审批实例缺少节点快照，无法重提");
+        List<WfNodeInstance> newNodes;
+        if (FINANCE_SAFE_RESUBMIT_TYPES.contains(instance.getBusinessType())) {
+            WfTemplate safeTemplate = core.findTemplate(instance.getBusinessType(), instance.getTenantId(),
+                    instance.getAmount(), instance.getBusinessId(), instance.getContractId());
+            List<WfTemplateNode> templateNodes = core.findTemplateNodes(safeTemplate.getId());
+            WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                    instance.getBusinessType(), templateNodes, POLICY_MAPPER);
+            WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
+                    POLICY_MAPPER, safeTemplate.getConditionRule());
+            policy = WorkflowSecurityPolicy.enforceBusinessMinimum(instance.getBusinessType(), policy);
+            core.validateApproverPlan(templateNodes, instance.getTenantId(), instance.getProjectId(), userId, policy);
+            instance.setTemplateId(safeTemplate.getId());
+            instance.setSecurityPolicyJson(policy.toCanonicalJson(POLICY_MAPPER));
+            wfInstanceMapper.updateById(instance);
+            newNodes = createNodeInstances(templateNodes, instanceId, instance.getTenantId(), newRound);
+        } else {
+            // Other businesses preserve their submitted workflow snapshot across resubmission.
+            List<WfNodeInstance> previousNodes = wfNodeInstanceMapper.selectList(
+                    new LambdaQueryWrapper<WfNodeInstance>()
+                            .eq(WfNodeInstance::getInstanceId, instanceId)
+                            .eq(WfNodeInstance::getRoundNo, newRound - 1)
+                            .orderByAsc(WfNodeInstance::getNodeOrder));
+            if (previousNodes.isEmpty()) {
+                throw new BusinessException("WORKFLOW_SNAPSHOT_MISSING", "审批实例缺少节点快照，无法重提");
+            }
+            WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
+                    POLICY_MAPPER, instance.getSecurityPolicyJson());
+            core.validateApproverSnapshots(previousNodes, instance.getTenantId(), instance.getProjectId(), userId, policy);
+            newNodes = cloneNodeInstances(previousNodes, instanceId, instance.getTenantId(), newRound);
         }
-        WorkflowSecurityPolicy policy = WorkflowSecurityPolicy.parseOrLegacy(
-                POLICY_MAPPER, instance.getSecurityPolicyJson());
-        core.validateApproverSnapshots(previousNodes, instance.getTenantId(), instance.getProjectId(), userId, policy);
-        List<WfNodeInstance> newNodes = cloneNodeInstances(previousNodes, instanceId, instance.getTenantId(), newRound);
 
         // Activate the first node of the new round
         WfNodeInstance firstNode = newNodes.get(0);
@@ -400,6 +451,11 @@ public class WorkflowSubmitService {
     }
 
     private void rejectGenericProtectedRoute(String businessType, String dedicatedBusinessType) {
+        if (COST_GOVERNANCE_TYPES.contains(businessType)
+                && !isDedicatedRoute(businessType, dedicatedBusinessType)) {
+            throw new BusinessException("COST_GOVERNANCE_DEDICATED_SUBMIT_REQUIRED",
+                    "成本治理业务必须通过专用业务入口提交或重提");
+        }
         if ((com.cgcpms.workflow.WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER.equals(businessType)
                 || com.cgcpms.workflow.WorkflowBusinessTypes.FINANCE_COST_ALLOCATION.equals(businessType)
                 || com.cgcpms.workflow.WorkflowBusinessTypes.QS_RECTIFICATION.equals(businessType)
@@ -433,6 +489,12 @@ public class WorkflowSubmitService {
             throw new BusinessException("PRODUCTION_MEASUREMENT_DEDICATED_SUBMIT_REQUIRED",
                     "产值计量必须通过专用接口提交");
         }
+    }
+
+    private boolean isDedicatedRoute(String businessType, String dedicatedBusinessType) {
+        return businessType.equals(dedicatedBusinessType)
+                || (COST_GOVERNANCE_ROUTE.equals(dedicatedBusinessType)
+                && COST_GOVERNANCE_TYPES.contains(businessType));
     }
 
     // ──────────────────────── Extracted helpers ────────────────────────

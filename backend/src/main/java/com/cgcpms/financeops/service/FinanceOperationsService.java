@@ -144,6 +144,17 @@ public class FinanceOperationsService {
         return Map.of("projectId", projectId, "versions", versions, "lines", lines);
     }
 
+    public Map<String,Object> formOptions(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "读取资金运营表单选项");
+        return Map.of("contracts", jdbc.queryForList("""
+                SELECT id,contract_code contractCode,contract_name contractName,contract_type contractType
+                FROM ct_contract
+                WHERE tenant_id=? AND project_id=? AND approval_status='APPROVED'
+                  AND contract_status IN ('PERFORMING','SETTLED') AND deleted_flag=0
+                ORDER BY contract_code,id
+                """, tenant(), projectId));
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSchedule(PaymentScheduleRequest request) {
         projectAccessChecker.checkAccess(request.projectId(), "维护付款计划");

@@ -4,7 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { V2Input, V2StatusToggle } from '@/components'
+import type { Component } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { V2Input, V2Select, V2StatusToggle } from '@/components'
 import CostSubjectRulesPage from '@/pages/master-data/cost-subject/CostSubjectRulesPage.vue'
 import CostSubjectScopePage from '@/pages/master-data/cost-subject/CostSubjectScopePage.vue'
 import CostSubjectTaxonomyPage from '@/pages/master-data/cost-subject/CostSubjectTaxonomyPage.vue'
@@ -13,13 +15,24 @@ import * as costSubject from '@/services/cost-subject'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/cost-subject', () => ({
+  cancelBidTransferRequest: vi.fn(),
+  cancelFinanceAllocationRequest: vi.fn(),
+  cancelProjectConfigRequest: vi.fn(),
   activateMappingVersion: vi.fn(),
+  cancelRecalculationBatch: vi.fn(),
   createAssignmentRule: vi.fn(),
   createBidTransferRequest: vi.fn(),
   createCostSubject: vi.fn(),
   createFinanceAllocationRequest: vi.fn(),
   createMappingVersion: vi.fn(),
+  createOverheadAllocationRule: vi.fn(),
+  createProjectConfigRequest: vi.fn(),
+  createRecalculationBatch: vi.fn(),
+  createReversalRequest: vi.fn(),
   deleteCostSubject: vi.fn(),
+  diffRulePlan: vi.fn(),
+  generateInitialRulePlan: vi.fn(),
+  executeOverheadAllocation: vi.fn(),
   loadAssignmentRules: vi.fn(),
   loadBidTransfers: vi.fn(),
   loadBidTransferRequests: vi.fn(),
@@ -28,20 +41,44 @@ vi.mock('@/services/cost-subject', () => ({
   loadCostSubjectTree: vi.fn(),
   loadFinanceAllocations: vi.fn(),
   loadFinanceAllocationRequests: vi.fn(),
+  loadGovernanceFormOptions: vi.fn(),
   loadMappingVersions: vi.fn(),
+  loadOverheadAllocationRules: vi.fn(),
+  loadProjectConfiguration: vi.fn(),
   loadProjectScopes: vi.fn(),
+  loadRecalculationBatches: vi.fn(),
+  loadReversalRequests: vi.fn(),
   loadSubjectImpact: vi.fn(),
+  overrideClassification: vi.fn(),
   reverseBidTransfer: vi.fn(),
   reverseFinanceAllocation: vi.fn(),
   saveProjectScope: vi.fn(),
   submitBidTransferRequest: vi.fn(),
   submitFinanceAllocationRequest: vi.fn(),
+  submitProjectConfigRequest: vi.fn(),
+  submitRecalculationBatch: vi.fn(),
+  submitReversalRequest: vi.fn(),
+  submitRulePlan: vi.fn(),
+  setOverheadAllocationRuleStatus: vi.fn(),
   toggleCostSubjectStatus: vi.fn(),
   updateCostSubject: vi.fn(),
+  updateOverheadAllocationRule: vi.fn(),
+  trialRulePlan: vi.fn(),
+  validateRulePlan: vi.fn(),
 }))
 
 function user(permissions: string[]): UserInfo {
   return { tenantId: '1001', userId: '7', username: 'cost.user', roles: ['USER'], permissions }
+}
+
+async function mountRouted(component: Component) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component }],
+  })
+  await router.push('/')
+  await router.isReady()
+  return mount(component, { global: { plugins: [router] } })
 }
 
 beforeEach(() => {
@@ -124,6 +161,18 @@ beforeEach(() => {
         },
       ],
     },
+    {
+      id: '2',
+      parentId: '0',
+      subjectCode: '1122-AR',
+      subjectName: '应收账款',
+      subjectType: 'GENERAL_LEDGER',
+      accountCategory: 'ASSET',
+      level: 1,
+      sortOrder: 20,
+      status: 'ENABLE',
+      children: [],
+    },
   ])
   vi.mocked(costSubject.loadMappingVersions).mockResolvedValue([
     {
@@ -181,6 +230,55 @@ beforeEach(() => {
     },
   ])
   vi.mocked(costSubject.loadFinanceAllocations).mockResolvedValue([])
+  vi.mocked(costSubject.loadRecalculationBatches).mockResolvedValue([])
+  vi.mocked(costSubject.loadReversalRequests).mockResolvedValue([])
+  vi.mocked(costSubject.loadGovernanceFormOptions).mockResolvedValue({
+    projects: [
+      {
+        id: 'P-1',
+        projectCode: 'XM-001',
+        projectName: '服务端项目',
+        projectStatus: 'ACTIVE',
+      },
+    ],
+    costSubjects: [
+      {
+        id: '111',
+        subjectCode: '5401.04.19',
+        subjectName: '财务费用',
+        subjectType: 'FINANCE',
+        status: 'ENABLE',
+      },
+      {
+        id: '112',
+        subjectCode: '5401.04.20',
+        subjectName: '项目间接费',
+        subjectType: 'OVERHEAD',
+        status: 'ENABLE',
+        overheadRuleStatus: 'DISABLE',
+      },
+    ],
+    rulePlans: [],
+    bidCosts: [],
+    targetVersions: [],
+    financeSources: [],
+    pendingClassifications: [],
+  })
+  vi.mocked(costSubject.loadProjectConfiguration).mockResolvedValue({
+    project: {
+      id: 'P-1',
+      projectCode: 'XM-001',
+      projectName: '服务端项目',
+      projectStatus: 'ACTIVE',
+      mainContractCode: 'HT-001',
+      mainContractName: '主合同',
+      targetVersionNo: 'V1',
+      targetVersionName: '首版目标成本',
+      targetAmount: '1000',
+    },
+    subjects: [],
+    requests: [],
+  })
   vi.mocked(costSubject.loadFinanceAllocationRequests).mockResolvedValue([
     {
       id: '51',
@@ -201,6 +299,31 @@ beforeEach(() => {
       approvalInstanceId: 'WF-51',
     },
   ])
+  vi.mocked(costSubject.loadOverheadAllocationRules).mockResolvedValue({
+    records: [
+      {
+        id: '801',
+        costSubjectId: '112',
+        allocationBasis: 'DIRECT_LABOR',
+        allocationCycle: 'PER_OCCURRENCE',
+        status: 'ENABLE',
+      },
+    ],
+    total: 1,
+    pageNo: 1,
+    pageSize: 100,
+  })
+  vi.mocked(costSubject.createOverheadAllocationRule).mockResolvedValue('802')
+  vi.mocked(costSubject.updateOverheadAllocationRule).mockResolvedValue(undefined)
+  vi.mocked(costSubject.executeOverheadAllocation).mockResolvedValue({
+    period: '2026-08-31',
+    ruleCount: 1,
+    createdRunCount: 1,
+    duplicateRunCount: 0,
+    costItemCount: 2,
+    allocatedAmount: '100.00',
+    idempotent: false,
+  })
   vi.mocked(costSubject.loadCostSubject).mockResolvedValue({
     id: '9',
     parentId: '0',
@@ -223,13 +346,15 @@ describe('M7 cost-subject center', () => {
 
     expect(wrapper.findAll('.v2-card')).toHaveLength(2)
     expect(wrapper.findAll('.cost-subject-page__taxonomy > section')).toHaveLength(3)
-    expect(wrapper.get('#cost-subject-first-level-title').text()).toBe('1. 一级科目')
-    expect(wrapper.get('#cost-subject-second-level-title').text()).toBe('2. 二级科目')
-    expect(wrapper.get('#cost-subject-detail-title').text()).toBe('3. 科目详情')
+    expect(wrapper.get('#account-category-title').text()).toBe('1. 科目大类')
+    expect(wrapper.get('#account-subject-catalog-title').text()).toBe('2. 科目目录')
+    expect(wrapper.get('#account-subject-detail-title').text()).toBe('3. 科目详情')
+    expect(wrapper.get('h1').text()).toBe('会计科目')
     expect(wrapper.text()).toContain('招投标及前期费用')
     expect(wrapper.text()).toContain('投标费用')
-    expect(wrapper.text()).not.toContain('下级末级科目')
-    expect(wrapper.text()).not.toContain('下级测试科目')
+    expect(wrapper.text()).toContain('下级测试科目')
+    expect(wrapper.text()).toContain('1122-AR')
+    expect(wrapper.text()).toContain('应收账款')
     expect(wrapper.text()).not.toContain('请选择科目')
     expect(wrapper.text()).not.toContain('ROOT')
     expect(wrapper.text()).not.toContain('新增一级科目')
@@ -300,6 +425,10 @@ describe('M7 cost-subject center', () => {
     expect(wrapper.text()).not.toContain(
       '固定十类，系统维护；仅允许编辑名称和排序，不支持新增、停用或删除',
     )
+    const governed = wrapper
+      .findAll('.cost-subject-page__list-item')
+      .find((item) => item.text().includes('5401.03.01'))!
+    await governed.get('button.cost-subject-page__select').trigger('click')
     expect(wrapper.findAll('button').some((button) => button.text() === '新增子科目')).toBe(false)
     const editButton = wrapper.findAll('button').find((button) => button.text() === '编辑')!
     expect(editButton.exists()).toBe(true)
@@ -330,7 +459,7 @@ describe('M7 cost-subject center', () => {
     wrapper.unmount()
   })
 
-  it('links first-level selection to second-level subjects and detail', async () => {
+  it('links catalog selection to the subject detail', async () => {
     useSessionStore().replaceUserInfo(user(['cost:query']))
     const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
@@ -339,10 +468,10 @@ describe('M7 cost-subject center', () => {
     const purchase = wrapper
       .findAll('.cost-subject-page__list-item')
       .find((item) => item.text().includes('5401.02'))!
-    await purchase.trigger('click')
+    await purchase.get('button.cost-subject-page__select').trigger('click')
     expect(purchase.classes()).toContain('is-selected')
-    expect(wrapper.text()).toContain('5401.02.01')
-    expect(wrapper.text()).not.toContain('5401.01.01')
+    expect(wrapper.get('.cost-subject-page__facts').text()).toContain('5401.02')
+    expect(wrapper.get('.cost-subject-page__facts').text()).toContain('采购阶段成本')
   })
 
   it('confirms ordinary cost-subject status through the dedicated API and rereads facts', async () => {
@@ -350,7 +479,7 @@ describe('M7 cost-subject center', () => {
     const wrapper = mount(CostSubjectTaxonomyPage, { attachTo: document.body })
     await flushPromises()
 
-    await wrapper.find('[aria-label="停用成本科目 投标费用"]').trigger('click')
+    await wrapper.find('[aria-label="停用会计科目 投标费用"]').trigger('click')
     expect(costSubject.toggleCostSubjectStatus).not.toHaveBeenCalled()
     const confirm = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent?.trim() === '确认',
@@ -367,7 +496,7 @@ describe('M7 cost-subject center', () => {
     useSessionStore().replaceUserInfo(
       user(['cost:subject:mapping:query', 'cost:subject:rule:query']),
     )
-    const wrapper = mount(CostSubjectRulesPage)
+    const wrapper = mount(CostSubjectRulesPage, { attachTo: document.body })
     await flushPromises()
 
     expect(wrapper.text()).toContain('服务端映射版本')
@@ -377,24 +506,89 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.loadAssignmentRules).toHaveBeenCalledOnce()
     expect(costSubject.loadCostSubjectTree).not.toHaveBeenCalled()
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('creates, disables and executes overhead rules without manual identifiers', async () => {
+    useSessionStore().replaceUserInfo(
+      user([
+        'cost:subject:mapping:query',
+        'cost:subject:rule:query',
+        'overhead:query',
+        'overhead:add',
+        'overhead:edit',
+        'overhead:execute',
+      ]),
+    )
+    const wrapper = mount(CostSubjectRulesPage, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('项目间接费')
+    await wrapper.findAll('button').find((button) => button.text() === '编辑')!.trigger('click')
+    document
+      .querySelector('#overhead-rule-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(costSubject.updateOverheadAllocationRule).toHaveBeenCalledWith('801', {
+      costSubjectId: '112',
+      allocationBasis: 'DIRECT_LABOR',
+      allocationCycle: 'MONTHLY',
+    })
+
+    await wrapper.findAll('button').find((button) => button.text() === '停用')!.trigger('click')
+    await flushPromises()
+    expect(costSubject.setOverheadAllocationRuleStatus).toHaveBeenCalledWith('801', 'DISABLE')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新建间接费规则')!
+      .trigger('click')
+    const overheadSubject = wrapper
+      .findAllComponents(V2Select)
+      .find((select) => select.props('label') === '间接费科目')!
+    overheadSubject.vm.$emit('update:modelValue', '112')
+    document
+      .querySelector('#overhead-rule-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(costSubject.createOverheadAllocationRule).toHaveBeenCalledWith({
+      costSubjectId: '112',
+      allocationBasis: 'DIRECT_LABOR',
+      allocationCycle: 'MONTHLY',
+    })
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '按期间执行')!
+      .trigger('click')
+    document
+      .querySelector('#overhead-execute-form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+    const now = new Date()
+    const expectedPeriod = new Date(now.getFullYear(), now.getMonth(), 0)
+    expect(costSubject.executeOverheadAllocation).toHaveBeenCalledWith(
+      `${expectedPeriod.getFullYear()}-${String(expectedPeriod.getMonth() + 1).padStart(2, '0')}-${String(expectedPeriod.getDate()).padStart(2, '0')}`,
+    )
+    expect(document.body.textContent).toContain('100.00')
+    wrapper.unmount()
   })
 
   it('places project scope controls in the page heading', async () => {
     useSessionStore().replaceUserInfo(user(['cost:subject:scope:query']))
-    const wrapper = mount(CostSubjectScopePage)
+    const wrapper = await mountRouted(CostSubjectScopePage)
     await flushPromises()
 
-    expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
     expect(
-      wrapper.findAllComponents(V2Input).some((input) => input.props('label') === '项目标识'),
+      wrapper.findAllComponents(V2Select).some((select) => select.props('label') === '项目'),
     ).toBe(true)
-    expect(wrapper.text()).not.toContain('项目适用范围')
+    expect(wrapper.text()).toContain('项目成本配置')
   })
 
   it('normalizes a created subject id and rereads detail plus taxonomy', async () => {
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))
     vi.mocked(costSubject.createCostSubject).mockResolvedValue(9)
-    const wrapper = mount(CostSubjectTaxonomyPage)
+    const wrapper = mount(CostSubjectTaxonomyPage, { attachTo: document.body })
     await flushPromises()
 
     await wrapper
@@ -418,21 +612,26 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.createCostSubject).toHaveBeenCalledOnce()
     expect(costSubject.loadCostSubject).toHaveBeenCalledWith('9')
     expect(costSubject.loadCostSubjectTree).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 
   it('formats server amounts to two decimals and hides transfer actions without write permission', async () => {
     useSessionStore().replaceUserInfo(user(['cost:subject:audit:query']))
-    const wrapper = mount(CostSubjectTracePage)
+    const wrapper = await mountRouted(CostSubjectTracePage)
     await flushPromises()
 
+    await wrapper.findAll('[role="tab"]')[2]!.trigger('click')
+    await flushPromises()
     expect(wrapper.text()).toContain('¥125.23')
     expect(wrapper.text()).toContain('¥81.23')
     expect(wrapper.text()).toContain('BTR-001')
-    expect(wrapper.text()).toContain('FAR-001')
     expect(wrapper.text()).toContain('服务端投标项目')
     expect(wrapper.text()).toContain('TB-001')
     expect(wrapper.text()).toContain('XM-001 · 服务端项目')
     expect(wrapper.text()).toContain('V1 · 首版目标成本')
+    await wrapper.findAll('[role="tab"]')[3]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('FAR-001')
     expect(wrapper.text()).toContain('已过账借方凭证明细 · PZ-001')
     expect(wrapper.text()).toContain('5401.04.19 · 财务费用')
     expect(wrapper.findAll('button').map((button) => button.text())).not.toEqual(
@@ -452,14 +651,37 @@ describe('M7 cost-subject center', () => {
         'cost:subject:bid-transfer',
         'cost:subject:transfer:submit',
         'cost:subject:finance-allocate',
+        'cost:classification:override',
         'cost:subject:allocation:submit',
       ]),
     )
-    const wrapper = mount(CostSubjectTracePage)
+    const wrapper = await mountRouted(CostSubjectTracePage)
     await flushPromises()
 
+    await wrapper.findAll('[role="tab"]')[2]!.trigger('click')
+    await flushPromises()
     expect(wrapper.text()).toContain('新建转入申请')
+    await wrapper.findAll('[role="tab"]')[3]!.trigger('click')
+    await flushPromises()
     expect(wrapper.text()).toContain('新建分摊申请')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '新建分摊申请')!
+      .trigger('click')
+    await flushPromises()
+    const targetSubjectSelect = wrapper
+      .findAllComponents(V2Select)
+      .find((select) => select.props('label') === '目标末级成本科目')!
+    expect(targetSubjectSelect.props('options')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: '111', disabled: false }),
+        expect.objectContaining({
+          value: '112',
+          disabled: true,
+          label: expect.stringContaining('间接费规则已停用'),
+        }),
+      ]),
+    )
     useSessionStore().replaceUserInfo(
       user([
         'cost:subject:audit:query',
@@ -468,8 +690,9 @@ describe('M7 cost-subject center', () => {
       ]),
     )
     await flushPromises()
+    await wrapper.findAll('[role="tab"]')[2]!.trigger('click')
+    await flushPromises()
     expect(wrapper.text()).not.toContain('新建转入申请')
-    expect(wrapper.text()).not.toContain('新建分摊申请')
     const submitButtons = wrapper.findAll('button').filter((button) => button.text() === '提交审批')
     expect(submitButtons).toHaveLength(1)
     await submitButtons[0]!.trigger('click')
@@ -484,6 +707,6 @@ describe('M7 cost-subject center', () => {
     const allocationForm = source.match(/<form id="allocation-form"[\s\S]*?<\/form>/)?.[0] ?? ''
     expect(transferForm).not.toContain('approvalInstanceId')
     expect(allocationForm).not.toContain('approvalInstanceId')
-    expect(source).toContain('reverseForm.approvalInstanceId')
+    expect(source).not.toContain('reverseForm.approvalInstanceId')
   })
 })

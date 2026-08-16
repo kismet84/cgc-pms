@@ -41,13 +41,20 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("299", flyway.info().current().getVersion().getVersion());
+        assertEquals("304", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
                                 'variation:order:item:edit','cost:target:add','cost:target:edit',
                                 'cost:target:delete','cost:target:activate','cost:summary:refresh')
                   AND deleted_flag=0
+                """));
+        assertEquals(4, count("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='COMPANY_FINANCE' AND r.deleted_flag=0 AND m.deleted_flag=0
+                  AND m.perms IN ('overhead:query','overhead:add','overhead:edit','overhead:execute')
                 """));
         assertEquals(0, count("""
                 SELECT COUNT(*) FROM cost_subject
@@ -56,9 +63,25 @@ class BaselineMySqlSmokeTest {
                 """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(215, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(225, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
+        assertEquals(10, count("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema=DATABASE() AND table_name IN (
+                  'cost_classification_snapshot','cost_classification_override','cost_unclassified_case',
+                  'cost_project_config_request','cost_project_config_request_line','project_cost_subject_scope_history',
+                  'cost_recalculation_batch','cost_recalculation_line','cost_recalculation_fact_reservation',
+                  'cost_reversal_request')
+                """));
+        assertEquals(11, count("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema=DATABASE() AND table_name='cost_item'
+                  AND column_name IN ('original_cost_subject_id','mapping_version_id','assignment_rule_id',
+                    'classification_snapshot_id','classification_override_id','classification_status',
+                    'recognition_role','root_source_type','classification_business_category',
+                    'adjustment_batch_id','original_cost_item_id')
+                """));
         assertEquals(1, count("SELECT COUNT(*) FROM information_schema.views "
                 + "WHERE table_schema=DATABASE() AND table_name='v_business_audit_event' "
                 + "AND security_type='INVOKER'"));
@@ -72,8 +95,8 @@ class BaselineMySqlSmokeTest {
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM wf_template WHERE deleted_flag=0") > 0);
-        assertEquals(30, count("SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(65, count("SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id "
+        assertEquals(29, count("SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(60, count("SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id "
                 + "WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0"));
         assertEquals(8, count("""
                 SELECT COUNT(*) FROM sys_role_menu rm
