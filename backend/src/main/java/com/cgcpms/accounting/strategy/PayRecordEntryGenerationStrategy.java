@@ -4,7 +4,6 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.cost.constant.AccountingSubjectCatalog;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
@@ -54,23 +53,25 @@ public class PayRecordEntryGenerationStrategy implements EntryGenerationStrategy
         entry.setContractId(record.getContractId());
         entry.setPayApplicationId(record.getPayApplicationId());
         entry.setPayRecordId(record.getId());
+        entry.setPartnerId(record.getPartnerId());
 
         AccountingEntryLine debit = new AccountingEntryLine();
         debit.setDirection("DEBIT");
-        boolean advance = "ADVANCE".equals(application.getPayType());
-        CostSubject debitSubject = subjectResolver.require(
-                advance ? AccountingSubjectCatalog.PREPAYMENT : AccountingSubjectCatalog.PAYABLE,
-                advance ? "ASSET" : "LIABILITY");
+        CostSubject businessSubject = application.getCostSubjectId() == null ? null
+                : subjectResolver.requireBusinessCostSubject(application.getCostSubjectId());
+        CostSubject debitSubject = subjectResolver.requirePayableSubject(businessSubject);
+        debit.setAccountingSubjectId(debitSubject.getId());
         debit.setAccountCode(debitSubject.getSubjectCode());
         debit.setAccountName(debitSubject.getSubjectName());
-        debit.setCostSubjectId(application.getCostSubjectId());
+        debit.setCostSubjectId(null);
         debit.setAmount(record.getPayAmount());
-        debit.setSummary((advance ? "支付预付款：" : "支付合同款，冲减应付：") + record.getExternalTxnNo());
+        debit.setSummary("支付合同款，冲减应付：" + record.getExternalTxnNo());
 
         AccountingEntryLine credit = new AccountingEntryLine();
         credit.setDirection("CREDIT");
-        CostSubject bankSubject = subjectResolver.require(AccountingSubjectCatalog.BANK, "ASSET");
-        credit.setAccountCode(bankSubject.getSubjectCode() + "-" + record.getFundAccountId());
+        CostSubject bankSubject = subjectResolver.requireFundAccount(record.getFundAccountId());
+        credit.setAccountingSubjectId(bankSubject.getId());
+        credit.setAccountCode(bankSubject.getSubjectCode());
         credit.setAccountName(bankSubject.getSubjectName());
         credit.setAmount(record.getPayAmount());
         credit.setSummary("银行付款：" + record.getExternalTxnNo());

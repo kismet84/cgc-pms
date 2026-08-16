@@ -5,6 +5,10 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.accounting.service.AccountingEntryService;
 import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.service.AccountingCostCarryoverService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.AccountingEntryDetailVO;
@@ -24,6 +28,7 @@ public class AccountingEntryController {
 
     private final AccountingEntryService entryService;
     private final EntryGenerator generator;
+    private final AccountingCostCarryoverService carryoverService;
 
     @GetMapping("/workspace")
     @PreAuthorize("hasAuthority('accounting:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -82,6 +87,13 @@ public class AccountingEntryController {
         return ApiResponse.success(entry != null ? entry.getId() : null);
     }
 
+    @PostMapping("/cost-carryovers")
+    @PreAuthorize("hasAuthority('accounting:cost-carryover')")
+    public ApiResponse<Long> createCostCarryover(@Valid @RequestBody CostCarryoverCommand command) {
+        return ApiResponse.success(carryoverService.create(
+                command.projectId(), command.contractId(), command.carryoverDate()).getId());
+    }
+
     @PutMapping("/{id}/post")
     @PreAuthorize("hasAuthority('accounting:post') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> post(@PathVariable Long id) {
@@ -109,5 +121,9 @@ public class AccountingEntryController {
     public ApiResponse<Long> reverse(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         String reason = body == null || body.get("reason") == null ? "会计冲销" : body.get("reason").toString();
         return ApiResponse.success(entryService.createReversal(id, reason).getId());
+    }
+
+    public record CostCarryoverCommand(@NotNull Long projectId, @NotNull Long contractId,
+                                       @NotNull LocalDate carryoverDate) {
     }
 }

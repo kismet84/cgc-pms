@@ -70,7 +70,7 @@ class Phase4IntegrationTest {
     private static final long USER_ADMIN = 1L;
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
-    private static final long PARTNER_ID = 20001L;
+    private static final long PARTNER_ID = 20002L;
 
     // ── INVENTORY ──
     @Autowired private MatStockService matStockService;

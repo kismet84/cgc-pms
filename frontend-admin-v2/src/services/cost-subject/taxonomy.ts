@@ -1,11 +1,17 @@
 import { apiRequest } from '../request'
 import { normalizeSubject, requiredId } from './normalize'
-import type { CostSubjectCommand, CostSubjectRecord } from './types'
+import type { AccountingCatalogOverview, CostSubjectCommand, CostSubjectRecord } from './types'
 
 export function loadCostSubjectTree(signal?: AbortSignal): Promise<CostSubjectRecord[]> {
-  return apiRequest<CostSubjectRecord[]>('/cost-subjects/tree', { signal }).then((rows) =>
-    rows.map(normalizeSubject),
+  return apiRequest<CostSubjectRecord[]>('/cost-subjects/accounting-tree', { signal }).then(
+    (rows) => rows.map(normalizeSubject),
   )
+}
+
+export function loadAccountingCatalogOverview(
+  signal?: AbortSignal,
+): Promise<AccountingCatalogOverview> {
+  return apiRequest<AccountingCatalogOverview>('/cost-subjects/accounting-overview', { signal })
 }
 
 export function loadCostSubject(id: string): Promise<CostSubjectRecord> {

@@ -111,9 +111,24 @@ const governedAccountingCodes = new Set([
 export function isGovernedSubject(subject?: CostSubjectRecord | null): boolean {
   return Boolean(
     subject &&
-    (subject.subjectCode === '5401.03' ||
+    (subject.ledgerFlag === 1 ||
+      subject.subjectCode === '5401.03' ||
       subject.subjectCode.startsWith('5401.03.') ||
       governedAccountingCodes.has(subject.subjectCode)),
+  )
+}
+
+export function dimensionRequirementLabel(value?: string | null): string {
+  return (
+    (
+      {
+        REQUIRED: '必填',
+        RECOMMENDED: '建议',
+        OPTIONAL: '可选',
+        INHERITED: '继承业务',
+        NONE: '不核算',
+      } as Record<string, string>
+    )[value ?? ''] ?? '—'
   )
 }
 

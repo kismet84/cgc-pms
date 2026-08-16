@@ -106,6 +106,11 @@ export interface AccountingEntryDetail {
   entry: AccountingEntryRecord;
   lines: AccountingEntryLineRecord[];
 }
+export interface AccountingCostCarryoverCommand {
+  projectId: string;
+  contractId: string;
+  carryoverDate: string;
+}
 export interface FinancePeriodRecord {
   id: string;
   periodCode: string;

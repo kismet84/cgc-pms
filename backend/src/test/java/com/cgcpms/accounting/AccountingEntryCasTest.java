@@ -4,6 +4,7 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.mapper.AccountingEntryLineMapper;
 import com.cgcpms.accounting.mapper.AccountingEntryMapper;
 import com.cgcpms.accounting.service.AccountingEntryService;
+import com.cgcpms.accounting.service.AccountingCostCarryoverService;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -40,7 +41,8 @@ class AccountingEntryCasTest {
         when(entryMapper.updateById(entry)).thenReturn(0);
         AccountingEntryService service = new AccountingEntryService(entryMapper,
                 mock(AccountingEntryLineMapper.class), mock(CostSubjectMapper.class),
-                periodGuard, mock(ProjectAccessChecker.class));
+                periodGuard, mock(ProjectAccessChecker.class), mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                mock(AccountingCostCarryoverService.class));
         TestUserContext.setUser(99L, 2L, "reviewer", java.util.List.of("FINANCE"));
 
         BusinessException error = assertThrows(BusinessException.class,

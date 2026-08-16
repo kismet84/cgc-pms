@@ -497,7 +497,7 @@ public class CostTargetService {
     private void requireLeafCostSubject(Long subjectId, Long projectId) {
         Integer valid = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM cost_subject s
-                WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id AND c.parent_id=s.id AND c.deleted_flag=0)
                   AND NOT EXISTS (SELECT 1 FROM project_cost_subject_scope_history h
                     WHERE h.tenant_id=s.tenant_id AND h.project_id=? AND h.cost_subject_id=s.id AND h.enabled=0

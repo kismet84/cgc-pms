@@ -48,27 +48,29 @@ public class CollectionRecordEntryGenerationStrategy implements EntryGenerationS
         entry.setProjectId(((Number) record.get("project_id")).longValue());
         entry.setContractId(((Number) record.get("contract_id")).longValue());
         entry.setCollectionRecordId(sourceId);
+        entry.setPartnerId(((Number) record.get("customer_id")).longValue());
 
-        CostSubject bankSubject = subjectResolver.require(AccountingSubjectCatalog.BANK, "ASSET");
-        AccountingEntryLine debit = line("DEBIT", bankSubject.getSubjectCode() + "-" + record.get("fund_account_id"),
-                bankSubject.getSubjectName(), amount, "项目回款：" + record.get("external_txn_no"));
+        CostSubject bankSubject = subjectResolver.requireFundAccount(((Number) record.get("fund_account_id")).longValue());
+        AccountingEntryLine debit = line("DEBIT", bankSubject, amount, "项目回款：" + record.get("external_txn_no"));
         java.util.ArrayList<AccountingEntryLine> lines = new java.util.ArrayList<>();
         lines.add(debit);
         if (allocated.signum() > 0) {
             CostSubject receivable = subjectResolver.require(AccountingSubjectCatalog.RECEIVABLE, "ASSET");
-            lines.add(line("CREDIT", receivable.getSubjectCode(), receivable.getSubjectName(), allocated, "核销项目应收"));
+            lines.add(line("CREDIT", receivable, allocated, "核销项目应收"));
         }
         if (unallocated.signum() > 0) {
-            CostSubject advanceReceipt = subjectResolver.require(AccountingSubjectCatalog.ADVANCE_RECEIPT, "LIABILITY");
-            lines.add(line("CREDIT", advanceReceipt.getSubjectCode(), advanceReceipt.getSubjectName(), unallocated, "未分配项目回款"));
+            CostSubject advanceReceipt = subjectResolver.require(AccountingSubjectCatalog.CONTRACT_LIABILITY_ADVANCE, "LIABILITY");
+            lines.add(line("CREDIT", advanceReceipt, unallocated, "未分配项目回款"));
         }
         entry.setLines(lines);
         return entry;
     }
 
-    private AccountingEntryLine line(String direction, String code, String name, BigDecimal amount, String summary) {
+    private AccountingEntryLine line(String direction, CostSubject accountingSubject, BigDecimal amount, String summary) {
         AccountingEntryLine line = new AccountingEntryLine();
-        line.setDirection(direction); line.setAccountCode(code); line.setAccountName(name); line.setAmount(amount); line.setSummary(summary);
+        line.setDirection(direction); line.setAccountingSubjectId(accountingSubject.getId());
+        line.setAccountCode(accountingSubject.getSubjectCode()); line.setAccountName(accountingSubject.getSubjectName());
+        line.setAmount(amount); line.setSummary(summary);
         return line;
     }
 }

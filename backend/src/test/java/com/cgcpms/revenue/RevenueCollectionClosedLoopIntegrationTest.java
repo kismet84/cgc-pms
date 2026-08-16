@@ -129,10 +129,10 @@ class RevenueCollectionClosedLoopIntegrationTest {
                    AND entry_type='AR_CONFIRMATION'
                 """, Integer.class, settlementId));
         assertEquals(new BigDecimal("1000.00"), jdbc.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1122-AR'",
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1122'",
                 BigDecimal.class, arEntryId));
         assertEquals(new BigDecimal("1000.00"), jdbc.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='6001.01'",
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='4401.01'",
                 BigDecimal.class, arEntryId));
 
         var receivables = service.receivables(PROJECT,null);

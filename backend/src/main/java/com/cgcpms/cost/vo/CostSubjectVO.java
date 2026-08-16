@@ -17,6 +17,7 @@ public class CostSubjectVO {
     private Integer sortOrder;
     private String status;
     private BigDecimal defaultTargetRatio;
+    private Integer ledgerFlag;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

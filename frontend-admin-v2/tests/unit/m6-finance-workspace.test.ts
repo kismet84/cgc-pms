@@ -412,6 +412,10 @@ describe('M6 finance workspace contract', () => {
     const close = source('src/pages/finance/finance-control-workspace/FinancialClosePage.vue')
 
     expect(accounting).toContain("new Set(['PAY_APPLICATION', 'PAY_RECORD', 'PAY_INVOICE'])")
+    expect(accounting).toContain('createAccountingCostCarryover')
+    expect(accounting).toContain("can('accounting:cost-carryover')")
+    expect(accounting).toContain('成本结转</V2Button')
+    expect(accounting).toContain('权威主合同')
     expect(accounting).toContain(':disabled="!canOpenPaymentTrace(row)"')
     expect(journal).toContain("return row.sourceType === 'PAY_RECORD'")
     expect(journal).toContain(':disabled="!canOpenPaymentTrace(row)"')

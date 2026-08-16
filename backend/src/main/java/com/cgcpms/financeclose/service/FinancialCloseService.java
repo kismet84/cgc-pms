@@ -103,9 +103,9 @@ public class FinancialCloseService {
                    AND p.pay_type='ADVANCE' AND p.deleted_flag=0
                    AND (SELECT COUNT(DISTINCT e.entry_type) FROM accounting_entry e
                          WHERE e.tenant_id=i.tenant_id AND e.source_type='PAY_INVOICE' AND e.source_id=i.id
-                           AND e.entry_type IN ('ADVANCE_AP_CONFIRMATION','ADVANCE_PREPAY_RECLASS')
+                           AND e.entry_type='ADVANCE_AP_CONFIRMATION'
                            AND (e.entry_status='POSTED' OR (e.entry_status='REVERSED' AND e.posted_at IS NOT NULL))
-                           AND e.deleted_flag=0)<2
+                           AND e.deleted_flag=0)<1
                 """, endExclusive.atStartOfDay(), tenant());
         issues += addCheck(periodId, "SOURCE_VOUCHER_COMPLETENESS", missingVoucher, Map.of("message", "成功收付款必须存在已过账凭证"));
 
@@ -397,7 +397,7 @@ public class FinancialCloseService {
                      WHERE r.tenant_id=? AND r.deleted_flag=0 AND r.created_at<?
                     """, endExclusive.atStartOfDay(), endExclusive.atStartOfDay(), endExclusive.atStartOfDay(),
                     tenant(), endExclusive.atStartOfDay());
-            ledger=postedBalance("1122-AR", true, endExclusive);
+            ledger=postedBalance("1122", true, endExclusive);
         } else {
             expected=amount("""
                     SELECT COALESCE(SUM(GREATEST(COALESCE(p.approved_amount,p.apply_amount,0)
@@ -414,7 +414,7 @@ public class FinancialCloseService {
                                      AND a.business_type='PAY_APPLICATION' AND a.business_id=p.id
                                      AND a.event_at<?)
                     """, endExclusive.atStartOfDay(), endExclusive.atStartOfDay(), tenant(), endExclusive.atStartOfDay());
-            ledger=postedBalance("2202-AP", false, endExclusive);
+            ledger=postedBalancePrefix("2202.", false, endExclusive);
         }
         BigDecimal difference=expected.subtract(ledger).abs(); String status=difference.signum()==0?"MATCHED":"EXCEPTION";
         jdbc.update("INSERT INTO finance_account_reconciliation(id,tenant_id,period_id,account_type,expected_amount,ledger_amount,difference_amount,status,detail_json,reconciled_by,reconciled_at) VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),periodId,type,expected,ledger,difference,status,json(Map.of("periodStart",start.toString(),"periodEndExclusive",endExclusive.toString())),user());
@@ -429,6 +429,16 @@ public class FinancialCloseService {
                         + "AND l.account_code=? AND (e.entry_status='POSTED' OR "
                         + "(e.entry_status='REVERSED' AND e.posted_at IS NOT NULL))",
                 balanceDirection, tenant(), endExclusive, accountCode);
+    }
+
+    private BigDecimal postedBalancePrefix(String accountCodePrefix, boolean debitBalance, LocalDate endExclusive) {
+        String balanceDirection = debitBalance ? "DEBIT" : "CREDIT";
+        return amount("SELECT COALESCE(SUM(CASE WHEN l.direction=? THEN l.amount ELSE -l.amount END),0) FROM accounting_entry e "
+                        + "JOIN accounting_entry_line l ON l.entry_id=e.id AND l.tenant_id=e.tenant_id "
+                        + "WHERE e.tenant_id=? AND e.entry_date<? AND e.deleted_flag=0 AND l.deleted_flag=0 "
+                        + "AND l.account_code LIKE ? AND (e.entry_status='POSTED' OR "
+                        + "(e.entry_status='REVERSED' AND e.posted_at IS NOT NULL))",
+                balanceDirection, tenant(), endExclusive, accountCodePrefix + "%");
     }
 
     private int addCheck(Long periodId,String type,int issueCount,Object detail){jdbc.update("INSERT INTO finance_period_check(id,tenant_id,period_id,check_type,check_status,issue_count,detail_json,checked_by,checked_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),periodId,type,issueCount==0?"PASS":"FAIL",issueCount,json(detail),user());return issueCount;}

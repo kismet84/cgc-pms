@@ -737,6 +737,7 @@ public class VarOrderService {
                         .eq(CostSubject::getTenantId, tenantId)
                         .eq(CostSubject::getStatus, "ENABLE")
                         .eq(CostSubject::getAccountCategory, "COST")
+                        .eq(CostSubject::getLedgerFlag, 0)
                         .in(CostSubject::getId, subjectIds))
                 .stream().map(CostSubject::getId).collect(Collectors.toSet());
         Set<Long> parentIds = costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()

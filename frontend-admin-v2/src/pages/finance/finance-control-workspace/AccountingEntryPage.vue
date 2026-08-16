@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { V2ActionMenu, V2Button, V2Card, V2PageState, V2Pagination } from '@/components'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import {
+  V2ActionMenu,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2Input,
+  V2PageState,
+  V2Pagination,
+  V2Select,
+} from '@/components'
 import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import { showToast } from '@/components/toast'
 import {
   loadAccountingEntries,
+  createAccountingCostCarryover,
+  loadFinanceOperationsFormOptions,
   loadAccountingEntryDetail,
   loadPaymentTraceByVoucher,
   postAccountingEntry,
@@ -14,11 +25,13 @@ import {
 } from '@/services/finance'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { localDateInputValue } from '@/services/workspace-context'
 import type {
   AccountingEntryDetail,
   AccountingEntryPage as AccountingEntryPageResult,
   AccountingEntryRecord,
   PaymentTraceRecord,
+  FinanceOperationsFormOptions,
 } from '@cgc-pms/frontend-contracts'
 import { amount, askReason, label } from './model'
 
@@ -41,6 +54,14 @@ const traceOpen = ref(false)
 const traceRows = ref<PaymentTraceRecord[]>([])
 const traceLoading = ref(false)
 const traceError = ref('')
+const carryoverDialog = ref(false)
+const carryoverOptions = ref<FinanceOperationsFormOptions>({ contracts: [] })
+const carryoverForm = reactive({ contractId: '', carryoverDate: localDateInputValue() })
+const carryoverContractOptions = computed(() =>
+  carryoverOptions.value.contracts
+    .filter((item) => item.contractType === 'MAIN')
+    .map((item) => ({ value: item.id, label: `${item.contractCode} · ${item.contractName}` })),
+)
 let controller: AbortController | null = null
 
 function canOpenPaymentTrace(row: AccountingEntryRecord): boolean {
@@ -132,6 +153,39 @@ async function openTrace(id: string): Promise<void> {
   }
 }
 
+async function openCarryover(): Promise<void> {
+  if (!projectId.value) return
+  try {
+    carryoverOptions.value = await loadFinanceOperationsFormOptions(projectId.value)
+    carryoverForm.contractId = carryoverContractOptions.value[0]?.value ?? ''
+    carryoverForm.carryoverDate = localDateInputValue()
+    carryoverDialog.value = true
+  } catch (cause) {
+    showToast(
+      'error',
+      '无法创建成本结转',
+      cause instanceof Error ? cause.message : '合同候选加载失败。',
+    )
+  }
+}
+
+async function submitCarryover(): Promise<void> {
+  if (!projectId.value || !carryoverForm.contractId || !carryoverForm.carryoverDate) {
+    showToast('warning', '信息不完整', '请选择项目、主合同和结转日期。')
+    return
+  }
+  await run(
+    () =>
+      createAccountingCostCarryover({
+        projectId: projectId.value,
+        contractId: carryoverForm.contractId,
+        carryoverDate: carryoverForm.carryoverDate,
+      }),
+    '成本结转凭证已生成',
+  )
+  carryoverDialog.value = false
+}
+
 watch(projectId, () => void load(), { immediate: true })
 onBeforeUnmount(() => controller?.abort())
 </script>
@@ -151,6 +205,14 @@ onBeforeUnmount(() => controller?.abort())
             <V2Button size="small" variant="secondary" :loading="loading" @click="refreshWorkspace">
               刷新
             </V2Button>
+            <V2Button
+              v-if="can('accounting:cost-carryover')"
+              size="small"
+              :disabled="!projectId"
+              title="按固定八类映射将合同履约成本结转至主营业务成本"
+              @click="openCarryover"
+              >成本结转</V2Button
+            >
           </div>
         </template>
       </V2Card>
@@ -327,6 +389,36 @@ onBeforeUnmount(() => controller?.abort())
         :error="traceError"
         @close="traceOpen = false"
       />
+      <V2Dialog
+        :open="carryoverDialog"
+        title="项目成本结转"
+        description="系统按1451八类余额生成借记6401、贷记1451的平衡凭证；历史凭证不改写。"
+        :close-disabled="busy"
+        :close-on-backdrop="false"
+        @close="carryoverDialog = false"
+      >
+        <form
+          id="accounting-cost-carryover-form"
+          class="finance-control__form"
+          @submit.prevent="submitCarryover"
+        >
+          <V2Select
+            v-model="carryoverForm.contractId"
+            label="权威主合同"
+            :options="carryoverContractOptions"
+            required
+          />
+          <V2Input v-model="carryoverForm.carryoverDate" label="结转日期" type="date" required />
+        </form>
+        <template #footer>
+          <V2Button variant="secondary" :disabled="busy" @click="carryoverDialog = false"
+            >取消</V2Button
+          >
+          <V2Button type="submit" form="accounting-cost-carryover-form" :loading="busy"
+            >生成凭证</V2Button
+          >
+        </template>
+      </V2Dialog>
     </template>
   </section>
 </template>

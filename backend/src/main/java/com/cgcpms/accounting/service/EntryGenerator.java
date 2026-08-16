@@ -35,6 +35,7 @@ public class EntryGenerator {
     private final AccountingEntryMapper entryMapper;
     private final AccountingEntryLineMapper lineMapper;
     private final AccountingPeriodGuard periodGuard;
+    private final AccountingDimensionValidator dimensionValidator;
     private Map<String, EntryGenerationStrategy> strategyMap;
 
     @PostConstruct
@@ -95,6 +96,7 @@ public class EntryGenerator {
         if (lines == null || lines.isEmpty()) {
             throw new BusinessException("ENTRY_NO_LINES", "凭证无分录行");
         }
+        dimensionValidator.validate(entry);
         BigDecimal totalDebit = lines.stream()
                 .filter(l -> "DEBIT".equals(l.getDirection()))
                 .map(AccountingEntryLine::getAmount)

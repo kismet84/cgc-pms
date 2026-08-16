@@ -34,6 +34,7 @@ vi.mock('@/services/cost-subject', () => ({
   generateInitialRulePlan: vi.fn(),
   executeOverheadAllocation: vi.fn(),
   loadAssignmentRules: vi.fn(),
+  loadAccountingCatalogOverview: vi.fn(),
   loadBidTransfers: vi.fn(),
   loadBidTransferRequests: vi.fn(),
   loadCostSubject: vi.fn(),
@@ -174,6 +175,40 @@ beforeEach(() => {
       children: [],
     },
   ])
+  vi.mocked(costSubject.loadAccountingCatalogOverview).mockResolvedValue({
+    policies: [
+      {
+        subjectCode: '1122',
+        subjectName: '应收账款',
+        projectRequirement: 'REQUIRED',
+        contractRequirement: 'REQUIRED',
+        partnerRequirement: 'REQUIRED',
+        departmentRequirement: 'NONE',
+        employeeRequirement: 'NONE',
+      },
+    ],
+    carryoverMappings: [
+      {
+        categoryCode: 'MATERIAL',
+        categoryName: '材料',
+        fulfillmentCode: '1451.01',
+        fulfillmentName: '材料费',
+        expenseCode: '6401.01',
+        expenseName: '材料成本',
+        status: 'ENABLE',
+      },
+    ],
+    legacyReviews: [
+      {
+        sourceSubjectCode: '1122-AR',
+        sourceSubjectName: '应收账款（历史别名）',
+        suggestedSubjectCode: '1122',
+        reviewStatus: 'PENDING',
+        reviewNote: '只读保留，不直接改写历史凭证',
+      },
+    ],
+    reportRoutes: [{ label: '科目余额表', path: '/financial-close' }],
+  })
   vi.mocked(costSubject.loadMappingVersions).mockResolvedValue([
     {
       id: '2',
@@ -344,7 +379,7 @@ describe('M7 cost-subject center', () => {
     const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
-    expect(wrapper.findAll('.v2-card')).toHaveLength(2)
+    expect(wrapper.findAll('.v2-card')).toHaveLength(6)
     expect(wrapper.findAll('.cost-subject-page__taxonomy > section')).toHaveLength(3)
     expect(wrapper.get('#account-category-title').text()).toBe('1. 科目大类')
     expect(wrapper.get('#account-subject-catalog-title').text()).toBe('2. 科目目录')
@@ -359,11 +394,17 @@ describe('M7 cost-subject center', () => {
     expect(wrapper.text()).not.toContain('ROOT')
     expect(wrapper.text()).not.toContain('新增一级科目')
     expect(costSubject.loadCostSubjectTree).toHaveBeenCalledOnce()
+    expect(costSubject.loadAccountingCatalogOverview).toHaveBeenCalledOnce()
+    expect(wrapper.text()).toContain('项目、合同、往来单位、部门、员工使用辅助核算维度')
+    expect(wrapper.text()).toContain('1451.01')
+    expect(wrapper.text()).toContain('6401.01')
+    expect(wrapper.text()).toContain('只读保留，不直接改写历史凭证')
+    expect(wrapper.text()).toContain('科目余额表')
     expect(costSubject.loadMappingVersions).not.toHaveBeenCalled()
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
   })
 
-  it('shows taxonomy writes to administrators without explicit permissions', async () => {
+  it('keeps the fixed accounting structure read-only for administrators', async () => {
     useSessionStore().replaceUserInfo({
       ...user([]),
       roles: ['SUPER_ADMIN'],
@@ -371,7 +412,9 @@ describe('M7 cost-subject center', () => {
     const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('新增一级科目')
+    expect(wrapper.text()).not.toContain('新增一级科目')
+    expect(wrapper.text()).not.toContain('新增子科目')
+    expect(wrapper.text()).not.toContain('删除')
   })
 
   it('keeps fixed target-cost subjects read-only and removes the default-ratio card', async () => {
@@ -524,7 +567,10 @@ describe('M7 cost-subject center', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('项目间接费')
-    await wrapper.findAll('button').find((button) => button.text() === '编辑')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '编辑')!
+      .trigger('click')
     document
       .querySelector('#overhead-rule-form')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
@@ -535,7 +581,10 @@ describe('M7 cost-subject center', () => {
       allocationCycle: 'MONTHLY',
     })
 
-    await wrapper.findAll('button').find((button) => button.text() === '停用')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '停用')!
+      .trigger('click')
     await flushPromises()
     expect(costSubject.setOverheadAllocationRuleStatus).toHaveBeenCalledWith('801', 'DISABLE')
 
@@ -585,34 +634,31 @@ describe('M7 cost-subject center', () => {
     expect(wrapper.text()).toContain('项目成本配置')
   })
 
-  it('normalizes a created subject id and rereads detail plus taxonomy', async () => {
-    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))
-    vi.mocked(costSubject.createCostSubject).mockResolvedValue(9)
-    const wrapper = mount(CostSubjectTaxonomyPage, { attachTo: document.body })
+  it('locks code, hierarchy and status for formal accounting subjects', async () => {
+    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit', 'cost:add']))
+    vi.mocked(costSubject.loadCostSubjectTree).mockResolvedValue([
+      {
+        id: '3052',
+        parentId: '0',
+        subjectCode: '1122',
+        subjectName: '应收账款',
+        subjectType: 'GENERAL_LEDGER',
+        accountCategory: 'ASSET',
+        level: 1,
+        sortOrder: 1,
+        status: 'ENABLE',
+        ledgerFlag: 1,
+        children: [],
+      },
+    ])
+    const wrapper = mount(CostSubjectTaxonomyPage)
     await flushPromises()
 
-    await wrapper
-      .findAll('button')
-      .find((button) => button.text() === '新增一级科目')!
-      .trigger('click')
-    const inputs = wrapper.findAllComponents(V2Input)
-    await inputs
-      .find((input) => input.props('label') === '科目编码')!
-      .find('input')
-      .setValue('NEW-COST')
-    await inputs
-      .find((input) => input.props('label') === '科目名称')!
-      .find('input')
-      .setValue('新成本科目')
-    document
-      .querySelector('#cost-subject-form')!
-      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await flushPromises()
-
-    expect(costSubject.createCostSubject).toHaveBeenCalledOnce()
-    expect(costSubject.loadCostSubject).toHaveBeenCalledWith('9')
-    expect(costSubject.loadCostSubjectTree).toHaveBeenCalledTimes(2)
-    wrapper.unmount()
+    expect(wrapper.text()).not.toContain('新增一级科目')
+    expect(wrapper.text()).not.toContain('新增子科目')
+    expect(wrapper.text()).not.toContain('删除')
+    expect(wrapper.find('[aria-label="会计科目 应收账款 状态由系统维护"]').exists()).toBe(true)
+    expect(costSubject.createCostSubject).not.toHaveBeenCalled()
   })
 
   it('formats server amounts to two decimals and hides transfer actions without write permission', async () => {

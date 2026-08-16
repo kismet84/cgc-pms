@@ -17,11 +17,13 @@ import {
 import {
   createCostSubject,
   deleteCostSubject,
+  loadAccountingCatalogOverview,
   loadCostSubject,
   loadCostSubjectTree,
   toggleCostSubjectStatus,
   updateCostSubject,
   type AccountCategory,
+  type AccountingCatalogOverview,
   type CostSubjectCommand,
   type CostSubjectRecord,
 } from '@/services/cost-subject'
@@ -30,6 +32,7 @@ import { useSessionStore } from '@/stores/session'
 import {
   accountCategoryLabel,
   accountCategoryOptions,
+  dimensionRequirementLabel,
   isGovernedSubject,
   statusOptions,
   subjectTypeLabel,
@@ -46,11 +49,17 @@ const error = ref('')
 let controller: AbortController | null = null
 
 const can = (permission: string) => session.hasAdminOrPermission(permission)
-const canSubjectAdd = computed(() => can('cost:add'))
+const canSubjectAdd = computed(() => false)
 const canSubjectEdit = computed(() => can('cost:edit'))
-const canSubjectDelete = computed(() => can('cost:delete'))
+const canSubjectDelete = computed(() => false)
 
 const subjects = ref<CostSubjectRecord[]>([])
+const overview = ref<AccountingCatalogOverview>({
+  policies: [],
+  carryoverMappings: [],
+  legacyReviews: [],
+  reportRoutes: [],
+})
 const categoryFilter = ref<CategoryFilter>('ALL')
 const selectedSubjectId = ref('')
 const categoryFilters: Array<{ value: CategoryFilter; label: string }> = [
@@ -76,6 +85,11 @@ const visibleSubjects = computed(() =>
 const selectedSubject = computed(
   () =>
     allSubjects.value.find(({ subject }) => subject.id === selectedSubjectId.value)?.subject ??
+    null,
+)
+const selectedPolicy = computed(
+  () =>
+    overview.value.policies.find((row) => row.subjectCode === selectedSubject.value?.subjectCode) ??
     null,
 )
 const editingGovernedSubject = computed(
@@ -172,7 +186,10 @@ function subjectCommand(): CostSubjectCommand | null {
 }
 
 async function loadTaxonomy(signal?: AbortSignal): Promise<void> {
-  subjects.value = await loadCostSubjectTree(signal)
+  ;[subjects.value, overview.value] = await Promise.all([
+    loadCostSubjectTree(signal),
+    loadAccountingCatalogOverview(signal),
+  ])
   normalizeSelection()
 }
 
@@ -261,6 +278,12 @@ onBeforeUnmount(() => controller?.abort())
       <template #actions>
         <V2Button size="small" variant="secondary" @click="refreshTaxonomy">刷新</V2Button>
       </template>
+    </V2Card>
+
+    <V2Card title="实施口径" :heading-level="2">
+      <p class="cost-subject-page__notice">
+        固定施工企业总账目录；项目、合同、往来单位、部门、员工使用辅助核算维度，不再拆成科目。预付账款、其他应收款、累计折旧、其他应付款及权益类科目不纳入本轻量化目录。
+      </p>
     </V2Card>
 
     <V2PageState v-if="loading" kind="loading" title="正在读取会计科目" description="请稍候。" />
@@ -424,10 +447,105 @@ onBeforeUnmount(() => controller?.abort())
               <dt>默认目标成本比例</dt>
               <dd>{{ formatDecimal(selectedSubject.defaultTargetRatio) }}%</dd>
             </div>
+            <div>
+              <dt>项目辅助核算</dt>
+              <dd>{{ dimensionRequirementLabel(selectedPolicy?.projectRequirement) }}</dd>
+            </div>
+            <div>
+              <dt>合同辅助核算</dt>
+              <dd>{{ dimensionRequirementLabel(selectedPolicy?.contractRequirement) }}</dd>
+            </div>
+            <div>
+              <dt>往来单位</dt>
+              <dd>{{ dimensionRequirementLabel(selectedPolicy?.partnerRequirement) }}</dd>
+            </div>
+            <div>
+              <dt>部门 / 员工</dt>
+              <dd>
+                {{ dimensionRequirementLabel(selectedPolicy?.departmentRequirement) }} /
+                {{ dimensionRequirementLabel(selectedPolicy?.employeeRequirement) }}
+              </dd>
+            </div>
           </dl>
           <V2PageState v-else kind="empty" title="请选择科目" description="选择科目后查看详情。" />
         </section>
       </div>
+    </V2Card>
+
+    <V2Card title="成本结转映射" :heading-level="2">
+      <div
+        class="cost-subject-page__table-wrap"
+        role="region"
+        aria-label="成本结转映射"
+        tabindex="0"
+      >
+        <table class="v2-table">
+          <thead>
+            <tr>
+              <th>类别</th>
+              <th>合同履约成本</th>
+              <th>主营业务成本</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in overview.carryoverMappings" :key="row.categoryCode">
+              <td>{{ row.categoryCode }} · {{ row.categoryName }}</td>
+              <td>{{ row.fulfillmentCode }} · {{ row.fulfillmentName }}</td>
+              <td>{{ row.expenseCode }} · {{ row.expenseName }}</td>
+              <td>{{ row.status === 'ENABLE' ? '启用' : '停用' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </V2Card>
+
+    <V2Card title="历史科目复核" :heading-level="2">
+      <V2PageState
+        v-if="!overview.legacyReviews.length"
+        kind="empty"
+        title="没有待复核历史科目"
+        description="历史凭证保持原样。"
+      />
+      <div
+        v-else
+        class="cost-subject-page__table-wrap"
+        role="region"
+        aria-label="历史科目复核"
+        tabindex="0"
+      >
+        <table class="v2-table">
+          <thead>
+            <tr>
+              <th>历史科目</th>
+              <th>建议正式科目</th>
+              <th>状态</th>
+              <th>处理原则</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in overview.legacyReviews" :key="row.sourceSubjectCode">
+              <td>{{ row.sourceSubjectCode }} · {{ row.sourceSubjectName }}</td>
+              <td>{{ row.suggestedSubjectCode || '待人工判断' }}</td>
+              <td>{{ row.reviewStatus === 'PENDING' ? '待复核' : row.reviewStatus }}</td>
+              <td>{{ row.reviewNote || '只读保留，不直接改写历史凭证' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </V2Card>
+
+    <V2Card title="关联报表" :heading-level="2">
+      <V2Cluster>
+        <RouterLink
+          v-for="route in overview.reportRoutes"
+          :key="route.path"
+          :to="route.path"
+          class="v2-button v2-button--secondary v2-button--small"
+        >
+          {{ route.label }}
+        </RouterLink>
+      </V2Cluster>
     </V2Card>
 
     <V2Dialog

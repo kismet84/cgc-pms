@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("304", flyway.info().current().getVersion().getVersion());
+        assertEquals("306", flyway.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(flyway);
         assertCostGovernanceSchema(flyway);
         assertUnifiedAuditColumns(flyway);
@@ -255,7 +255,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("304", current.info().current().getVersion().getVersion());
+        assertEquals("306", current.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(current);
         assertCostGovernanceSchema(current);
         assertEquals(1, count(current, "wf_template_node", """
@@ -445,7 +445,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
         current.migrate();
 
-        assertEquals("304", current.info().current().getVersion().getVersion());
+        assertEquals("306", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "finance_cost_allocation_batch",
                 "id=301990000000000018 AND reversal_of_id=301990000000000014 AND status='REVERSED'"));
     }
@@ -768,6 +768,22 @@ class BaselineFlywayCompatibilityTest {
                 """));
         assertEquals(1, count(flyway, "sys_menu",
                 "path='/cost/subject' AND menu_name='会计科目' AND deleted_flag=0"));
+        assertEquals(84, count(flyway, "cost_subject",
+                "tenant_id=0 AND deleted_flag=0 AND ledger_flag=1 AND subject_type='GENERAL_LEDGER'"));
+        assertEquals(84, count(flyway, "accounting_subject_dimension_rule", "tenant_id=0"));
+        assertEquals(8, count(flyway, "accounting_cost_carryover_mapping",
+                "tenant_id=0 AND status='ENABLE'"));
+        assertEquals(5, count(flyway, "accounting_subject_legacy_review",
+                "tenant_id=0 AND review_status='PENDING'"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='accounting_entry_line' AND COLUMN_NAME='accounting_subject_id'"));
+        assertEquals(3, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='accounting_entry' AND COLUMN_NAME IN ('partner_id','department_id','employee_id')"));
+        assertEquals(1, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0
+                  AND perms='accounting:cost-carryover')
+                """));
     }
 
     private static void assertCostGovernanceSchema(Flyway flyway) {

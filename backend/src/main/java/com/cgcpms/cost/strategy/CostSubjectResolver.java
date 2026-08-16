@@ -68,7 +68,7 @@ public class CostSubjectResolver {
                 SELECT o.id,o.override_cost_subject_id,o.mapping_version_id,o.assignment_rule_id
                 FROM cost_classification_override o
                 JOIN cost_subject s ON s.tenant_id=o.tenant_id AND s.id=o.override_cost_subject_id
-                  AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                  AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                 WHERE o.tenant_id=? AND o.source_type=? AND o.source_id=? AND o.source_item_id=?
                   AND o.status='ACTIVE' AND NOT EXISTS (
                     SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id
@@ -98,7 +98,7 @@ public class CostSubjectResolver {
                 JOIN cost_subject_mapping_version v ON v.tenant_id=r.tenant_id
                   AND v.id=r.mapping_version_id AND v.status='ACTIVE'
                 JOIN cost_subject s ON s.tenant_id=r.tenant_id AND s.id=r.cost_subject_id
-                  AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                  AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                 WHERE r.tenant_id=? AND r.status='ACTIVE' AND r.source_type=?
                   AND r.business_category IN (?, '*') AND (r.project_id=? OR r.project_id IS NULL)
                   AND r.effective_from<=?
@@ -168,7 +168,7 @@ public class CostSubjectResolver {
                 FROM cost_subject_assignment_rule r
                 JOIN cost_subject_mapping_version v ON v.tenant_id=r.tenant_id AND v.id=r.mapping_version_id
                 JOIN cost_subject s ON s.tenant_id=r.tenant_id AND s.id=r.cost_subject_id
-                  AND s.deleted_flag=0 AND s.account_category='COST'
+                  AND s.deleted_flag=0 AND s.account_category='COST' AND s.ledger_flag=0
                 WHERE r.tenant_id=? AND r.mapping_version_id=? AND r.source_type=?
                   AND r.business_category IN (?, '*') AND (r.project_id=? OR r.project_id IS NULL)
                   AND r.effective_from<=? AND (r.effective_to IS NULL OR r.effective_to>=?)
@@ -270,7 +270,7 @@ public class CostSubjectResolver {
         List<Long> subjects = jdbc.queryForList("""
                 SELECT s.id FROM cost_subject s
                 WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0
-                  AND s.status='ENABLE' AND s.account_category='COST'
+                  AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject child
                     WHERE child.tenant_id=s.tenant_id AND child.parent_id=s.id AND child.deleted_flag=0)
                 FOR UPDATE

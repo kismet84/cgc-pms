@@ -37,7 +37,7 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
         }
         Long tenantId = UserContext.getCurrentTenantId();
         Map<String, Object> settlement = one("""
-                SELECT project_id,contract_id,settlement_code,status
+                SELECT project_id,contract_id,customer_id,settlement_code,status
                   FROM owner_settlement
                  WHERE id=? AND tenant_id=? AND deleted_flag=0
                 """, sourceId, tenantId, "OWNER_SETTLEMENT_NOT_FOUND", "业主结算不存在或不属于当前租户");
@@ -53,7 +53,7 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
         requirePositive(amount, "OWNER_SETTLEMENT_AR_AMOUNT_INVALID", "业主结算有效应收金额必须大于0");
 
         CostSubject receivableSubject = subjectResolver.require(AccountingSubjectCatalog.RECEIVABLE, "ASSET");
-        CostSubject revenueSubject = subjectResolver.requireWithPublicFallback("6001.01", "REVENUE");
+        CostSubject settlementSubject = subjectResolver.require(AccountingSubjectCatalog.PRICE_SETTLEMENT, "SETTLEMENT");
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode("AR-CONF-" + sourceId);
@@ -61,12 +61,12 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
         entry.setEntryDate(LocalDate.now());
         entry.setProjectId(number(settlement.get("project_id")));
         entry.setContractId(number(settlement.get("contract_id")));
+        entry.setPartnerId(number(settlement.get("customer_id")));
         entry.setLines(List.of(
-                line("DEBIT", receivableSubject.getSubjectCode(), receivableSubject.getSubjectName(), null, amount,
+                line("DEBIT", receivableSubject, null, amount,
                         "业主结算确认应收：" + settlement.get("settlement_code")),
-                line("CREDIT", revenueSubject.getSubjectCode(), revenueSubject.getSubjectName(),
-                        revenueSubject.getId(), amount,
-                        "业主结算确认收入：" + settlement.get("settlement_code"))));
+                line("CREDIT", settlementSubject, null, amount,
+                        "业主结算确认价款：" + settlement.get("settlement_code"))));
         return entry;
     }
 
@@ -86,12 +86,13 @@ public class OwnerSettlementEntryGenerationStrategy implements EntryGenerationSt
         return value == null ? null : ((Number) value).longValue();
     }
 
-    private static AccountingEntryLine line(String direction, String accountCode, String accountName,
+    private static AccountingEntryLine line(String direction, CostSubject accountingSubject,
                                             Long costSubjectId, BigDecimal amount, String summary) {
         AccountingEntryLine line = new AccountingEntryLine();
         line.setDirection(direction);
-        line.setAccountCode(accountCode);
-        line.setAccountName(accountName);
+        line.setAccountingSubjectId(accountingSubject.getId());
+        line.setAccountCode(accountingSubject.getSubjectCode());
+        line.setAccountName(accountingSubject.getSubjectName());
         line.setCostSubjectId(costSubjectId);
         line.setAmount(amount);
         line.setSummary(summary);

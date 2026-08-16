@@ -74,56 +74,57 @@ test('cost-subject deep links render server facts and preserve root redirect sta
         },
       ])
     }
-    if (path.endsWith('/api/cost-subjects/tree')) {
+    if (path.endsWith('/api/cost-subjects/accounting-overview')) {
+      return success(route, {
+        policies: [
+          {
+            subjectCode: '1122',
+            subjectName: '应收账款',
+            projectRequirement: 'REQUIRED',
+            contractRequirement: 'REQUIRED',
+            partnerRequirement: 'REQUIRED',
+            departmentRequirement: 'NONE',
+            employeeRequirement: 'NONE',
+            allowedContractTypes: 'MAIN',
+            allowedPartnerTypes: 'CUSTOMER,OWNER',
+          },
+        ],
+        carryoverMappings: [
+          {
+            categoryCode: 'LABOR',
+            categoryName: '人工费',
+            fulfillmentCode: '1451.01',
+            fulfillmentName: '人工费',
+            expenseCode: '6401.01',
+            expenseName: '人工费',
+            status: 'ENABLE',
+          },
+        ],
+        legacyReviews: [
+          {
+            sourceSubjectCode: '1122-AR',
+            sourceSubjectName: '应收账款',
+            suggestedSubjectCode: '1122',
+            reviewStatus: 'PENDING_REVIEW',
+            reviewNote: '历史只读保留',
+          },
+        ],
+        reportRoutes: [{ label: '应收账龄', path: '/receivable-aging' }],
+      })
+    }
+    if (path.endsWith('/api/cost-subjects/accounting-tree')) {
       return success(route, [
         {
-          id: '1',
+          id: '11',
           parentId: '0',
-          subjectCode: '5401',
-          subjectName: '工程成本',
-          subjectType: 'ROOT',
-          accountCategory: 'COST',
-          level: 1,
-          sortOrder: 1,
-          status: 'ENABLE',
-          children: [
-            {
-              id: '11',
-              parentId: '1',
-              subjectCode: '5401.01',
-              subjectName: '直接工程费',
-              subjectType: 'GROUP',
-              accountCategory: 'COST',
-              level: 2,
-              sortOrder: 1,
-              status: 'ENABLE',
-              children: [
-                {
-                  id: '111',
-                  parentId: '11',
-                  subjectCode: '5401.01.01',
-                  subjectName: '人工费',
-                  subjectType: 'DETAIL',
-                  accountCategory: 'COST',
-                  level: 3,
-                  sortOrder: 1,
-                  status: 'ENABLE',
-                  children: [],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          id: '2',
-          parentId: '0',
-          subjectCode: '1122-AR',
+          subjectCode: '1122',
           subjectName: '应收账款',
           subjectType: 'GENERAL_LEDGER',
           accountCategory: 'ASSET',
           level: 1,
-          sortOrder: 20,
+          sortOrder: 1,
           status: 'ENABLE',
+          ledgerFlag: 1,
           children: [],
         },
       ])
@@ -277,10 +278,12 @@ test('cost-subject deep links render server facts and preserve root redirect sta
   await expect(page.getByRole('heading', { level: 1, name: '会计科目' })).toBeVisible()
   await expect(page.getByRole('region', { name: '1. 科目大类' })).toContainText('资产类')
   const catalog = page.getByRole('region', { name: '2. 科目目录' })
-  await expect(catalog).toContainText('5401.01.01')
-  await expect(catalog).toContainText('1122-AR')
+  await expect(catalog).toContainText('1122')
+  await expect(catalog).not.toContainText('1122-AR')
   await catalog.getByText('应收账款', { exact: true }).click()
-  await expect(page.getByRole('region', { name: '3. 科目详情' })).toContainText('1122-AR')
+  await expect(page.getByRole('region', { name: '3. 科目详情' })).toContainText('1122')
+  await expect(page.getByRole('region', { name: '成本结转映射' })).toContainText('1451.01')
+  await expect(page.getByRole('region', { name: '历史科目复核' })).toContainText('1122-AR')
 
   await page.goto('/cost/subject/rules')
   await expect(page.getByRole('heading', { level: 1, name: '成本规则方案' })).toBeVisible()

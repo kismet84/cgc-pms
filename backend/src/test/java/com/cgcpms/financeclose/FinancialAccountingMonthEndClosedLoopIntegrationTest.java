@@ -250,9 +250,9 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
         AccountingEntry adjustment = closeService.createAdjustment(new AdjustmentRequest(
                 LocalDate.of(YEAR, MONTH, 15), null, null, "制造独立账差",
                 List.of(
-                        new AdjustmentLine("DEBIT", "1122-AR", "应收账款", null,
+                        new AdjustmentLine("DEBIT", "1122", "应收账款", null,
                                 new BigDecimal("0.01"), "总账应收差异"),
-                        new AdjustmentLine("CREDIT", "2202-AP", "应付账款", null,
+                        new AdjustmentLine("CREDIT", "2202.04", "应付分包款", null,
                                 new BigDecimal("0.01"), "总账应付差异"))));
         TestUserContext.setUser(TENANT, 102L, "reviewer", List.of("FINANCE"));
         entryService.review(adjustment.getId(), true, "差异测试复核");
