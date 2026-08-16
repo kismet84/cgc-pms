@@ -57,9 +57,15 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   BID_COST_TRANSFERRED: '已结转投标费用',
   OVERHEAD_ALLOCATION: '间接费用分摊',
 }
+const RECOGNITION_ROLE_LABELS: Record<string, string> = {
+  ACTUAL: '实际成本',
+  COMMITTED: '承诺成本',
+  NON_COST: '非成本事实',
+}
 const costStatusLabel = (value: string) => COST_STATUS_LABELS[value] ?? '未知状态'
 const costTypeLabel = (value: string) => COST_TYPE_LABELS[value] ?? '其他成本'
 const sourceTypeLabel = (value: string) => SOURCE_TYPE_LABELS[value] ?? '其他来源'
+const recognitionRoleLabel = (value: string) => RECOGNITION_ROLE_LABELS[value] ?? '口径未知'
 const errorText = (e: unknown, fallback: string) =>
   isApiClientError(e) ? e.message : e instanceof Error ? e.message : fallback
 function hydrate() {
@@ -203,6 +209,7 @@ onBeforeUnmount(() => {
                 <th scope="col">发生日期</th>
                 <th scope="col">金额</th>
                 <th scope="col">税额</th>
+                <th scope="col">成本口径</th>
                 <th scope="col">来源</th>
               </tr>
             </thead>
@@ -223,6 +230,7 @@ onBeforeUnmount(() => {
                 <td>{{ row.costDate || '—' }}</td>
                 <td>{{ formatAmount(row.amount) }}</td>
                 <td>{{ formatAmount(row.taxAmount) }}</td>
+                <td>{{ recognitionRoleLabel(row.recognitionRole) }}</td>
                 <td>{{ sourceTypeLabel(row.sourceType) }}</td>
               </tr>
             </tbody>
@@ -288,6 +296,10 @@ onBeforeUnmount(() => {
           <div>
             <dt>状态</dt>
             <dd>{{ costStatusLabel(detail.costStatus) }}</dd>
+          </div>
+          <div>
+            <dt>成本口径</dt>
+            <dd>{{ recognitionRoleLabel(detail.recognitionRole) }}</dd>
           </div>
         </dl></V2Dialog
       ></template

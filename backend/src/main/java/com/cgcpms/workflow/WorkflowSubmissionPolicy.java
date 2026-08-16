@@ -40,7 +40,12 @@ public final class WorkflowSubmissionPolicy {
             dedicated(WorkflowBusinessTypes.BID_COST_TARGET_TRANSFER, "cost:subject:transfer:submit"),
             dedicated(WorkflowBusinessTypes.FINANCE_COST_ALLOCATION, "cost:subject:allocation:submit"),
             dedicated(WorkflowBusinessTypes.QS_RECTIFICATION, "quality:rectification:submit"),
-            dedicated(WorkflowBusinessTypes.QS_CONSEQUENCE, "quality:consequence:submit"));
+            dedicated(WorkflowBusinessTypes.QS_CONSEQUENCE, "quality:consequence:submit"),
+            dedicated(WorkflowBusinessTypes.COST_RULE_PLAN, "cost:rule-plan:submit"),
+            dedicated(WorkflowBusinessTypes.COST_PROJECT_CONFIG, "cost:project-config:submit"),
+            dedicated(WorkflowBusinessTypes.COST_RECALCULATION, "cost:recalculation:submit"),
+            dedicated(WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT, "cost:post-close:submit"),
+            dedicated(WorkflowBusinessTypes.COST_REVERSAL, "cost:reversal:submit"));
 
     private WorkflowSubmissionPolicy() {
     }

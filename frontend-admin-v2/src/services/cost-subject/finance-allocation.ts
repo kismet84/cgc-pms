@@ -38,6 +38,15 @@ export function submitFinanceAllocationRequest(
   ).then((row) => normalizeAuditRow(row) as FinanceAllocationRequestRecord)
 }
 
+export function cancelFinanceAllocationRequest(
+  id: string,
+): Promise<FinanceAllocationRequestRecord> {
+  return apiRequest<Record<string, unknown>>(
+    `/cost-subject-v2/finance-allocation-requests/${requiredId(id)}/cancel`,
+    { method: 'POST' },
+  ).then((row) => normalizeAuditRow(row) as FinanceAllocationRequestRecord)
+}
+
 export function reverseFinanceAllocation(
   id: string,
   approvalInstanceId: string,

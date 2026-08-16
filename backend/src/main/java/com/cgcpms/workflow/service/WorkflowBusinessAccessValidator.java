@@ -228,6 +228,26 @@ public class WorkflowBusinessAccessValidator {
                         requestProjectId, requestContractId, "QS_CONSEQUENCE_NOT_FOUND",
                         "DRAFT", "REJECTED", "WITHDRAWN");
             }
+            case WorkflowBusinessTypes.COST_RULE_PLAN -> {
+                return validateCompanyGovernance("cost_subject_mapping_version", "status", businessId,
+                        tenantId, "COST_RULE_PLAN_NOT_FOUND", "VALIDATED");
+            }
+            case WorkflowBusinessTypes.COST_PROJECT_CONFIG -> {
+                return validateProjectGovernance("cost_project_config_request", "status", businessId,
+                        tenantId, requestProjectId, "COST_PROJECT_CONFIG_NOT_FOUND",
+                        "DRAFT", "REJECTED", "WITHDRAWN");
+            }
+            case WorkflowBusinessTypes.COST_RECALCULATION -> {
+                return validateRecalculation(businessId, tenantId, requestProjectId,
+                        WorkflowBusinessTypes.COST_RECALCULATION, "HISTORY_RECALCULATION");
+            }
+            case WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT -> {
+                return validateRecalculation(businessId, tenantId, requestProjectId,
+                        WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT, "POST_CLOSE_ADJUSTMENT");
+            }
+            case WorkflowBusinessTypes.COST_REVERSAL -> {
+                return validateReversal(businessId, tenantId, requestProjectId);
+            }
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         }
     }
@@ -319,6 +339,95 @@ public class WorkflowBusinessAccessValidator {
                 "cost_corrective_action", "technical_scheme", "closeout_final_acceptance",
                 "bid_cost_target_transfer_request", "finance_cost_allocation_request",
                 "qs_rectification").contains(table);
+    }
+
+    private ValidationResult validateCompanyGovernance(String table, String statusColumn, Long businessId,
+                                                         Long tenantId, String notFoundCode,
+                                                         String... allowedStatuses) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT tenant_id," + statusColumn + " approval_status FROM " + table + " WHERE id=?",
+                businessId);
+        Map<String, Object> row = rows.isEmpty() ? null : rows.get(0);
+        if (row == null || !Objects.equals(((Number) row.get("tenant_id")).longValue(), tenantId)) {
+            throw new BusinessException(notFoundCode, "审批业务对象不存在");
+        }
+        String status = Objects.toString(row.get("approval_status"), null);
+        if (!isAllowedStatus(status, allowedStatuses)) {
+            throw new BusinessException("WORKFLOW_STATUS_NOT_SUBMITTABLE", "业务状态不允许提交审批");
+        }
+        return new ValidationResult(null, null, status);
+    }
+
+    private ValidationResult validateProjectGovernance(String table, String statusColumn, Long businessId,
+                                                         Long tenantId, Long requestProjectId,
+                                                         String notFoundCode, String... allowedStatuses) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT tenant_id,project_id," + statusColumn + " approval_status FROM " + table + " WHERE id=?",
+                businessId);
+        Map<String, Object> row = rows.isEmpty() ? null : rows.get(0);
+        if (row == null || !Objects.equals(((Number) row.get("tenant_id")).longValue(), tenantId)) {
+            throw new BusinessException(notFoundCode, "审批业务对象不存在");
+        }
+        Long projectId = ((Number) row.get("project_id")).longValue();
+        if (requestProjectId != null && !Objects.equals(projectId, requestProjectId)) {
+            throw new BusinessException("WORKFLOW_PROJECT_MISMATCH", "审批请求项目与业务对象不一致");
+        }
+        String status = Objects.toString(row.get("approval_status"), null);
+        if (!isAllowedStatus(status, allowedStatuses)) {
+            throw new BusinessException("WORKFLOW_STATUS_NOT_SUBMITTABLE", "业务状态不允许提交审批");
+        }
+        projectAccessChecker.checkAccess(projectId, "提交成本治理审批");
+        return new ValidationResult(projectId, null, status);
+    }
+
+    private ValidationResult validateRecalculation(Long businessId, Long tenantId, Long requestProjectId,
+                                                    String businessType, String expectedBatchType) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT tenant_id,project_id,batch_type,status approval_status
+                FROM cost_recalculation_batch WHERE id=?
+                """, businessId);
+        Map<String, Object> row = rows.isEmpty() ? null : rows.get(0);
+        if (row == null || !Objects.equals(((Number) row.get("tenant_id")).longValue(), tenantId)
+                || !expectedBatchType.equals(Objects.toString(row.get("batch_type"), null))) {
+            throw new BusinessException("COST_RECALCULATION_NOT_FOUND", "审批业务对象不存在");
+        }
+        String status = Objects.toString(row.get("approval_status"), null);
+        if (!isAllowedStatus(status, "DRAFT", "REJECTED", "WITHDRAWN")) {
+            throw new BusinessException("WORKFLOW_STATUS_NOT_SUBMITTABLE", "业务状态不允许提交审批");
+        }
+        Long projectId = row.get("project_id") == null ? null : ((Number) row.get("project_id")).longValue();
+        if (WorkflowBusinessTypes.COST_POST_CLOSE_ADJUSTMENT.equals(businessType) && projectId == null) {
+            throw new BusinessException("WORKFLOW_PROJECT_MISSING", "关闭后财务调整必须绑定项目");
+        }
+        if (requestProjectId != null && !Objects.equals(projectId, requestProjectId)) {
+            throw new BusinessException("WORKFLOW_PROJECT_MISMATCH", "审批请求项目与业务对象不一致");
+        }
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "提交成本重算审批");
+        }
+        return new ValidationResult(projectId, null, status);
+    }
+
+    private ValidationResult validateReversal(Long businessId, Long tenantId, Long requestProjectId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT tenant_id,project_id,status approval_status
+                FROM cost_reversal_request WHERE id=?
+                """, businessId);
+        Map<String, Object> row = rows.isEmpty() ? null : rows.getFirst();
+        if (row == null || !Objects.equals(((Number) row.get("tenant_id")).longValue(), tenantId)) {
+            throw new BusinessException("COST_REVERSAL_NOT_FOUND", "审批业务对象不存在");
+        }
+        String status = Objects.toString(row.get("approval_status"), null);
+        if (!isAllowedStatus(status, "DRAFT", "REJECTED", "WITHDRAWN")) {
+            throw new BusinessException("WORKFLOW_STATUS_NOT_SUBMITTABLE", "业务状态不允许提交审批");
+        }
+        Long projectId = row.get("project_id") == null ? null : ((Number) row.get("project_id")).longValue();
+        if (requestProjectId != null && !Objects.equals(projectId, requestProjectId)) {
+            throw new BusinessException("WORKFLOW_PROJECT_MISMATCH", "审批请求项目与业务对象不一致");
+        }
+        if (projectId == null) projectAccessChecker.requireAllScope("提交成本冲销审批");
+        else projectAccessChecker.checkAccess(projectId, "提交成本冲销审批");
+        return new ValidationResult(projectId, null, status);
     }
 
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,

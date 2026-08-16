@@ -25,6 +25,7 @@ import { amount, askReason, label } from './model'
 type EntryAction = 'approve' | 'reject' | 'post' | 'resubmit' | 'reverse'
 
 const pageSize = 10
+const paymentTraceSourceTypes = new Set(['PAY_APPLICATION', 'PAY_RECORD', 'PAY_INVOICE'])
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const projectId = computed(() => workspace.selectedProjectId || '')
@@ -41,6 +42,10 @@ const traceRows = ref<PaymentTraceRecord[]>([])
 const traceLoading = ref(false)
 const traceError = ref('')
 let controller: AbortController | null = null
+
+function canOpenPaymentTrace(row: AccountingEntryRecord): boolean {
+  return paymentTraceSourceTypes.has(row.sourceType)
+}
 
 async function load(preservePage = false): Promise<void> {
   if (!canQuery.value) return
@@ -208,8 +213,14 @@ onBeforeUnmount(() => controller?.abort())
                         v-if="can('payment:trace:query')"
                         size="small"
                         variant="ghost"
+                        :disabled="!canOpenPaymentTrace(row)"
+                        :title="
+                          canOpenPaymentTrace(row)
+                            ? '查看付款全链路'
+                            : '该凭证未绑定付款申请，不属于付款 Trace'
+                        "
                         @click="openTrace(row.id)"
-                        >查看 Trace</V2Button
+                        >查看付款 Trace</V2Button
                       >
                       <V2Button
                         v-if="
@@ -289,8 +300,8 @@ onBeforeUnmount(() => controller?.abort())
                 <tr>
                   <th>行号</th>
                   <th>方向</th>
-                  <th>科目编码</th>
-                  <th>科目名称</th>
+                  <th>会计科目编码</th>
+                  <th>会计科目名称</th>
                   <th>摘要</th>
                   <th>金额</th>
                 </tr>

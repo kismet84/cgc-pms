@@ -109,6 +109,76 @@ public class FinancialCloseService {
                 """, endExclusive.atStartOfDay(), tenant());
         issues += addCheck(periodId, "SOURCE_VOUCHER_COMPLETENESS", missingVoucher, Map.of("message", "成功收付款必须存在已过账凭证"));
 
+        int pendingOverhead = count("""
+                SELECT COUNT(*) FROM (
+                  SELECT r.id
+                  FROM cost_item ci
+                  JOIN overhead_allocation_rule r
+                    ON r.tenant_id=ci.tenant_id AND r.cost_subject_id=ci.cost_subject_id
+                   AND r.allocation_cycle='MONTHLY' AND r.deleted_flag=0
+                  WHERE ci.tenant_id=? AND ci.cost_date BETWEEN ? AND ? AND ci.deleted_flag=0
+                    AND ci.cost_status IN ('CONFIRMED','POSTED')
+                    AND ci.classification_status<>'UNCLASSIFIED' AND ci.recognition_role='ACTUAL'
+                  AND ci.source_type NOT IN ('OVERHEAD_ALLOCATION','OVERHEAD_ALLOCATION_CLEARING',
+                    'COST_RECALCULATION_NEGATIVE','COST_RECALCULATION_POSITIVE','COST_RECALCULATION_REVERSAL')
+                    AND NOT EXISTS (
+                      SELECT 1 FROM cost_item clearing
+                      WHERE clearing.tenant_id=ci.tenant_id AND clearing.original_cost_item_id=ci.id
+                        AND clearing.source_type='OVERHEAD_ALLOCATION_CLEARING'
+                        AND clearing.deleted_flag=0 AND clearing.cost_status<>'WRITE_OFF')
+                  GROUP BY r.id,ci.project_id
+                  HAVING ROUND(SUM(ci.amount),2)<>0 OR ROUND(SUM(ci.tax_amount),2)<>0
+                      OR ROUND(SUM(ci.amount_without_tax),2)<>0
+                ) pending_overhead
+                """, tenant(), start, end);
+        issues += addCheck(periodId, "OVERHEAD_ALLOCATION_COMPLETENESS", pendingOverhead,
+                Map.of("message", "期间内仍有尚未完成分摊的间接费成本"));
+
+        int unclassifiedCostFacts = count("""
+                SELECT COUNT(*)
+                FROM cost_item ci
+                WHERE ci.tenant_id=? AND ci.cost_date BETWEEN ? AND ? AND ci.deleted_flag=0
+                  AND ci.cost_status IN ('CONFIRMED','POSTED')
+                  AND ci.recognition_role IN ('ACTUAL','COMMITTED')
+                  AND ci.classification_status='UNCLASSIFIED'
+                  AND (ROUND(ci.amount,2)<>0 OR ROUND(ci.tax_amount,2)<>0
+                       OR ROUND(ci.amount_without_tax,2)<>0)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cost_recalculation_batch own_batch
+                    WHERE own_batch.tenant_id=ci.tenant_id AND own_batch.id=ci.adjustment_batch_id
+                      AND own_batch.status='REVERSED')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cost_item successor
+                    LEFT JOIN cost_recalculation_batch successor_batch
+                      ON successor_batch.tenant_id=successor.tenant_id
+                     AND successor_batch.id=successor.adjustment_batch_id
+                    WHERE successor.tenant_id=ci.tenant_id AND successor.original_cost_item_id=ci.id
+                      AND successor.deleted_flag=0
+                      AND (successor.source_type='COST_RECALCULATION_REVERSAL'
+                           OR (successor.source_type='COST_RECALCULATION_NEGATIVE'
+                               AND successor_batch.status='POSTED')))
+                """, tenant(), start, end);
+        issues += addCheck(periodId, "UNCLASSIFIED_COST_FACT_COMPLETENESS", unclassifiedCostFacts,
+                Map.of("message", "期间内仍有待归类成本事实，完成归类或历史重算后方可结账"));
+
+        int submittedRecalculations = count("""
+                SELECT COUNT(DISTINCT b.id)
+                FROM cost_recalculation_batch b
+                JOIN cost_recalculation_line l ON l.tenant_id=b.tenant_id AND l.batch_id=b.id
+                JOIN cost_item fact ON fact.tenant_id=l.tenant_id AND fact.id=l.original_cost_item_id
+                WHERE b.tenant_id=? AND b.status='SUBMITTED' AND fact.deleted_flag=0
+                  AND fact.cost_date BETWEEN ? AND ?
+                """, tenant(), start, end);
+        issues += addCheck(periodId, "SUBMITTED_COST_RECALCULATION", submittedRecalculations,
+                Map.of("message", "期间内仍有审批中的成本重算或关闭后调整，完成或撤回后方可结账"));
+
+        int submittedFinanceAllocations = count("""
+                SELECT COUNT(*) FROM finance_cost_allocation_request
+                WHERE tenant_id=? AND accounting_period=? AND status='SUBMITTED' AND deleted_flag=0
+                """, tenant(), YearMonth.from(start).toString());
+        issues += addCheck(periodId, "SUBMITTED_FINANCE_COST_ALLOCATION", submittedFinanceAllocations,
+                Map.of("message", "期间内仍有审批中的财务费用分摊，完成或撤回后方可结账"));
+
         MandatoryAuditService.IntegrityReport auditIntegrity = mandatoryAuditService.inspectTenant();
         issues += addCheck(periodId, "MANDATORY_AUDIT_INTEGRITY", auditIntegrity.issueCount(), Map.of(
                 "missingEvents", auditIntegrity.missingEvents(),
@@ -129,6 +199,10 @@ public class FinancialCloseService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> close(int year, int month, String comment) {
         Map<String, Object> period = requiredPeriodForUpdate(year, month);
+        LocalDate end = date(period.get("end_date"));
+        if (!end.isBefore(LocalDate.now())) {
+            throw error("FINANCE_PERIOD_NOT_ENDED", "自然月尚未结束，禁止提前结账");
+        }
         if ("CLOSED".equals(period.get("status"))) throw error("FINANCE_PERIOD_ALREADY_CLOSED", "会计期间已结账");
         if (period.get("last_check_at") == null) throw error("FINANCE_PERIOD_CHECK_REQUIRED", "月结前必须运行完整性检查");
         if (((Number) period.get("issue_count")).intValue() > 0) throw error("FINANCE_PERIOD_ISSUES_EXIST", "月结检查存在未解决异常，禁止结账");
@@ -138,7 +212,6 @@ public class FinancialCloseService {
         Long id = longValue(period.get("id"));
         long version = ((Number) period.get("version")).longValue();
         LocalDate start = date(period.get("start_date"));
-        LocalDate end = date(period.get("end_date"));
         jdbc.update("UPDATE accounting_entry SET period_id=? WHERE tenant_id=? AND entry_date BETWEEN ? AND ? AND deleted_flag=0", id, tenant(), start, end);
         updatePeriod("UPDATE finance_period SET status='CLOSED',closed_by=?,closed_at=CURRENT_TIMESTAMP,close_comment=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), blank(comment), id, tenant());

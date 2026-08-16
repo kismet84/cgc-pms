@@ -4,6 +4,7 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.invoice.entity.PayInvoice;
@@ -28,6 +29,7 @@ public class InvoiceAdvanceEntryGenerationStrategy implements EntryGenerationStr
     private final PayInvoiceMapper invoiceMapper;
     private final PayApplicationMapper applicationMapper;
     private final CostSubjectMapper costSubjectMapper;
+    private final AccountingSubjectResolver subjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -65,9 +67,11 @@ public class InvoiceAdvanceEntryGenerationStrategy implements EntryGenerationStr
         }
         CostSubject subject = costSubjectMapper.selectById(application.getCostSubjectId());
         if (subject == null || !Objects.equals(subject.getTenantId(), tenantId)
-                || !"ENABLE".equals(subject.getStatus())) {
-            throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户或已停用");
+                || !"ENABLE".equals(subject.getStatus()) || !"COST".equals(subject.getAccountCategory())) {
+            throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户、非成本类或已停用");
         }
+        CostSubject payableSubject = subjectResolver.require(AccountingSubjectCatalog.PAYABLE, "LIABILITY");
+        CostSubject prepaymentSubject = subjectResolver.require(AccountingSubjectCatalog.PREPAYMENT, "ASSET");
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode((AP_CONFIRMATION_ENTRY_TYPE.equals(entryType) ? "ADV-AP-" : "ADV-RECLASS-") + sourceId);
@@ -80,12 +84,12 @@ public class InvoiceAdvanceEntryGenerationStrategy implements EntryGenerationStr
                 ? List.of(
                     line("DEBIT", subject.getSubjectCode(), subject.getSubjectName(), subject.getId(), amount,
                             "预付款发票确认成本：" + invoice.getInvoiceNo()),
-                    line("CREDIT", "2202-AP", "应付账款", null, amount,
+                    line("CREDIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
                             "预付款发票确认应付：" + invoice.getInvoiceNo()))
                 : List.of(
-                    line("DEBIT", "2202-AP", "应付账款", null, amount,
+                    line("DEBIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
                             "预付款发票冲减应付：" + invoice.getInvoiceNo()),
-                    line("CREDIT", "1123-PREPAY", "预付账款", null, amount,
+                    line("CREDIT", prepaymentSubject.getSubjectCode(), prepaymentSubject.getSubjectName(), null, amount,
                             "预付款发票结转：" + invoice.getInvoiceNo())));
         return entry;
     }

@@ -36,7 +36,7 @@ function routeContract(route: RouteRecordRaw): unknown {
 describe('M94 navigation and router boundaries', () => {
   it('freezes navigation domain data and public selector behavior', () => {
     expect(hash(navigationDomains)).toBe(
-      '2bfc4dd11f376fd746642d3f6a4c6fa91e9920c99bd9e015bc2f39243b3c8b61',
+      '519e8daa749d14781c8bc0a0112ce5719572de08b4b50649087253c24c99b060',
     )
     expect(navigationDomains.map((domain) => domain.id)).toEqual([
       'workbench',

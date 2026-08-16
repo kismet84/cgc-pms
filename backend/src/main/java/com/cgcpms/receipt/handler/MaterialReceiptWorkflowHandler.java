@@ -5,6 +5,7 @@ import static com.cgcpms.common.util.BigDecimalUtils.nvl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.inventory.entity.MatWarehouse;
@@ -48,6 +49,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     private final MatPurchaseOrderItemMapper purchaseOrderItemMapper;
     private final MatWarehouseMapper warehouseMapper;
     private final CostGenerationService costGenerationService;
+    private final CostClassificationGuard costClassificationGuard;
     private final MatStockService matStockService;
     private final ContractProcurementPayableService payableService;
     private final PurchaseOrderReceiptStateService orderReceiptStateService;
@@ -60,6 +62,11 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        costClassificationGuard.requireClassified("MAT_RECEIPT", resolveReceiptId(context.getInstance()));
     }
 
     @Override
@@ -133,6 +140,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
         receiptMapper.update(null, new LambdaUpdateWrapper<MatReceipt>()
                 .eq(MatReceipt::getId, receiptId)
                 .set(MatReceipt::getApprovalStatus, "REJECTED"));
+        costClassificationGuard.voidPending("MAT_RECEIPT", receiptId);
     }
 
     @Override
@@ -143,6 +151,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
         receiptMapper.update(null, new LambdaUpdateWrapper<MatReceipt>()
                 .eq(MatReceipt::getId, receiptId)
                 .set(MatReceipt::getApprovalStatus, "DRAFT"));
+        costClassificationGuard.voidPending("MAT_RECEIPT", receiptId);
     }
 
     private Long resolveReceiptId(WfInstance instance) {

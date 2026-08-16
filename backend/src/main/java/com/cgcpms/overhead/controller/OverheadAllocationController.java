@@ -56,6 +56,13 @@ public class OverheadAllocationController {
         return ApiResponse.success();
     }
 
+    @PutMapping("/rules/{id}/status")
+    @PreAuthorize("hasAuthority('overhead:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> setRuleStatus(@PathVariable Long id, @RequestParam String status) {
+        service.setStatus(id, status);
+        return ApiResponse.success();
+    }
+
     @PostMapping("/execute")
     @PreAuthorize("hasAuthority('overhead:execute') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "UPDATE", businessType = "OVERHEAD_ALLOCATION", businessIdExpression = "#period")

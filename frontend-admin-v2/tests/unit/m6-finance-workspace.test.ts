@@ -15,6 +15,10 @@ import {
 } from '@/pages/finance/receivables-workspace/model'
 import {
   createFundAccount,
+  createCashForecast,
+  createCollectionSchedule,
+  createFinancePeriod,
+  createPaymentSchedule,
   loadApprovedContractRevenues,
   loadCashForecastCycles,
   loadFinanceOperationsWorkspace,
@@ -115,6 +119,63 @@ describe('M6 finance workspace contract', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/finance-operations\/workspace$/)
     expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/cash-forecasts\/workspace$/)
     vi.unstubAllGlobals()
+  })
+  it('creates payment, collection, forecast, and current-period facts through finance APIs', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: '0', data: null })))
+    vi.stubGlobal('fetch', fetchMock)
+    await createPaymentSchedule({
+      projectId: 'P1',
+      contractId: 'C1',
+      scheduleName: '八月付款计划',
+      plannedDate: '2026-08-15',
+      plannedAmount: '9560.00',
+      reminderDays: 7,
+    })
+    await createCollectionSchedule({
+      projectId: 'P1',
+      contractId: 'C2',
+      plannedDate: '2026-08-15',
+      plannedAmount: '5000.00',
+      reminderDays: 7,
+      note: '八月回款计划',
+    })
+    await createCashForecast({
+      projectId: 'P1',
+      forecastName: '八月资金预测',
+      asOfDate: '2026-08-15',
+      horizonStart: '2026-08-15',
+      horizonEnd: '2026-08-15',
+      scenario: 'BASE',
+      openingBalance: '1082440.00',
+    })
+    await createFinancePeriod({ fiscalYear: 2026, fiscalMonth: 8 })
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      expect.stringMatching(/\/api\/finance-operations\/schedules$/),
+      expect.stringMatching(/\/api\/revenue-operations\/schedules$/),
+      expect.stringMatching(/\/api\/cash-forecasts\/cycles$/),
+      expect.stringMatching(/\/api\/financial-close\/periods$/),
+    ])
+    expect(
+      fetchMock.mock.calls.map((call) => JSON.parse(String((call[1] as RequestInit).body))),
+    ).toEqual([
+      expect.objectContaining({ plannedAmount: '9560.00' }),
+      expect.objectContaining({ plannedAmount: '5000.00', note: '八月回款计划' }),
+      expect.objectContaining({ openingBalance: '1082440.00', scenario: 'BASE' }),
+      { fiscalYear: 2026, fiscalMonth: 8 },
+    ])
+    vi.unstubAllGlobals()
+  })
+  it('exposes creation controls for finance planning and current accounting period', () => {
+    const pages = `${receivablesSource()}\n${controlSource()}`
+    expect(pages).toContain('新建付款计划')
+    expect(pages).toContain('新建回款计划')
+    expect(pages).toContain('新建资金预测')
+    expect(pages).toContain('创建当前账期')
+    expect(pages).toContain('loadFinanceOperationsFormOptions(projectId.value)')
+    expect(pages).toContain('关闭项目仅允许补录截至实际完工日的历史预测')
+    expect(pages).toContain("['PERFORMING', 'SETTLED'].includes(item.contractStatus)")
+    expect(pages).toContain('cash-forecast-review-form')
+    expect(pages).not.toContain("askReason(action === 'approve'")
   })
   it('keeps enterprise reads separate from project detail writes', () => {
     const pages = controlSource()
@@ -342,6 +403,22 @@ describe('M6 finance workspace contract', () => {
     expect(control).toContain('loadPaymentTraceByCashJournal')
     expect(control).toContain('loadPaymentTraceByVoucher')
     expect(dialog).toContain('缺链由接口直接拒绝，不在页面补链。')
+    expect(dialog).toContain('正在读取服务端付款链路。')
+  })
+  it('only offers payment Trace for records with an explicit payment-chain source', () => {
+    const accounting = source('src/pages/finance/finance-control-workspace/AccountingEntryPage.vue')
+    const journal = source('src/pages/finance/finance-control-workspace/CashJournalPage.vue')
+    const expense = source('src/pages/finance/receivables-workspace/ExpenseApplicationPage.vue')
+    const close = source('src/pages/finance/finance-control-workspace/FinancialClosePage.vue')
+
+    expect(accounting).toContain("new Set(['PAY_APPLICATION', 'PAY_RECORD', 'PAY_INVOICE'])")
+    expect(accounting).toContain(':disabled="!canOpenPaymentTrace(row)"')
+    expect(journal).toContain("return row.sourceType === 'PAY_RECORD'")
+    expect(journal).toContain(':disabled="!canOpenPaymentTrace(row)"')
+    expect(expense).toContain('canTrace && canOpenPaymentTrace(row)')
+    expect(expense).toContain('return Number(row.convertedAmount) > 0')
+    expect(close).toContain('试算平衡（会计科目）')
+    expect(close).toContain("row.checkType === 'BANK_RECONCILIATION'")
   })
   it('renders the backend payment trace shape and conservation facts', () => {
     const trace: PaymentTraceRecord = {

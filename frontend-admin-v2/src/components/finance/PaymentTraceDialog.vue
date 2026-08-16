@@ -49,7 +49,12 @@ function text(entity: PaymentTraceEntity | null | undefined, ...keys: string[]):
     panel-class="payment-trace-dialog"
     @update:open="(value) => !value && emit('close')"
   >
-    <V2PageState v-if="loading" kind="loading" title="正在读取 Trace" />
+    <V2PageState
+      v-if="loading"
+      kind="loading"
+      title="正在读取 Trace"
+      description="正在读取服务端付款链路。"
+    />
     <V2PageState v-else-if="error" kind="error" title="Trace 不完整" :description="error" />
     <V2PageState
       v-else-if="!traces.length"

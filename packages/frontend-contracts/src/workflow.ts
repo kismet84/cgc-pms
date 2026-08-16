@@ -103,6 +103,7 @@ export interface WorkflowInstance {
   initiatorId: string;
   initiatorName: string;
   businessSummary?: string;
+  businessDetails?: Record<string, unknown>;
   startedAt: string;
   endedAt?: string;
   availableActions: WorkflowUiAction[];

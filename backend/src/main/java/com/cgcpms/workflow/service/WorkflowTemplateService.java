@@ -92,6 +92,8 @@ public class WorkflowTemplateService {
         template.setFormSchema(blankToNull(request.getFormSchema()));
         template.setRemark(request.getRemark());
         templateMapper.updateById(template);
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                template.getBusinessType(), listNodes(templateId), objectMapper);
         audit(templateId, "UPDATE_TEMPLATE", before);
     }
 
@@ -110,13 +112,15 @@ public class WorkflowTemplateService {
         WfTemplateNode node = buildNodeFromRequest(template, templateId, request, targetOrder);
         nodeMapper.insert(node);
         normalizeOrders(templateId);
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                template.getBusinessType(), listNodes(templateId), objectMapper);
         audit(templateId, "CREATE_TEMPLATE_NODE", before);
         return voAssembler.toTemplateNodeVO(nodeMapper.selectById(node.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void updateNode(Long templateId, Long nodeId, WorkflowTemplateNodeRequest request) {
-        getTemplateForUpdate(templateId);
+        WfTemplate template = getTemplateForUpdate(templateId);
         String before = snapshot(templateId);
         WfTemplateNode node = getNodeOrThrow(templateId, nodeId);
         validateNodeRequest(request, node.getApproverConfig());
@@ -129,23 +133,27 @@ public class WorkflowTemplateService {
         applyNodeRequest(node, request);
         nodeMapper.updateById(node);
         normalizeOrders(templateId);
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                template.getBusinessType(), listNodes(templateId), objectMapper);
         audit(templateId, "UPDATE_TEMPLATE_NODE", before);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteNode(Long templateId, Long nodeId) {
-        getTemplateForUpdate(templateId);
+        WfTemplate template = getTemplateForUpdate(templateId);
         String before = snapshot(templateId);
         getNodeOrThrow(templateId, nodeId);
         if (countNodes(templateId) <= 1) throw new BusinessException("TEMPLATE_LAST_NODE", "至少保留一个审批节点");
         nodeMapper.deleteById(nodeId);
         normalizeOrders(templateId);
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                template.getBusinessType(), listNodes(templateId), objectMapper);
         audit(templateId, "DELETE_TEMPLATE_NODE", before);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void reorderNodes(Long templateId, WorkflowTemplateNodeReorderRequest request) {
-        getTemplateForUpdate(templateId);
+        WfTemplate template = getTemplateForUpdate(templateId);
         String before = snapshot(templateId);
         List<WfTemplateNode> nodes = listNodes(templateId);
         if (request.getNodeIds().size() != nodes.size())
@@ -160,6 +168,8 @@ public class WorkflowTemplateService {
             update.setNodeOrder(order++);
             nodeMapper.updateById(update);
         }
+        WorkflowSecurityPolicy.validateFinanceTemplateShape(
+                template.getBusinessType(), listNodes(templateId), objectMapper);
         audit(templateId, "REORDER_TEMPLATE_NODES", before);
     }
 
@@ -277,6 +287,7 @@ public class WorkflowTemplateService {
         WorkflowSecurityPolicy policy = json == null || json.isBlank()
                 ? WorkflowSecurityPolicy.defaultFor(businessType)
                 : WorkflowSecurityPolicy.parse(objectMapper, json);
+        policy = WorkflowSecurityPolicy.enforceBusinessMinimum(businessType, policy);
         return policy.toCanonicalJson(objectMapper);
     }
 

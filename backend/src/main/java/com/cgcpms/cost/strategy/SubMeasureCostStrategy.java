@@ -1,6 +1,7 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
@@ -40,6 +41,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
     private final SubTaskMapper subTaskMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Override
     public String supportSourceType() {
@@ -81,9 +83,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
         }
 
         LocalDate costDate = measure.getMeasureDate() == null ? LocalDate.now() : measure.getMeasureDate();
-
-        // Resolve default cost subject for SUBCONTRACT type
-        Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(measure.getTenantId(), "分包");
+        accountingPeriodGuard.assertWritable(costDate);
 
         int generated = 0;
         BigDecimal allocatedTotal = BigDecimal.ZERO;
@@ -93,6 +93,10 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
                     ? netAmount.subtract(allocatedTotal)
                     : netAmount.multiply(money(item.getAmount())).divide(grossAmount, 2, RoundingMode.HALF_UP);
             allocatedTotal = allocatedTotal.add(allocatedAmount);
+            if (costSubjectResolver.costFactExists(measure.getTenantId(), SOURCE_TYPE,
+                    measureId, item.getId(), COST_TYPE)) {
+                continue;
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(measure.getTenantId());
             cost.setOrgId(null);
@@ -101,7 +105,11 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             cost.setContractId(measure.getContractId());
             cost.setPartnerId(measure.getPartnerId());
             cost.setCostType(COST_TYPE);
-            cost.setCostSubjectId(defaultSubjectId);
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    measure.getTenantId(), measure.getProjectId(), SOURCE_TYPE,
+                    "*", measureId, item.getId(), null, costDate);
+            applyDecision(cost, decision);
+            cost.setClassificationBusinessCategory("*");
             cost.setAmount(allocatedAmount);
             // Source item does not provide tax breakdown; assume full amount without tax
             cost.setTaxAmount(BigDecimal.ZERO);
@@ -115,8 +123,10 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
 
             try {
                 costItemMapper.insert(cost);
+                costSubjectResolver.markSnapshotPosted(decision);
                 generated++;
             } catch (DuplicateKeyException e) {
+                costSubjectResolver.markSnapshotPosted(decision);
                 log.info("成本已存在，跳过 measureId={}, itemId={}", measureId, item.getId());
             }
         }
@@ -130,6 +140,16 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
 
     private static BigDecimal money(BigDecimal value) {
         return nvl(value).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static void applyDecision(CostItem cost, CostSubjectResolver.Decision decision) {
+        cost.setCostSubjectId(decision.costSubjectId());
+        cost.setClassificationStatus(decision.classificationStatus());
+        cost.setMappingVersionId(decision.mappingVersionId());
+        cost.setAssignmentRuleId(decision.assignmentRuleId());
+        cost.setOriginalCostSubjectId(decision.originalCostSubjectId());
+        cost.setClassificationOverrideId(decision.overrideId());
+        cost.setClassificationSnapshotId(decision.snapshotId());
     }
 
 }

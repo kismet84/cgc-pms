@@ -91,7 +91,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertEquals(new BigDecimal("8000.00"), jdbc.queryForObject("SELECT target_cost FROM pm_project WHERE id=?", BigDecimal.class, PROJECT));
 
         insertCost(99187101L, SUBJECT_A, "CT_CONTRACT", "CONTRACT_LOCKED", "7000.00");
-        jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,contract_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(99187104,0,?,?,?,'CONTRACT_LOCKED',12000,0,12000,'CT_CONTRACT',?,?,?,'CONFIRMED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+        jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,contract_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,recognition_role,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(99187104,0,?,?,?,'CONTRACT_LOCKED',12000,0,12000,'CT_CONTRACT',?,?,?,'CONFIRMED','COMMITTED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
                 PROJECT, MAIN_CONTRACT, SUBJECT_A, MAIN_CONTRACT, 99187104L, LocalDate.now());
         insertCost(99187102L, SUBJECT_A, "MAT_RECEIPT", "MATERIAL_COST", "4500.00");
         insertCost(99187103L, SUBJECT_B, "SUB_MEASURE", "SUBCONTRACT_COST", "1000.00");
@@ -345,8 +345,9 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
     }
 
     private void insertCost(long id, long subject, String sourceType, String costType, String amount) {
-        jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,?, ?,0,?, ?,?,?,?,'CONFIRMED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
-                id, PROJECT, subject, costType, new BigDecimal(amount), new BigDecimal(amount), sourceType, id, id, LocalDate.now());
+        jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,recognition_role,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,?, ?,0,?, ?,?,?,?,'CONFIRMED',?,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                id, PROJECT, subject, costType, new BigDecimal(amount), new BigDecimal(amount), sourceType, id, id,
+                LocalDate.now(), "CT_CONTRACT".equals(sourceType) ? "COMMITTED" : "ACTUAL");
     }
 
     private void approveAll(String businessType, long businessId) {

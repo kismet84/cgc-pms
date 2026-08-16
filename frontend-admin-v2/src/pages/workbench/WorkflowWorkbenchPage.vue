@@ -22,7 +22,14 @@ import {
   submitCostTarget,
   submitMeasurement,
 } from '@/services/commercial'
-import { submitBidTransferRequest, submitFinanceAllocationRequest } from '@/services/cost-subject'
+import {
+  submitBidTransferRequest,
+  submitFinanceAllocationRequest,
+  submitProjectConfigRequest,
+  submitRecalculationBatch,
+  submitReversalRequest,
+  submitRulePlan,
+} from '@/services/cost-subject'
 import {
   V2Alert,
   V2Badge,
@@ -74,6 +81,11 @@ type WorkflowRecordSet = WorkflowTask[] | WorkflowRecord[] | WorkflowCc[] | Work
 const DEDICATED_RESUBMIT_PERMISSIONS: Record<string, string> = {
   BID_COST_TARGET_TRANSFER: 'cost:subject:transfer:submit',
   FINANCE_COST_ALLOCATION: 'cost:subject:allocation:submit',
+  COST_RULE_PLAN: 'cost:rule-plan:submit',
+  COST_PROJECT_CONFIG: 'cost:project-config:submit',
+  COST_RECALCULATION: 'cost:recalculation:submit',
+  COST_POST_CLOSE_ADJUSTMENT: 'cost:post-close:submit',
+  COST_REVERSAL: 'cost:reversal:submit',
   QS_RECTIFICATION: 'quality:rectification:submit',
   QS_CONSEQUENCE: 'quality:consequence:submit',
   PURCHASE_REQUEST: 'purchase:request:submit',
@@ -169,6 +181,56 @@ const pendingTask = computed(() =>
     ?.flatMap((node) => node.tasks ?? [])
     .find((task) => task.taskStatus === 'PENDING' && task.approverId === session.userInfo?.userId),
 )
+type ApprovalDetailRow = Record<string, unknown>
+const approvalDetailFacts = computed(() =>
+  Object.entries(detail.value?.businessDetails ?? {}).filter(([, value]) => !Array.isArray(value)),
+)
+const approvalDetailSections = computed(() =>
+  Object.entries(detail.value?.businessDetails ?? {})
+    .filter(([, value]) => Array.isArray(value))
+    .map(([key, value]) => ({ key, rows: value as ApprovalDetailRow[] })),
+)
+const approvalDetailLabels: Record<string, string> = {
+  versionCode: '方案编号', versionName: '方案名称', effectiveDate: '生效日', validationReport: '校验报告',
+  requestCode: '申请编号', projectCode: '项目编码', projectName: '项目名称', projectStatusSnapshot: '项目状态快照',
+  mainContractCode: '主合同编号', mainContractAmount: '主合同金额', targetVersionNo: '目标成本版本', targetAmount: '目标成本金额',
+  batchCode: '批次编号', batchType: '批次类型', scopeKey: '范围', cutoffAt: '冻结基准',
+  originalFactCount: '原事实数', changedFactCount: '变化数', unclassifiedCount: '待归类数', originalTotal: '原金额',
+  targetType: '冲销对象类型', targetId: '冲销对象', reason: '原因', status: '状态', createdAt: '创建时间',
+  ruleCode: '规则编号', sourceType: '业务来源', businessCategory: '业务分类', priority: '优先级',
+  targetSubjectCode: '目标科目编码', targetSubjectName: '目标科目', subjectCode: '科目编码', subjectName: '科目名称',
+  enabled: '调整结果', effectiveFrom: '生效日', effectiveTo: '失效日', impactSnapshot: '影响快照',
+  oldSubjectCode: '原科目编码', oldSubjectName: '原科目', newSubjectCode: '新科目编码', newSubjectName: '新科目',
+  sourceSubjectCode: '源科目编码', sourceSubjectName: '源科目', targetGroupCode: '归集组', mappingReason: '映射原因',
+  factCount: '事实数', sourceCode: '来源编号', projectCodes: '项目编码', subjectCodes: '科目编码',
+  accountingPeriod: '会计期间', originalAmount: '原金额', reversalAmount: '冲销金额',
+  amount: '金额', taxAmount: '税额', amountWithoutTax: '不含税金额', differenceType: '差异类型',
+}
+
+function approvalDetailLabel(key: string): string {
+  return approvalDetailLabels[key] ?? key
+}
+
+function approvalDetailColumns(rows: ApprovalDetailRow[]): string[] {
+  return [...new Set(rows.flatMap((row) => Object.keys(row)))]
+}
+
+function approvalDetailValue(value: unknown): string {
+  if (value == null || value === '') return '—'
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'string' && value.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(value) as Record<string, unknown>
+      return Object.entries(parsed)
+        .map(([key, item]) => `${approvalDetailLabel(key)}：${String(item ?? '—')}`)
+        .join('；')
+    } catch {
+      return value
+    }
+  }
+  return String(value)
+}
 
 function requiredVersion(value: unknown, label: string): string | number {
   if (typeof value === 'number' || (typeof value === 'string' && value.trim())) return value
@@ -182,6 +244,15 @@ async function resubmitBusiness(instance: WorkflowInstance): Promise<unknown> {
       return submitBidTransferRequest(id)
     case 'FINANCE_COST_ALLOCATION':
       return submitFinanceAllocationRequest(id)
+    case 'COST_RULE_PLAN':
+      return submitRulePlan(id)
+    case 'COST_PROJECT_CONFIG':
+      return submitProjectConfigRequest(id)
+    case 'COST_RECALCULATION':
+    case 'COST_POST_CLOSE_ADJUSTMENT':
+      return submitRecalculationBatch(id)
+    case 'COST_REVERSAL':
+      return submitReversalRequest(id)
     case 'QS_RECTIFICATION':
       return submitQualityRectification(id)
     case 'QS_CONSEQUENCE':
@@ -704,6 +775,53 @@ onBeforeUnmount(() => {
             </div>
           </dl>
         </div>
+        <section
+          v-if="approvalDetailFacts.length || approvalDetailSections.length"
+          class="v2-detail-dialog__section workflow-business-detail"
+        >
+          <h3>业务审批内容</h3>
+          <dl v-if="approvalDetailFacts.length" class="v2-detail-dialog__facts">
+            <div v-for="[key, value] in approvalDetailFacts" :key="key">
+              <dt>{{ approvalDetailLabel(key) }}</dt>
+              <dd>{{ approvalDetailValue(value) }}</dd>
+            </div>
+          </dl>
+          <div
+            v-for="section in approvalDetailSections"
+            :key="section.key"
+            class="workflow-business-detail__table-wrap"
+            role="region"
+            :aria-label="`${section.key === 'rules' ? '规则' : section.key === 'mappings' ? '科目映射' : '变更'}明细表`"
+            tabindex="0"
+          >
+            <h4>
+              {{
+                section.key === 'rules'
+                  ? '规则明细'
+                  : section.key === 'mappings'
+                    ? '科目映射明细'
+                    : '变更明细'
+              }}
+            </h4>
+            <table v-if="section.rows.length" data-table-identity="contextual">
+              <thead>
+                <tr>
+                  <th v-for="column in approvalDetailColumns(section.rows)" :key="column">
+                    {{ approvalDetailLabel(column) }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, index) in section.rows" :key="index">
+                  <td v-for="column in approvalDetailColumns(section.rows)" :key="column">
+                    {{ approvalDetailValue(row[column]) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else>暂无明细。</p>
+          </div>
+        </section>
         <div class="workflow-detail-grid">
           <section class="v2-detail-dialog__section">
             <h3>审批节点</h3>
@@ -897,6 +1015,30 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--v2-space-4);
+}
+
+.workflow-business-detail {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.workflow-business-detail__table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.workflow-business-detail__table-wrap table {
+  width: 100%;
+  min-width: 42rem;
+  border-collapse: collapse;
+}
+
+.workflow-business-detail__table-wrap th,
+.workflow-business-detail__table-wrap td {
+  padding: var(--v2-space-2);
+  border-bottom: 1px solid var(--v2-color-border);
+  text-align: left;
+  vertical-align: top;
 }
 .workflow-timeline {
   display: grid;

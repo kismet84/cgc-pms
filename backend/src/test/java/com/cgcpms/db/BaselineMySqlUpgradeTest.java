@@ -106,7 +106,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("299", current.info().current().getVersion().getVersion());
+        assertEquals("304", current.info().current().getVersion().getVersion());
         assertEquals(20, count(current, """
                 SELECT COUNT(*) FROM information_schema.columns
                 WHERE table_schema=DATABASE()
@@ -140,11 +140,34 @@ class BaselineMySqlUpgradeTest {
                 """));
         assertEquals(10, count(current,
                 "SELECT COUNT(*) FROM sys_role WHERE status='ENABLE' AND deleted_flag=0"));
-        assertEquals(30, count(current,
+        assertEquals(29, count(current,
                 "SELECT COUNT(*) FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(65, count(current, """
+        assertEquals(60, count(current, """
                 SELECT COUNT(*) FROM wf_template_node n JOIN wf_template t ON t.id=n.template_id
                 WHERE t.enabled=1 AND t.deleted_flag=0 AND t.template_code LIKE 'M89-%' AND n.deleted_flag=0
+                """));
+        assertEquals(10, count(current, """
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema=DATABASE() AND table_name IN (
+                  'cost_classification_snapshot','cost_classification_override','cost_unclassified_case',
+                  'cost_project_config_request','cost_project_config_request_line','project_cost_subject_scope_history',
+                  'cost_recalculation_batch','cost_recalculation_line','cost_recalculation_fact_reservation',
+                  'cost_reversal_request')
+                """));
+        assertEquals(11, count(current, """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema=DATABASE() AND table_name='cost_item'
+                  AND column_name IN ('original_cost_subject_id','mapping_version_id','assignment_rule_id',
+                    'classification_snapshot_id','classification_override_id','classification_status',
+                    'recognition_role','root_source_type','classification_business_category',
+                    'adjustment_batch_id','original_cost_item_id')
+                """));
+        assertEquals(4, count(current, """
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='COMPANY_FINANCE' AND r.deleted_flag=0 AND m.deleted_flag=0
+                  AND m.perms IN ('overhead:query','overhead:add','overhead:edit','overhead:execute')
                 """));
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));

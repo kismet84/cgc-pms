@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 class FinancialAccountingMonthEndClosedLoopIntegrationTest {
     private static final long TENANT = 88192L;
-    private static final int YEAR = 2031;
+    private static final int YEAR = 2025;
     private static final int MONTH = 1;
     private static final long BANK_ENDPOINT = 8819201L;
 
@@ -122,6 +122,111 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
                 List.of(new AdjustmentLine("DEBIT", "6602", "管理费用", null, new BigDecimal("10.00"), "单边分录")));
         BusinessException unbalanced = assertThrows(BusinessException.class, () -> closeService.createAdjustment(invalid));
         assertEquals("ADJUSTMENT_ENTRY_UNBALANCED", unbalanced.getCode());
+    }
+
+    @Test
+    void monthEndCheckBlocksUnallocatedOverheadUntilClearingExists() {
+        long subjectId = 8819291L;
+        long ruleId = 8819292L;
+        long sourceId = 8819293L;
+        long clearingId = 8819294L;
+        long projectId = 8819295L;
+        long secondSourceId = 8819393L;
+        long secondClearingId = 8819394L;
+        long secondProjectId = 8819395L;
+        closeService.ensurePeriod(YEAR, MONTH);
+        jdbc.update("""
+                INSERT INTO pm_project
+                (id,tenant_id,project_code,project_name,status,approval_status,deleted_flag)
+                VALUES (?,?,'FIN-CLOSE-OH','月结间接费完整性项目','ACTIVE','APPROVED',0)
+                """, projectId, TENANT);
+        jdbc.update("""
+                INSERT INTO pm_project
+                (id,tenant_id,project_code,project_name,status,approval_status,deleted_flag)
+                VALUES (?,?,'FIN-CLOSE-OH-NEG','月结间接费负向项目','ACTIVE','APPROVED',0)
+                """, secondProjectId, TENANT);
+        jdbc.update("""
+                INSERT INTO cost_subject
+                (id,tenant_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,deleted_flag)
+                VALUES (?,?,'5401.04.99','待分摊间接费','OVERHEAD','COST',3,1,'ENABLE',0)
+                """, subjectId, TENANT);
+        jdbc.update("""
+                INSERT INTO overhead_allocation_rule
+                (id,tenant_id,cost_subject_id,allocation_basis,allocation_cycle,status,deleted_flag)
+                VALUES (?,?,?,'CONTRACT_AMOUNT','MONTHLY','ENABLE',0)
+                """, ruleId, TENANT, subjectId);
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,cost_type,amount,tax_amount,
+                 amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,?,'CLASSIFIED','ACTUAL','OVERHEAD',100,0,100,'MANUAL_COST',?,?,?,'CONFIRMED',1,0)
+                """, sourceId, TENANT, projectId, subjectId, sourceId, sourceId, LocalDate.of(YEAR, MONTH, 31));
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,cost_type,amount,tax_amount,
+                 amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,?,'CLASSIFIED','ACTUAL','OVERHEAD',-100,0,-100,'MANUAL_COST',?,?,?,'CONFIRMED',1,0)
+                """, secondSourceId, TENANT, secondProjectId, subjectId,
+                secondSourceId, secondSourceId, LocalDate.of(YEAR, MONTH, 31));
+
+        Map<String, Object> blocked = closeService.runChecks(YEAR, MONTH);
+        Map<?, ?> pending = ((List<Map<String, Object>>) blocked.get("checks")).stream()
+                .filter(row -> "OVERHEAD_ALLOCATION_COMPLETENESS".equals(row.get("check_type")))
+                .findFirst().orElseThrow();
+        assertEquals(2, ((Number) pending.get("issue_count")).intValue());
+
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,original_cost_item_id,cost_type,
+                 amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,?,'REVERSAL','ACTUAL',?,'OVERHEAD_CLEARING',-100,0,-100,
+                        'OVERHEAD_ALLOCATION_CLEARING',?,?,?,'CONFIRMED',1,0)
+                """, clearingId, TENANT, projectId, subjectId, sourceId, ruleId, sourceId, LocalDate.of(YEAR, MONTH, 31));
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,original_cost_item_id,cost_type,
+                 amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,?,'REVERSAL','ACTUAL',?,'OVERHEAD_CLEARING',100,0,100,
+                        'OVERHEAD_ALLOCATION_CLEARING',?,?,?,'CONFIRMED',1,0)
+                """, secondClearingId, TENANT, secondProjectId, subjectId, secondSourceId,
+                ruleId, secondSourceId, LocalDate.of(YEAR, MONTH, 31));
+
+        Map<String, Object> cleared = closeService.runChecks(YEAR, MONTH);
+        Map<?, ?> complete = ((List<Map<String, Object>>) cleared.get("checks")).stream()
+                .filter(row -> "OVERHEAD_ALLOCATION_COMPLETENESS".equals(row.get("check_type")))
+                .findFirst().orElseThrow();
+        assertEquals(0, ((Number) complete.get("issue_count")).intValue());
+    }
+
+    @Test
+    void unclassifiedCostFactBlocksPeriodCloseChecks() {
+        long projectId = 8819296L;
+        long factId = 8819297L;
+        closeService.ensurePeriod(YEAR, MONTH);
+        jdbc.update("""
+                INSERT INTO pm_project
+                (id,tenant_id,project_code,project_name,status,approval_status,deleted_flag)
+                VALUES (?,?,'FIN-CLOSE-UNCLASSIFIED','月结待归类成本项目','ACTIVE','APPROVED',0)
+                """, projectId, TENANT);
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,classification_status,recognition_role,cost_type,amount,tax_amount,
+                 amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,'UNCLASSIFIED','ACTUAL','MATERIAL',100,0,100,'MAT_RECEIPT',?,?,?,'CONFIRMED',1,0)
+                """, factId, TENANT, projectId, factId, factId, LocalDate.of(YEAR, MONTH, 15));
+
+        Map<String, Object> blocked = closeService.runChecks(YEAR, MONTH);
+        Map<?, ?> pending = ((List<Map<String, Object>>) blocked.get("checks")).stream()
+                .filter(row -> "UNCLASSIFIED_COST_FACT_COMPLETENESS".equals(row.get("check_type")))
+                .findFirst().orElseThrow();
+        assertEquals(1, ((Number) pending.get("issue_count")).intValue());
+
+        jdbc.update("UPDATE cost_item SET classification_status='CLASSIFIED' WHERE tenant_id=? AND id=?", TENANT, factId);
+        Map<String, Object> classified = closeService.runChecks(YEAR, MONTH);
+        Map<?, ?> complete = ((List<Map<String, Object>>) classified.get("checks")).stream()
+                .filter(row -> "UNCLASSIFIED_COST_FACT_COMPLETENESS".equals(row.get("check_type")))
+                .findFirst().orElseThrow();
+        assertEquals(0, ((Number) complete.get("issue_count")).intValue());
     }
 
     @Test
@@ -431,6 +536,12 @@ class FinancialAccountingMonthEndClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM cost_item WHERE tenant_id=? AND original_cost_item_id IS NOT NULL", TENANT);
+        jdbc.update("DELETE FROM cost_item WHERE tenant_id=?", TENANT);
+        jdbc.update("DELETE FROM overhead_allocation_run WHERE tenant_id=?", TENANT);
+        jdbc.update("DELETE FROM overhead_allocation_rule WHERE tenant_id=?", TENANT);
+        jdbc.update("DELETE FROM cost_subject WHERE tenant_id=? AND subject_code='5401.04.99'", TENANT);
+        jdbc.update("DELETE FROM pm_project WHERE tenant_id=? AND project_code IN ('FIN-CLOSE-OH','FIN-CLOSE-UNCLASSIFIED')", TENANT);
         jdbc.update("DELETE FROM mandatory_audit_expectation WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM finance_audit_event WHERE tenant_id=?", TENANT);
         jdbc.update("DELETE FROM accounting_entry_line WHERE tenant_id=?", TENANT);

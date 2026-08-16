@@ -25,7 +25,9 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("299", flyway.info().current().getVersion().getVersion());
+        assertEquals("304", flyway.info().current().getVersion().getVersion());
+        assertAccountingSubjectCatalog(flyway);
+        assertCostGovernanceSchema(flyway);
         assertUnifiedAuditColumns(flyway);
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='var_order_item' AND COLUMN_NAME='wbs_task_id'"));
@@ -197,8 +199,8 @@ class BaselineFlywayCompatibilityTest {
                 """));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='project_period_plan' AND COLUMN_NAME='replaces_period_plan_id'"));
-        assertEquals(30, count(flyway, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(65, count(flyway, "wf_template_node", """
+        assertEquals(29, count(flyway, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(60, count(flyway, "wf_template_node", """
                 deleted_flag=0 AND template_id IN
                     (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));
@@ -229,12 +231,39 @@ class BaselineFlywayCompatibilityTest {
         old.migrate();
         assertEquals("180", old.info().current().getVersion().getVersion());
 
+        Flyway beforeGovernance = Flyway.configure()
+                .dataSource(url("upgrade"), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("300"))
+                .cleanDisabled(false)
+                .load();
+        beforeGovernance.migrate();
+        assertEquals("300", beforeGovernance.info().current().getVersion().getVersion());
+        execute(beforeGovernance, """
+                UPDATE wf_template_node SET node_order=node_order+6
+                WHERE template_id=(SELECT MIN(id) FROM wf_template
+                  WHERE business_type='BID_COST_TARGET_TRANSFER' AND enabled=1 AND deleted_flag=0)
+                  AND deleted_flag=0
+                """);
+        assertEquals(0, count(beforeGovernance, "wf_template_node", """
+                node_order=1 AND deleted_flag=0 AND template_id=(SELECT MIN(id) FROM wf_template
+                  WHERE business_type='BID_COST_TARGET_TRANSFER' AND enabled=1 AND deleted_flag=0)
+                """));
+
         Flyway current = flyway("upgrade", ACTIVE, LEGACY, JAVA);
         current.migrate();
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("299", current.info().current().getVersion().getVersion());
+        assertEquals("304", current.info().current().getVersion().getVersion());
+        assertAccountingSubjectCatalog(current);
+        assertCostGovernanceSchema(current);
+        assertEquals(1, count(current, "wf_template_node", """
+                node_order=1 AND deleted_flag=0 AND allow_transfer=0 AND allow_add_sign=0
+                AND CAST(approver_config AS VARCHAR) LIKE '%COMPANY_FINANCE%'
+                AND template_id=(SELECT MIN(id) FROM wf_template
+                  WHERE business_type='BID_COST_TARGET_TRANSFER' AND enabled=1 AND deleted_flag=0)
+                """));
         assertUnifiedAuditColumns(current);
         assertEquals(9, count(current, "sys_menu", """
                 perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
@@ -266,13 +295,192 @@ class BaselineFlywayCompatibilityTest {
                 """));
         assertEquals(1, count(current, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='project_period_plan' AND COLUMN_NAME='replaces_period_plan_id'"));
-        assertEquals(30, count(current, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
-        assertEquals(65, count(current, "wf_template_node", """
+        assertEquals(29, count(current, "wf_template", "enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%'"));
+        assertEquals(60, count(current, "wf_template_node", """
                 deleted_flag=0 AND template_id IN
                     (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0 AND template_code LIKE 'M89-%')
                 """));
         assertFalse(Arrays.stream(current.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
+    }
+
+    @Test
+    void v301RefusesRunningLegacyTransferSnapshot() {
+        assertV301RejectsLegacyWorkflow(
+                "running-legacy-transfer", "BID_COST_TARGET_TRANSFER", "RUNNING",
+                "ck_m96_no_running_legacy_cost_workflow");
+    }
+
+    @Test
+    void v301RefusesResumableLegacyReversalWithoutPostingHandler() {
+        assertV301RejectsLegacyWorkflow(
+                "resumable-legacy-reversal", "FINANCE_COST_ALLOCATION_REVERSAL", "REJECTED",
+                "ck_m96_no_resumable_legacy_reversal");
+    }
+
+    @Test
+    void v301RefusesResumableTransferWithoutGovernedRequestWrapper() {
+        assertV301RejectsLegacyWorkflow(
+                "resumable-unwrapped-transfer", "BID_COST_TARGET_TRANSFER", "REJECTED",
+                "ck_m96_no_resumable_unwrapped_request");
+    }
+
+    @Test
+    void v301RefusesApprovedLegacyReversalThatWasNeverPosted() {
+        assertV301RejectsLegacyWorkflow(
+                "approved-unposted-legacy-reversal", "FINANCE_COST_ALLOCATION_REVERSAL", "APPROVED",
+                "ck_m96_no_unposted_approved_legacy_reversal");
+    }
+
+    @Test
+    void v301RefusesRunningLegacyCostSubjectMappingWorkflow() {
+        assertV301RejectsLegacyWorkflow(
+                "running-legacy-cost-mapping", "COST_SUBJECT_MAPPING", "RUNNING",
+                "ck_m96_no_nonterminal_legacy_mapping");
+    }
+
+    @Test
+    void v301RefusesResumableLegacyCostSubjectMappingWorkflow() {
+        assertV301RejectsLegacyWorkflow(
+                "resumable-legacy-cost-mapping", "COST_SUBJECT_MAPPING", "WITHDRAWN",
+                "ck_m96_no_nonterminal_legacy_mapping");
+    }
+
+    @Test
+    void v301RefusesApprovedLegacyCostSubjectMappingWithoutActivation() {
+        assertV301RejectsLegacyWorkflow(
+                "approved-unposted-legacy-cost-mapping", "COST_SUBJECT_MAPPING", "APPROVED",
+                "ck_m96_no_unposted_approved_legacy_mapping");
+    }
+
+    @Test
+    void v301RefusesAmbiguousDuplicateActiveMappingVersions() {
+        String databaseName = "duplicate-active-cost-mapping";
+        Flyway beforeGovernance = Flyway.configure()
+                .dataSource(url(databaseName), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("300"))
+                .cleanDisabled(false)
+                .load();
+        beforeGovernance.migrate();
+        execute(beforeGovernance, """
+                INSERT INTO cost_subject_mapping_version
+                    (id,tenant_id,version_code,version_name,status,effective_date,version,created_by)
+                VALUES
+                    (301990000000000021,0,'V301-DUPLICATE-ACTIVE-1','冲突活动方案一','ACTIVE',CURRENT_DATE,0,1),
+                    (301990000000000022,0,'V301-DUPLICATE-ACTIVE-2','冲突活动方案二','ACTIVE',CURRENT_DATE,0,1)
+                """);
+
+        Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
+        FlywayException failure = assertThrows(FlywayException.class, current::migrate);
+        StringBuilder messages = new StringBuilder();
+        for (Throwable cursor = failure; cursor != null; cursor = cursor.getCause()) {
+            messages.append(' ').append(cursor.getMessage());
+        }
+        assertTrue(messages.toString().toLowerCase().contains("ck_m96_no_duplicate_active_mapping"),
+                messages::toString);
+        assertEquals(0, count(current, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='cost_subject_mapping_version' AND COLUMN_NAME='active_guard'"));
+    }
+
+    @Test
+    void v301AllowsApprovedLegacyFinanceReversalThatWasAlreadyPosted() {
+        String databaseName = "approved-posted-legacy-reversal";
+        Flyway beforeGovernance = Flyway.configure()
+                .dataSource(url(databaseName), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("300"))
+                .cleanDisabled(false)
+                .load();
+        beforeGovernance.migrate();
+        execute(beforeGovernance, """
+                INSERT INTO wf_instance
+                    (id,tenant_id,template_id,business_type,business_id,title,instance_status,
+                     current_round,resubmit_count,business_revision,initiator_id,deleted_flag)
+                VALUES
+                    (301990000000000011,0,
+                     (SELECT MIN(id) FROM wf_template
+                      WHERE business_type='FINANCE_COST_ALLOCATION' AND enabled=1 AND deleted_flag=0),
+                     'FINANCE_COST_ALLOCATION',301990000000000012,'旧财务分摊审批','APPROVED',
+                     1,0,1,301990000000000013,0)
+                """);
+        execute(beforeGovernance, """
+                INSERT INTO finance_cost_allocation_batch
+                    (id,tenant_id,batch_code,source_type,source_id,source_amount,allocation_basis,
+                     accounting_period,cost_subject_id,idempotency_key,status,approval_instance_id,
+                     posted_by,remark)
+                VALUES
+                    (301990000000000014,0,'LEGACY-FINANCE-ORIGINAL','ACCOUNTING_ENTRY_LINE',
+                     301990000000000015,100,'DIRECT_PROJECT','2026-08',
+                     (SELECT MIN(id) FROM cost_subject
+                      WHERE account_category='COST' AND status='ENABLE' AND deleted_flag=0),
+                     'legacy-finance-original','POSTED',301990000000000011,301990000000000013,
+                     'V301 posted reversal fixture')
+                """);
+        execute(beforeGovernance, """
+                INSERT INTO wf_instance
+                    (id,tenant_id,template_id,business_type,business_id,title,instance_status,
+                     current_round,resubmit_count,business_revision,initiator_id,deleted_flag)
+                VALUES
+                    (301990000000000016,0,
+                     (SELECT MIN(id) FROM wf_template
+                      WHERE business_type='FINANCE_COST_ALLOCATION_REVERSAL' AND enabled=1 AND deleted_flag=0),
+                     'FINANCE_COST_ALLOCATION_REVERSAL',301990000000000014,
+                     '旧财务分摊冲销审批','APPROVED',1,0,1,301990000000000017,0)
+                """);
+        execute(beforeGovernance, """
+                INSERT INTO finance_cost_allocation_batch
+                    (id,tenant_id,batch_code,source_type,source_id,source_amount,allocation_basis,
+                     accounting_period,cost_subject_id,idempotency_key,status,approval_instance_id,
+                     reversal_of_id,posted_by,remark)
+                VALUES
+                    (301990000000000018,0,'LEGACY-FINANCE-REVERSAL','ACCOUNTING_ENTRY_LINE',
+                     301990000000000015,-100,'DIRECT_PROJECT','2026-08',
+                     (SELECT MIN(id) FROM cost_subject
+                      WHERE account_category='COST' AND status='ENABLE' AND deleted_flag=0),
+                     'legacy-finance-reversal','REVERSED',301990000000000016,
+                     301990000000000014,301990000000000017,'V301 posted reversal fixture')
+                """);
+
+        Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals("304", current.info().current().getVersion().getVersion());
+        assertEquals(1, count(current, "finance_cost_allocation_batch",
+                "id=301990000000000018 AND reversal_of_id=301990000000000014 AND status='REVERSED'"));
+    }
+
+    @Test
+    void v301NormalizesMalformedLegacyFinanceWorkflowNode() {
+        String databaseName = "malformed-legacy-finance-node";
+        Flyway beforeGovernance = Flyway.configure()
+                .dataSource(url(databaseName), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("300"))
+                .cleanDisabled(false)
+                .load();
+        beforeGovernance.migrate();
+        execute(beforeGovernance, """
+                UPDATE wf_template_node SET node_type='CC',approve_mode='SEQUENTIAL',node_order=7,
+                    allow_transfer=1,allow_add_sign=1
+                WHERE id=(SELECT node_id FROM(
+                    SELECT n.id node_id FROM wf_template_node n
+                    JOIN wf_template t ON t.id=n.template_id AND t.tenant_id=n.tenant_id
+                    WHERE t.business_type='FINANCE_COST_ALLOCATION' AND t.enabled=1
+                      AND t.deleted_flag=0 AND n.deleted_flag=0
+                    ORDER BY n.node_order,n.id LIMIT 1))
+                """);
+
+        Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals(1, count(current, "wf_template_node", """
+                node_type='APPROVAL' AND approve_mode='OR_SIGN' AND node_order=1
+                AND allow_transfer=0 AND allow_add_sign=0
+                AND template_id IN(SELECT id FROM wf_template
+                  WHERE business_type='FINANCE_COST_ALLOCATION' AND enabled=1 AND deleted_flag=0)
+                AND deleted_flag=0
+                """));
     }
 
     @Test
@@ -552,9 +760,137 @@ class BaselineFlywayCompatibilityTest {
         }
     }
 
+    private static void assertAccountingSubjectCatalog(Flyway flyway) {
+        assertEquals(5, count(flyway, "cost_subject", """
+                tenant_id=0 AND deleted_flag=0 AND status='ENABLE'
+                AND subject_code IN ('1002-BANK','1122-AR','1123-PREPAY','2202-AP','2203-ADVANCE')
+                AND account_category IN ('ASSET','LIABILITY')
+                """));
+        assertEquals(1, count(flyway, "sys_menu",
+                "path='/cost/subject' AND menu_name='会计科目' AND deleted_flag=0"));
+    }
+
+    private static void assertCostGovernanceSchema(Flyway flyway) {
+        assertEquals(6, count(flyway, "INFORMATION_SCHEMA.TABLES", """
+                TABLE_NAME IN ('cost_classification_snapshot','cost_classification_override',
+                  'cost_unclassified_case','cost_project_config_request',
+                  'cost_recalculation_batch','cost_reversal_request')
+                """));
+        assertEquals(8, count(flyway, "INFORMATION_SCHEMA.COLUMNS", """
+                TABLE_NAME='cost_item' AND COLUMN_NAME IN
+                  ('classification_status','mapping_version_id','assignment_rule_id','original_cost_subject_id',
+                   'classification_override_id','classification_snapshot_id','adjustment_batch_id','original_cost_item_id')
+                """));
+        assertEquals(3, count(flyway, "INFORMATION_SCHEMA.COLUMNS", """
+                TABLE_NAME='cost_item' AND COLUMN_NAME IN
+                  ('recognition_role','root_source_type','classification_business_category')
+                """));
+        assertEquals(0, count(flyway, "cost_item", """
+                recognition_role NOT IN ('ACTUAL','COMMITTED','NON_COST')
+                OR root_source_type IS NULL
+                OR classification_business_category IS NULL
+                OR classification_business_category=''
+                """));
+        assertEquals(3, count(flyway, "INFORMATION_SCHEMA.COLUMNS", """
+                COLUMN_NAME='active_guard' AND TABLE_NAME IN
+                  ('cost_subject_mapping_version','cost_classification_snapshot','cost_recalculation_batch')
+                """));
+        assertEquals(5, count(flyway, "wf_template", """
+                template_code LIKE 'M96-%' AND enabled=1 AND deleted_flag=0
+                """));
+        assertEquals(5, count(flyway, "wf_template_node", """
+                deleted_flag=0 AND template_id IN
+                  (SELECT id FROM wf_template WHERE template_code LIKE 'M96-%' AND enabled=1 AND deleted_flag=0)
+                AND CAST(approver_config AS VARCHAR) LIKE '%COMPANY_FINANCE%'
+                """));
+        assertEquals(3, count(flyway, "sys_type_registry", """
+                type_domain='COST_SOURCE_TYPE' AND status='ACTIVE'
+                AND type_code IN ('COST_RECALCULATION_NEGATIVE','COST_RECALCULATION_POSITIVE',
+                                  'COST_RECALCULATION_REVERSAL')
+                """));
+        assertEquals(4, count(flyway, "wf_template", """
+                business_type IN ('BID_COST_TARGET_TRANSFER','FINANCE_COST_ALLOCATION',
+                  'BID_COST_TARGET_TRANSFER_REVERSAL','FINANCE_COST_ALLOCATION_REVERSAL')
+                AND enabled=1 AND deleted_flag=0
+                AND CAST(condition_rule AS VARCHAR) LIKE '%preventInitiatorApproval%true%'
+                """));
+        assertEquals(4, count(flyway, "wf_template_node", """
+                deleted_flag=0 AND node_order=1 AND node_type='APPROVAL' AND approve_mode='OR_SIGN'
+                AND allow_transfer=0 AND allow_add_sign=0
+                AND CAST(approver_config AS VARCHAR) LIKE '%COMPANY_FINANCE%'
+                AND template_id IN (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0
+                  AND business_type IN ('BID_COST_TARGET_TRANSFER','FINANCE_COST_ALLOCATION',
+                    'BID_COST_TARGET_TRANSFER_REVERSAL','FINANCE_COST_ALLOCATION_REVERSAL'))
+                """));
+        assertEquals(0, count(flyway, "wf_template_node", """
+                deleted_flag=0 AND node_order<>1 AND template_id IN
+                  (SELECT id FROM wf_template WHERE enabled=1 AND deleted_flag=0
+                   AND business_type IN ('BID_COST_TARGET_TRANSFER','FINANCE_COST_ALLOCATION',
+                    'BID_COST_TARGET_TRANSFER_REVERSAL','FINANCE_COST_ALLOCATION_REVERSAL'))
+                """));
+        assertEquals(19, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('workflow:approve','workflow:reject','cost:subject:mapping:edit','cost:subject:rule:edit',
+                   'cost:subject:scope:edit','cost:project-config:edit','cost:subject:bid-transfer',
+                   'cost:subject:transfer:submit','cost:subject:finance-allocate','cost:subject:allocation:submit',
+                   'cost:recalculation:edit','cost:post-close:edit','cost:reversal:edit','cost:classification:override',
+                   'cost:rule-plan:submit','cost:project-config:submit','cost:recalculation:submit',
+                   'cost:post-close:submit','cost:reversal:submit'))
+                """));
+        assertEquals(4, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0
+                  AND perms IN ('overhead:query','overhead:add','overhead:edit','overhead:execute'))
+                """));
+        assertEquals(0, count(flyway, "sys_role_menu", """
+                role_id IN (SELECT id FROM sys_role WHERE role_code<>'COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0
+                  AND perms IN ('overhead:query','overhead:add','overhead:edit','overhead:execute'))
+                """));
+        assertEquals(0, count(flyway, "sys_role_menu", """
+                role_id IN (SELECT id FROM sys_role WHERE role_code<>'COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0 AND perms IN
+                  ('cost:subject:mapping:edit','cost:subject:mapping:activate','cost:subject:rule:edit',
+                   'cost:subject:scope:edit','cost:subject:bid-transfer','cost:subject:finance-allocate',
+                   'cost:subject:transfer:submit','cost:subject:allocation:submit','cost:rule-plan:submit',
+                   'cost:project-config:submit','cost:recalculation:submit','cost:post-close:submit',
+                   'cost:reversal:submit'))
+                """));
+    }
+
     private static String url(String name) {
         return "jdbc:h2:mem:cgc_m52_" + name
                 + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1";
+    }
+
+    private static void assertV301RejectsLegacyWorkflow(String databaseName, String businessType,
+                                                         String instanceStatus, String guardName) {
+        Flyway beforeGovernance = Flyway.configure()
+                .dataSource(url(databaseName), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("300"))
+                .cleanDisabled(false)
+                .load();
+        beforeGovernance.migrate();
+        execute(beforeGovernance, """
+                INSERT INTO wf_instance
+                    (id,tenant_id,template_id,business_type,business_id,title,instance_status,
+                     current_round,resubmit_count,business_revision,initiator_id,deleted_flag)
+                VALUES
+                    (301990000000000001,0,
+                     (SELECT MIN(id) FROM wf_template WHERE business_type='%s' AND enabled=1 AND deleted_flag=0),
+                     '%s',301990000000000002,'旧成本审批升级门禁','%s',1,0,1,301990000000000003,0)
+                """.formatted(businessType, businessType, instanceStatus));
+
+        Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
+        FlywayException failure = assertThrows(FlywayException.class, current::migrate);
+        StringBuilder messages = new StringBuilder();
+        for (Throwable cursor = failure; cursor != null; cursor = cursor.getCause()) {
+            messages.append(' ').append(cursor.getMessage());
+        }
+        assertTrue(messages.toString().toLowerCase().contains(guardName.toLowerCase()), messages::toString);
+        assertEquals(0, count(current, "INFORMATION_SCHEMA.TABLES", "TABLE_NAME='cost_recalculation_batch'"));
     }
 
     private static int count(Flyway flyway, String table) {

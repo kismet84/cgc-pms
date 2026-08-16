@@ -2,6 +2,7 @@ package com.cgcpms.requisition.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandler {
 
     private final MatRequisitionMapper requisitionMapper;
+    private final CostClassificationGuard costClassificationGuard;
 
     @Override
     public String supportBusinessType() {
@@ -32,6 +34,11 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        costClassificationGuard.requireClassified("MAT_REQUISITION", resolveRequisitionId(context.getInstance()));
     }
 
     @Override
@@ -72,6 +79,7 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
         requisitionMapper.update(null, new LambdaUpdateWrapper<MatRequisition>()
                 .eq(MatRequisition::getId, requisitionId)
                 .set(MatRequisition::getApprovalStatus, "REJECTED"));
+        costClassificationGuard.voidPending("MAT_REQUISITION", requisitionId);
     }
 
     @Override
@@ -82,6 +90,7 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
         requisitionMapper.update(null, new LambdaUpdateWrapper<MatRequisition>()
                 .eq(MatRequisition::getId, requisitionId)
                 .set(MatRequisition::getApprovalStatus, "DRAFT"));
+        costClassificationGuard.voidPending("MAT_REQUISITION", requisitionId);
     }
 
     private Long resolveRequisitionId(WfInstance instance) {

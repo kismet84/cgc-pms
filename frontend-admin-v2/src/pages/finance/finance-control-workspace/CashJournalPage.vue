@@ -14,6 +14,7 @@ import {
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type {
+  CashJournalRecord,
   CashJournalPage as CashJournalPageResult,
   PaymentTraceRecord,
 } from '@cgc-pms/frontend-contracts'
@@ -38,6 +39,10 @@ const traceRows = ref<PaymentTraceRecord[]>([])
 const traceLoading = ref(false)
 const traceError = ref('')
 let controller: AbortController | null = null
+
+function canOpenPaymentTrace(row: CashJournalRecord): boolean {
+  return row.sourceType === 'PAY_RECORD'
+}
 
 async function load(preservePage = false): Promise<void> {
   if (!canQuery.value) return
@@ -203,8 +208,12 @@ onBeforeUnmount(() => controller?.abort())
                       v-if="can('payment:trace:query')"
                       size="small"
                       variant="ghost"
+                      :disabled="!canOpenPaymentTrace(row)"
+                      :title="
+                        canOpenPaymentTrace(row) ? '查看付款全链路' : '仅付款流出支持付款 Trace'
+                      "
                       @click="openTrace(row.id)"
-                      >查看 Trace</V2Button
+                      >查看付款 Trace</V2Button
                     >
                     <label
                       v-if="

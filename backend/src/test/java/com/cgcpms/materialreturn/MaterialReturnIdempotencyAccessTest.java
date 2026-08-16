@@ -2,8 +2,10 @@ package com.cgcpms.materialreturn;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
 import com.cgcpms.inventory.mapper.MatStockTxnMapper;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.materialreturn.dto.MaterialReturnRequest;
@@ -41,8 +43,10 @@ class MaterialReturnIdempotencyAccessTest {
             mock(MatRequisitionItemMapper.class),
             mock(MatStockTxnMapper.class),
             mock(CostItemMapper.class),
+            mock(CostFactLineageResolver.class),
             mock(MatStockService.class),
-            projectAccessChecker);
+            projectAccessChecker,
+            mock(AccountingPeriodGuard.class));
     private final MaterialReturnRequest request = new MaterialReturnRequest(
             201L, 301L, new BigDecimal("2.0000"),
             LocalDate.of(2026, 7, 20), "退回余料", "RETURN-KEY-1");

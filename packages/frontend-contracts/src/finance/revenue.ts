@@ -139,3 +139,12 @@ export interface CollectionCommand {
   allocations?: AmountAllocation[];
   remark?: string;
 }
+export interface CollectionScheduleCommand {
+  projectId: string;
+  contractId: string;
+  receivableId?: string;
+  plannedDate: string;
+  plannedAmount: FinanceDecimalString;
+  reminderDays: number;
+  note: string;
+}

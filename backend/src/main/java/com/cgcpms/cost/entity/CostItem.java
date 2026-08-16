@@ -37,6 +37,28 @@ public class CostItem extends BaseEntity {
 
     private Long costSubjectId;
 
+    private String classificationStatus;
+
+    private String classificationBusinessCategory;
+
+    private String recognitionRole;
+
+    private String rootSourceType;
+
+    private Long mappingVersionId;
+
+    private Long assignmentRuleId;
+
+    private Long originalCostSubjectId;
+
+    private Long classificationOverrideId;
+
+    private Long classificationSnapshotId;
+
+    private Long adjustmentBatchId;
+
+    private Long originalCostItemId;
+
     private String costType;
 
     @JsonSerialize(using = ToStringSerializer.class)

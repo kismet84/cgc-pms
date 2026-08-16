@@ -21,6 +21,8 @@ public class CostLedgerVO {
     private String amount;
     private String taxAmount;
     private String amountWithoutTax;
+    private String classificationStatus;
+    private String recognitionRole;
     private String sourceType;
     private String sourceId;
     private String sourceCode;

@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.vo.CostLedgerSummaryVO;
 import com.cgcpms.cost.vo.CostLedgerVO;
 import com.cgcpms.project.entity.PmProject;
@@ -36,12 +38,16 @@ class CostLedgerServiceTest {
     private static final long PROJECT_ID = 10001L;
     private static final long LEDGER_DEMO_PROJECT_ID = 2071032241708793858L;
     private static final long TEST_KEYWORD_PROJECT_ID = 99010001L;
+    private static final long LEDGER_COST_SUBJECT_ID = 99010002L;
 
     @Autowired
     private CostLedgerService costLedgerService;
 
     @Autowired
     private CostItemMapper costItemMapper;
+
+    @Autowired
+    private CostSubjectMapper costSubjectMapper;
 
     @Autowired
     private PmProjectMapper pmProjectMapper;
@@ -59,6 +65,21 @@ class CostLedgerServiceTest {
         costItemMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getProjectId, TEST_KEYWORD_PROJECT_ID));
         pmProjectMapper.deleteById(TEST_KEYWORD_PROJECT_ID);
+        if (costSubjectMapper.selectById(LEDGER_COST_SUBJECT_ID) == null) {
+            CostSubject subject = new CostSubject();
+            subject.setId(LEDGER_COST_SUBJECT_ID);
+            subject.setTenantId(TENANT_ID);
+            subject.setParentId(0L);
+            subject.setSubjectCode("LEDGER-TEST-COST");
+            subject.setSubjectName("成本台账测试科目");
+            subject.setSubjectType("DETAIL");
+            subject.setAccountCategory("COST");
+            subject.setLevel(1);
+            subject.setSortOrder(1);
+            subject.setStatus("ENABLE");
+            subject.setCreatedBy(USER_ADMIN);
+            costSubjectMapper.insert(subject);
+        }
     }
 
     @AfterEach
@@ -116,6 +137,8 @@ class CostLedgerServiceTest {
         assertNotNull(vo);
         assertEquals("500.00", vo.getAmount());
         assertEquals("TEST_GET_BY_ID", vo.getSourceType());
+        assertEquals("ACTUAL", vo.getRecognitionRole());
+        assertEquals("CLASSIFIED", vo.getClassificationStatus());
         /*
          * V90 seed data includes pm_project (id=10001, name='麓谷科技产业园一期') at tenant 0.
          * CostLedgerService.getById() calls toVO(item) without batch-resolved names (empty maps),
@@ -233,6 +256,44 @@ class CostLedgerServiceTest {
         } finally {
             costItemMapper.deleteById(item1.getId());
             costItemMapper.deleteById(item2.getId());
+        }
+    }
+
+    @Test
+    @DisplayName("getSummary: 实际、承诺与非成本口径分离且未归类事实不进入实际成本")
+    void getSummarySeparatesRecognitionRoles() {
+        CostItem actual = buildCostItem("SUMMARY_ROLE_SPLIT", new BigDecimal("20.00"),
+                new BigDecimal("2.00"), PROJECT_ID, "ROLE_SPLIT");
+        CostItem committed = buildCostItem("SUMMARY_ROLE_SPLIT", new BigDecimal("100.00"),
+                BigDecimal.ZERO, PROJECT_ID, "ROLE_SPLIT");
+        committed.setRecognitionRole("COMMITTED");
+        CostItem nonCost = buildCostItem("SUMMARY_ROLE_SPLIT", new BigDecimal("150.00"),
+                BigDecimal.ZERO, PROJECT_ID, "ROLE_SPLIT");
+        nonCost.setRecognitionRole("NON_COST");
+        CostItem unclassified = buildCostItem("SUMMARY_ROLE_SPLIT", new BigDecimal("30.00"),
+                BigDecimal.ZERO, PROJECT_ID, "ROLE_SPLIT");
+        unclassified.setClassificationStatus("UNCLASSIFIED");
+        costItemMapper.insert(actual);
+        costItemMapper.insert(committed);
+        costItemMapper.insert(nonCost);
+        costItemMapper.insert(unclassified);
+
+        try {
+            CostLedgerSummaryVO summary = costLedgerService.getSummary(
+                    PROJECT_ID, null, null, null, null, "SUMMARY_ROLE_SPLIT", null,
+                    null, null, null);
+
+            assertEquals("20.00", summary.getTotalAmount());
+            assertEquals("2.00", summary.getTotalTaxAmount());
+            assertEquals("100.00", summary.getCommittedAmount());
+            assertEquals("150.00", summary.getNonCostAmount());
+            assertEquals("20.00", summary.getByCostType().get("ROLE_SPLIT"));
+            assertEquals("20.00", summary.getBySourceType().get("SUMMARY_ROLE_SPLIT"));
+        } finally {
+            costItemMapper.deleteById(actual.getId());
+            costItemMapper.deleteById(committed.getId());
+            costItemMapper.deleteById(nonCost.getId());
+            costItemMapper.deleteById(unclassified.getId());
         }
     }
 
@@ -418,7 +479,9 @@ class CostLedgerServiceTest {
         item.setProjectId(projectId);
         item.setContractId(null);
         item.setPartnerId(null);
-        item.setCostSubjectId(null);
+        item.setCostSubjectId(LEDGER_COST_SUBJECT_ID);
+        item.setClassificationStatus("CLASSIFIED");
+        item.setRecognitionRole("ACTUAL");
         item.setCostType(costType);
         item.setAmount(amount);
         item.setTaxAmount(taxAmount);

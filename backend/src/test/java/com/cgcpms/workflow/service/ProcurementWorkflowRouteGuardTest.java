@@ -52,8 +52,9 @@ class ProcurementWorkflowRouteGuardTest {
         WfInstanceMapper instances = mock(WfInstanceMapper.class);
         WfNodeInstanceMapper nodes = mock(WfNodeInstanceMapper.class);
         WfTaskMapper tasks = mock(WfTaskMapper.class);
+        com.cgcpms.system.mapper.SysUserMapper users = mock(com.cgcpms.system.mapper.SysUserMapper.class);
         WorkflowNotificationAlertService alerts = mock(WorkflowNotificationAlertService.class);
-        WorkflowApprovalService service = new WorkflowApprovalService(core, instances, nodes, tasks, alerts);
+        WorkflowApprovalService service = new WorkflowApprovalService(core, instances, nodes, tasks, users, alerts);
         WfTask task = new WfTask();
         task.setId(20L);
         task.setTenantId(0L);

@@ -2,9 +2,11 @@ package com.cgcpms.accounting;
 
 import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.strategy.CollectionRecordEntryGenerationStrategy;
+import com.cgcpms.accounting.strategy.AccountingSubjectResolver;
 import com.cgcpms.accounting.strategy.PayRecordEntryGenerationStrategy;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
@@ -37,6 +39,7 @@ class AccountingEntryGenerationStrategyTest {
     private PayRecordMapper recordMapper;
     private PayApplicationMapper applicationMapper;
     private JdbcTemplate jdbc;
+    private AccountingSubjectResolver subjectResolver;
     private PayRecordEntryGenerationStrategy payStrategy;
     private CollectionRecordEntryGenerationStrategy collectionStrategy;
 
@@ -51,8 +54,29 @@ class AccountingEntryGenerationStrategyTest {
         recordMapper = mock(PayRecordMapper.class);
         applicationMapper = mock(PayApplicationMapper.class);
         jdbc = mock(JdbcTemplate.class);
-        payStrategy = new PayRecordEntryGenerationStrategy(recordMapper, applicationMapper);
-        collectionStrategy = new CollectionRecordEntryGenerationStrategy(jdbc);
+        subjectResolver = mock(AccountingSubjectResolver.class);
+        when(subjectResolver.require(anyString(), anyString())).thenAnswer(invocation -> {
+            String code = invocation.getArgument(0);
+            CostSubject subject = new CostSubject();
+            subject.setSubjectCode(code);
+            subject.setSubjectName(switch (code) {
+                case "1002-BANK" -> "银行存款";
+                case "1122-AR" -> "应收账款";
+                case "1123-PREPAY" -> "预付账款";
+                case "2202-AP" -> "应付账款";
+                case "2203-ADVANCE" -> "预收账款";
+                default -> "测试科目";
+            });
+            return subject;
+        });
+        when(subjectResolver.requireWithPublicFallback(anyString(), anyString())).thenAnswer(invocation -> {
+            CostSubject subject = new CostSubject();
+            subject.setSubjectCode(invocation.getArgument(0));
+            subject.setSubjectName("合同建造收入");
+            return subject;
+        });
+        payStrategy = new PayRecordEntryGenerationStrategy(recordMapper, applicationMapper, subjectResolver);
+        collectionStrategy = new CollectionRecordEntryGenerationStrategy(jdbc, subjectResolver);
     }
 
     @AfterEach

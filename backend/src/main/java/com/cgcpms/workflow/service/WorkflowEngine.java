@@ -185,6 +185,14 @@ public class WorkflowEngine {
                 title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
     }
 
+    public WfInstance submitCostGovernance(Long userId, String username, Long tenantId,
+                                            String businessType, Long businessId, String title,
+                                            java.math.BigDecimal amount, Long projectId, Long contractId,
+                                            String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitCostGovernance(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
     // ───────────────────── RESUBMIT ─────────────────────
 
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
@@ -233,6 +241,10 @@ public class WorkflowEngine {
 
     public WfInstance resubmitQualityConsequence(Long instanceId, Long userId, String username) {
         return submitService.resubmitQualityConsequence(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitCostGovernance(Long instanceId, Long userId, String username) {
+        return submitService.resubmitCostGovernance(instanceId, userId, username);
     }
 
     // ───────────────────── APPROVE ─────────────────────

@@ -8,9 +8,12 @@ import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
 import com.cgcpms.bid.service.BidDocumentVersionService;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,9 +50,12 @@ class BidCostServiceTest {
 
     @Mock BidCostMapper mapper;
     @Mock CostItemMapper costItemMapper;
+    @Mock CostSubjectResolver costSubjectResolver;
+    @Mock CostFactLineageResolver costFactLineageResolver;
     @Mock ProjectAccessChecker projectAccessChecker;
     @Mock CodeGenerationService codeGenerationService;
     @Mock BidDocumentVersionService documentService;
+    @Mock AccountingPeriodGuard accountingPeriodGuard;
 
     private BidCostService service;
 
@@ -61,8 +67,9 @@ class BidCostServiceTest {
             assistant.setCurrentNamespace("BidCostServiceTest");
             TableInfoHelper.initTableInfo(assistant, BidCost.class);
         }
-        service = new BidCostService(mapper, costItemMapper, projectAccessChecker, codeGenerationService,
-                documentService, Optional.empty());
+        service = new BidCostService(mapper, costItemMapper, costSubjectResolver, costFactLineageResolver,
+                projectAccessChecker, codeGenerationService,
+                documentService, Optional.empty(), accountingPeriodGuard);
     }
 
     @AfterEach

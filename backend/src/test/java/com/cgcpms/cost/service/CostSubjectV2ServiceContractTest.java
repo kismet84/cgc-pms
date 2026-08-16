@@ -1,6 +1,8 @@
 package com.cgcpms.cost.service;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,16 +25,23 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class CostSubjectV2ServiceContractTest {
 
     private static final Set<String> TRANSACTIONAL_METHODS = Set.of(
-            "createMappingVersion", "activateMappingVersion", "createRule", "upsertScope",
-            "createBidTransferRequest", "submitBidTransferRequest", "postBidTransferRequest",
+            "createMappingVersion", "generateInitialPlan", "validateMappingVersion", "submitMappingVersion",
+            "activateMappingVersion", "approveRulePlan", "createRule", "upsertScope",
+            "createBidTransferRequest", "submitBidTransferRequest", "cancelBidTransferRequest", "postBidTransferRequest",
             "transferBidCost", "reverseBidTransfer",
-            "createFinanceAllocationRequest", "submitFinanceAllocationRequest", "postFinanceAllocationRequest",
-            "allocateFinanceCost", "reverseFinanceAllocation");
+            "createFinanceAllocationRequest", "submitFinanceAllocationRequest", "cancelFinanceAllocationRequest", "postFinanceAllocationRequest",
+            "allocateFinanceCost", "reverseFinanceAllocation",
+            "createProjectConfig", "submitProjectConfig", "cancelProjectConfig", "applyProjectConfig", "cancelRecalculation",
+            "overrideClassification",
+            "createReversal", "submitReversal", "cancelReversal", "postReversal",
+            "createRecalculation", "submitRecalculation", "postRecalculation");
 
     @Test
     void keepsFacadeConstructorPublicMethodsAndTransactionBoundary() throws Exception {
         assertNotNull(CostSubjectV2Service.class.getConstructor(
-                JdbcTemplate.class, ProjectAccessChecker.class, ObjectProvider.class));
+                JdbcTemplate.class, ProjectAccessChecker.class, CostSubjectResolver.class,
+                CostFactLineageResolver.class, CostClassificationGuard.class,
+                AccountingPeriodGuard.class, ObjectProvider.class));
 
         Set<String> publicMethods = Arrays.stream(CostSubjectV2Service.class.getDeclaredMethods())
                 .filter(method -> Modifier.isPublic(method.getModifiers()))
@@ -41,24 +50,40 @@ class CostSubjectV2ServiceContractTest {
                 .collect(Collectors.toSet());
         assertEquals(Set.of(
                 "mappingVersions()", "mappingItems(Long)", "mappingVersionDetail(Long)",
-                "createMappingVersion(MappingVersionCommand)", "activateMappingVersion(Long,Long)",
+                "createMappingVersion(MappingVersionCommand)", "generateInitialPlan()",
+                "validateMappingVersion(Long)", "submitMappingVersion(Long)",
+                "mappingVersionDiff(Long,Long)", "trialMappingVersion(Long,String,String,Long)",
+                "activateMappingVersion(Long,Long)", "markRulePlanSubmitted(Long,Long)",
+                "approveRulePlan(Long,Long)", "rejectRulePlan(Long,Long,String)",
                 "rules()", "createRule(RuleCommand)", "resolveRule(String,String,Long)",
                 "scopes(Long)", "upsertScope(ScopeCommand)", "impact(Long)",
                 "bidTransferRequests()", "createBidTransferRequest(BidTransferRequestCommand)",
-                "submitBidTransferRequest(Long)", "bidTransferRequest(Long)",
+                "submitBidTransferRequest(Long)", "cancelBidTransferRequest(Long)", "bidTransferRequest(Long)",
                 "markBidTransferRequestSubmitted(Long,Long)",
                 "markBidTransferRequestRejected(Long,Long,String)",
                 "postBidTransferRequest(Long,Long)", "transfers()", "bidCostTransferDetail(Long)",
                 "bidCostTransferReversalDetail(Long)", "transferBidCost(TransferCommand)",
                 "reverseBidTransfer(Long,Long,String,String)",
                 "financeAllocationRequests()", "createFinanceAllocationRequest(FinanceAllocationCommand)",
-                "submitFinanceAllocationRequest(Long)", "financeAllocationRequest(Long)",
+                "submitFinanceAllocationRequest(Long)", "cancelFinanceAllocationRequest(Long)", "financeAllocationRequest(Long)",
                 "markFinanceAllocationRequestSubmitted(Long,Long)",
                 "markFinanceAllocationRequestRejected(Long,Long,String)",
                 "postFinanceAllocationRequest(Long,Long)", "financeAllocations()",
                 "financeAllocationDetail(Long)", "financeAllocationReversalDetail(Long)",
                 "allocateFinanceCost(FinanceAllocationCommand)",
-                "reverseFinanceAllocation(Long,Long,String,String)", "reconciliation(Long)"), publicMethods);
+                "reverseFinanceAllocation(Long,Long,String,String)", "reconciliation(Long)",
+                "governanceFormOptions()", "overrideClassification(ClassificationOverrideCommand)",
+                "projectConfiguration(Long)",
+                "createProjectConfig(ProjectConfigCommand)", "submitProjectConfig(Long)", "cancelProjectConfig(Long)",
+                "markProjectConfigSubmitted(Long,Long)", "applyProjectConfig(Long,Long)",
+                "rejectProjectConfig(Long,Long,String)", "recalculationBatches()",
+                "recalculationBatch(Long)", "cancelRecalculation(Long)",
+                "reversalRequests()", "reversalRequest(Long)",
+                "createReversal(ReversalCommand)", "submitReversal(Long)", "cancelReversal(Long)",
+                "markReversalSubmitted(Long,Long)", "postReversal(Long,Long)",
+                "rejectReversal(Long,Long,String)", "createRecalculation(RecalculationCommand)",
+                "submitRecalculation(Long)", "markRecalculationSubmitted(Long,Long)",
+                "postRecalculation(Long,Long)", "rejectRecalculation(Long,Long,String)"), publicMethods);
 
         Set<String> transactionalMethods = Arrays.stream(CostSubjectV2Service.class.getDeclaredMethods())
                 .filter(method -> method.getAnnotation(Transactional.class) != null)
@@ -81,7 +106,11 @@ class CostSubjectV2ServiceContractTest {
                 "historicalDisplayName:String", "mappingReason:String");
         assertRecord(CostSubjectV2Service.MappingVersionCommand.class,
                 "versionCode:String", "versionName:String", "effectiveDate:LocalDate",
-                "remark:String", "items:List");
+                "remark:String", "items:List", "rules:List");
+        assertRecord(CostSubjectV2Service.MappingRule.class,
+                "ruleCode:String", "sourceType:String", "businessCategory:String",
+                "projectId:Long", "costSubjectId:Long", "priority:Integer",
+                "effectiveFrom:LocalDate", "effectiveTo:LocalDate", "remark:String");
         assertRecord(CostSubjectV2Service.RuleCommand.class,
                 "ruleCode:String", "mappingVersionId:Long", "sourceType:String",
                 "businessCategory:String", "projectId:Long", "costSubjectId:Long",
@@ -101,6 +130,17 @@ class CostSubjectV2ServiceContractTest {
                 "sourceType:String", "sourceId:Long", "allocationBasis:String",
                 "accountingPeriod:String", "costSubjectId:Long", "approvalInstanceId:Long",
                 "idempotencyKey:String", "remark:String", "lines:List");
+        assertRecord(CostSubjectV2Service.ProjectConfigLine.class,
+                "costSubjectId:Long", "enabled:Boolean", "effectiveFrom:LocalDate", "effectiveTo:LocalDate");
+        assertRecord(CostSubjectV2Service.ProjectConfigCommand.class,
+                "projectId:Long", "reason:String", "lines:List");
+        assertRecord(CostSubjectV2Service.RecalculationCommand.class,
+                "projectId:Long", "ruleVersionId:Long", "cutoffAt:LocalDateTime",
+                "batchType:String", "reason:String", "idempotencyKey:String");
+        assertRecord(CostSubjectV2Service.ReversalCommand.class,
+                "targetType:String", "targetId:Long", "reason:String");
+        assertRecord(CostSubjectV2Service.ClassificationOverrideCommand.class,
+                "caseId:Long", "snapshotId:Long", "costSubjectId:Long", "reason:String");
     }
 
     @Test
@@ -109,6 +149,7 @@ class CostSubjectV2ServiceContractTest {
                 CostSubjectMappingOperations.class,
                 BidCostTransferOperations.class,
                 FinanceCostAllocationOperations.class,
+                CostGovernanceOperations.class,
                 CostSubjectV2Support.class)) {
             assertEquals(false, Modifier.isPublic(collaborator.getModifiers()));
             assertNull(collaborator.getAnnotation(Component.class));

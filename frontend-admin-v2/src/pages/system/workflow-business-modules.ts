@@ -36,6 +36,11 @@ const workflowModules: Record<string, WorkflowBusinessModule> = {
   OWNER_SETTLEMENT: { key: 'finance', label: '资金财务' },
   FINANCE_COST_ALLOCATION: { key: 'finance', label: '资金财务' },
   FINANCE_COST_ALLOCATION_REVERSAL: { key: 'finance', label: '资金财务' },
+  COST_RULE_PLAN: { key: 'master-data', label: '基础资料' },
+  COST_PROJECT_CONFIG: { key: 'master-data', label: '基础资料' },
+  COST_RECALCULATION: { key: 'master-data', label: '基础资料' },
+  COST_POST_CLOSE_ADJUSTMENT: { key: 'master-data', label: '基础资料' },
+  COST_REVERSAL: { key: 'master-data', label: '基础资料' },
   COST_SUBJECT_MAPPING: { key: 'master-data', label: '基础资料' },
   DEMO_APPROVAL_SCENARIO: { key: 'system-management', label: '系统管理' },
 }

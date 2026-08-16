@@ -4,6 +4,7 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.payment.entity.PayApplication;
@@ -24,6 +25,7 @@ public class PayApplicationEntryGenerationStrategy implements EntryGenerationStr
 
     private final PayApplicationMapper applicationMapper;
     private final CostSubjectMapper costSubjectMapper;
+    private final AccountingSubjectResolver subjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -51,9 +53,10 @@ public class PayApplicationEntryGenerationStrategy implements EntryGenerationStr
 
         CostSubject subject = costSubjectMapper.selectById(application.getCostSubjectId());
         if (subject == null || !Objects.equals(subject.getTenantId(), tenantId)
-                || !"ENABLE".equals(subject.getStatus())) {
-            throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户或已停用");
+                || !"ENABLE".equals(subject.getStatus()) || !"COST".equals(subject.getAccountCategory())) {
+            throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户、非成本类或已停用");
         }
+        CostSubject payableSubject = subjectResolver.require(AccountingSubjectCatalog.PAYABLE, "LIABILITY");
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode("AP-CONF-" + sourceId);
@@ -65,7 +68,7 @@ public class PayApplicationEntryGenerationStrategy implements EntryGenerationStr
         entry.setLines(List.of(
                 line("DEBIT", subject.getSubjectCode(), subject.getSubjectName(), subject.getId(), amount,
                         "付款申请确认成本：" + application.getApplyCode()),
-                line("CREDIT", "2202-AP", "应付账款", null, amount,
+                line("CREDIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
                         "付款申请确认应付：" + application.getApplyCode())));
         return entry;
     }

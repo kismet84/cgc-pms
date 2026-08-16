@@ -1,11 +1,14 @@
 package com.cgcpms.cost.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.service.CostSubjectV2Service.AllocationLine;
 import com.cgcpms.cost.service.CostSubjectV2Service.FinanceAllocationCommand;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,6 +17,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,10 +32,19 @@ import java.util.Objects;
 final class FinanceCostAllocationOperations extends CostSubjectV2Support {
 
     private final ObjectProvider<WorkflowEngine> workflowEngineProvider;
+    private final CostSubjectResolver costSubjectResolver;
+    private final CostFactLineageResolver costFactLineageResolver;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     FinanceCostAllocationOperations(JdbcTemplate jdbc, ProjectAccessChecker projectAccessChecker,
+                                    CostSubjectResolver costSubjectResolver,
+                                    CostFactLineageResolver costFactLineageResolver,
+                                    AccountingPeriodGuard accountingPeriodGuard,
                                     ObjectProvider<WorkflowEngine> workflowEngineProvider) {
         super(jdbc, projectAccessChecker);
+        this.costSubjectResolver = costSubjectResolver;
+        this.costFactLineageResolver = costFactLineageResolver;
+        this.accountingPeriodGuard = accountingPeriodGuard;
         this.workflowEngineProvider = workflowEngineProvider;
     }
 
@@ -66,7 +84,9 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
 
     Map<String, Object> createFinanceAllocationRequest(FinanceAllocationCommand command) {
         validateFinanceAllocationCommand(command);
-        command.lines().stream().map(AllocationLine::projectId).distinct().forEach(this::requireProject);
+        accountingPeriodGuard.assertWritable(allocationBusinessDate(command.accountingPeriod()));
+        requireProjectsOpenForNormalCostGovernance(
+                command.lines().stream().map(AllocationLine::projectId).toList());
         requireSubject(command.costSubjectId(), true);
         requireNoCompetingFinanceAllocation(command.sourceType(), command.sourceId(), null);
         BigDecimal sourceAmount = sourceAmount(command.sourceType(), command.sourceId());
@@ -81,23 +101,44 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
         if (basisTotal.signum() <= 0) throw new BusinessException("FINANCE_COST_BASIS_INVALID", "分摊依据合计必须大于零");
         List<BigDecimal> amounts = calculateAllocation(remaining, command.lines(), basisTotal);
         Long id = IdWorker.getId();
+        String sourceSnapshotHash = sourceSnapshotHash(command.sourceType(), command.sourceId(), remaining);
         try {
             jdbc.update("""
                     INSERT INTO finance_cost_allocation_request
                     (id,tenant_id,request_code,project_id,source_type,source_id,source_amount,allocation_basis,
-                     accounting_period,cost_subject_id,idempotency_key,status,version,created_by,updated_by,remark)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,?,?)
+                     accounting_period,cost_subject_id,override_reason,source_snapshot_hash,idempotency_key,status,
+                     version,created_by,updated_by,remark)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,?,?)
                     """, id, tenantId(), "FCARQ-" + id, command.lines().get(0).projectId(), command.sourceType(),
                     command.sourceId(), remaining, command.allocationBasis(), command.accountingPeriod(),
-                    command.costSubjectId(), command.idempotencyKey().trim(), userId(), userId(), command.remark());
+                    command.costSubjectId(), command.remark(), sourceSnapshotHash, "FCARQ-IDEMP-" + id,
+                    userId(), userId(), command.remark());
             for (int index = 0; index < command.lines().size(); index++) {
                 AllocationLine line = command.lines().get(index);
                 requireScope(line.projectId(), command.costSubjectId());
+                CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                        tenantId(), line.projectId(), command.sourceType(), command.allocationBasis(),
+                        command.sourceId(), line.projectId(), null,
+                        allocationBusinessDate(command.accountingPeriod()));
+                boolean overridden = !Objects.equals(decision.costSubjectId(), command.costSubjectId());
+                if (overridden && (command.remark() == null || command.remark().isBlank())) {
+                    throw new BusinessException("FINANCE_COST_OVERRIDE_REASON_REQUIRED", "覆盖自动匹配科目必须填写原因");
+                }
+                Long overrideId = decision.overrideId();
+                if (overridden && overrideId != null) {
+                    throw new BusinessException("FINANCE_COST_OVERRIDE_CONFLICT", "该财务来源已有不同的有效科目覆盖");
+                }
+                Long requestLineId = IdWorker.getId();
                 jdbc.update("""
                         INSERT INTO finance_cost_allocation_request_line
-                        (id,tenant_id,request_id,project_id,basis_value,allocated_amount)
-                        VALUES (?,?,?,?,?,?)
-                        """, IdWorker.getId(), tenantId(), id, line.projectId(), line.basisValue(), amounts.get(index));
+                        (id,tenant_id,request_id,project_id,basis_value,matched_cost_subject_id,selected_cost_subject_id,
+                         mapping_version_id,assignment_rule_id,classification_override_id,classification_status,
+                         override_reason,source_snapshot_hash,allocated_amount)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        """, requestLineId, tenantId(), id, line.projectId(), line.basisValue(), decision.costSubjectId(),
+                        command.costSubjectId(), decision.mappingVersionId(), decision.assignmentRuleId(), overrideId,
+                        overridden || "OVERRIDDEN".equals(decision.classificationStatus()) ? "OVERRIDDEN" : "CLASSIFIED",
+                        overridden ? command.remark().trim() : null, sourceSnapshotHash, amounts.get(index));
             }
         } catch (DuplicateKeyException ex) {
             throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_DUPLICATE", "财务分摊申请幂等键或项目明细重复", ex);
@@ -107,17 +148,19 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
 
     Map<String, Object> submitFinanceAllocationRequest(Long id) {
         Map<String, Object> request = financeAllocationRequestForUpdate(id);
+        requireCurrentUserCreated(request.get("createdBy"), "财务费用分摊申请");
         String status = String.valueOf(request.get("status"));
         if (!List.of("DRAFT", "REJECTED", "WITHDRAWN").contains(status)) {
             throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_NOT_SUBMITTABLE", "仅草稿、驳回或撤回申请可以提交");
         }
         sourceAmount(String.valueOf(request.get("sourceType")), longValue(request.get("sourceId")));
+        validateFrozenRequest(id, request);
         requireNoCompetingFinanceAllocation(String.valueOf(request.get("sourceType")),
                 longValue(request.get("sourceId")), id);
         jdbc.queryForList("""
                 SELECT DISTINCT project_id FROM finance_cost_allocation_request_line
                 WHERE tenant_id=? AND request_id=?
-                """, Long.class, tenantId(), id).forEach(this::requireProject);
+                """, Long.class, tenantId(), id).forEach(this::requireProjectOpenForNormalCostGovernance);
         Long instanceId = longValue(request.get("approvalInstanceId"));
         if (instanceId == null) {
             workflowEngineProvider.getObject().submitFinanceCostAllocation(userId(), UserContext.getCurrentUsername(), tenantId(),
@@ -131,12 +174,35 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
         return financeAllocationRequest(id);
     }
 
+    Map<String, Object> cancelFinanceAllocationRequest(Long id) {
+        Map<String, Object> request = financeAllocationRequestForUpdate(id);
+        requireCurrentUserCreated(request.get("createdBy"), "财务费用分摊申请");
+        jdbc.queryForList("""
+                SELECT DISTINCT project_id FROM finance_cost_allocation_request_line
+                WHERE tenant_id=? AND request_id=?
+                """, Long.class, tenantId(), id).forEach(this::requireProject);
+        if (!"DRAFT".equals(request.get("status")) || request.get("approvalInstanceId") != null) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_NOT_CANCELLABLE", "仅未提交审批的草稿申请可取消");
+        }
+        int updated = jdbc.update("""
+                UPDATE finance_cost_allocation_request
+                SET status='CANCELLED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND id=? AND deleted_flag=0 AND status='DRAFT'
+                  AND approval_instance_id IS NULL
+                """, userId(), tenantId(), id);
+        if (updated != 1) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请状态已变化");
+        }
+        return financeAllocationRequest(id);
+    }
+
     Map<String, Object> financeAllocationRequest(Long id) {
         return one("""
                 SELECT id,request_code requestCode,project_id projectId,source_type sourceType,source_id sourceId,
                        source_amount sourceAmount,allocation_basis allocationBasis,accounting_period accountingPeriod,
                        cost_subject_id costSubjectId,status,approval_instance_id approvalInstanceId,
-                       final_batch_id finalBatchId,created_at createdAt,remark
+                       final_batch_id finalBatchId,source_snapshot_hash sourceSnapshotHash,
+                       created_by createdBy,created_at createdAt,remark
                 FROM finance_cost_allocation_request WHERE tenant_id=? AND id=? AND deleted_flag=0
                 """, id);
     }
@@ -167,7 +233,7 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
     Long postFinanceAllocationRequest(Long requestId, Long instanceId) {
         Map<String, Object> request = one("""
                 SELECT id,project_id,source_type,source_id,source_amount,allocation_basis,accounting_period,
-                       cost_subject_id,idempotency_key,status,approval_instance_id,final_batch_id,remark
+                       cost_subject_id,source_snapshot_hash,idempotency_key,status,approval_instance_id,final_batch_id,remark
                 FROM finance_cost_allocation_request WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
                 """, requestId);
         if ("POSTED".equals(request.get("status"))) return longValue(request.get("final_batch_id"));
@@ -176,18 +242,27 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
             throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_STATE_INVALID", "财务分摊申请未处于当前审批中");
         }
         requireApprovedWorkflow(instanceId, WorkflowBusinessTypes.FINANCE_COST_ALLOCATION, requestId);
-        BigDecimal sourceTotal = sourceAmount(String.valueOf(request.get("source_type")),
-                longValue(request.get("source_id")));
-        requireSubject(longValue(request.get("cost_subject_id")), true);
+        LocalDate businessDate = allocationBusinessDate(String.valueOf(request.get("accounting_period")));
+        accountingPeriodGuard.assertWritable(businessDate);
         List<Map<String, Object>> lines = jdbc.queryForList("""
-                SELECT project_id,basis_value,allocated_amount
+                SELECT id,project_id,basis_value,allocated_amount,matched_cost_subject_id,selected_cost_subject_id,
+                       mapping_version_id,assignment_rule_id,classification_override_id,classification_status,
+                       override_reason,source_snapshot_hash
                 FROM finance_cost_allocation_request_line WHERE tenant_id=? AND request_id=? ORDER BY id
                 """, tenantId(), requestId);
         if (lines.isEmpty()) throw new BusinessException("FINANCE_COST_ALLOCATION_REQUEST_LINES_MISSING", "财务分摊申请缺少快照明细");
-        lines.stream().map(line -> longValue(line.get("project_id"))).distinct().forEach(projectId -> {
-            requireProject(projectId);
-            requireScope(projectId, longValue(request.get("cost_subject_id")));
-        });
+        List<Long> projectIds = lines.stream().map(line -> longValue(line.get("project_id"))).toList();
+        requireProjectsOpenForNormalCostGovernance(projectIds);
+        List<Long> subjectIds = new ArrayList<>();
+        subjectIds.add(longValue(request.get("cost_subject_id")));
+        lines.stream().map(line -> longValue(line.get("selected_cost_subject_id"))).forEach(subjectIds::add);
+        requireLeafSubjects(subjectIds);
+        for (Map<String, Object> line : lines) {
+            Long projectId = longValue(line.get("project_id"));
+            requireScope(projectId, longValue(line.get("selected_cost_subject_id")));
+        }
+        BigDecimal sourceTotal = sourceAmount(String.valueOf(request.get("source_type")),
+                longValue(request.get("source_id")));
         BigDecimal alreadyAllocated = jdbc.queryForList("""
                 SELECT source_amount FROM finance_cost_allocation_batch
                 WHERE tenant_id=? AND source_type=? AND source_id=?
@@ -195,7 +270,21 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                 """, BigDecimal.class, tenantId(), request.get("source_type"), request.get("source_id"))
                 .stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal total = money(request.get("source_amount"));
+        BigDecimal lineTotal = lines.stream().map(line -> money(line.get("allocated_amount")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (lineTotal.compareTo(total) != 0) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_NOT_CONSERVED", "分摊明细合计与来源金额不一致");
+        }
         BigDecimal remaining = sourceTotal.subtract(alreadyAllocated);
+        String currentSnapshotHash = sourceSnapshotHash(String.valueOf(request.get("source_type")),
+                longValue(request.get("source_id")), remaining);
+        if (!Objects.equals(currentSnapshotHash, request.get("source_snapshot_hash"))) {
+            throw new BusinessException("FINANCE_COST_SOURCE_DRIFT", "财务费用来源在审批期间已变化，请重新创建申请");
+        }
+        if (lines.stream().anyMatch(line -> line.get("selected_cost_subject_id") == null
+                || "UNCLASSIFIED".equals(line.get("classification_status")))) {
+            throw new BusinessException("FINANCE_COST_UNCLASSIFIED", "分摊明细仍有待归类科目，禁止过账");
+        }
         if (remaining.compareTo(total) != 0) {
             throw new BusinessException("FINANCE_COST_ALREADY_ALLOCATED", "审批期间来源财务费用已被其他申请分摊");
         }
@@ -209,18 +298,43 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                     """, batchId, tenantId(), "FCA-" + batchId, request.get("source_type"), request.get("source_id"),
                     total, request.get("allocation_basis"), request.get("accounting_period"),
                     request.get("cost_subject_id"), request.get("idempotency_key"), instanceId, userId(), request.get("remark"));
-            int index = 0;
             for (Map<String, Object> line : lines) {
                 Long projectId = longValue(line.get("project_id"));
                 BigDecimal amount = money(line.get("allocated_amount"));
+                requireActualFactSubject(longValue(line.get("selected_cost_subject_id")));
+                Long overrideId = longValue(line.get("classification_override_id"));
+                if ("OVERRIDDEN".equals(line.get("classification_status")) && overrideId == null) {
+                    overrideId = IdWorker.getId();
+                    jdbc.update("""
+                            INSERT INTO cost_classification_override
+                            (id,tenant_id,source_type,source_id,source_item_id,matched_cost_subject_id,
+                             override_cost_subject_id,mapping_version_id,assignment_rule_id,override_reason,
+                             status,version,created_by)
+                            VALUES (?,?,?,?,?,?,?,?,?,?, 'ACTIVE',0,?)
+                            """, overrideId, tenantId(), request.get("source_type"), request.get("source_id"), projectId,
+                            line.get("matched_cost_subject_id"), line.get("selected_cost_subject_id"),
+                            line.get("mapping_version_id"), line.get("assignment_rule_id"),
+                            line.get("override_reason"), userId());
+                    jdbc.update("""
+                            UPDATE finance_cost_allocation_request_line SET classification_override_id=?
+                            WHERE tenant_id=? AND id=? AND classification_override_id IS NULL
+                            """, overrideId, tenantId(), line.get("id"));
+                }
                 Long costItemId = IdWorker.getId();
                 jdbc.update("""
                         INSERT INTO cost_item
-                        (id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,
-                         source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag,remark)
-                        VALUES (?,?,?,?,?,?,?,?,'FINANCE_COST_ALLOCATION',?,?,CURRENT_DATE,'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
-                        """, costItemId, tenantId(), projectId, request.get("cost_subject_id"), "FINANCE", amount,
-                        BigDecimal.ZERO, amount, batchId, ++index, userId(), request.get("remark"));
+                        (id,tenant_id,project_id,cost_subject_id,classification_status,classification_business_category,mapping_version_id,
+                         assignment_rule_id,original_cost_subject_id,classification_override_id,cost_type,
+                         amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,
+                         cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag,remark)
+                        VALUES (?,?,?,?,?,?,?,?,?,?, ?,?,?,?,'FINANCE_COST_ALLOCATION',?,?,?,
+                         'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
+                        """, costItemId, tenantId(), projectId, line.get("selected_cost_subject_id"),
+                        line.get("classification_status"), request.get("allocation_basis"),
+                        line.get("mapping_version_id"), line.get("assignment_rule_id"),
+                        line.get("matched_cost_subject_id"), overrideId, "FINANCE", amount,
+                        BigDecimal.ZERO, amount, batchId, line.get("id"), businessDate,
+                        userId(), request.get("remark"));
                 jdbc.update("""
                         INSERT INTO finance_cost_allocation_line
                         (id,tenant_id,batch_id,project_id,basis_value,allocated_amount,cost_item_id)
@@ -238,6 +352,18 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
             throw new BusinessException("FINANCE_COST_ALLOCATION_DUPLICATE", "财务分摊申请已处理或事实重复", ex);
         }
         return batchId;
+    }
+
+    private void requireActualFactSubject(Long subjectId) {
+        requireSubject(subjectId, true);
+        Integer disabledRules = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM overhead_allocation_rule
+                WHERE tenant_id=? AND cost_subject_id=? AND status='DISABLE' AND deleted_flag=0
+                """, Integer.class, tenantId(), subjectId);
+        if (disabledRules != null && disabledRules > 0) {
+            throw new BusinessException("OVERHEAD_RULE_DISABLED_FOR_COST",
+                    "该间接费科目的分摊规则已停用，重新启用后方可生成新成本事实");
+        }
     }
 
     List<Map<String, Object>> financeAllocations() {
@@ -297,67 +423,56 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
     }
 
     Long allocateFinanceCost(FinanceAllocationCommand command) {
-        validateFinanceAllocationCommand(command);
-        command.lines().stream().map(AllocationLine::projectId).distinct().forEach(this::requireProject);
-        requireApprovedWorkflow(command.approvalInstanceId(), "FINANCE_COST_ALLOCATION", command.sourceId());
-        requireSubject(command.costSubjectId(), true);
-        BigDecimal sourceAmount = sourceAmount(command.sourceType(), command.sourceId());
-        BigDecimal allocatedBefore = jdbc.queryForObject("""
-                SELECT COALESCE(SUM(source_amount),0)
-                FROM finance_cost_allocation_batch WHERE tenant_id=? AND source_type=? AND source_id=?
-                """, BigDecimal.class, tenantId(), command.sourceType(), command.sourceId());
-        BigDecimal remaining = sourceAmount.subtract(allocatedBefore == null ? BigDecimal.ZERO : allocatedBefore);
-        if (remaining.signum() <= 0) throw new BusinessException("FINANCE_COST_ALREADY_ALLOCATED", "来源财务费用已全部分摊");
-        BigDecimal basisTotal = command.lines().stream().map(AllocationLine::basisValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (basisTotal.signum() <= 0) throw new BusinessException("FINANCE_COST_BASIS_INVALID", "分摊依据合计必须大于零");
-        List<BigDecimal> amounts = calculateAllocation(remaining, command.lines(), basisTotal);
-        Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO finance_cost_allocation_batch
-                    (id,tenant_id,batch_code,source_type,source_id,source_amount,allocation_basis,accounting_period,
-                     cost_subject_id,idempotency_key,status,approval_instance_id,posted_by,remark)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,'POSTED',?,?,?)
-                    """, id, tenantId(), "FCA-" + id, command.sourceType(), command.sourceId(), remaining,
-                    command.allocationBasis(), command.accountingPeriod(), command.costSubjectId(), command.idempotencyKey().trim(),
-                    command.approvalInstanceId(), userId(), command.remark());
-            for (int index = 0; index < command.lines().size(); index++) {
-                AllocationLine line = command.lines().get(index);
-                requireScope(line.projectId(), command.costSubjectId());
-                Long costItemId = IdWorker.getId();
-                BigDecimal amount = amounts.get(index);
-                jdbc.update("""
-                        INSERT INTO cost_item
-                        (id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,
-                         source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag,remark)
-                        VALUES (?,?,?,?,?,?,?,?, 'FINANCE_COST_ALLOCATION',?,?,CURRENT_DATE,'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
-                        """, costItemId, tenantId(), line.projectId(), command.costSubjectId(), "FINANCE",
-                        amount, BigDecimal.ZERO, amount, id, index + 1L, userId(), command.remark());
-                jdbc.update("""
-                        INSERT INTO finance_cost_allocation_line
-                        (id,tenant_id,batch_id,project_id,basis_value,allocated_amount,cost_item_id)
-                        VALUES (?,?,?,?,?,?,?)
-                        """, IdWorker.getId(), tenantId(), id, line.projectId(), line.basisValue(), amount, costItemId);
-            }
-        } catch (DuplicateKeyException ex) {
-            throw new BusinessException("FINANCE_COST_ALLOCATION_DUPLICATE", "分摊幂等键或项目明细重复", ex);
-        }
-        return id;
+        throw new BusinessException("WORKFLOW_REQUIRED", "财务成本分摊必须通过申请、试算和财务负责人审批");
     }
 
     Long reverseFinanceAllocation(Long originalId, Long approvalInstanceId, String idempotencyKey, String remark) {
-        requireText(idempotencyKey, "幂等键不能为空");
+        throw new BusinessException("WORKFLOW_REQUIRED", "财务成本分摊冲销必须通过统一成本冲销申请审批");
+    }
+
+    Long reverseFinanceAllocationApproved(Long originalId, Long reversalRequestId,
+                                          Long approvalInstanceId, String remark) {
+        accountingPeriodGuard.assertWritable(LocalDate.now());
         Map<String, Object> original = one("""
                 SELECT id,source_type,source_id,source_amount,allocation_basis,accounting_period,cost_subject_id,status
                 FROM finance_cost_allocation_batch WHERE tenant_id=? AND id=? AND reversal_of_id IS NULL
                 """, originalId);
         if (!"POSTED".equals(original.get("status"))) throw new BusinessException("FINANCE_COST_NOT_REVERSIBLE", "仅原始已过账分摊可冲销");
         List<Map<String, Object>> lines = jdbc.queryForList("""
-                SELECT project_id,basis_value,allocated_amount FROM finance_cost_allocation_line
-                WHERE tenant_id=? AND batch_id=? ORDER BY id
+                SELECT l.id,l.project_id,l.basis_value,l.allocated_amount,l.cost_item_id,
+                       ci.cost_subject_id,ci.classification_status,ci.mapping_version_id,ci.assignment_rule_id,
+                       ci.original_cost_subject_id,ci.classification_override_id,ci.classification_snapshot_id,
+                       ci.tax_amount,ci.amount_without_tax
+                FROM finance_cost_allocation_line l
+                JOIN cost_item ci ON ci.tenant_id=l.tenant_id AND ci.id=l.cost_item_id AND ci.deleted_flag=0
+                WHERE l.tenant_id=? AND l.batch_id=? ORDER BY l.id
                 """, tenantId(), originalId);
         lines.stream().map(line -> longValue(line.get("project_id"))).distinct().forEach(this::requireProject);
-        requireApprovedWorkflow(approvalInstanceId, "FINANCE_COST_ALLOCATION_REVERSAL", originalId);
+        for (Map<String, Object> line : lines) {
+            CostItem current = costFactLineageResolver.requireCurrentLeaf(
+                    tenantId(), longValue(line.get("cost_item_id")));
+            if (current.getAmountWithoutTax() == null
+                    || current.getAmountWithoutTax().compareTo(money(line.get("allocated_amount"))) != 0) {
+                throw new BusinessException("FINANCE_COST_REVERSAL_SOURCE_DRIFT", "财务分摊成本事实金额已变化，不能冲销");
+            }
+            line.put("current_cost_item_id", current.getId());
+            line.put("cost_subject_id", current.getCostSubjectId());
+            line.put("classification_status", current.getClassificationStatus());
+            line.put("classification_business_category", current.getClassificationBusinessCategory());
+            line.put("recognition_role", current.getRecognitionRole());
+            line.put("root_source_type", current.getRootSourceType() == null
+                    ? current.getSourceType() : current.getRootSourceType());
+            line.put("mapping_version_id", current.getMappingVersionId());
+            line.put("assignment_rule_id", current.getAssignmentRuleId());
+            line.put("original_cost_subject_id", current.getOriginalCostSubjectId());
+            line.put("classification_override_id", current.getClassificationOverrideId());
+            line.put("classification_snapshot_id", current.getClassificationSnapshotId());
+            line.put("cost_type", current.getCostType());
+            line.put("amount", current.getAmount());
+            line.put("tax_amount", current.getTaxAmount());
+            line.put("amount_without_tax", current.getAmountWithoutTax());
+        }
+        requireApprovedWorkflow(approvalInstanceId, WorkflowBusinessTypes.COST_REVERSAL, reversalRequestId);
         Long reversalId = IdWorker.getId();
         BigDecimal total = money(original.get("source_amount")).negate();
         try {
@@ -368,18 +483,26 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                     VALUES (?,?,?,?,?,?,?,?,?,?,'REVERSED',?,?,?,?)
                     """, reversalId, tenantId(), "FCAR-" + reversalId, original.get("source_type"), longValue(original.get("source_id")),
                     total, original.get("allocation_basis"), original.get("accounting_period"), longValue(original.get("cost_subject_id")),
-                    idempotencyKey.trim(), approvalInstanceId, originalId, userId(), remark);
-            int index = 0;
+                    "FCAR-IDEMP-" + reversalRequestId, approvalInstanceId, originalId, userId(), remark);
             for (Map<String, Object> line : lines) {
                 BigDecimal amount = money(line.get("allocated_amount")).negate();
                 Long costItemId = IdWorker.getId();
                 jdbc.update("""
                         INSERT INTO cost_item
-                        (id,tenant_id,project_id,cost_subject_id,cost_type,amount,tax_amount,amount_without_tax,source_type,
-                         source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag,remark)
-                        VALUES (?,?,?,?,?,?,?,?, 'FINANCE_COST_ALLOCATION_REVERSAL',?,?,CURRENT_DATE,'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
-                        """, costItemId, tenantId(), longValue(line.get("project_id")), longValue(original.get("cost_subject_id")),
-                        "FINANCE", amount, BigDecimal.ZERO, amount, reversalId, ++index, userId(), remark);
+                        (id,tenant_id,project_id,cost_subject_id,classification_status,classification_business_category,recognition_role,root_source_type,mapping_version_id,
+                         assignment_rule_id,original_cost_subject_id,classification_override_id,
+                         classification_snapshot_id,original_cost_item_id,cost_type,amount,tax_amount,
+                         amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,
+                         created_by,created_at,updated_at,deleted_flag,remark)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'FINANCE_COST_ALLOCATION_REVERSAL',?,?,CURRENT_DATE,
+                         'CONFIRMED',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,?)
+                        """, costItemId, tenantId(), longValue(line.get("project_id")), line.get("cost_subject_id"),
+                        "REVERSAL", line.get("classification_business_category"), line.get("recognition_role"), line.get("root_source_type"), line.get("mapping_version_id"), line.get("assignment_rule_id"),
+                        line.get("original_cost_subject_id"), line.get("classification_override_id"),
+                        line.get("classification_snapshot_id"), line.get("current_cost_item_id"), line.get("cost_type"),
+                        money(line.get("amount")).negate(),
+                        money(line.get("tax_amount")).negate(), money(line.get("amount_without_tax")).negate(),
+                        reversalId, line.get("current_cost_item_id"), userId(), remark);
                 jdbc.update("""
                         INSERT INTO finance_cost_allocation_line
                         (id,tenant_id,batch_id,project_id,basis_value,allocated_amount,cost_item_id)
@@ -397,11 +520,18 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
         requireProject(projectId);
         return jdbc.queryForMap("""
                 SELECT ? project_id,
-                  COALESCE((SELECT SUM(amount_without_tax) FROM cost_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND cost_status<>'WRITE_OFF'),0) actual_cost,
+                  COALESCE((SELECT SUM(ci.amount_without_tax) FROM cost_item ci
+                    JOIN cost_subject cs ON cs.tenant_id=ci.tenant_id AND cs.id=ci.cost_subject_id
+                      AND cs.deleted_flag=0 AND cs.account_category='COST'
+                    WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
+                      AND ci.cost_status IN ('CONFIRMED','POSTED')
+                      AND ci.classification_status<>'UNCLASSIFIED'
+                      AND ci.recognition_role='ACTUAL'),0) actual_cost,
                   COALESCE((SELECT SUM(target_amount) FROM cost_target_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0),0) target_cost,
                   COALESCE((SELECT SUM(l.amount) FROM bid_cost_target_transfer_line l JOIN bid_cost_target_transfer h ON h.id=l.transfer_id WHERE h.tenant_id=? AND h.project_id=?),0) bid_transferred,
                   COALESCE((SELECT SUM(l.allocated_amount) FROM finance_cost_allocation_line l JOIN finance_cost_allocation_batch h ON h.id=l.batch_id WHERE h.tenant_id=? AND l.project_id=?),0) finance_allocated,
-                  COALESCE((SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND cost_subject_id IS NULL),0) unclassified_count,
+                  COALESCE((SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND project_id=? AND deleted_flag=0
+                    AND cost_status IN ('CONFIRMED','POSTED') AND classification_status='UNCLASSIFIED'),0) unclassified_count,
                   COALESCE((SELECT COUNT(*) FROM cost_subject_assignment_rule r WHERE r.tenant_id=? AND r.status='ACTIVE' AND EXISTS (SELECT 1 FROM cost_subject s WHERE s.tenant_id=r.tenant_id AND s.parent_id=r.cost_subject_id AND s.deleted_flag=0)),0) active_non_leaf_rule_count
                 """, projectId, tenantId(), projectId, tenantId(), projectId, tenantId(), projectId,
                 tenantId(), projectId, tenantId(), projectId, tenantId());
@@ -424,7 +554,6 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
     }
 
     void validateFinanceAllocationCommand(FinanceAllocationCommand command) {
-        requireText(command.idempotencyKey(), "幂等键不能为空");
         requireText(command.accountingPeriod(), "会计期间不能为空");
         if (!command.accountingPeriod().matches("\\d{4}-(0[1-9]|1[0-2])")) {
             throw new BusinessException("FINANCE_COST_PERIOD_INVALID", "会计期间必须为YYYY-MM");
@@ -435,6 +564,9 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
         }
         if (command.lines() == null || command.lines().isEmpty()) {
             throw new BusinessException("FINANCE_COST_LINES_EMPTY", "财务费用分摊至少包含一个项目");
+        }
+        if (command.lines().size() > APPROVAL_DETAIL_ROW_LIMIT) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_LINE_LIMIT_EXCEEDED", "财务费用分摊明细最多1000行，请拆分后提交");
         }
         if (command.lines().stream().anyMatch(line -> line.projectId() == null || line.basisValue() == null
                 || line.basisValue().signum() < 0)) {
@@ -450,6 +582,10 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                 && (command.remark() == null || command.remark().isBlank())) {
             throw new BusinessException("FINANCE_COST_EXCEPTION_REASON_REQUIRED", "合同额例外分摊必须说明原因");
         }
+    }
+
+    private static LocalDate allocationBusinessDate(String accountingPeriod) {
+        return YearMonth.parse(accountingPeriod).atEndOfMonth();
     }
 
     List<BigDecimal> calculateAllocation(BigDecimal total, List<AllocationLine> lines, BigDecimal basisTotal) {
@@ -471,7 +607,8 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                 SELECT id,request_code requestCode,project_id projectId,source_type sourceType,source_id sourceId,
                        source_amount sourceAmount,allocation_basis allocationBasis,accounting_period accountingPeriod,
                        cost_subject_id costSubjectId,status,approval_instance_id approvalInstanceId,
-                       final_batch_id finalBatchId,created_at createdAt,remark
+                       final_batch_id finalBatchId,source_snapshot_hash sourceSnapshotHash,
+                       created_by createdBy,created_at createdAt,remark
                 FROM finance_cost_allocation_request
                 WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE
                 """, id);
@@ -492,8 +629,12 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
     BigDecimal sourceAmount(String sourceType, Long sourceId) {
         if ("ACCOUNTING_ENTRY_LINE".equals(sourceType)) {
             return money(one("""
-                    SELECT l.amount FROM accounting_entry_line l JOIN accounting_entry e ON e.id=l.entry_id AND e.tenant_id=l.tenant_id
-                    WHERE l.tenant_id=? AND l.id=? AND e.deleted_flag=0 AND e.entry_status='POSTED' AND l.direction='DEBIT'
+                    SELECT l.amount FROM accounting_entry_line l
+                    JOIN accounting_entry e ON e.id=l.entry_id AND e.tenant_id=l.tenant_id
+                    JOIN cost_subject s ON s.id=l.cost_subject_id AND s.tenant_id=l.tenant_id
+                    WHERE l.tenant_id=? AND l.id=? AND e.deleted_flag=0 AND e.entry_status='POSTED'
+                      AND e.source_type='MANUAL' AND l.direction='DEBIT'
+                      AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
                     FOR UPDATE
                     """, sourceId).get("amount"));
         }
@@ -501,5 +642,47 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
             return money(one("SELECT amount FROM expense_application WHERE tenant_id=? AND id=? AND deleted_flag=0 AND approval_status='APPROVED' FOR UPDATE", sourceId).get("amount"));
         }
         throw new BusinessException("FINANCE_COST_SOURCE_INVALID", "财务费用来源仅支持已过账借方凭证明细或已审批费用申请");
+    }
+
+    private void validateFrozenRequest(Long requestId, Map<String, Object> request) {
+        BigDecimal sourceTotal = sourceAmount(String.valueOf(request.get("sourceType")), longValue(request.get("sourceId")));
+        BigDecimal allocated = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(source_amount),0) FROM finance_cost_allocation_batch
+                WHERE tenant_id=? AND source_type=? AND source_id=?
+                """, BigDecimal.class, tenantId(), request.get("sourceType"), request.get("sourceId"));
+        BigDecimal remaining = sourceTotal.subtract(allocated == null ? BigDecimal.ZERO : allocated);
+        if (remaining.compareTo(money(request.get("sourceAmount"))) != 0
+                || !Objects.equals(sourceSnapshotHash(String.valueOf(request.get("sourceType")),
+                longValue(request.get("sourceId")), remaining), request.get("sourceSnapshotHash"))) {
+            throw new BusinessException("FINANCE_COST_SOURCE_DRIFT", "财务费用来源金额已变化，请重新创建分摊申请");
+        }
+        List<Map<String, Object>> lines = jdbc.queryForList("""
+                SELECT project_id,allocated_amount,selected_cost_subject_id,classification_status,
+                       mapping_version_id,assignment_rule_id,source_snapshot_hash
+                FROM finance_cost_allocation_request_line WHERE tenant_id=? AND request_id=?
+                """, tenantId(), requestId);
+        BigDecimal lineTotal = lines.stream().map(line -> money(line.get("allocated_amount")))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (lines.isEmpty() || lineTotal.compareTo(remaining) != 0) {
+            throw new BusinessException("FINANCE_COST_ALLOCATION_NOT_CONSERVED", "分摊明细合计与来源金额不一致");
+        }
+        for (Map<String, Object> line : lines) {
+            if (line.get("selected_cost_subject_id") == null || "UNCLASSIFIED".equals(line.get("classification_status"))
+                    || !Objects.equals(line.get("source_snapshot_hash"), request.get("sourceSnapshotHash"))) {
+                throw new BusinessException("FINANCE_COST_UNCLASSIFIED", "分摊明细归类快照不完整");
+            }
+            requireProjectOpenForNormalCostGovernance(longValue(line.get("project_id")));
+            requireScope(longValue(line.get("project_id")), longValue(line.get("selected_cost_subject_id")));
+        }
+    }
+
+    private static String sourceSnapshotHash(String sourceType, Long sourceId, BigDecimal amount) {
+        try {
+            String value = sourceType + "|" + sourceId + "|" + amount.setScale(2, RoundingMode.HALF_UP);
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable", ex);
+        }
     }
 }

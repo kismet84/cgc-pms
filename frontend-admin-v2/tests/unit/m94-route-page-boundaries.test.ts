@@ -39,14 +39,18 @@ describe('M94 focused route page boundaries', () => {
     expect(rules).toContain('loadMappingVersions')
     expect(rules).toContain('loadAssignmentRules')
     expect(rules).not.toMatch(/loadCostSubjectTree|loadProjectScopes|loadBidTransfers/)
-    expect(scope).toContain('loadProjectScopes')
+    expect(scope).toContain('loadProjectConfiguration')
+    expect(scope).toContain('createProjectConfigRequest')
     expect(scope).not.toMatch(/loadCostSubjectTree|loadMappingVersions|loadBidTransfers/)
     expect(trace).toMatch(/loadBidTransferRequests[\s\S]*loadFinanceAllocationRequests/)
+    expect(trace).toContain('loadRecalculationBatches')
+    expect(trace).toContain('loadReversalRequests')
     expect(trace).not.toMatch(/loadCostSubjectTree|loadMappingVersions|loadProjectScopes/)
 
-    for (const focused of [taxonomy, rules, scope, trace]) {
+    for (const focused of [taxonomy, rules, trace]) {
       expect(focused).not.toContain("from 'vue-router'")
     }
+    expect(scope).toContain("from 'vue-router'")
   })
 
   it('routes the three access-control entries to focused pages', () => {

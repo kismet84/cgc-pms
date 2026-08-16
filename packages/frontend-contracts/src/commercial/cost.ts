@@ -115,6 +115,8 @@ export interface CostLedgerRecord {
   amount: DecimalString;
   taxAmount: DecimalString;
   amountWithoutTax: DecimalString;
+  classificationStatus: string;
+  recognitionRole: 'ACTUAL' | 'COMMITTED' | 'NON_COST';
   costType: string;
   sourceType: string;
   sourceId?: string | null;
@@ -141,6 +143,8 @@ export type CostLedgerPage = PageResult<CostLedgerRecord>;
 export interface CostLedgerSummary {
   totalAmount: DecimalString;
   totalTaxAmount: DecimalString;
+  committedAmount: DecimalString;
+  nonCostAmount: DecimalString;
   bySourceType: Record<string, DecimalString>;
   byProject: Record<string, DecimalString>;
   byCostType: Record<string, DecimalString>;

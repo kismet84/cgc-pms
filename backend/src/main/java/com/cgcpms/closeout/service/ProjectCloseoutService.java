@@ -737,6 +737,7 @@ public class ProjectCloseoutService {
         Long projectId = longValue(closeout.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "关闭项目");
         requireStage(closeout, Set.of("READY_TO_CLOSE"), "档案签收完成后才能关闭项目");
+        requireProject(projectId, true);
         closeGateService.requireFinalClose(closeoutId, projectId);
         if (jdbc.update("""
                 UPDATE pm_project SET status='CLOSED',actual_end_date=?,remark=CONCAT(COALESCE(remark,''),?),

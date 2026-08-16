@@ -13,7 +13,7 @@ class CostSubjectControllerAuthorizationTest {
         String readGate = CostSubjectController.class.getMethod("getList", String.class)
                 .getAnnotation(PreAuthorize.class).value();
         String writeGate = CostSubjectController.class.getMethod(
-                        "create", com.cgcpms.cost.entity.CostSubject.class)
+                        "create", CostSubjectController.CostSubjectCommand.class)
                 .getAnnotation(PreAuthorize.class).value();
 
         assertThat(readGate)

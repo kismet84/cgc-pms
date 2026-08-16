@@ -156,7 +156,7 @@ class OverheadAllocationControllerTest {
     @DisplayName("规则修改要求 overhead:edit，路径 ID 与白名单字段为唯一更新输入")
     void updateRulePermissionAndWhitelistContract() throws Exception {
         String body = """
-                {"costSubjectId":54010401,"allocationBasis":"USAGE","allocationCycle":"PER_OCCURRENCE",
+                {"costSubjectId":54010401,"allocationBasis":"CONTRACT_AMOUNT","allocationCycle":"MONTHLY",
                  "id":999,"tenantId":999999,"status":"DISABLE","updatedBy":888}
                 """;
         mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
@@ -175,7 +175,7 @@ class OverheadAllocationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());
         verify(service, org.mockito.Mockito.times(2))
-                .updateValidated(940026001L, 54010401L, "USAGE", "PER_OCCURRENCE");
+                .updateValidated(940026001L, 54010401L, "CONTRACT_AMOUNT", "MONTHLY");
     }
 
     @Test
@@ -210,6 +210,23 @@ class OverheadAllocationControllerTest {
                         .cookie(cookie(List.of("SUPER_ADMIN"), List.of())))
                 .andExpect(status().isOk());
         verify(service, org.mockito.Mockito.times(2)).delete(940026001L);
+    }
+
+    @Test
+    @DisplayName("规则启停要求 overhead:edit，并只传路径 ID 与目标状态")
+    void setRuleStatusPermissionContract() throws Exception {
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001/status")
+                        .param("status", "DISABLE"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001/status")
+                        .cookie(cookie(List.of(), List.of("overhead:query")))
+                        .param("status", "DISABLE"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001/status")
+                        .cookie(cookie(List.of(), List.of("overhead:edit")))
+                        .param("status", "DISABLE"))
+                .andExpect(status().isOk());
+        verify(service).setStatus(940026001L, "DISABLE");
     }
 
     @AfterEach

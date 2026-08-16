@@ -133,6 +133,14 @@ class ProjectCashForecastClosedLoopIntegrationTest {
         jdbc.update("UPDATE pm_project SET status='SUSPENDED' WHERE id=?", PROJECT);
         assertThrows(BusinessException.class, () -> service.createCycle(new CycleRequest(PROJECT, "暂停项目预测",
                 FORECAST_DATE, FORECAST_DATE, FORECAST_DATE, "BASE", BigDecimal.ZERO, null)));
+
+        jdbc.update("UPDATE pm_project SET status='CLOSED',actual_end_date=? WHERE id=?", FORECAST_DATE, PROJECT);
+        assertDoesNotThrow(() -> service.createCycle(new CycleRequest(PROJECT, "关闭项目历史预测",
+                FORECAST_DATE, FORECAST_DATE, FORECAST_DATE, "CONSERVATIVE", BigDecimal.ZERO, null)));
+        BusinessException future = assertThrows(BusinessException.class, () -> service.createCycle(new CycleRequest(
+                PROJECT, "关闭项目未来预测", FORECAST_DATE, FORECAST_DATE, FORECAST_DATE.plusDays(1),
+                "OPTIMISTIC", BigDecimal.ZERO, null)));
+        assertEquals("CASH_FORECAST_CLOSED_PROJECT_HORIZON_INVALID", future.getCode());
     }
 
     @Test

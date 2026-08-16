@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
@@ -86,4 +87,17 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
 
     @Select("SELECT COUNT(*) FROM cash_journal_entry WHERE tenant_id=#{tenantId} AND bid_cost_id=#{bidCostId} AND deleted_flag=0")
     long countCashEntries(@Param("tenantId") Long tenantId, @Param("bidCostId") Long bidCostId);
+
+    @Select("""
+            SELECT j.id journalId,j.cost_subject_id costSubjectId,j.amount,j.direction,
+                   j.business_date businessDate,j.summary
+            FROM cash_journal_entry j
+            JOIN cost_subject s ON s.tenant_id=j.tenant_id AND s.id=j.cost_subject_id
+              AND s.deleted_flag=0 AND s.account_category='COST'
+            WHERE j.tenant_id=#{tenantId} AND j.bid_cost_id=#{bidCostId}
+              AND j.deleted_flag=0 AND j.status='ARCHIVED'
+            ORDER BY j.business_date,j.id
+            """)
+    List<Map<String, Object>> selectArchivedCostJournals(@Param("tenantId") Long tenantId,
+                                                          @Param("bidCostId") Long bidCostId);
 }

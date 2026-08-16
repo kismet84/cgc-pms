@@ -63,6 +63,17 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long TECH_ARCHIVE = 99191024L;
     private static final long SAFETY_PLAN = 99191025L;
     private static final long SAFETY_INSPECTION = 99191026L;
+    private static final long OVERHEAD_SUBJECT = 99191027L;
+    private static final long OVERHEAD_RULE = 99191028L;
+    private static final long OVERHEAD_SOURCE = 99191029L;
+    private static final long OVERHEAD_CLEARING = 99191030L;
+    private static final long REVERSAL_OTHER_PROJECT = 99191031L;
+    private static final long REVERSAL_BATCH = 99191032L;
+    private static final long REVERSAL_LINE_FIRST = 99191033L;
+    private static final long REVERSAL_LINE_CURRENT = 99191034L;
+    private static final long REVERSAL_REQUEST = 99191035L;
+    private static final long REVERSAL_APPROVAL = 99191036L;
+    private static final long UNCLASSIFIED_COST = 99191037L;
     private static final AtomicLong IDS = new AtomicLong(99191100L);
 
     @Autowired ProjectCloseoutService service;
@@ -386,6 +397,107 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     @Test
+    void pendingOverheadAllocationBlocksConstructionCompletionUntilCleared() {
+        jdbc.update("""
+                INSERT INTO cost_subject
+                (id,tenant_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,deleted_flag)
+                VALUES (?,0,'5401.04.98','收尾待分摊间接费','OVERHEAD','COST',3,1,'ENABLE',0)
+                """, OVERHEAD_SUBJECT);
+        jdbc.update("""
+                INSERT INTO overhead_allocation_rule
+                (id,tenant_id,cost_subject_id,allocation_basis,allocation_cycle,status,deleted_flag)
+                VALUES (?,0,?,'CONTRACT_AMOUNT','MONTHLY','DISABLE',0)
+                """, OVERHEAD_RULE, OVERHEAD_SUBJECT);
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,cost_type,
+                 amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,0,?,?,'CLASSIFIED','ACTUAL','OVERHEAD',100,0,100,'MANUAL_COST',?,?,CURRENT_DATE,'CONFIRMED',1,0)
+                """, OVERHEAD_SOURCE, PROJECT, OVERHEAD_SUBJECT, OVERHEAD_SOURCE, OVERHEAD_SOURCE);
+
+        assertTrue(gateCodes().contains("CONSTRUCTION_OVERHEAD_ALLOCATION_PENDING"));
+
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,cost_subject_id,classification_status,recognition_role,original_cost_item_id,
+                 cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,
+                 generated_flag,deleted_flag)
+                VALUES (?,0,?,?,'REVERSAL','ACTUAL',?,'OVERHEAD_CLEARING',-100,0,-100,
+                        'OVERHEAD_ALLOCATION_CLEARING',?,?,CURRENT_DATE,'CONFIRMED',1,0)
+                """, OVERHEAD_CLEARING, PROJECT, OVERHEAD_SUBJECT, OVERHEAD_SOURCE,
+                OVERHEAD_RULE, OVERHEAD_SOURCE);
+        assertFalse(gateCodes().contains("CONSTRUCTION_OVERHEAD_ALLOCATION_PENDING"));
+    }
+
+    @Test
+    void unclassifiedCostFactBlocksConstructionCompletionUntilClassified() {
+        jdbc.update("""
+                INSERT INTO cost_item
+                (id,tenant_id,project_id,classification_status,recognition_role,cost_type,amount,tax_amount,
+                 amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,0,?,'UNCLASSIFIED','ACTUAL','MATERIAL',100,0,100,'MAT_RECEIPT',?,?,CURRENT_DATE,'CONFIRMED',1,0)
+                """, UNCLASSIFIED_COST, PROJECT, UNCLASSIFIED_COST, UNCLASSIFIED_COST);
+
+        assertTrue(gateCodes().contains("CONSTRUCTION_UNCLASSIFIED_COST_FACT"));
+
+        jdbc.update("UPDATE cost_item SET classification_status='CLASSIFIED' WHERE id=?", UNCLASSIFIED_COST);
+        assertFalse(gateCodes().contains("CONSTRUCTION_UNCLASSIFIED_COST_FACT"));
+    }
+
+    @Test
+    void multiProjectCostReversalBlocksEveryAffectedProjectFromClosing() {
+        jdbc.update("""
+                INSERT INTO pm_project
+                (id,tenant_id,project_code,project_name,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES (?,0,'CLOSEOUT-REV-OTHER','冲销首项目','ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, REVERSAL_OTHER_PROJECT);
+        jdbc.update("""
+                INSERT INTO cost_subject
+                (id,tenant_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,deleted_flag)
+                VALUES (?,0,'5401.04.98','收尾冲销测试成本','OVERHEAD','COST',3,1,'ENABLE',0)
+                """, OVERHEAD_SUBJECT);
+        Long templateId = jdbc.queryForObject("""
+                SELECT id FROM wf_template
+                WHERE tenant_id=0 AND business_type='FINANCE_COST_ALLOCATION'
+                  AND enabled=1 AND deleted_flag=0 ORDER BY id DESC LIMIT 1
+                """, Long.class);
+        jdbc.update("""
+                INSERT INTO wf_instance
+                (id,tenant_id,template_id,business_type,business_id,project_id,title,instance_status,
+                 current_round,resubmit_count,business_revision,initiator_id,created_by,deleted_flag)
+                VALUES (?,0,?,'FINANCE_COST_ALLOCATION',?,?,?,'APPROVED',1,0,1,1,1,0)
+                """, REVERSAL_APPROVAL, templateId, REVERSAL_BATCH, REVERSAL_OTHER_PROJECT, "跨项目分摊审批");
+        jdbc.update("""
+                INSERT INTO finance_cost_allocation_batch
+                (id,tenant_id,batch_code,source_type,source_id,source_amount,allocation_basis,accounting_period,
+                 cost_subject_id,idempotency_key,status,approval_instance_id,posted_by,posted_at)
+                VALUES (?,0,'FCAB-CLOSEOUT-REV','ACCOUNTING_ENTRY_LINE',1,100,'DIRECT_PROJECT','2026-07',
+                        ?,'closeout-reversal','POSTED',?,1,CURRENT_TIMESTAMP)
+                """, REVERSAL_BATCH, OVERHEAD_SUBJECT, REVERSAL_APPROVAL);
+        jdbc.update("""
+                INSERT INTO finance_cost_allocation_line
+                (id,tenant_id,batch_id,project_id,basis_value,allocated_amount)
+                VALUES (?,0,?,?,1,50),(?,0,?,?,1,50)
+                """, REVERSAL_LINE_FIRST, REVERSAL_BATCH, REVERSAL_OTHER_PROJECT,
+                REVERSAL_LINE_CURRENT, REVERSAL_BATCH, PROJECT);
+        jdbc.update("""
+                INSERT INTO cost_reversal_request
+                (id,tenant_id,request_code,target_type,target_id,project_id,status,version,created_by,reason)
+                VALUES (?,0,'CRR-CLOSEOUT-REV','FINANCE_ALLOCATION',?,?,'DRAFT',0,1,'跨项目分摊冲销')
+                """, REVERSAL_REQUEST, REVERSAL_BATCH, REVERSAL_OTHER_PROJECT);
+
+        assertTrue(gateCodes().contains("CONSTRUCTION_COST_REVERSAL_OPEN"),
+                "冲销申请头绑定其他项目时，仍须阻断明细涉及项目关闭");
+    }
+
+    @Test
+    void activeQualityPlanBlocksConstructionCompletion() {
+        assertFalse(gateCodes().contains("CONSTRUCTION_QUALITY_PLAN_OPEN"));
+        jdbc.update("UPDATE qs_inspection_plan SET status='ACTIVE' WHERE id=?", QUALITY_PLAN);
+        assertTrue(gateCodes().contains("CONSTRUCTION_QUALITY_PLAN_OPEN"));
+    }
+
+    @Test
     void ignoresSupersededScheduleTasksInCloseoutReadiness() {
         long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-SUPERSEDED", LocalDate.now(), null)));
         long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
@@ -481,6 +593,17 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM cost_reversal_request WHERE id=?", REVERSAL_REQUEST);
+        jdbc.update("DELETE FROM finance_cost_allocation_line WHERE id IN(?,?)", REVERSAL_LINE_FIRST, REVERSAL_LINE_CURRENT);
+        jdbc.update("DELETE FROM finance_cost_allocation_batch WHERE id=?", REVERSAL_BATCH);
+        jdbc.update("DELETE FROM wf_instance WHERE id=?", REVERSAL_APPROVAL);
+        jdbc.update("DELETE FROM pm_project WHERE id=?", REVERSAL_OTHER_PROJECT);
+        jdbc.update("DELETE FROM cost_item WHERE id=?", OVERHEAD_CLEARING);
+        jdbc.update("DELETE FROM cost_item WHERE id=?", OVERHEAD_SOURCE);
+        jdbc.update("DELETE FROM cost_item WHERE id=?", UNCLASSIFIED_COST);
+        jdbc.update("DELETE FROM overhead_allocation_run WHERE rule_id=?", OVERHEAD_RULE);
+        jdbc.update("DELETE FROM overhead_allocation_rule WHERE id=?", OVERHEAD_RULE);
+        jdbc.update("DELETE FROM cost_subject WHERE id=?", OVERHEAD_SUBJECT);
         jdbc.update("DELETE FROM tech_acceptance_archive WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM tech_construction_reference WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM tech_disclosure WHERE project_id=?", PROJECT);

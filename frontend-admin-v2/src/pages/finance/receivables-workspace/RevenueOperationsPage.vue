@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
   V2ActionMenu,
   V2Button,
@@ -19,6 +19,7 @@ import {
   confirmCollection,
   confirmSalesInvoice,
   createCollection,
+  createCollectionSchedule,
   createOwnerSettlement,
   createSalesInvoice,
   creditReceivable,
@@ -90,6 +91,7 @@ const loading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
 const dialog = ref(false)
+const scheduleDialog = ref(false)
 const editor = ref<RevenueEditor | null>(null)
 const editorKind = ref<EditorKind>('settlement')
 const pending = ref<{ row: RevenueRow; action: Action } | null>(null)
@@ -103,6 +105,14 @@ const salesInvoiceAttachment = ref<File | null>(null)
 const collectionAttachment = ref<File | null>(null)
 const settlementAttachmentInput = ref<HTMLInputElement | null>(null)
 const settlementAttachmentTarget = ref<OwnerSettlementRecord | null>(null)
+const scheduleForm = reactive({
+  contractId: '',
+  receivableId: '',
+  plannedDate: localDateInputValue(),
+  plannedAmount: '',
+  reminderDays: '7',
+  note: '',
+})
 let controller: AbortController | null = null
 let dictionariesLoaded = false
 
@@ -175,6 +185,30 @@ const receivableOptions = computed(() =>
       label: `${item.receivableCode} · 可分配 ${formatAmount(item.outstandingAmount)}`,
     })),
 )
+const scheduleContractOptions = computed(() =>
+  contracts.value
+    .filter(
+      (item) =>
+        item.approvalStatus === 'APPROVED' &&
+        item.contractType === 'MAIN' &&
+        ['PERFORMING', 'SETTLED'].includes(item.contractStatus),
+    )
+    .map((item) => ({ value: item.id, label: `${item.contractCode} · ${item.contractName}` })),
+)
+const scheduleReceivableOptions = computed(() => [
+  { value: '', label: '不关联具体应收款' },
+  ...rows.value
+    .filter(
+      (item): item is ReceivableRecord & { kind: 'receivable' } =>
+        item.kind === 'receivable' &&
+        item.projectId === projectId.value &&
+        item.contractId === scheduleForm.contractId,
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.receivableCode} · 未收 ${formatAmount(item.outstandingAmount)}`,
+    })),
+])
 
 function rowText(row: RevenueRow): string {
   return row.kind === 'settlement'
@@ -301,6 +335,54 @@ async function openForm(kind: EditorKind): Promise<void> {
   } catch (cause) {
     dialog.value = false
     showToast('error', '候选项加载失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  }
+}
+
+async function openSchedule(): Promise<void> {
+  if (!projectId.value) {
+    showToast('error', '请选择项目', '回款计划需要切换至具体项目。')
+    return
+  }
+  try {
+    await loadContracts(projectId.value)
+    Object.assign(scheduleForm, {
+      contractId: scheduleContractOptions.value[0]?.value ?? '',
+      receivableId: '',
+      plannedDate: localDateInputValue(),
+      plannedAmount: '',
+      reminderDays: '7',
+      note: '项目回款计划',
+    })
+    scheduleDialog.value = true
+  } catch (cause) {
+    showToast('error', '候选项加载失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  }
+}
+
+async function saveSchedule(): Promise<void> {
+  if (!projectId.value || !scheduleForm.contractId || busy.value) return
+  const reminderDays = Number(scheduleForm.reminderDays)
+  if (!Number.isInteger(reminderDays) || reminderDays < 0 || reminderDays > 365) {
+    showToast('error', '提醒天数无效', '请输入 0 至 365 的整数。')
+    return
+  }
+  busy.value = true
+  try {
+    await createCollectionSchedule({
+      projectId: projectId.value,
+      contractId: scheduleForm.contractId,
+      receivableId: scheduleForm.receivableId || undefined,
+      plannedDate: scheduleForm.plannedDate,
+      plannedAmount: scheduleForm.plannedAmount,
+      reminderDays,
+      note: scheduleForm.note.trim(),
+    })
+    scheduleDialog.value = false
+    showToast('success', '回款计划已创建', '资金预测可读取该计划。')
+  } catch (cause) {
+    showToast('error', '保存失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
   }
 }
 
@@ -445,6 +527,13 @@ onBeforeUnmount(() => controller?.abort())
             >
             <V2Button v-if="canAdd" size="small" variant="secondary" @click="openForm('collection')"
               >新建回款</V2Button
+            >
+            <V2Button
+              v-if="canAdd && projectId"
+              size="small"
+              variant="secondary"
+              @click="openSchedule"
+              >新建回款计划</V2Button
             >
             <V2Button size="small" variant="secondary" :loading="loading" @click="refreshWorkspace"
               >刷新</V2Button
@@ -737,6 +826,46 @@ onBeforeUnmount(() => controller?.abort())
             >保存</V2Button
           ></template
         >
+      </V2Dialog>
+
+      <V2Dialog v-model:open="scheduleDialog" title="新建回款计划" :close-disabled="busy">
+        <form
+          id="collection-schedule-form"
+          class="finance-workspace__form"
+          @submit.prevent="saveSchedule"
+        >
+          <V2Select
+            v-model="scheduleForm.contractId"
+            label="合同"
+            :options="scheduleContractOptions"
+            required
+          />
+          <V2Select
+            v-model="scheduleForm.receivableId"
+            label="应收款（可选）"
+            :options="scheduleReceivableOptions"
+          />
+          <V2Input v-model="scheduleForm.plannedDate" type="date" label="计划日期" required />
+          <V2Input
+            v-model="scheduleForm.plannedAmount"
+            label="计划金额"
+            :decimal-scale="2"
+            required
+          />
+          <V2Input
+            v-model="scheduleForm.reminderDays"
+            type="number"
+            label="提前提醒天数"
+            required
+          />
+          <V2Input v-model="scheduleForm.note" label="计划说明" required />
+        </form>
+        <template #footer>
+          <V2Button variant="secondary" :disabled="busy" @click="scheduleDialog = false"
+            >取消</V2Button
+          >
+          <V2Button type="submit" form="collection-schedule-form" :loading="busy">保存</V2Button>
+        </template>
       </V2Dialog>
 
       <input

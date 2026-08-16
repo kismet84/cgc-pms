@@ -8,8 +8,10 @@ import com.cgcpms.cost.vo.CostSubjectVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,13 +64,14 @@ public class CostSubjectController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody CostSubject subject) {
-        return ApiResponse.success(costSubjectService.create(subject));
+    public ApiResponse<Long> create(@Valid @RequestBody CostSubjectCommand command) {
+        return ApiResponse.success(costSubjectService.create(command.toEntity()));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostSubject subject) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostSubjectCommand command) {
+        CostSubject subject = command.toEntity();
         subject.setId(id);
         costSubjectService.update(subject);
         return ApiResponse.success();
@@ -91,5 +94,28 @@ public class CostSubjectController {
     public record TargetRatioRequest(
             @NotBlank String subjectCode,
             @NotNull @DecimalMin("0.0000") @DecimalMax("100.0000") BigDecimal ratio) {
+    }
+
+    public record CostSubjectCommand(
+            @NotNull Long parentId,
+            @NotBlank @Size(max = 64) String subjectCode,
+            @NotBlank @Size(max = 128) String subjectName,
+            @NotBlank @Size(max = 32) String subjectType,
+            @NotBlank @Pattern(regexp = "ASSET|LIABILITY|EQUITY|COST|REVENUE|SETTLEMENT|RECEIVABLE")
+            String accountCategory,
+            @NotNull @Min(0) Integer sortOrder,
+            @NotBlank @Pattern(regexp = "ENABLE|DISABLE") String status) {
+
+        CostSubject toEntity() {
+            CostSubject subject = new CostSubject();
+            subject.setParentId(parentId);
+            subject.setSubjectCode(subjectCode.trim());
+            subject.setSubjectName(subjectName.trim());
+            subject.setSubjectType(subjectType.trim());
+            subject.setAccountCategory(accountCategory);
+            subject.setSortOrder(sortOrder);
+            subject.setStatus(status);
+            return subject;
+        }
     }
 }

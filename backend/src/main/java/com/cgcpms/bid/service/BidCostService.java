@@ -1,5 +1,6 @@
 package com.cgcpms.bid.service;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -13,6 +14,8 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -49,23 +52,32 @@ public class BidCostService {
 
     private final BidCostMapper mapper;
     private final CostItemMapper costItemMapper;
+    private final CostSubjectResolver costSubjectResolver;
+    private final CostFactLineageResolver costFactLineageResolver;
     private final ProjectAccessChecker projectAccessChecker;
     private final CodeGenerationService codeGenerationService;
     private final BidDocumentVersionService documentService;
     private final Optional<BidAwardProjectCreator> awardProjectCreator;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     public BidCostService(BidCostMapper mapper,
                           CostItemMapper costItemMapper,
+                          CostSubjectResolver costSubjectResolver,
+                          CostFactLineageResolver costFactLineageResolver,
                           ProjectAccessChecker projectAccessChecker,
                           CodeGenerationService codeGenerationService,
                           BidDocumentVersionService documentService,
-                          Optional<BidAwardProjectCreator> awardProjectCreator) {
+                          Optional<BidAwardProjectCreator> awardProjectCreator,
+                          AccountingPeriodGuard accountingPeriodGuard) {
         this.mapper = mapper;
         this.costItemMapper = costItemMapper;
+        this.costSubjectResolver = costSubjectResolver;
+        this.costFactLineageResolver = costFactLineageResolver;
         this.projectAccessChecker = projectAccessChecker;
         this.codeGenerationService = codeGenerationService;
         this.documentService = documentService;
         this.awardProjectCreator = awardProjectCreator;
+        this.accountingPeriodGuard = accountingPeriodGuard;
     }
 
     public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword,
@@ -265,6 +277,7 @@ public class BidCostService {
             throw new BusinessException("BID_CONCURRENT_STATE_CHANGE", "投标状态已变化，请刷新后重试");
         }
         if (Objects.equals(current, target) && "WON".equals(target) && bid.getProjectId() != null) {
+            materializeWonBidCostFacts(bid.getId(), bid.getProjectId());
             return bid.getProjectId();
         }
         boolean legacyPreparingResult = legacyResultEntry && "PREPARING".equals(current)
@@ -292,8 +305,55 @@ public class BidCostService {
         if (projectId != null) update.set(BidCost::getProjectId, projectId);
         requireStateCas(mapper.update(null, update));
 
+        if (projectId != null) materializeWonBidCostFacts(id, projectId);
         if ("LOST".equals(target)) writeOffLegacyCost(id);
         return projectId;
+    }
+
+    private void materializeWonBidCostFacts(Long bidCostId, Long projectId) {
+        Long tenantId = tenant();
+        for (Map<String, Object> journal : mapper.selectArchivedCostJournals(tenantId, bidCostId)) {
+            Long journalId = ((Number) journal.get("journalId")).longValue();
+            long existing = costItemMapper.selectCount(new LambdaQueryWrapper<CostItem>()
+                    .eq(CostItem::getTenantId, tenantId)
+                    .eq(CostItem::getSourceType, "BID_COST")
+                    .eq(CostItem::getSourceId, bidCostId)
+                    .eq(CostItem::getSourceItemId, journalId));
+            if (existing > 0) continue;
+            java.math.BigDecimal amount = (java.math.BigDecimal) journal.get("amount");
+            if ("IN".equals(journal.get("direction"))) amount = amount.negate();
+            Long originalSubjectId = ((Number) journal.get("costSubjectId")).longValue();
+            Object businessDate = journal.get("businessDate");
+            LocalDate costDate = businessDate instanceof LocalDate date ? date
+                    : ((java.sql.Date) businessDate).toLocalDate();
+            CostSubjectResolver.Decision decision = costSubjectResolver.resolveForFact(
+                    tenantId, projectId, "BID_COST", "BID", bidCostId, journalId, originalSubjectId, costDate);
+            CostItem item = new CostItem();
+            item.setTenantId(tenantId);
+            item.setProjectId(projectId);
+            item.setCostSubjectId(decision.costSubjectId());
+            item.setClassificationStatus(decision.classificationStatus());
+            item.setClassificationBusinessCategory("BID");
+            item.setMappingVersionId(decision.mappingVersionId());
+            item.setAssignmentRuleId(decision.assignmentRuleId());
+            item.setOriginalCostSubjectId(decision.originalCostSubjectId());
+            item.setClassificationOverrideId(decision.overrideId());
+            item.setClassificationSnapshotId(decision.snapshotId());
+            item.setCostType("BID");
+            item.setAmount(amount);
+            item.setTaxAmount(java.math.BigDecimal.ZERO);
+            item.setAmountWithoutTax(amount);
+            item.setSourceType("BID_COST");
+            item.setSourceId(bidCostId);
+            item.setSourceItemId(journalId);
+            accountingPeriodGuard.assertWritable(costDate);
+            item.setCostDate(costDate);
+            item.setCostStatus("CONFIRMED");
+            item.setGeneratedFlag(1);
+            item.setRemark("中标后从已归档投标现金日记账物化：" + journal.get("summary"));
+            costItemMapper.insert(item);
+            costSubjectResolver.markSnapshotPosted(decision);
+        }
     }
 
     /** Compatibility input; projectId is intentionally ignored because WON now creates the project. */
@@ -343,11 +403,52 @@ public class BidCostService {
     }
 
     private void writeOffLegacyCost(Long bidCostId) {
-        costItemMapper.update(null, new LambdaUpdateWrapper<CostItem>()
+        List<CostItem> originals = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getTenantId, tenant())
                 .eq(CostItem::getSourceType, "BID_COST")
                 .eq(CostItem::getSourceId, bidCostId)
-                .set(CostItem::getCostStatus, "WRITE_OFF"));
+                .in(CostItem::getCostStatus, "CONFIRMED", "POSTED"));
+        for (CostItem original : originals) {
+            CostItem current = costFactLineageResolver.requireCurrentLeaf(tenant(), original.getId());
+            long existing = costItemMapper.selectCount(new LambdaQueryWrapper<CostItem>()
+                    .eq(CostItem::getTenantId, tenant())
+                    .eq(CostItem::getSourceType, "BID_COST_WRITE_OFF")
+                    .eq(CostItem::getSourceId, bidCostId)
+                    .eq(CostItem::getSourceItemId, original.getId()));
+            if (existing > 0) continue;
+            CostItem reversal = new CostItem();
+            reversal.setTenantId(current.getTenantId());
+            reversal.setOrgId(current.getOrgId());
+            reversal.setProjectId(current.getProjectId());
+            reversal.setWbsTaskId(current.getWbsTaskId());
+            reversal.setContractId(current.getContractId());
+            reversal.setPartnerId(current.getPartnerId());
+            reversal.setCostSubjectId(current.getCostSubjectId());
+            reversal.setClassificationStatus("REVERSAL");
+            reversal.setClassificationBusinessCategory(current.getClassificationBusinessCategory());
+            reversal.setRecognitionRole(current.getRecognitionRole());
+            reversal.setRootSourceType(current.getRootSourceType());
+            reversal.setMappingVersionId(current.getMappingVersionId());
+            reversal.setAssignmentRuleId(current.getAssignmentRuleId());
+            reversal.setOriginalCostSubjectId(current.getOriginalCostSubjectId());
+            reversal.setClassificationOverrideId(current.getClassificationOverrideId());
+            reversal.setClassificationSnapshotId(current.getClassificationSnapshotId());
+            reversal.setOriginalCostItemId(current.getId());
+            reversal.setCostType(current.getCostType());
+            reversal.setAmount(current.getAmount().negate());
+            reversal.setTaxAmount(current.getTaxAmount().negate());
+            reversal.setAmountWithoutTax(current.getAmountWithoutTax().negate());
+            reversal.setSourceType("BID_COST_WRITE_OFF");
+            reversal.setSourceId(bidCostId);
+            reversal.setSourceItemId(original.getId());
+            LocalDate costDate = LocalDate.now();
+            accountingPeriodGuard.assertWritable(costDate);
+            reversal.setCostDate(costDate);
+            reversal.setCostStatus("CONFIRMED");
+            reversal.setGeneratedFlag(1);
+            reversal.setRemark("投标终止核销，根事实 " + original.getId() + "，当前事实 " + current.getId());
+            costItemMapper.insert(reversal);
+        }
     }
 
     private LambdaUpdateWrapper<BidCost> identityAndStatus(Long id, String current) {

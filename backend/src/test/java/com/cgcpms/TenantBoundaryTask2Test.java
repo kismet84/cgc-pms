@@ -414,7 +414,7 @@ class TenantBoundaryTask2Test {
 
         // Cleanup
         TestUserContext.setAdmin(TENANT_A, USER_A);
-        overheadAllocationService.delete(id);
+        overheadRuleMapper.deleteById(id);
     }
 
     @Test
@@ -437,7 +437,7 @@ class TenantBoundaryTask2Test {
 
         // Cleanup
         TestUserContext.setAdmin(TENANT_B, 999L);
-        overheadAllocationService.delete(ruleBId);
+        overheadRuleMapper.deleteById(ruleBId);
     }
 
     // ═══════════════════════════════════════════════════════════════

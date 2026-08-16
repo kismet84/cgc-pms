@@ -1,10 +1,12 @@
 package com.cgcpms.materialreturn.service;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
 import com.cgcpms.inventory.entity.MatStockTxn;
 import com.cgcpms.inventory.mapper.MatStockTxnMapper;
 import com.cgcpms.inventory.service.MatStockService;
@@ -40,8 +42,10 @@ public class MaterialReturnService {
     private final MatRequisitionItemMapper requisitionItemMapper;
     private final MatStockTxnMapper stockTxnMapper;
     private final CostItemMapper costItemMapper;
+    private final CostFactLineageResolver costFactLineageResolver;
     private final MatStockService stockService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final AccountingPeriodGuard accountingPeriodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Long confirm(MaterialReturnRequest request) {
@@ -53,6 +57,7 @@ public class MaterialReturnService {
             projectAccessChecker.checkAccess(existing.getProjectId(), "确认材料退料");
             return resolveExisting(existing, request, tenantId);
         }
+        accountingPeriodGuard.assertWritable(request.returnDate());
 
         MatRequisitionItem requisitionItem = requisitionItemMapper.selectById(request.requisitionItemId());
         if (requisitionItem == null || !tenantId.equals(requisitionItem.getTenantId())) {
@@ -90,6 +95,7 @@ public class MaterialReturnService {
         if (originalCost == null) {
             throw new BusinessException("RETURN_ORIGINAL_COST_NOT_FOUND", "原出库成本不存在，禁止退料冲销");
         }
+        originalCost = costFactLineageResolver.requireCurrentLeaf(tenantId, originalCost.getId());
 
         BigDecimal unitCost = originalTxn.getUnitCost();
         BigDecimal amount = request.quantity().multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
@@ -128,10 +134,22 @@ public class MaterialReturnService {
         CostItem reversal = new CostItem();
         reversal.setTenantId(tenantId);
         reversal.setProjectId(requisition.getProjectId());
+        reversal.setWbsTaskId(originalCost.getWbsTaskId());
         reversal.setContractId(requisition.getContractId());
         reversal.setPartnerId(requisition.getPartnerId());
         reversal.setCostType("MATERIAL");
         reversal.setCostSubjectId(originalCost.getCostSubjectId());
+        reversal.setClassificationStatus("REVERSAL");
+        reversal.setClassificationBusinessCategory(originalCost.getClassificationBusinessCategory());
+        reversal.setRecognitionRole(originalCost.getRecognitionRole());
+        reversal.setRootSourceType(originalCost.getRootSourceType() == null
+                ? originalCost.getSourceType() : originalCost.getRootSourceType());
+        reversal.setMappingVersionId(originalCost.getMappingVersionId());
+        reversal.setAssignmentRuleId(originalCost.getAssignmentRuleId());
+        reversal.setOriginalCostSubjectId(originalCost.getOriginalCostSubjectId());
+        reversal.setClassificationOverrideId(originalCost.getClassificationOverrideId());
+        reversal.setClassificationSnapshotId(originalCost.getClassificationSnapshotId());
+        reversal.setOriginalCostItemId(originalCost.getId());
         reversal.setAmount(amount.negate());
         reversal.setTaxAmount(BigDecimal.ZERO);
         reversal.setAmountWithoutTax(amount.negate());
@@ -168,6 +186,7 @@ public class MaterialReturnService {
             throw new BusinessException("MATERIAL_RETURN_REVERSAL_REASON_INVALID", "冲销原因不能为空且最多500字");
         }
         Long tenantId = UserContext.getCurrentTenantId();
+        accountingPeriodGuard.assertWritable(java.time.LocalDate.now());
         MaterialReturn materialReturn = returnMapper.selectForUpdate(returnId, tenantId);
         if (materialReturn == null) {
             throw new BusinessException("MATERIAL_RETURN_NOT_FOUND", "退料单不存在");
@@ -191,17 +210,34 @@ public class MaterialReturnService {
             stockService.stockOutAtUnitCost(materialReturn.getWarehouseId(), item.getMaterialId(),
                     item.getQuantity(), item.getUnitCost(), "MATERIAL_RETURN_REVERSAL", returnId, item.getId());
 
-            CostItem originalCost = costItemMapper.selectById(item.getOriginalCostItemId());
-            if (originalCost == null || !tenantId.equals(originalCost.getTenantId())) {
-                throw new BusinessException("RETURN_ORIGINAL_COST_NOT_FOUND", "原出库成本不存在，禁止冲销退料");
+            CostItem returnCost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                    .eq(CostItem::getTenantId, tenantId)
+                    .eq(CostItem::getSourceType, "MATERIAL_RETURN")
+                    .eq(CostItem::getSourceId, returnId)
+                    .eq(CostItem::getSourceItemId, item.getId()));
+            if (returnCost == null) {
+                throw new BusinessException("RETURN_ORIGINAL_COST_NOT_FOUND", "退料成本事实不存在，禁止冲销退料");
             }
+            CostItem originalCost = costFactLineageResolver.requireCurrentLeaf(tenantId, returnCost.getId());
             CostItem undo = new CostItem();
             undo.setTenantId(tenantId);
             undo.setProjectId(materialReturn.getProjectId());
+            undo.setWbsTaskId(originalCost.getWbsTaskId());
             undo.setContractId(materialReturn.getContractId());
             undo.setPartnerId(originalCost.getPartnerId());
             undo.setCostType("MATERIAL");
             undo.setCostSubjectId(originalCost.getCostSubjectId());
+            undo.setClassificationStatus("REVERSAL");
+            undo.setClassificationBusinessCategory(originalCost.getClassificationBusinessCategory());
+            undo.setRecognitionRole(originalCost.getRecognitionRole());
+            undo.setRootSourceType(originalCost.getRootSourceType() == null
+                    ? originalCost.getSourceType() : originalCost.getRootSourceType());
+            undo.setMappingVersionId(originalCost.getMappingVersionId());
+            undo.setAssignmentRuleId(originalCost.getAssignmentRuleId());
+            undo.setOriginalCostSubjectId(originalCost.getOriginalCostSubjectId());
+            undo.setClassificationOverrideId(originalCost.getClassificationOverrideId());
+            undo.setClassificationSnapshotId(originalCost.getClassificationSnapshotId());
+            undo.setOriginalCostItemId(originalCost.getId());
             undo.setAmount(item.getAmount());
             undo.setTaxAmount(BigDecimal.ZERO);
             undo.setAmountWithoutTax(item.getAmount());

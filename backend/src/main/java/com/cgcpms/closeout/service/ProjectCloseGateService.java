@@ -44,6 +44,11 @@ public class ProjectCloseGateService {
                     WHERE q.tenant_id=w.tenant_id AND q.project_id=w.project_id AND q.wbs_task_id=w.id
                       AND q.status='SUBMITTED' AND q.conclusion='PASS' AND q.deleted_flag=0)
                 """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_QUALITY_PLAN_OPEN", "QUALITY", "仍有未结束质量安全检查计划", """
+                SELECT id biz_id FROM qs_inspection_plan
+                WHERE tenant_id=? AND project_id=? AND deleted_flag=0
+                  AND status IN ('DRAFT','ACTIVE')
+                """, tenant(), projectId);
         addRows(blockers, "CONSTRUCTION_QUALITY_OPEN", "QUALITY", "仍有未关闭质量安全问题", """
                 SELECT id biz_id FROM qs_issue WHERE tenant_id=? AND project_id=?
                   AND status<>'CLOSED' AND deleted_flag=0
@@ -107,6 +112,96 @@ public class ProjectCloseGateService {
                 """, tenant(), projectId);
         addRows(blockers, "CONSTRUCTION_WORKFLOW_RUNNING", "WORKFLOW", "仍有运行中审批流程", """
                 SELECT id biz_id FROM wf_instance WHERE tenant_id=? AND project_id=? AND instance_status='RUNNING'
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_COST_PROJECT_CONFIG_OPEN", "COST", "仍有未收口的项目成本配置申请", """
+                SELECT id biz_id FROM cost_project_config_request
+                WHERE tenant_id=? AND project_id=? AND status IN ('DRAFT','SUBMITTED')
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_BID_COST_TRANSFER_OPEN", "COST", "仍有未收口的投标成本转入申请", """
+                SELECT id biz_id FROM bid_cost_target_transfer_request
+                WHERE tenant_id=? AND project_id=? AND status IN ('DRAFT','SUBMITTED') AND deleted_flag=0
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_FINANCE_ALLOCATION_OPEN", "COST", "仍有未收口的财务费用分摊申请", """
+                SELECT DISTINCT r.id biz_id FROM finance_cost_allocation_request r
+                JOIN finance_cost_allocation_request_line l
+                  ON l.tenant_id=r.tenant_id AND l.request_id=r.id
+                WHERE r.tenant_id=? AND l.project_id=? AND r.status IN ('DRAFT','SUBMITTED') AND r.deleted_flag=0
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_COST_RECALCULATION_OPEN", "COST", "仍有涉及本项目的普通历史重算批次", """
+                SELECT DISTINCT b.id biz_id
+                FROM cost_recalculation_batch b
+                JOIN cost_recalculation_line l ON l.tenant_id=b.tenant_id AND l.batch_id=b.id
+                JOIN cost_item fact ON fact.tenant_id=l.tenant_id AND fact.id=l.original_cost_item_id
+                WHERE b.tenant_id=? AND fact.project_id=? AND b.batch_type='HISTORY_RECALCULATION'
+                  AND b.status IN ('DRAFT','SUBMITTED') AND fact.deleted_flag=0
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_UNCLASSIFIED_COST_FACT", "COST", "仍有待归类成本事实", """
+                SELECT ci.id biz_id
+                FROM cost_item ci
+                WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
+                  AND ci.cost_status IN ('CONFIRMED','POSTED')
+                  AND ci.recognition_role IN ('ACTUAL','COMMITTED')
+                  AND ci.classification_status='UNCLASSIFIED'
+                  AND (ROUND(ci.amount,2)<>0 OR ROUND(ci.tax_amount,2)<>0
+                       OR ROUND(ci.amount_without_tax,2)<>0)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cost_recalculation_batch own_batch
+                    WHERE own_batch.tenant_id=ci.tenant_id AND own_batch.id=ci.adjustment_batch_id
+                      AND own_batch.status='REVERSED')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cost_item successor
+                    LEFT JOIN cost_recalculation_batch successor_batch
+                      ON successor_batch.tenant_id=successor.tenant_id
+                     AND successor_batch.id=successor.adjustment_batch_id
+                    WHERE successor.tenant_id=ci.tenant_id AND successor.original_cost_item_id=ci.id
+                      AND successor.deleted_flag=0
+                      AND (successor.source_type='COST_RECALCULATION_REVERSAL'
+                           OR (successor.source_type='COST_RECALCULATION_NEGATIVE'
+                               AND successor_batch.status='POSTED')))
+                """, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_COST_REVERSAL_OPEN", "COST", "仍有涉及本项目的成本冲销申请", """
+                SELECT DISTINCT r.id biz_id
+                FROM cost_reversal_request r
+                JOIN bid_cost_target_transfer h
+                  ON h.tenant_id=r.tenant_id AND h.id=r.target_id AND h.reversal_of_id IS NULL
+                WHERE r.tenant_id=? AND h.project_id=? AND r.target_type='BID_TRANSFER'
+                  AND r.status IN ('DRAFT','SUBMITTED')
+                UNION
+                SELECT DISTINCT r.id biz_id
+                FROM cost_reversal_request r
+                JOIN finance_cost_allocation_line l
+                  ON l.tenant_id=r.tenant_id AND l.batch_id=r.target_id
+                WHERE r.tenant_id=? AND l.project_id=? AND r.target_type='FINANCE_ALLOCATION'
+                  AND r.status IN ('DRAFT','SUBMITTED')
+                UNION
+                SELECT DISTINCT r.id biz_id
+                FROM cost_reversal_request r
+                JOIN cost_recalculation_line l
+                  ON l.tenant_id=r.tenant_id AND l.batch_id=r.target_id
+                JOIN cost_item fact
+                  ON fact.tenant_id=l.tenant_id AND fact.id=l.original_cost_item_id AND fact.deleted_flag=0
+                WHERE r.tenant_id=? AND fact.project_id=? AND r.target_type='RECALCULATION'
+                  AND r.status IN ('DRAFT','SUBMITTED')
+                """, tenant(), projectId, tenant(), projectId, tenant(), projectId);
+        addRows(blockers, "CONSTRUCTION_OVERHEAD_ALLOCATION_PENDING", "COST", "仍有尚未完成月度分摊的间接费成本", """
+                SELECT MIN(ci.id) biz_id
+                FROM cost_item ci
+                JOIN overhead_allocation_rule r
+                  ON r.tenant_id=ci.tenant_id AND r.cost_subject_id=ci.cost_subject_id
+                 AND r.allocation_cycle='MONTHLY' AND r.deleted_flag=0
+                WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
+                  AND ci.cost_status IN ('CONFIRMED','POSTED')
+                  AND ci.classification_status<>'UNCLASSIFIED' AND ci.recognition_role='ACTUAL'
+                  AND ci.source_type NOT IN ('OVERHEAD_ALLOCATION','OVERHEAD_ALLOCATION_CLEARING',
+                    'COST_RECALCULATION_NEGATIVE','COST_RECALCULATION_POSITIVE','COST_RECALCULATION_REVERSAL')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cost_item clearing
+                    WHERE clearing.tenant_id=ci.tenant_id AND clearing.original_cost_item_id=ci.id
+                      AND clearing.source_type='OVERHEAD_ALLOCATION_CLEARING'
+                      AND clearing.deleted_flag=0 AND clearing.cost_status<>'WRITE_OFF')
+                GROUP BY r.id,YEAR(ci.cost_date),MONTH(ci.cost_date)
+                HAVING ROUND(SUM(ci.amount),2)<>0 OR ROUND(SUM(ci.tax_amount),2)<>0
+                    OR ROUND(SUM(ci.amount_without_tax),2)<>0
                 """, tenant(), projectId);
         return List.copyOf(blockers);
     }

@@ -1,32 +1,55 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { V2Button, V2Card, V2PageState, V2Pagination } from '@/components'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import {
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2Input,
+  V2PageState,
+  V2Pagination,
+  V2Select,
+} from '@/components'
 import { showToast } from '@/components/toast'
 import {
   approveCashForecast,
+  createCashForecast,
   loadCashForecastCycles,
   loadCashForecastTrace,
   refreshCashForecastActuals,
   regenerateCashForecast,
   submitCashForecast,
 } from '@/services/finance'
+import { localDateInputValue } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type { CashForecastCycleRecord, CashForecastTrace } from '@cgc-pms/frontend-contracts'
-import { amount, askReason, label, pageSlice } from './model'
+import { amount, label, pageSlice } from './model'
 
 const pageSize = 10
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const projectId = computed(() => workspace.selectedProjectId || '')
 const canQuery = computed(() => session.hasPermission('finance:forecast:query'))
-const can = (permission: string) => session.hasPermission(permission)
+const can = (permission: string) => session.hasAdminOrPermission(permission)
 const cycles = ref<CashForecastCycleRecord[]>([])
 const pageNo = ref(1)
 const trace = ref<CashForecastTrace | null>(null)
 const loading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
+const dialog = ref(false)
+const reviewDialog = ref(false)
+const reviewAction = ref<'approve' | 'reject'>('approve')
+const reviewComment = ref('')
+const today = localDateInputValue()
+const form = reactive({
+  forecastName: '',
+  asOfDate: today,
+  horizonStart: today,
+  horizonEnd: today,
+  scenario: 'BASE' as 'BASE' | 'OPTIMISTIC' | 'CONSERVATIVE',
+  openingBalance: '0.00',
+})
 let controller: AbortController | null = null
 const pagedCycles = computed(() => pageSlice(cycles.value, pageNo.value))
 
@@ -67,35 +90,80 @@ async function refreshWorkspace(): Promise<void> {
   if (!errorMessage.value) showToast('success', '刷新完成', '已读取最新数据。')
 }
 
+function openForecast(): void {
+  if (!projectRequired()) return
+  Object.assign(form, {
+    forecastName: `${today.slice(0, 7)}项目资金预测`,
+    asOfDate: today,
+    horizonStart: today,
+    horizonEnd: today,
+    scenario: 'BASE',
+    openingBalance: '0.00',
+  })
+  dialog.value = true
+}
+
+async function saveForecast(): Promise<void> {
+  if (!projectRequired() || !form.forecastName.trim()) return
+  const saved = await run(
+    () =>
+      createCashForecast({
+        projectId: projectId.value,
+        forecastName: form.forecastName.trim(),
+        asOfDate: form.asOfDate,
+        horizonStart: form.horizonStart,
+        horizonEnd: form.horizonEnd,
+        scenario: form.scenario,
+        openingBalance: form.openingBalance,
+      }),
+    '资金预测已创建',
+  )
+  if (saved) dialog.value = false
+}
+
 async function selectForecast(id: string): Promise<void> {
   if (projectRequired()) trace.value = await loadCashForecastTrace(id)
 }
 
-async function run(action: () => Promise<unknown>, success: string): Promise<void> {
+async function run(action: () => Promise<unknown>, success: string): Promise<boolean> {
   busy.value = true
   try {
     await action()
     await load()
     showToast('success', success, '已读取最新数据。')
+    return true
   } catch (cause) {
     showToast('error', '操作失败', cause instanceof Error ? cause.message : '请稍后重试。')
+    return false
   } finally {
     busy.value = false
   }
 }
 
-async function actForecast(
-  action: 'regenerate' | 'submit' | 'approve' | 'reject' | 'refresh',
-): Promise<void> {
+async function actForecast(action: 'regenerate' | 'submit' | 'refresh'): Promise<void> {
   if (!projectRequired()) return
   const id = trace.value?.cycle.id
   if (!id) return
   if (action === 'regenerate') return run(() => regenerateCashForecast(id), '预测已重算')
   if (action === 'submit') return run(() => submitCashForecast(id), '预测已提交')
   if (action === 'refresh') return run(() => refreshCashForecastActuals(id), '预测实际收付已回写')
-  const comment = askReason(action === 'approve' ? '请输入批准意见' : '请输入驳回意见')
-  if (comment)
-    await run(() => approveCashForecast(id, action === 'approve', comment), '预测审批已完成')
+}
+
+function openReview(action: 'approve' | 'reject'): void {
+  reviewAction.value = action
+  reviewComment.value = ''
+  reviewDialog.value = true
+}
+
+async function saveReview(): Promise<void> {
+  const id = trace.value?.cycle.id
+  const comment = reviewComment.value.trim()
+  if (!id || !comment) return
+  const saved = await run(
+    () => approveCashForecast(id, reviewAction.value === 'approve', comment),
+    '预测审批已完成',
+  )
+  if (saved) reviewDialog.value = false
 }
 
 watch(projectId, () => void load(), { immediate: true })
@@ -114,6 +182,12 @@ onBeforeUnmount(() => controller?.abort())
       <V2Card title="资金预测" :heading-level="1">
         <template #actions>
           <div class="finance-control__actions">
+            <V2Button
+              v-if="projectId && can('finance:forecast:maintain')"
+              size="small"
+              @click="openForecast"
+              >新建资金预测</V2Button
+            >
             <V2Button size="small" variant="secondary" :loading="loading" @click="refreshWorkspace">
               刷新
             </V2Button>
@@ -201,14 +275,14 @@ onBeforeUnmount(() => controller?.abort())
               <V2Button
                 v-if="trace.cycle.status === 'SUBMITTED' && can('finance:forecast:approve')"
                 size="small"
-                @click="actForecast('approve')"
+                @click="openReview('approve')"
                 >批准</V2Button
               >
               <V2Button
                 v-if="trace.cycle.status === 'SUBMITTED' && can('finance:forecast:approve')"
                 size="small"
                 variant="danger"
-                @click="actForecast('reject')"
+                @click="openReview('reject')"
                 >驳回</V2Button
               >
               <V2Button
@@ -283,6 +357,53 @@ onBeforeUnmount(() => controller?.abort())
         </V2Card>
       </template>
     </template>
+    <V2Dialog v-model:open="dialog" title="新建资金预测" :close-disabled="busy">
+      <form id="cash-forecast-form" class="finance-control__form" @submit.prevent="saveForecast">
+        <V2Input v-model="form.forecastName" label="预测名称" required />
+        <V2Input v-model="form.asOfDate" type="date" label="基准日期" required />
+        <V2Input v-model="form.horizonStart" type="date" label="预测开始日期" required />
+        <V2Input v-model="form.horizonEnd" type="date" label="预测结束日期" required />
+        <V2Select
+          v-model="form.scenario"
+          label="预测场景"
+          :options="[
+            { value: 'BASE', label: '基准' },
+            { value: 'OPTIMISTIC', label: '乐观' },
+            { value: 'CONSERVATIVE', label: '保守' },
+          ]"
+          required
+        />
+        <V2Input v-model="form.openingBalance" label="期初余额" :decimal-scale="2" required />
+        <p>关闭项目仅允许补录截至实际完工日的历史预测。</p>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = false">取消</V2Button>
+        <V2Button type="submit" form="cash-forecast-form" :loading="busy">保存</V2Button>
+      </template>
+    </V2Dialog>
+    <V2Dialog
+      v-model:open="reviewDialog"
+      :title="reviewAction === 'approve' ? '批准资金预测' : '驳回资金预测'"
+      :close-disabled="busy"
+    >
+      <form id="cash-forecast-review-form" @submit.prevent="saveReview">
+        <V2Input
+          v-model="reviewComment"
+          :label="reviewAction === 'approve' ? '批准意见' : '驳回意见'"
+          required
+        />
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="busy" @click="reviewDialog = false">取消</V2Button>
+        <V2Button
+          type="submit"
+          form="cash-forecast-review-form"
+          :variant="reviewAction === 'reject' ? 'danger' : 'primary'"
+          :loading="busy"
+          >确认</V2Button
+        >
+      </template>
+    </V2Dialog>
   </section>
 </template>
 

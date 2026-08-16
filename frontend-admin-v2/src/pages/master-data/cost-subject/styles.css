@@ -41,6 +41,12 @@
   gap: var(--v2-space-2);
 }
 
+.cost-subject-page__catalog {
+  max-height: 36rem;
+  overflow-y: auto;
+  padding-right: var(--v2-space-1);
+}
+
 .cost-subject-page__list-item {
   width: 100%;
   padding: var(--v2-space-3);
@@ -86,6 +92,15 @@
   gap: var(--v2-space-4);
 }
 
+.cost-subject-page__form--wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cost-subject-page__span {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .cost-subject-page__query--wide {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -111,6 +126,11 @@
   margin: 0;
 }
 
+.cost-subject-page__facts--impact {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: var(--v2-space-4);
+}
+
 .cost-subject-page__facts div {
   padding: var(--v2-space-3);
   border: var(--v2-border-width) solid var(--v2-color-border);
@@ -123,6 +143,30 @@
 }
 
 .cost-subject-page__facts dd {
+  margin: var(--v2-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.cost-subject-page__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.cost-subject-page__summary div {
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.cost-subject-page__summary dt {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
+}
+
+.cost-subject-page__summary dd {
   margin: var(--v2-space-1) 0 0;
   overflow-wrap: anywhere;
 }
@@ -143,11 +187,30 @@
   gap: var(--v2-space-3);
 }
 
+.cost-subject-page__lines > .cost-subject-page__line-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.cost-subject-page__report {
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  background: var(--v2-color-surface-subtle);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 64rem) {
   .cost-subject-page__columns,
   .cost-subject-page__query,
   .cost-subject-page__form,
-  .cost-subject-page__facts {
+  .cost-subject-page__form--wide,
+  .cost-subject-page__facts,
+  .cost-subject-page__facts--impact,
+  .cost-subject-page__summary {
     grid-template-columns: 1fr;
   }
 }

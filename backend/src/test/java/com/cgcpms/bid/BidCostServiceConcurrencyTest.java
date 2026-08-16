@@ -8,10 +8,13 @@ import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
 import com.cgcpms.bid.service.BidDocumentVersionService;
 import com.cgcpms.bid.service.BidAwardProjectCreator;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -29,6 +32,8 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -39,10 +44,13 @@ class BidCostServiceConcurrencyTest {
 
     @Mock BidCostMapper mapper;
     @Mock CostItemMapper costItemMapper;
+    @Mock CostSubjectResolver costSubjectResolver;
+    @Mock CostFactLineageResolver costFactLineageResolver;
     @Mock ProjectAccessChecker projectAccessChecker;
     @Mock CodeGenerationService codeGenerationService;
     @Mock BidDocumentVersionService documentService;
     @Mock BidAwardProjectCreator awardProjectCreator;
+    @Mock AccountingPeriodGuard accountingPeriodGuard;
 
     private BidCostService service;
 
@@ -54,8 +62,9 @@ class BidCostServiceConcurrencyTest {
             assistant.setCurrentNamespace("BidCostServiceConcurrencyTest");
             TableInfoHelper.initTableInfo(assistant, BidCost.class);
         }
-        service = new BidCostService(mapper, costItemMapper, projectAccessChecker, codeGenerationService,
-                documentService, java.util.Optional.of(awardProjectCreator));
+        service = new BidCostService(mapper, costItemMapper, costSubjectResolver, costFactLineageResolver,
+                projectAccessChecker, codeGenerationService,
+                documentService, java.util.Optional.of(awardProjectCreator), accountingPeriodGuard);
     }
 
     @AfterEach

@@ -111,7 +111,7 @@ describe('V2 navigation contract', () => {
       navigationDomains
         .find((domain) => domain.id === 'master-data')
         ?.workspaces.map((item) => item.label),
-    ).toEqual(['客户管理', '组织架构', '物资数据', '成本科目'])
+    ).toEqual(['客户管理', '组织架构', '物资数据', '会计科目'])
   })
 
   it('gates reports and keeps employee self-service tabs visible', () => {

@@ -2,6 +2,7 @@ package com.cgcpms.variation.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -24,6 +25,7 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
 
     private final VarOrderMapper varOrderMapper;
     private final CostGenerationService costGenerationService;
+    private final CostClassificationGuard costClassificationGuard;
 
     @Override
     public String supportBusinessType() {
@@ -33,6 +35,11 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        costClassificationGuard.requireClassified("VAR_ORDER", resolveVarOrderId(context.getInstance()));
     }
 
     @Override
@@ -83,6 +90,7 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
                 .set(VarOrder::getOwnerStatus, "NOT_READY")
                 .setSql("version=version+1"));
         if (updated != 1) throw new IllegalStateException("签证变更审批状态已变化，varOrderId=" + varOrderId);
+        costClassificationGuard.voidPending("VAR_ORDER", varOrderId);
     }
 
     @Override
@@ -103,6 +111,7 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
                 .set(VarOrder::getOwnerStatus, "NOT_READY")
                 .setSql("version=version+1"));
         if (updated != 1) throw new IllegalStateException("签证变更审批状态已变化，varOrderId=" + varOrderId);
+        costClassificationGuard.voidPending("VAR_ORDER", varOrderId);
     }
 
     private void requireMatchingRunningInstance(VarOrder order, WfInstance instance) {

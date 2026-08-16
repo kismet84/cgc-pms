@@ -160,6 +160,20 @@ public class CostSummaryService {
         itemWrapper.eq(CostItem::getTenantId, tenantId);
         itemWrapper.eq(CostItem::getProjectId, projectId);
         List<CostItem> allItems = costItemMapper.selectList(itemWrapper);
+        boolean hasUnclassified = allItems.stream()
+                .anyMatch(item -> "UNCLASSIFIED".equals(item.getClassificationStatus())
+                        && ("CONFIRMED".equals(item.getCostStatus()) || "POSTED".equals(item.getCostStatus()))
+                        && item.getAmount() != null && item.getAmount().signum() != 0);
+        if (hasUnclassified) {
+            throw new BusinessException("COST_SUMMARY_UNCLASSIFIED_COST", "项目存在待归类成本，禁止生成成本汇总");
+        }
+        Set<Long> itemSubjectIds = allItems.stream().map(CostItem::getCostSubjectId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> costSubjectIds = itemSubjectIds.isEmpty() ? Collections.emptySet()
+                : costSubjectMapper.selectByIds(itemSubjectIds).stream()
+                .filter(subject -> Objects.equals(tenantId, subject.getTenantId()))
+                .filter(subject -> "COST".equals(subject.getAccountCategory()))
+                .map(CostSubject::getId).collect(Collectors.toSet());
         Set<Long> mainContractIds = allItems.stream()
                 .map(CostItem::getContractId)
                 .filter(Objects::nonNull)
@@ -175,7 +189,7 @@ public class CostSummaryService {
 
         // Group cost items by costSubjectId
         Map<Long, List<CostItem>> itemsBySubject = allItems.stream()
-                .filter(item -> item.getCostSubjectId() != null)
+                .filter(item -> costSubjectIds.contains(item.getCostSubjectId()))
                 .collect(Collectors.groupingBy(CostItem::getCostSubjectId));
 
         Map<Long, BigDecimal> paidBySubject = paidBySubject(tenantId, projectId);
@@ -210,7 +224,7 @@ public class CostSummaryService {
                     : targetItem == null || targetItem.getResponsibilityAmount() == null ? BigDecimal.ZERO : targetItem.getResponsibilityAmount();
 
             BigDecimal contractLockedCost = subjectItems.stream()
-                    .filter(item -> "CT_CONTRACT".equals(item.getSourceType()))
+                    .filter(assembler::isCommittedCostSource)
                     .filter(item -> item.getContractId() == null || !mainContractIds.contains(item.getContractId()))
                     .map(CostItem::getAmount)
                     .filter(Objects::nonNull)

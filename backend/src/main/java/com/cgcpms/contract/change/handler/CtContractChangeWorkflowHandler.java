@@ -7,6 +7,7 @@ import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -39,6 +40,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
     private final CtContractChangeMapper changeMapper;
     private final CtContractMapper contractMapper;
     private final CostGenerationService costGenerationService;
+    private final CostClassificationGuard costClassificationGuard;
     private final CostSummaryService costSummaryService;
     private final VarOrderMapper varOrderMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -52,6 +54,11 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        costClassificationGuard.requireClassified("CT_CHANGE", resolveChangeId(context.getInstance()));
     }
 
     /**
@@ -142,6 +149,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
                 .eq(CtContractChange::getId, changeId)
                 .set(CtContractChange::getApprovalStatus, "REJECTED"));
         syncSourceStatus(changeId, "CHANGE_REJECTED");
+        costClassificationGuard.voidPending("CT_CHANGE", changeId);
     }
 
     @Override
@@ -153,6 +161,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
                 .eq(CtContractChange::getId, changeId)
                 .set(CtContractChange::getApprovalStatus, "DRAFT"));
         syncSourceStatus(changeId, "CHANGE_PENDING");
+        costClassificationGuard.voidPending("CT_CHANGE", changeId);
     }
 
     private void syncSourceStatus(Long changeId, String ownerStatus) {

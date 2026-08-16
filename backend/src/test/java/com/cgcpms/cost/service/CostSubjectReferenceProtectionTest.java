@@ -37,7 +37,9 @@ class CostSubjectReferenceProtectionTest {
 
     @BeforeEach
     void setUp() {
-        UserContext.restore(new UserContext.Snapshot(1L, "tester", TENANT_ID, List.of("ADMIN")));
+        UserContext.restore(new UserContext.Snapshot(1L, "tester", TENANT_ID, List.of("COMPANY_FINANCE")));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(), any(), any()))
+                .thenReturn(1);
     }
 
     @AfterEach
@@ -48,9 +50,13 @@ class CostSubjectReferenceProtectionTest {
     @Test
     void disablingReferencedSubjectMustBeRejected() {
         CostSubject subject = subject("ENABLE");
-        when(costSubjectMapper.selectById(SUBJECT_ID)).thenReturn(subject);
+        when(costSubjectMapper.selectOne(any())).thenReturn(subject);
         when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), anyLong(), anyLong()))
                 .thenAnswer(invocation -> invocation.getArgument(0, String.class).contains("pay_application") ? 2L : 0L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any()))
+                .thenReturn(0L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any()))
+                .thenReturn(0L);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> service.toggleStatus(SUBJECT_ID));
 
@@ -61,10 +67,14 @@ class CostSubjectReferenceProtectionTest {
     @Test
     void deletingReferencedSubjectMustBeRejected() {
         CostSubject subject = subject("ENABLE");
-        when(costSubjectMapper.selectById(SUBJECT_ID)).thenReturn(subject);
+        when(costSubjectMapper.selectOne(any())).thenReturn(subject);
         when(costSubjectMapper.selectCount(any())).thenReturn(0L);
         when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), anyLong(), anyLong()))
                 .thenAnswer(invocation -> invocation.getArgument(0, String.class).contains("stl_settlement_item") ? 1L : 0L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any()))
+                .thenReturn(0L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class), any(), any(), any(), any()))
+                .thenReturn(0L);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> service.delete(SUBJECT_ID));
 

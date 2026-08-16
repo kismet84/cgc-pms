@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.cost.service.CostClassificationGuard;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.service.SubMeasureIntegrityService;
@@ -28,6 +29,7 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
 
     private final SubMeasureMapper subMeasureMapper;
     private final CostGenerationService costGenerationService;
+    private final CostClassificationGuard costClassificationGuard;
     private final SubMeasureIntegrityService integrityService;
 
     @Override
@@ -38,6 +40,11 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        costClassificationGuard.requireClassified("SUB_MEASURE", resolveMeasureId(context.getInstance()));
     }
 
     @Override
@@ -61,6 +68,7 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
 
         requireApproving(measureId);
         transition(measureId, "REJECTED", "REJECTED");
+        costClassificationGuard.voidPending("SUB_MEASURE", measureId);
     }
 
     @Override
@@ -71,6 +79,7 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
 
         requireApproving(measureId);
         transition(measureId, "DRAFT", "DRAFT");
+        costClassificationGuard.voidPending("SUB_MEASURE", measureId);
     }
 
     private SubMeasure requireApproving(Long measureId) {

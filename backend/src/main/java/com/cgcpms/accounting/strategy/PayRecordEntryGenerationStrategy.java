@@ -4,6 +4,8 @@ import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.AccountingSubjectCatalog;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
@@ -22,6 +24,7 @@ public class PayRecordEntryGenerationStrategy implements EntryGenerationStrategy
 
     private final PayRecordMapper recordMapper;
     private final PayApplicationMapper applicationMapper;
+    private final AccountingSubjectResolver subjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -55,16 +58,20 @@ public class PayRecordEntryGenerationStrategy implements EntryGenerationStrategy
         AccountingEntryLine debit = new AccountingEntryLine();
         debit.setDirection("DEBIT");
         boolean advance = "ADVANCE".equals(application.getPayType());
-        debit.setAccountCode(advance ? "1123-PREPAY" : "2202-AP");
-        debit.setAccountName(advance ? "预付账款" : "应付账款");
+        CostSubject debitSubject = subjectResolver.require(
+                advance ? AccountingSubjectCatalog.PREPAYMENT : AccountingSubjectCatalog.PAYABLE,
+                advance ? "ASSET" : "LIABILITY");
+        debit.setAccountCode(debitSubject.getSubjectCode());
+        debit.setAccountName(debitSubject.getSubjectName());
         debit.setCostSubjectId(application.getCostSubjectId());
         debit.setAmount(record.getPayAmount());
         debit.setSummary((advance ? "支付预付款：" : "支付合同款，冲减应付：") + record.getExternalTxnNo());
 
         AccountingEntryLine credit = new AccountingEntryLine();
         credit.setDirection("CREDIT");
-        credit.setAccountCode("1002-BANK-" + record.getFundAccountId());
-        credit.setAccountName("银行存款");
+        CostSubject bankSubject = subjectResolver.require(AccountingSubjectCatalog.BANK, "ASSET");
+        credit.setAccountCode(bankSubject.getSubjectCode() + "-" + record.getFundAccountId());
+        credit.setAccountName(bankSubject.getSubjectName());
         credit.setAmount(record.getPayAmount());
         credit.setSummary("银行付款：" + record.getExternalTxnNo());
         entry.setLines(List.of(debit, credit));

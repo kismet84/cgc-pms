@@ -7,10 +7,13 @@ import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidAwardProjectCreator;
 import com.cgcpms.bid.service.BidCostService;
 import com.cgcpms.bid.service.BidDocumentVersionService;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.service.CostFactLineageResolver;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -25,10 +28,13 @@ import java.util.Optional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,10 +46,13 @@ class BidWorkflowServiceTest {
 
     @Mock BidCostMapper mapper;
     @Mock CostItemMapper costItemMapper;
+    @Mock CostSubjectResolver costSubjectResolver;
+    @Mock CostFactLineageResolver costFactLineageResolver;
     @Mock ProjectAccessChecker projectAccessChecker;
     @Mock CodeGenerationService codeGenerationService;
     @Mock BidDocumentVersionService documentService;
     @Mock BidAwardProjectCreator projectCreator;
+    @Mock AccountingPeriodGuard accountingPeriodGuard;
 
     private BidCostService service;
 
@@ -60,8 +69,9 @@ class BidWorkflowServiceTest {
             assistant.setCurrentNamespace("BidWorkflowServiceTestCostItem");
             TableInfoHelper.initTableInfo(assistant, CostItem.class);
         }
-        service = new BidCostService(mapper, costItemMapper, projectAccessChecker, codeGenerationService,
-                documentService, Optional.of(projectCreator));
+        service = new BidCostService(mapper, costItemMapper, costSubjectResolver, costFactLineageResolver,
+                projectAccessChecker, codeGenerationService,
+                documentService, Optional.of(projectCreator), accountingPeriodGuard);
     }
 
     @AfterEach
@@ -151,16 +161,48 @@ class BidWorkflowServiceTest {
     }
 
     @Test
-    void legacyLostFromPreparingUsesUnifiedStateWrite() {
+    void legacyLostWritesOffCurrentRecalculatedLeafWithStableRootKey() {
         BidCost bid = bid(33L, "PREPARING");
         bid.setSourceUrl("https://example.test/result");
+        CostItem original = new CostItem();
+        original.setId(3301L);
+        original.setTenantId(0L);
+        original.setProjectId(3302L);
+        original.setCostSubjectId(3303L);
+        original.setClassificationStatus("CLASSIFIED");
+        original.setCostType("BID");
+        original.setAmount(new BigDecimal("100.00"));
+        original.setTaxAmount(BigDecimal.ZERO);
+        original.setAmountWithoutTax(new BigDecimal("100.00"));
+        CostItem current = new CostItem();
+        current.setId(3304L);
+        current.setTenantId(0L);
+        current.setProjectId(3302L);
+        current.setCostSubjectId(3305L);
+        current.setClassificationStatus("CLASSIFIED");
+        current.setRecognitionRole("ACTUAL");
+        current.setRootSourceType("BID_COST");
+        current.setCostType("BID");
+        current.setAmount(new BigDecimal("100.00"));
+        current.setTaxAmount(BigDecimal.ZERO);
+        current.setAmountWithoutTax(new BigDecimal("100.00"));
         when(mapper.selectById(33L)).thenReturn(bid);
         when(mapper.update(isNull(), any())).thenReturn(1);
+        when(costItemMapper.selectList(any())).thenReturn(List.of(original));
+        when(costItemMapper.selectCount(any())).thenReturn(0L);
+        when(costFactLineageResolver.requireCurrentLeaf(0L, 3301L)).thenReturn(current);
 
         service.markAsLost(33L);
 
         verify(mapper).update(isNull(), any());
-        verify(costItemMapper).update(isNull(), any());
+        ArgumentCaptor<CostItem> reversal = ArgumentCaptor.forClass(CostItem.class);
+        verify(costItemMapper).insert(reversal.capture());
+        assertEquals("BID_COST_WRITE_OFF", reversal.getValue().getSourceType());
+        assertEquals(new BigDecimal("-100.00"), reversal.getValue().getAmount());
+        assertEquals(3305L, reversal.getValue().getCostSubjectId());
+        assertEquals(3304L, reversal.getValue().getOriginalCostItemId());
+        assertEquals(3301L, reversal.getValue().getSourceItemId());
+        verify(costItemMapper, never()).update(isNull(), any());
     }
 
     @Test

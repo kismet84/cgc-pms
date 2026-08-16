@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  cancelBidTransferRequest,
+  cancelFinanceAllocationRequest,
   createBidTransferRequest,
   createFinanceAllocationRequest,
+  createOverheadAllocationRule,
+  executeOverheadAllocation,
   loadBidTransferRequests,
   loadCostSubjectTree,
   loadFinanceAllocationRequests,
+  loadOverheadAllocationRules,
+  setOverheadAllocationRuleStatus,
   submitBidTransferRequest,
   submitFinanceAllocationRequest,
+  updateOverheadAllocationRule,
 } from '@/services/cost-subject'
 import { apiRequest } from '@/services/request'
 
@@ -72,6 +79,8 @@ describe('cost subject service', () => {
         status: 'SUBMITTED',
         approvalInstanceId: 9002,
       })
+      .mockResolvedValueOnce({ id: 42, requestCode: 'BTR-002', status: 'CANCELLED' })
+      .mockResolvedValueOnce({ id: 52, requestCode: 'FAR-002', status: 'CANCELLED' })
 
     const transferCommand = {
       bidCostId: 'BID-1',
@@ -98,6 +107,8 @@ describe('cost subject service', () => {
     const allocations = await loadFinanceAllocationRequests()
     await createFinanceAllocationRequest(allocationCommand)
     const submittedAllocation = await submitFinanceAllocationRequest('52')
+    await cancelBidTransferRequest('42')
+    await cancelFinanceAllocationRequest('52')
 
     expect(transfers[0]).toMatchObject({ id: '41', requestCode: 'BTR-001', totalAmount: '12.5' })
     expect(submittedTransfer).toMatchObject({
@@ -139,7 +150,70 @@ describe('cost subject service', () => {
       '/cost-subject-v2/finance-allocation-requests/52/submit',
       { method: 'POST' },
     )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      7,
+      '/cost-subject-v2/bid-transfer-requests/42/cancel',
+      { method: 'POST' },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      8,
+      '/cost-subject-v2/finance-allocation-requests/52/cancel',
+      { method: 'POST' },
+    )
     expect(transferCommand).not.toHaveProperty('approvalInstanceId')
     expect(allocationCommand).not.toHaveProperty('approvalInstanceId')
+  })
+
+  it('uses governed overhead rule lifecycle endpoints', async () => {
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce({ records: [], total: 0, pageNo: 1, pageSize: 100 })
+      .mockResolvedValueOnce('801')
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        period: '2026-08-31',
+        ruleCount: 1,
+        createdRunCount: 1,
+        duplicateRunCount: 0,
+        costItemCount: 2,
+        allocatedAmount: '100.00',
+        idempotent: false,
+      })
+
+    const command = {
+      costSubjectId: '54010419',
+      allocationBasis: 'DIRECT_LABOR' as const,
+      allocationCycle: 'MONTHLY' as const,
+    }
+    await loadOverheadAllocationRules()
+    await createOverheadAllocationRule(command)
+    await updateOverheadAllocationRule('801', command)
+    await setOverheadAllocationRuleStatus('801', 'DISABLE')
+    await executeOverheadAllocation('2026-08-31')
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      1,
+      '/overhead-allocation/rules?pageNo=1&pageSize=100',
+      { signal: undefined },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/overhead-allocation/rules', {
+      method: 'POST',
+      body: command,
+    })
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      3,
+      '/overhead-allocation/rules/801',
+      { method: 'PUT', body: command },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      4,
+      '/overhead-allocation/rules/801/status?status=DISABLE',
+      { method: 'PUT' },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      5,
+      '/overhead-allocation/execute?period=2026-08-31',
+      { method: 'POST' },
+    )
   })
 })
