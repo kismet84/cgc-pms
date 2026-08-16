@@ -43,6 +43,8 @@ export interface AccountingLegacyReview {
   reviewNote?: string | null
 }
 
+export type AccountingLegacyReviewStatus = 'CONFIRMED' | 'IGNORED'
+
 export interface AccountingCatalogOverview {
   policies: AccountingDimensionPolicy[]
   carryoverMappings: AccountingCarryoverMapping[]

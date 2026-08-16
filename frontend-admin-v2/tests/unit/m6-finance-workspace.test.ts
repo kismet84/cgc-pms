@@ -359,6 +359,7 @@ describe('M6 finance workspace contract', () => {
       accountCode: 'V15-BANK-001',
       accountName: 'V1.5项目资金专户',
       accountType: 'BANK',
+      accountingSubjectCode: '1002.03',
       openingDate: '2026-01-01',
       openingBalance: '9007199254740993.01',
     })
@@ -369,8 +370,10 @@ describe('M6 finance workspace contract', () => {
   it('keeps fund-account maintenance on its own workspace tab', () => {
     const accounts = source('src/pages/finance/finance-control-workspace/FundAccountsPage.vue')
     const journal = source('src/pages/finance/finance-control-workspace/CashJournalPage.vue')
-    expect(accounts).toContain('accounts.value = await loadFundAccounts(request.signal)')
-    expect(accounts).toContain('@click="openFundAccount"')
+    expect(accounts).toContain('await loadManagedFundAccounts(request.signal)')
+    expect(accounts).toContain('await loadFundAccounts(request.signal)')
+    expect(accounts).toContain('@click="openFundAccount()"')
+    expect(accounts).toContain('@click="openFundAccount(row)"')
     expect(accounts).not.toContain('loadCashJournal')
     expect(journal).toContain('journal.value = await loadCashJournal(')
     expect(journal).toContain("uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')")

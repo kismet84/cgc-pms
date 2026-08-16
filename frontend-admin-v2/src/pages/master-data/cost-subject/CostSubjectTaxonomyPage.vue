@@ -20,10 +20,13 @@ import {
   loadAccountingCatalogOverview,
   loadCostSubject,
   loadCostSubjectTree,
+  reviewAccountingLegacySubject,
   toggleCostSubjectStatus,
   updateCostSubject,
   type AccountCategory,
   type AccountingCatalogOverview,
+  type AccountingLegacyReview,
+  type AccountingLegacyReviewStatus,
   type CostSubjectCommand,
   type CostSubjectRecord,
 } from '@/services/cost-subject'
@@ -52,6 +55,7 @@ const can = (permission: string) => session.hasAdminOrPermission(permission)
 const canSubjectAdd = computed(() => false)
 const canSubjectEdit = computed(() => can('cost:edit'))
 const canSubjectDelete = computed(() => false)
+const canLegacyReview = computed(() => can('accounting:subject-review'))
 
 const subjects = ref<CostSubjectRecord[]>([])
 const overview = ref<AccountingCatalogOverview>({
@@ -100,6 +104,10 @@ const subjectDialog = ref(false)
 const subjectMode = ref<'create' | 'edit'>('create')
 const subjectDeleteTarget = ref<CostSubjectRecord | null>(null)
 const subjectStatusTarget = ref<CostSubjectRecord | null>(null)
+const legacyReviewTarget = ref<{
+  row: AccountingLegacyReview
+  status: AccountingLegacyReviewStatus
+} | null>(null)
 const subjectForm = reactive({
   parentId: '0',
   subjectCode: '',
@@ -242,6 +250,22 @@ async function confirmSubjectDelete(): Promise<void> {
     showToast('success', '会计科目已删除', '科目目录已刷新。')
   } catch (value) {
     showToast('error', '删除失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function confirmLegacyReview(): Promise<void> {
+  const target = legacyReviewTarget.value
+  if (!target) return
+  saving.value = true
+  try {
+    await reviewAccountingLegacySubject(target.row.sourceSubjectCode, target.status)
+    legacyReviewTarget.value = null
+    await loadTaxonomy()
+    showToast('success', '历史科目复核完成', '复核状态与审计信息已刷新。')
+  } catch (value) {
+    showToast('error', '历史科目复核失败', messageOf(value))
   } finally {
     saving.value = false
   }
@@ -517,10 +541,11 @@ onBeforeUnmount(() => controller?.abort())
         <table class="v2-table">
           <thead>
             <tr>
-              <th>历史科目</th>
+              <th>历史科目编码</th>
               <th>建议正式科目</th>
               <th>状态</th>
               <th>处理原则</th>
+              <th v-if="canLegacyReview">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -529,6 +554,27 @@ onBeforeUnmount(() => controller?.abort())
               <td>{{ row.suggestedSubjectCode || '待人工判断' }}</td>
               <td>{{ row.reviewStatus === 'PENDING' ? '待复核' : row.reviewStatus }}</td>
               <td>{{ row.reviewNote || '只读保留，不直接改写历史凭证' }}</td>
+              <td v-if="canLegacyReview">
+                <V2Cluster v-if="row.reviewStatus === 'PENDING'">
+                  <V2Button
+                    v-if="row.suggestedSubjectCode"
+                    size="small"
+                    :disabled="saving"
+                    @click="legacyReviewTarget = { row, status: 'CONFIRMED' }"
+                  >
+                    确认映射
+                  </V2Button>
+                  <V2Button
+                    size="small"
+                    variant="secondary"
+                    :disabled="saving"
+                    @click="legacyReviewTarget = { row, status: 'IGNORED' }"
+                  >
+                    保留历史
+                  </V2Button>
+                </V2Cluster>
+                <span v-else>已处理</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -625,6 +671,19 @@ onBeforeUnmount(() => controller?.abort())
       :loading="saving"
       @close="subjectDeleteTarget = null"
       @confirm="confirmSubjectDelete"
+    />
+    <V2ConfirmDialog
+      :open="Boolean(legacyReviewTarget)"
+      title="确认历史科目复核"
+      :description="
+        legacyReviewTarget?.status === 'CONFIRMED'
+          ? `确认“${legacyReviewTarget.row.sourceSubjectCode}”后续业务使用“${legacyReviewTarget.row.suggestedSubjectCode}”？历史凭证保持原样。`
+          : `确认保留“${legacyReviewTarget?.row.sourceSubjectCode}”历史快照且不建立统一映射？`
+      "
+      :confirm-text="legacyReviewTarget?.status === 'CONFIRMED' ? '确认映射' : '保留历史'"
+      :loading="saving"
+      @close="legacyReviewTarget = null"
+      @confirm="confirmLegacyReview"
     />
   </V2Stack>
 </template>

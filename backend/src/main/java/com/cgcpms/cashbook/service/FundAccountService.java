@@ -23,6 +23,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class FundAccountService {
 
+    private static final List<String> BANK_ACCOUNTING_SUBJECTS = List.of("1002.01", "1002.02", "1002.03");
+
     private final FundAccountMapper fundAccountMapper;
     private final CashJournalEntryMapper entryMapper;
 
@@ -136,11 +138,21 @@ public class FundAccountService {
                 && (!StringUtils.hasText(command.getBankName()) || !StringUtils.hasText(command.getBankAccountNo()))) {
             throw new BusinessException("FUND_ACCOUNT_BANK_INFO_REQUIRED", "银行账户必须填写开户行和账号");
         }
+        String subjectCode = command.getAccountingSubjectCode();
+        if (CashbookConstants.AccountType.CASH.equals(command.getAccountType())) {
+            if (StringUtils.hasText(subjectCode) && !"1001".equals(subjectCode.trim())) {
+                throw new BusinessException("FUND_ACCOUNT_ACCOUNTING_SUBJECT_INVALID", "现金账户只能绑定1001库存现金");
+            }
+        } else if (!StringUtils.hasText(subjectCode) || !BANK_ACCOUNTING_SUBJECTS.contains(subjectCode.trim())) {
+            throw new BusinessException("FUND_ACCOUNT_ACCOUNTING_SUBJECT_REQUIRED", "银行账户必须选择基本账户、一般账户或项目专户");
+        }
     }
 
     private void copy(FundAccountCommand command, FundAccount account) {
         account.setAccountName(command.getAccountName().trim());
         account.setAccountType(command.getAccountType());
+        account.setAccountingSubjectCode(CashbookConstants.AccountType.CASH.equals(command.getAccountType())
+                ? "1001" : command.getAccountingSubjectCode().trim());
         account.setBankName(CashbookConstants.AccountType.BANK.equals(command.getAccountType())
                 ? command.getBankName().trim() : null);
         account.setBankAccountNo(CashbookConstants.AccountType.BANK.equals(command.getAccountType())
@@ -164,6 +176,7 @@ public class FundAccountService {
         vo.setAccountCode(account.getAccountCode());
         vo.setAccountName(account.getAccountName());
         vo.setAccountType(account.getAccountType());
+        vo.setAccountingSubjectCode(account.getAccountingSubjectCode());
         vo.setBankName(account.getBankName());
         vo.setBankAccountNo(masked ? mask(account.getBankAccountNo()) : account.getBankAccountNo());
         vo.setOpeningDate(account.getOpeningDate());

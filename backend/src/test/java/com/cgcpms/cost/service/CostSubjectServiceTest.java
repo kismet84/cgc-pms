@@ -1026,6 +1026,54 @@ class CostSubjectServiceTest {
         assertNull(findSubjectByCode(code));
     }
 
+    @Test
+    @Transactional
+    @DisplayName("历史会计科目确认写入审计信息且不可重复处理")
+    void reviewAccountingLegacySubjectConfirmsOnceWithAudit() {
+        costSubjectService.reviewAccountingLegacySubject("1122-AR", "CONFIRMED", null);
+
+        assertEquals("CONFIRMED", jdbc.queryForObject("""
+                SELECT review_status FROM accounting_subject_legacy_review
+                WHERE tenant_id=? AND source_subject_code='1122-AR'
+                """, String.class, TENANT_ID));
+        assertEquals(financeUserId, jdbc.queryForObject("""
+                SELECT reviewed_by FROM accounting_subject_legacy_review
+                WHERE tenant_id=? AND source_subject_code='1122-AR' AND reviewed_at IS NOT NULL
+                """, Long.class, TENANT_ID));
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.reviewAccountingLegacySubject("1122-AR", "IGNORED", null));
+        assertEquals("ACCOUNTING_LEGACY_REVIEW_ALREADY_FINISHED", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("无统一建议的历史银行科目只能保留历史")
+    void reviewAccountingLegacyBankSubjectCannotConfirmWithoutTarget() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.reviewAccountingLegacySubject("1002-BANK", "CONFIRMED", null));
+        assertEquals("ACCOUNTING_LEGACY_REVIEW_TARGET_INVALID", error.getCode());
+
+        costSubjectService.reviewAccountingLegacySubject("1002-BANK", "IGNORED", "逐户配置资金账户总账科目");
+        assertEquals("IGNORED", jdbc.queryForObject("""
+                SELECT review_status FROM accounting_subject_legacy_review
+                WHERE tenant_id=? AND source_subject_code='1002-BANK'
+                """, String.class, TENANT_ID));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("历史会计科目复核在服务边界拒绝非法状态和超长说明")
+    void reviewAccountingLegacySubjectValidatesDirectServiceCalls() {
+        BusinessException invalidStatus = assertThrows(BusinessException.class,
+                () -> costSubjectService.reviewAccountingLegacySubject("1123-PREPAY", null, null));
+        assertEquals("ACCOUNTING_LEGACY_REVIEW_STATUS_INVALID", invalidStatus.getCode());
+
+        BusinessException longNote = assertThrows(BusinessException.class,
+                () -> costSubjectService.reviewAccountingLegacySubject(
+                        "1123-PREPAY", "IGNORED", "x".repeat(501)));
+        assertEquals("ACCOUNTING_LEGACY_REVIEW_NOTE_TOO_LONG", longNote.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 辅助方法
     // ═══════════════════════════════════════════════════════════════

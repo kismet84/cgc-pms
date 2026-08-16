@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("306", flyway.info().current().getVersion().getVersion());
+        assertEquals("307", flyway.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(flyway);
         assertCostGovernanceSchema(flyway);
         assertUnifiedAuditColumns(flyway);
@@ -255,7 +255,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("306", current.info().current().getVersion().getVersion());
+        assertEquals("307", current.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(current);
         assertCostGovernanceSchema(current);
         assertEquals(1, count(current, "wf_template_node", """
@@ -445,9 +445,61 @@ class BaselineFlywayCompatibilityTest {
         Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
         current.migrate();
 
-        assertEquals("306", current.info().current().getVersion().getVersion());
+        assertEquals("307", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "finance_cost_allocation_batch",
                 "id=301990000000000018 AND reversal_of_id=301990000000000014 AND status='REVERSED'"));
+    }
+
+    @Test
+    void v307RequiresExplicitBankClassificationAndRemovesUnsupportedHistoricalLink() {
+        String databaseName = "legacy-accounting-review";
+        Flyway beforeReviewFix = Flyway.configure()
+                .dataSource(url(databaseName), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("306"))
+                .cleanDisabled(false)
+                .load();
+        beforeReviewFix.migrate();
+        execute(beforeReviewFix, """
+                INSERT INTO fund_account
+                  (id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,
+                   enabled_flag,version,deleted_flag)
+                VALUES (307001,0,'BANK-307','历史银行账户','BANK',CURRENT_DATE,0,1,0,0),
+                       (307002,0,'CASH-307','历史现金账户','CASH',CURRENT_DATE,0,1,0,0)
+                """);
+        execute(beforeReviewFix, """
+                INSERT INTO accounting_entry
+                  (id,tenant_id,entry_code,entry_date,entry_type,source_type,source_id,entry_status,
+                   total_debit,total_credit,version,review_status,deleted_flag)
+                VALUES (307010,0,'ENTRY-307',CURRENT_DATE,'PAYMENT','PAY_RECORD',307011,'POSTED',1,1,0,'APPROVED',0)
+                """);
+        execute(beforeReviewFix, """
+                INSERT INTO accounting_entry_line
+                  (id,tenant_id,entry_id,line_no,direction,amount,account_code,account_name,
+                   accounting_subject_id,deleted_flag)
+                SELECT 307012,0,307010,1,'CREDIT',1,'1002-BANK-307001','银行存款',subject.id,0
+                FROM cost_subject subject
+                WHERE subject.tenant_id=0 AND subject.subject_code='1002.02' AND subject.deleted_flag=0
+                """);
+
+        Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals("307", current.info().current().getVersion().getVersion());
+        assertEquals(1, count(current, "fund_account",
+                "id=307001 AND accounting_subject_code IS NULL"));
+        assertEquals(1, count(current, "fund_account",
+                "id=307002 AND accounting_subject_code='1001'"));
+        assertEquals(1, count(current, "accounting_entry_line",
+                "id=307012 AND account_code='1002-BANK-307001' AND accounting_subject_id IS NULL"));
+        assertEquals(1, count(current, "accounting_subject_legacy_review",
+                "source_subject_code='1002-BANK' AND suggested_subject_code IS NULL"));
+        assertThrows(IllegalStateException.class, () -> execute(current, """
+                INSERT INTO fund_account
+                  (id,tenant_id,account_code,account_name,account_type,accounting_subject_code,
+                   opening_date,opening_balance,enabled_flag,version,deleted_flag)
+                VALUES (307003,0,'BANK-INVALID','错误科目银行账户','BANK','1001',CURRENT_DATE,0,1,0,0)
+                """));
     }
 
     @Test
@@ -775,6 +827,10 @@ class BaselineFlywayCompatibilityTest {
                 "tenant_id=0 AND status='ENABLE'"));
         assertEquals(5, count(flyway, "accounting_subject_legacy_review",
                 "tenant_id=0 AND review_status='PENDING'"));
+        assertEquals(1, count(flyway, "accounting_subject_legacy_review",
+                "tenant_id=0 AND source_subject_code='1002-BANK' AND suggested_subject_code IS NULL"));
+        assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
+                "TABLE_NAME='fund_account' AND COLUMN_NAME='accounting_subject_code'"));
         assertEquals(1, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
                 "TABLE_NAME='accounting_entry_line' AND COLUMN_NAME='accounting_subject_id'"));
         assertEquals(3, count(flyway, "INFORMATION_SCHEMA.COLUMNS",
@@ -783,6 +839,11 @@ class BaselineFlywayCompatibilityTest {
                 role_id=(SELECT id FROM sys_role WHERE role_code='COMPANY_FINANCE' AND deleted_flag=0)
                 AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0
                   AND perms='accounting:cost-carryover')
+                """));
+        assertEquals(1, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='COMPANY_FINANCE' AND deleted_flag=0)
+                AND menu_id IN (SELECT id FROM sys_menu WHERE deleted_flag=0
+                  AND perms='accounting:subject-review')
                 """));
     }
 

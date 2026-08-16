@@ -41,7 +41,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("306", flyway.info().current().getVersion().getVersion());
+        assertEquals("307", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
@@ -55,6 +55,16 @@ class BaselineMySqlSmokeTest {
                 JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
                 WHERE r.role_code='COMPANY_FINANCE' AND r.deleted_flag=0 AND m.deleted_flag=0
                   AND m.perms IN ('overhead:query','overhead:add','overhead:edit','overhead:execute')
+                """));
+        assertEquals(1, count("SELECT COUNT(*) FROM information_schema.columns "
+                + "WHERE table_schema=DATABASE() AND table_name='fund_account' "
+                + "AND column_name='accounting_subject_code'"));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='COMPANY_FINANCE' AND r.deleted_flag=0 AND m.deleted_flag=0
+                  AND m.perms='accounting:subject-review'
                 """));
         assertEquals(0, count("""
                 SELECT COUNT(*) FROM cost_subject

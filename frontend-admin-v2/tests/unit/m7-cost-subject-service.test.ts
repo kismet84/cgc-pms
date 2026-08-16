@@ -11,6 +11,7 @@ import {
   loadCostSubjectTree,
   loadFinanceAllocationRequests,
   loadOverheadAllocationRules,
+  reviewAccountingLegacySubject,
   setOverheadAllocationRuleStatus,
   submitBidTransferRequest,
   submitFinanceAllocationRequest,
@@ -47,14 +48,12 @@ describe('cost subject service', () => {
   })
 
   it('loads the accounting catalog and governance overview from dedicated endpoints', async () => {
-    vi.mocked(apiRequest)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({
-        policies: [],
-        carryoverMappings: [],
-        legacyReviews: [],
-        reportRoutes: [],
-      })
+    vi.mocked(apiRequest).mockResolvedValueOnce([]).mockResolvedValueOnce({
+      policies: [],
+      carryoverMappings: [],
+      legacyReviews: [],
+      reportRoutes: [],
+    })
 
     await loadCostSubjectTree()
     await loadAccountingCatalogOverview()
@@ -64,6 +63,17 @@ describe('cost subject service', () => {
     })
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/cost-subjects/accounting-overview', {
       signal: undefined,
+    })
+  })
+
+  it('reviews historical accounting subjects through the audited endpoint', async () => {
+    vi.mocked(apiRequest).mockResolvedValue(undefined)
+
+    await reviewAccountingLegacySubject('1122/AR', 'CONFIRMED')
+
+    expect(apiRequest).toHaveBeenCalledWith('/cost-subjects/accounting-legacy-reviews/1122%2FAR', {
+      method: 'PUT',
+      body: { reviewStatus: 'CONFIRMED' },
     })
   })
 

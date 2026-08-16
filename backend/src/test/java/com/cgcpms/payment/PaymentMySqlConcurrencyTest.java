@@ -145,6 +145,7 @@ class PaymentMySqlConcurrencyTest {
         account.setAccountCode("M70-MYSQL-FUND");
         account.setAccountName("M70 MySQL fund");
         account.setAccountType("BANK");
+        account.setAccountingSubjectCode("1002.02");
         account.setOpeningDate(LocalDate.now().minusYears(1));
         account.setOpeningBalance(new BigDecimal("2000000.00"));
         account.setEnabledFlag(1);

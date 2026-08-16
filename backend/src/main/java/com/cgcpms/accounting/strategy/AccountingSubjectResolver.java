@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -44,16 +45,19 @@ public class AccountingSubjectResolver {
         if (fundAccountId == null) {
             throw new BusinessException("FUND_ACCOUNT_REQUIRED", "资金账户不能为空");
         }
-        String accountType = jdbcTemplate.query("""
-                SELECT account_type FROM fund_account
+        List<String> subjectCodes = jdbcTemplate.query("""
+                SELECT accounting_subject_code FROM fund_account
                 WHERE tenant_id=? AND id=? AND enabled_flag=1 AND deleted_flag=0
-                """, rs -> rs.next() ? rs.getString(1) : null,
+                """, (rs, rowNum) -> rs.getString(1),
                 UserContext.getCurrentTenantId(), fundAccountId);
-        if (accountType == null) {
+        if (subjectCodes.isEmpty()) {
             throw new BusinessException("FUND_ACCOUNT_UNAVAILABLE", "资金账户不存在或已停用");
         }
-        return require("CASH".equals(accountType) ? AccountingSubjectCatalog.CASH
-                : AccountingSubjectCatalog.BANK_GENERAL, "ASSET");
+        String subjectCode = subjectCodes.getFirst();
+        if (subjectCode == null) {
+            throw new BusinessException("FUND_ACCOUNT_ACCOUNTING_SUBJECT_REQUIRED", "资金账户未配置正式总账科目");
+        }
+        return require(subjectCode, "ASSET");
     }
 
     public CostSubject requireBusinessCostSubject(Long subjectId) {

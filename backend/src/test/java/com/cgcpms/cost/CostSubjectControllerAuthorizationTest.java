@@ -15,6 +15,10 @@ class CostSubjectControllerAuthorizationTest {
         String writeGate = CostSubjectController.class.getMethod(
                         "create", CostSubjectController.CostSubjectCommand.class)
                 .getAnnotation(PreAuthorize.class).value();
+        String legacyReviewGate = CostSubjectController.class.getMethod(
+                        "reviewAccountingLegacySubject", String.class,
+                        CostSubjectController.AccountingLegacyReviewCommand.class)
+                .getAnnotation(PreAuthorize.class).value();
 
         assertThat(readGate)
                 .contains("cost:target:query")
@@ -22,5 +26,8 @@ class CostSubjectControllerAuthorizationTest {
         assertThat(writeGate)
                 .doesNotContain("cost:target:query")
                 .doesNotContain("budget:query");
+        assertThat(legacyReviewGate)
+                .contains("accounting:subject-review")
+                .doesNotContain("cost:query");
     }
 }

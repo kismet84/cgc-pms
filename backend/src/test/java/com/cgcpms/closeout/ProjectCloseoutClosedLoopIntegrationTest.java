@@ -158,9 +158,9 @@ class ProjectCloseoutClosedLoopIntegrationTest {
                 VALUES(?,0,?,?,?,?, 'RETENTION','AR-RETENTION',100,0,0,100,?,'OPEN',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, RETENTION_RECEIVABLE, PROJECT, CONTRACT, SETTLEMENT, PARTNER, LocalDate.now());
         jdbc.update("""
-                INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,
+                INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,accounting_subject_code,opening_date,opening_balance,
                  enabled_flag,version,created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES(?,0,'FA-CLOSEOUT','收尾测试银行账户','BANK',?,0,1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                VALUES(?,0,'FA-CLOSEOUT','收尾测试银行账户','BANK','1002.02',?,0,1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, FUND_ACCOUNT, LocalDate.now().minusYears(1));
     }
 

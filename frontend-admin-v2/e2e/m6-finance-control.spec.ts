@@ -111,13 +111,14 @@ async function install(page: Page, writes: string[]) {
           },
         ],
       })
-    if (path === '/api/fund-accounts')
+    if (path === '/api/fund-accounts' || path === '/api/fund-accounts/manage')
       return fulfill(route, [
         {
           id: 'FA1',
           accountCode: 'BANK-001',
           accountName: '项目基本户',
           accountType: 'BANK',
+          accountingSubjectCode: '1002.01',
           bankName: '中国建设银行',
           openingDate: '2026-01-01',
           openingBalance: '5000000.00',

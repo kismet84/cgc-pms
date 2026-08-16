@@ -76,7 +76,7 @@ class CommunicationMigrationH2Test {
                 .load();
         flyway.migrate();
 
-        assertEquals("306", flyway.info().current().getVersion().getVersion());
+        assertEquals("307", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO communication_conversation(
                     id,tenant_id,type,direct_pair_key,status,created_at,updated_at)

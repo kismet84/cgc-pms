@@ -26,6 +26,9 @@ public class FundAccountCommand {
     @Pattern(regexp = "CASH|BANK")
     private String accountType;
 
+    @Size(max = 64)
+    private String accountingSubjectCode;
+
     @Size(max = 128)
     private String bankName;
 
