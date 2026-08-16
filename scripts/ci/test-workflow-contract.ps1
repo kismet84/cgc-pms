@@ -280,7 +280,7 @@ if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names mus
 $timeoutMinutes = @{
   'pr-push-evidence' = 5
   'desktop-launcher' = 10
-  'backend-test' = 15
+  'backend-test' = 25
   'backend-order-sensitive' = 10
   'backend-dependency-scan' = 10
   'reliability-contracts' = 15

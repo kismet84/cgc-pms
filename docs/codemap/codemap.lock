@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-16T01:09:19.399Z",
+  "generation_time": "2026-08-16T01:33:06.095Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 282,
-      "fingerprint": "967edbf5f9e84f64edf2eee1ca09dedc57a902645796ad3b53144014234cc6be"
+      "fingerprint": "e738db3391d35c30dbed296c232ca9b40c6847a0b0eed5c7bd4078b5cd7e5b0b"
     },
     {
       "id": "desktop_launcher",
@@ -134,13 +134,13 @@
       "fingerprint": "78b1f40b459bcbec552b5a45f48877d0a2f210fc45c1d52c1e6c26134f49b1f3"
     }
   ],
-  "generation_base_commit": "147240a2289e4ce1ee75654a4d228052ef61c420",
-  "input_scope_dirty": false,
+  "generation_base_commit": "610aea534c5febdd5e472a99b23ff1d93f4b1fff",
+  "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "14e2010247e6cdf90afa7835c20690b92af1ba12",
+    "previous_generation_base_commit": "610aea534c5febdd5e472a99b23ff1d93f4b1fff",
     "stale_modules": [
-      "documentation"
+      "delivery_tooling"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
