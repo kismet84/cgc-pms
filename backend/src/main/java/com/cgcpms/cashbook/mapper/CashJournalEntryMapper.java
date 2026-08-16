@@ -82,7 +82,7 @@ public interface CashJournalEntryMapper extends BaseMapper<CashJournalEntry> {
                    WHERE subject.tenant_id = cash_journal_entry.tenant_id
                      AND subject.id = cash_journal_entry.cost_subject_id
                      AND subject.deleted_flag = 0
-                     AND subject.account_category = 'COST'
+                     AND subject.account_category = 'COST' AND subject.ledger_flag=0
                  )
                 THEN CASE WHEN direction = 'OUT' THEN amount ELSE -amount END
                 ELSE 0 END), 0) AS actual_bid_expense,

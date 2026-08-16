@@ -3,6 +3,7 @@ package com.cgcpms.accounting;
 import com.cgcpms.accounting.entity.AccountingEntry;
 import com.cgcpms.accounting.strategy.CollectionRecordEntryGenerationStrategy;
 import com.cgcpms.accounting.strategy.AccountingSubjectResolver;
+import com.cgcpms.accounting.strategy.ContractRevenueEntryGenerationStrategy;
 import com.cgcpms.accounting.strategy.PayRecordEntryGenerationStrategy;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -11,12 +12,15 @@ import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.revenue.entity.ContractRevenue;
+import com.cgcpms.revenue.mapper.ContractRevenueMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +48,8 @@ class AccountingEntryGenerationStrategyTest {
     private AccountingSubjectResolver subjectResolver;
     private PayRecordEntryGenerationStrategy payStrategy;
     private CollectionRecordEntryGenerationStrategy collectionStrategy;
+    private ContractRevenueMapper revenueMapper;
+    private ContractRevenueEntryGenerationStrategy revenueStrategy;
 
     @BeforeEach
     void setUp() {
@@ -58,17 +66,24 @@ class AccountingEntryGenerationStrategyTest {
         when(subjectResolver.require(anyString(), anyString())).thenAnswer(invocation -> {
             String code = invocation.getArgument(0);
             CostSubject subject = new CostSubject();
+            subject.setId(Math.abs((long) code.hashCode()));
             subject.setSubjectCode(code);
             subject.setSubjectName(switch (code) {
-                case "1002-BANK" -> "银行存款";
-                case "1122-AR" -> "应收账款";
-                case "1123-PREPAY" -> "预付账款";
-                case "2202-AP" -> "应付账款";
-                case "2203-ADVANCE" -> "预收账款";
+                case "1122" -> "应收账款";
+                case "2206.01" -> "预收工程款";
                 default -> "测试科目";
             });
             return subject;
         });
+        CostSubject businessSubject = new CostSubject();
+        businessSubject.setId(9001L);
+        businessSubject.setSubjectType("MATERIAL");
+        businessSubject.setSubjectName("材料费");
+        when(subjectResolver.requireBusinessCostSubject(9001L)).thenReturn(businessSubject);
+        CostSubject payable = accountingSubject(220201L, "2202.01", "材料款");
+        when(subjectResolver.requirePayableSubject(businessSubject)).thenReturn(payable);
+        when(subjectResolver.requireFundAccount(anyLong())).thenReturn(
+                accountingSubject(100202L, "1002.02", "一般账户"));
         when(subjectResolver.requireWithPublicFallback(anyString(), anyString())).thenAnswer(invocation -> {
             CostSubject subject = new CostSubject();
             subject.setSubjectCode(invocation.getArgument(0));
@@ -77,6 +92,8 @@ class AccountingEntryGenerationStrategyTest {
         });
         payStrategy = new PayRecordEntryGenerationStrategy(recordMapper, applicationMapper, subjectResolver);
         collectionStrategy = new CollectionRecordEntryGenerationStrategy(jdbc, subjectResolver);
+        revenueMapper = mock(ContractRevenueMapper.class);
+        revenueStrategy = new ContractRevenueEntryGenerationStrategy(revenueMapper, subjectResolver, jdbc);
     }
 
     @AfterEach
@@ -102,15 +119,15 @@ class AccountingEntryGenerationStrategyTest {
         assertEquals(401L, entry.getContractId());
         assertEquals(101L, entry.getPayRecordId());
         assertEquals("DEBIT", entry.getLines().get(0).getDirection());
-        assertEquals("2202-AP", entry.getLines().get(0).getAccountCode());
+        assertEquals("2202.01", entry.getLines().get(0).getAccountCode());
         assertEquals(0, new BigDecimal("125.50").compareTo(entry.getLines().get(0).getAmount()));
         assertEquals("CREDIT", entry.getLines().get(1).getDirection());
-        assertEquals("1002-BANK-501", entry.getLines().get(1).getAccountCode());
+        assertEquals("1002.02", entry.getLines().get(1).getAccountCode());
         assertEquals(0, entry.getLines().get(0).getAmount().compareTo(entry.getLines().get(1).getAmount()));
     }
 
     @Test
-    void advancePaymentStrategyDebitsPrepaymentInsteadOfUnconfirmedPayable() {
+    void advancePaymentStrategyUsesPayableWithoutAddingPrepaymentSubject() {
         PayRecord record = successfulPayRecord(TENANT_ID);
         PayApplication application = new PayApplication();
         application.setTenantId(TENANT_ID);
@@ -121,8 +138,8 @@ class AccountingEntryGenerationStrategyTest {
 
         AccountingEntry entry = payStrategy.generate(101L, "PAYMENT");
 
-        assertEquals("1123-PREPAY", entry.getLines().get(0).getAccountCode());
-        assertEquals("1002-BANK-501", entry.getLines().get(1).getAccountCode());
+        assertEquals("2202.01", entry.getLines().get(0).getAccountCode());
+        assertEquals("1002.02", entry.getLines().get(1).getAccountCode());
         assertEquals(0, entry.getLines().get(0).getAmount().compareTo(entry.getLines().get(1).getAmount()));
     }
 
@@ -156,6 +173,7 @@ class AccountingEntryGenerationStrategyTest {
                 "collected_at", LocalDateTime.of(2026, 7, 17, 10, 30),
                 "project_id", 601L,
                 "contract_id", 701L,
+                "customer_id", 702L,
                 "fund_account_id", 801L,
                 "external_txn_no", "COLLECTION-001"));
 
@@ -163,9 +181,9 @@ class AccountingEntryGenerationStrategyTest {
 
         assertEquals("COLLECTION", entry.getEntryType());
         assertEquals(901L, entry.getCollectionRecordId());
-        assertEquals("1002-BANK-801", entry.getLines().get(0).getAccountCode());
-        assertEquals("1122-AR", entry.getLines().get(1).getAccountCode());
-        assertEquals("2203-ADVANCE", entry.getLines().get(2).getAccountCode());
+        assertEquals("1002.02", entry.getLines().get(0).getAccountCode());
+        assertEquals("1122", entry.getLines().get(1).getAccountCode());
+        assertEquals("2206.01", entry.getLines().get(2).getAccountCode());
         BigDecimal debit = entry.getLines().get(0).getAmount();
         BigDecimal credit = entry.getLines().get(1).getAmount().add(entry.getLines().get(2).getAmount());
         assertEquals(0, debit.compareTo(credit));
@@ -190,6 +208,49 @@ class AccountingEntryGenerationStrategyTest {
         assertEquals("COLLECTION_NOT_SUCCESS", nonSuccess.getCode());
     }
 
+    @Test
+    void contractRevenueStrategyBuildsBalancedSettlementAndIncomeEntry() {
+        ContractRevenue revenue = new ContractRevenue();
+        revenue.setId(1001L);
+        revenue.setTenantId(TENANT_ID);
+        revenue.setProjectId(601L);
+        revenue.setContractId(701L);
+        revenue.setRevenueCode("REV-001");
+        revenue.setRevenueDate(LocalDate.of(2026, 7, 31));
+        revenue.setRevenueAmount(new BigDecimal("880.00"));
+        revenue.setApprovalStatus("APPROVED");
+        when(revenueMapper.selectById(1001L)).thenReturn(revenue);
+        doReturn(702L).when(jdbc).query(anyString(),
+                org.mockito.ArgumentMatchers.<ResultSetExtractor<Long>>any(), eq(TENANT_ID), eq(701L));
+        when(subjectResolver.require("4401.02", "SETTLEMENT"))
+                .thenReturn(accountingSubject(440102L, "4401.02", "收入结转"));
+        when(subjectResolver.require("6001.01", "REVENUE"))
+                .thenReturn(accountingSubject(600101L, "6001.01", "建筑工程收入"));
+
+        AccountingEntry entry = revenueStrategy.generate(1001L, "REVENUE_RECOGNITION");
+
+        assertEquals("REVENUE_RECOGNITION", entry.getEntryType());
+        assertEquals(702L, entry.getPartnerId());
+        assertEquals("4401.02", entry.getLines().get(0).getAccountCode());
+        assertEquals("6001.01", entry.getLines().get(1).getAccountCode());
+        assertEquals(0, entry.getLines().get(0).getAmount().compareTo(entry.getLines().get(1).getAmount()));
+    }
+
+    @Test
+    void contractRevenueStrategyRejectsWrongTypeAndUnapprovedRevenue() {
+        BusinessException wrongType = assertThrows(BusinessException.class,
+                () -> revenueStrategy.generate(1001L, "COLLECTION"));
+        assertEquals("CONTRACT_REVENUE_ENTRY_TYPE_INVALID", wrongType.getCode());
+
+        ContractRevenue revenue = new ContractRevenue();
+        revenue.setTenantId(TENANT_ID);
+        revenue.setApprovalStatus("PENDING");
+        when(revenueMapper.selectById(1001L)).thenReturn(revenue);
+        BusinessException unapproved = assertThrows(BusinessException.class,
+                () -> revenueStrategy.generate(1001L, "REVENUE_RECOGNITION"));
+        assertEquals("CONTRACT_REVENUE_NOT_APPROVED", unapproved.getCode());
+    }
+
     private PayRecord successfulPayRecord(long tenantId) {
         PayRecord record = new PayRecord();
         record.setId(101L);
@@ -203,5 +264,13 @@ class AccountingEntryGenerationStrategyTest {
         record.setPayStatus("SUCCESS");
         record.setExternalTxnNo("PAYMENT-001");
         return record;
+    }
+
+    private static CostSubject accountingSubject(Long id, String code, String name) {
+        CostSubject subject = new CostSubject();
+        subject.setId(id);
+        subject.setSubjectCode(code);
+        subject.setSubjectName(name);
+        return subject;
     }
 }

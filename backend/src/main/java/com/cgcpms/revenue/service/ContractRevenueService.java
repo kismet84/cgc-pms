@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.strategy.ContractRevenueEntryGenerationStrategy;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.entity.CostItem;
@@ -71,6 +73,7 @@ public class ContractRevenueService {
     private final CodeGenerationService codeGenerationService;
     private final JdbcTemplate jdbcTemplate;
     private final FileLifecycleGateway fileLifecycleGateway;
+    private final EntryGenerator entryGenerator;
     @Lazy
     private final WorkflowEngine workflowEngine;
 
@@ -329,6 +332,8 @@ public class ContractRevenueService {
 
         // 3. 刷新成本汇总
         costSummaryService.refreshSummary(revenue.getTenantId(), revenue.getProjectId());
+        entryGenerator.generateEntry(ContractRevenueEntryGenerationStrategy.SOURCE_TYPE, revenue.getId(),
+                ContractRevenueEntryGenerationStrategy.ENTRY_TYPE);
 
         log.info("收入确认审批通过 revenueId={} revenueCode={} costItemId={}",
                 revenue.getId(), revenue.getRevenueCode(), item.getId());

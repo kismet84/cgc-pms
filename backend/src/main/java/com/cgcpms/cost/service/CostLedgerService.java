@@ -41,7 +41,7 @@ public class CostLedgerService {
             AND EXISTS (SELECT 1 FROM cost_subject cs
                         WHERE cs.tenant_id=cost_item.tenant_id
                           AND cs.id=cost_item.cost_subject_id
-                          AND cs.account_category='COST')
+                          AND cs.account_category='COST' AND cs.ledger_flag=0)
             """;
     private static final String ACTUAL_COST_FACT = "recognition_role='ACTUAL' "
             + "AND cost_status IN ('CONFIRMED','POSTED') AND " + CLASSIFIED_COST_SUBJECT;

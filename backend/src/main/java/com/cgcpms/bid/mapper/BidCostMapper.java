@@ -30,7 +30,7 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
             SELECT b.id,
                    MAX(u.real_name) AS owner_name,
                    COALESCE(SUM(CASE
-                     WHEN s.account_category='COST' AND j.status IN ('ARCHIVED','REVERSED')
+                     WHEN s.account_category='COST' AND s.ledger_flag=0 AND j.status IN ('ARCHIVED','REVERSED')
                      THEN CASE WHEN j.direction='OUT' THEN j.amount ELSE -j.amount END
                      ELSE 0 END),0) AS bid_expense
             FROM bid_cost b
@@ -93,7 +93,7 @@ public interface BidCostMapper extends BaseMapper<BidCost>, DeletedCodeSource {
                    j.business_date businessDate,j.summary
             FROM cash_journal_entry j
             JOIN cost_subject s ON s.tenant_id=j.tenant_id AND s.id=j.cost_subject_id
-              AND s.deleted_flag=0 AND s.account_category='COST'
+              AND s.deleted_flag=0 AND s.account_category='COST' AND s.ledger_flag=0
             WHERE j.tenant_id=#{tenantId} AND j.bid_cost_id=#{bidCostId}
               AND j.deleted_flag=0 AND j.status='ARCHIVED'
             ORDER BY j.business_date,j.id

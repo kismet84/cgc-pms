@@ -38,7 +38,6 @@ class ContractRevenueServiceTest {
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private static final long EXACT_REVENUE_SUBJECT_ID = 900201L;
-    private static final long FALLBACK_REVENUE_SUBJECT_ID = 900200L;
 
     @BeforeEach void setUp() {
         UserContext.set(Jwts.claims().subject("admin").add("userId", USER_ID)
@@ -212,8 +211,9 @@ class ContractRevenueServiceTest {
         assertEquals("0", balance.getContractLiability());
     }
 
-    @Test @DisplayName("onApproved → PENDING 转 APPROVED 并生成收入 cost_item")
+    @Test @Transactional @DisplayName("onApproved → PENDING 转 APPROVED 并生成收入 cost_item")
     void testOnApproved_GeneratesRevenueCostItem() {
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='MAIN' WHERE id=?", CONTRACT_ID);
         ContractRevenue pending = revenue("RV-APP-", "PENDING", "16000.00", "10000.00");
         mapper.insert(pending);
 
@@ -232,8 +232,9 @@ class ContractRevenueServiceTest {
         assertEquals(new BigDecimal("16000.00"), item.getAmount());
     }
 
-    @Test @DisplayName("ISSUE-004-008: 收入确认审批重复回调不重复生成收入调整项")
+    @Test @Transactional @DisplayName("ISSUE-004-008: 收入确认审批重复回调不重复生成收入调整项")
     void testOnApproved_RevenueAdjustmentIsIdempotent() {
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='MAIN' WHERE id=?", CONTRACT_ID);
         ContractRevenue pending = revenue("RV-ISSUE-004-008-", "PENDING", "28000.00", "12000.00");
         mapper.insert(pending);
 
@@ -257,19 +258,25 @@ class ContractRevenueServiceTest {
         assertEquals(0, new BigDecimal("28000.00").compareTo(item.getAmount()));
     }
 
-    @Test @DisplayName("onApproved → 缺少 6001.01 时回退到首个启用收入科目")
+    @Test @DisplayName("onApproved → 缺少固定收入科目时失败关闭")
     void testOnApproved_FallsBackWhen600101Missing() {
-        jdbcTemplate.update("UPDATE cost_subject SET deleted_flag = 1 WHERE id = ?", EXACT_REVENUE_SUBJECT_ID);
+        String originalContractType = jdbcTemplate.queryForObject(
+                "SELECT contract_type FROM ct_contract WHERE id=?", String.class, CONTRACT_ID);
+        try {
+            jdbcTemplate.update("UPDATE ct_contract SET contract_type='MAIN' WHERE id=?", CONTRACT_ID);
+            jdbcTemplate.update("UPDATE cost_subject SET deleted_flag = 1 WHERE id = ?", EXACT_REVENUE_SUBJECT_ID);
 
-        ContractRevenue pending = revenue("RV-FALLBACK-", "PENDING", "6000.00", "1000.00");
-        mapper.insert(pending);
+            ContractRevenue pending = revenue("RV-FALLBACK-", "PENDING", "6000.00", "1000.00");
+            mapper.insert(pending);
 
-        service.onApproved(pending.getId());
-
-        ContractRevenue approved = mapper.selectById(pending.getId());
-        CostItem item = costItemMapper.selectById(approved.getCostItemId());
-        assertNotNull(item);
-        assertEquals(FALLBACK_REVENUE_SUBJECT_ID, item.getCostSubjectId());
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.onApproved(pending.getId()));
+            assertEquals("ACCOUNTING_SUBJECT_UNAVAILABLE", error.getCode());
+            assertEquals("PENDING", mapper.selectById(pending.getId()).getApprovalStatus());
+        } finally {
+            jdbcTemplate.update("UPDATE ct_contract SET contract_type=? WHERE id=?",
+                    originalContractType, CONTRACT_ID);
+        }
     }
 
     @Test @DisplayName("onApproved → 非 PENDING 状态幂等退出且不重复生成 cost_item")

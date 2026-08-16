@@ -18,5 +18,6 @@ public class CostSubjectTreeNodeVO {
     private Integer sortOrder;
     private String parentId;
     private BigDecimal defaultTargetRatio;
+    private Integer ledgerFlag;
     private List<CostSubjectTreeNodeVO> children = new ArrayList<>();
 }

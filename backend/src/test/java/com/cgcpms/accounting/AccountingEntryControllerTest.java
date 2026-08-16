@@ -110,7 +110,7 @@ class AccountingEntryControllerTest {
         mockMvc.perform(putWith("/accounting-entry/999999/reverse").cookie(adminCookie())).andExpect(status().isBadRequest());
     }
 
-    @Test @Order(7) @DisplayName("V148 grants query/edit to FINANCE but keeps accounting:add closed")
+    @Test @Order(7) @DisplayName("V306 grants cost carryover only to COMPANY_FINANCE")
     void testAccountingMenuPermissionMigrationApplied() {
         Set<String> permissions = Set.copyOf(jdbcTemplate.queryForList("""
                 SELECT m.perms
@@ -127,6 +127,14 @@ class AccountingEntryControllerTest {
                 "SELECT COUNT(*) FROM sys_menu WHERE perms = 'accounting:add' AND deleted_flag = 0",
                 Integer.class);
         assertEquals(0, addPermissionCount);
+        Integer carryoverPermissionCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.id=rm.role_id AND r.tenant_id=rm.tenant_id
+                JOIN sys_menu m ON m.id=rm.menu_id AND m.tenant_id=rm.tenant_id
+                WHERE r.role_code='COMPANY_FINANCE' AND r.deleted_flag=0
+                  AND m.perms='accounting:cost-carryover' AND m.deleted_flag=0
+                """, Integer.class);
+        assertEquals(1, carryoverPermissionCount);
     }
 
     private MockHttpServletRequestBuilder getWith(String p) { return get("/api" + p).contextPath("/api"); }

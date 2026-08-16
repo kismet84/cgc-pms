@@ -522,7 +522,7 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                 SELECT ? project_id,
                   COALESCE((SELECT SUM(ci.amount_without_tax) FROM cost_item ci
                     JOIN cost_subject cs ON cs.tenant_id=ci.tenant_id AND cs.id=ci.cost_subject_id
-                      AND cs.deleted_flag=0 AND cs.account_category='COST'
+                      AND cs.deleted_flag=0 AND cs.account_category='COST' AND cs.ledger_flag=0
                     WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
                       AND ci.cost_status IN ('CONFIRMED','POSTED')
                       AND ci.classification_status<>'UNCLASSIFIED'
@@ -634,7 +634,7 @@ final class FinanceCostAllocationOperations extends CostSubjectV2Support {
                     JOIN cost_subject s ON s.id=l.cost_subject_id AND s.tenant_id=l.tenant_id
                     WHERE l.tenant_id=? AND l.id=? AND e.deleted_flag=0 AND e.entry_status='POSTED'
                       AND e.source_type='MANUAL' AND l.direction='DEBIT'
-                      AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                      AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                     FOR UPDATE
                     """, sourceId).get("amount"));
         }

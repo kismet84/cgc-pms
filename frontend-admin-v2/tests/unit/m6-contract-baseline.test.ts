@@ -8,6 +8,7 @@ import {
   SUBCONTRACT_QUERY_PERMISSIONS,
 } from '@cgc-pms/frontend-contracts'
 import {
+  createAccountingCostCarryover,
   loadAccountingEntries,
   loadAccountingEntryDetail,
   loadCashForecastCycles,
@@ -104,6 +105,21 @@ describe('M6 contract and read-only canary baseline', () => {
     ])
     for (const [, options] of fetchMock.mock.calls)
       expect(options).toMatchObject({ method: 'GET', body: undefined, signal })
+  })
+
+  it('posts a governed project cost carryover command', async () => {
+    fetchMock.mockResolvedValueOnce(apiResponse('9007199254740993'))
+    const command = {
+      projectId: 'P/1',
+      contractId: 'C/1',
+      carryoverDate: '2026-08-31',
+    }
+
+    await expect(createAccountingCostCarryover(command)).resolves.toBe('9007199254740993')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/accounting-entry/cost-carryovers',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(command) }),
+    )
   })
 
   it('keeps large values, zero and null as server-returned strings', async () => {

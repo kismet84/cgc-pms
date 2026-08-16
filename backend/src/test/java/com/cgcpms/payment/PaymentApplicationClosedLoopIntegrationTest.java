@@ -318,10 +318,10 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 .eq(AccountingEntry::getEntryType, "AP_CONFIRMATION"));
         assertNotNull(payableConfirmation);
         assertMoney("100.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='PAYMENT-CLOSED-LOOP-SUBJECT'",
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1451.08'",
                 BigDecimal.class, payableConfirmation.getId()));
         assertMoney("100.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP'",
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202.04'",
                 BigDecimal.class, payableConfirmation.getId()));
         assertEquals(SUBJECT_ID, jdbcTemplate.queryForObject(
                 "SELECT cost_subject_id FROM accounting_entry_line WHERE entry_id=? AND direction='DEBIT'",
@@ -585,8 +585,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
     }
 
     @Test
-    @DisplayName("预付款不确认AP，发票核验后显式确认并重分类")
-    void advancePaymentUsesPrepaymentThenInvoiceReclassifiesIt() {
+    @DisplayName("预付款不新增预付科目，付款直接冲减正式应付且发票不重复记账")
+    void advancePaymentUsesPayableWithoutPrepaymentReclassification() {
         Long applicationId = createPayment(new BigDecimal("300.00"), "ADVANCE");
         saveDirectSource(applicationId, new BigDecimal("300.00"));
         attach("PAYMENT", applicationId);
@@ -611,7 +611,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 .eq(AccountingEntry::getEntryType, "PAYMENT"));
         assertNotNull(paymentEntry);
         assertMoney("300.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1123-PREPAY'",
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202.04' AND direction='DEBIT'",
                 BigDecimal.class, paymentEntry.getId()));
 
         PayInvoice invoice = new PayInvoice();
@@ -633,22 +633,16 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 SELECT id FROM accounting_entry
                  WHERE source_type='PAY_INVOICE' AND source_id=? AND entry_type='ADVANCE_AP_CONFIRMATION'
                 """, Long.class, invoiceId);
-        Long reclassId = jdbcTemplate.queryForObject("""
-                SELECT id FROM accounting_entry
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1451.08' AND direction='DEBIT'",
+                BigDecimal.class, confirmationId));
+        assertMoney("300.00", jdbcTemplate.queryForObject(
+                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202.04' AND direction='CREDIT'",
+                BigDecimal.class, confirmationId));
+        assertEquals(0, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM accounting_entry
                  WHERE source_type='PAY_INVOICE' AND source_id=? AND entry_type='ADVANCE_PREPAY_RECLASS'
-                """, Long.class, invoiceId);
-        assertMoney("300.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='PAYMENT-CLOSED-LOOP-SUBJECT'",
-                BigDecimal.class, confirmationId));
-        assertMoney("300.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP' AND direction='CREDIT'",
-                BigDecimal.class, confirmationId));
-        assertMoney("300.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='2202-AP' AND direction='DEBIT'",
-                BigDecimal.class, reclassId));
-        assertMoney("300.00", jdbcTemplate.queryForObject(
-                "SELECT amount FROM accounting_entry_line WHERE entry_id=? AND account_code='1123-PREPAY'",
-                BigDecimal.class, reclassId));
+                """, Integer.class, invoiceId));
     }
 
     @Test

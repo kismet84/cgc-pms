@@ -460,7 +460,7 @@ public class CostControlService {
                     AND ci.classification_status<>'UNCLASSIFIED' THEN ci.amount ELSE 0 END) actual_amount
                 FROM cost_item ci
                 JOIN cost_subject cs ON cs.tenant_id=ci.tenant_id AND cs.id=ci.cost_subject_id
-                  AND cs.deleted_flag=0 AND cs.account_category='COST'
+                  AND cs.deleted_flag=0 AND cs.account_category='COST' AND cs.ledger_flag=0
                 WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0 AND (ci.cost_date IS NULL OR ci.cost_date<=?)
                 GROUP BY ci.cost_subject_id
                 HAVING committed_amount<>0 OR actual_amount<>0
@@ -543,11 +543,11 @@ public class CostControlService {
                     FROM cost_item ci
                     JOIN cost_subject actual_subject ON actual_subject.tenant_id=ci.tenant_id
                       AND actual_subject.id=ci.cost_subject_id AND actual_subject.deleted_flag=0
-                      AND actual_subject.account_category='COST'
+                      AND actual_subject.account_category='COST' AND actual_subject.ledger_flag=0
                     WHERE ci.tenant_id=? AND ci.project_id=? AND ci.deleted_flag=0
                       AND (ci.cost_date IS NULL OR ci.cost_date<=?) GROUP BY ci.cost_subject_id
                 ) c ON c.cost_subject_id=s.id
-                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST'
+                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST' AND s.ledger_flag=0
                   AND (t.id IS NOT NULL OR c.cost_subject_id IS NOT NULL)
                 ORDER BY s.subject_code,s.id
                 """, targetId, tenant(), projectId, date, tenant());

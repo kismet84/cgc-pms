@@ -41,7 +41,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("304", flyway.info().current().getVersion().getVersion());
+        assertEquals("306", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',
@@ -63,7 +63,7 @@ class BaselineMySqlSmokeTest {
                 """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(225, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(229, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
         assertEquals(10, count("""
@@ -82,6 +82,14 @@ class BaselineMySqlSmokeTest {
                     'recognition_role','root_source_type','classification_business_category',
                     'adjustment_batch_id','original_cost_item_id')
                 """));
+        assertEquals(4, count("""
+                SELECT COUNT(*) FROM information_schema.tables
+                WHERE table_schema=DATABASE() AND table_name IN (
+                  'accounting_subject_dimension_rule','accounting_cost_carryover_mapping',
+                  'accounting_cost_carryover','accounting_subject_legacy_review')
+                """));
+        assertEquals(84, count("SELECT COUNT(*) FROM cost_subject WHERE tenant_id=0 AND ledger_flag=1 AND deleted_flag=0"));
+        assertEquals(8, count("SELECT COUNT(*) FROM accounting_cost_carryover_mapping WHERE tenant_id=0 AND status='ENABLE'"));
         assertEquals(1, count("SELECT COUNT(*) FROM information_schema.views "
                 + "WHERE table_schema=DATABASE() AND table_name='v_business_audit_event' "
                 + "AND security_type='INVOKER'"));

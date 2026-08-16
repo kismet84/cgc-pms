@@ -40,10 +40,22 @@ public class CostSubjectService {
     private final JdbcTemplate jdbcTemplate;
 
     public List<CostSubjectTreeNodeVO> getTree(String accountCategory) {
+        return getTree(accountCategory, false);
+    }
+
+    public List<CostSubjectTreeNodeVO> getAccountingTree(String accountCategory) {
+        return getTree(accountCategory, true);
+    }
+
+    private List<CostSubjectTreeNodeVO> getTree(String accountCategory, boolean ledgerOnly) {
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
+        if (ledgerOnly) {
+            wrapper.eq(CostSubject::getLedgerFlag, 1);
+        }
         if (accountCategory != null && !accountCategory.isEmpty()) {
             wrapper.eq(CostSubject::getAccountCategory, accountCategory);
+            if ("COST".equals(accountCategory) && !ledgerOnly) wrapper.eq(CostSubject::getLedgerFlag, 0);
         }
         wrapper.orderByAsc(CostSubject::getSortOrder, CostSubject::getId);
 
@@ -85,6 +97,7 @@ public class CostSubjectService {
         node.setSortOrder(subject.getSortOrder());
         node.setParentId(subject.getParentId() != null ? subject.getParentId().toString() : "0");
         node.setDefaultTargetRatio(subject.getDefaultTargetRatio());
+        node.setLedgerFlag(subject.getLedgerFlag());
 
         // Recursively build children
         List<CostSubject> children = parentMap.getOrDefault(subjectId, new ArrayList<>());
@@ -101,11 +114,59 @@ public class CostSubjectService {
         wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
         if (accountCategory != null && !accountCategory.isEmpty()) {
             wrapper.eq(CostSubject::getAccountCategory, accountCategory);
+            if ("COST".equals(accountCategory)) wrapper.eq(CostSubject::getLedgerFlag, 0);
         }
         wrapper.orderByAsc(CostSubject::getSortOrder, CostSubject::getId);
 
         List<CostSubject> subjects = costSubjectMapper.selectList(wrapper);
         return subjects.stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    public Map<String, Object> getAccountingOverview() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<Map<String, Object>> policies = jdbcTemplate.queryForList("""
+                SELECT subject.subject_code subjectCode,subject.subject_name subjectName,
+                       rule_row.project_requirement projectRequirement,
+                       rule_row.contract_requirement contractRequirement,
+                       rule_row.partner_requirement partnerRequirement,
+                       rule_row.department_requirement departmentRequirement,
+                       rule_row.employee_requirement employeeRequirement,
+                       rule_row.allowed_contract_types allowedContractTypes,
+                       rule_row.allowed_partner_types allowedPartnerTypes
+                FROM accounting_subject_dimension_rule rule_row
+                JOIN cost_subject subject ON subject.tenant_id=rule_row.tenant_id
+                 AND subject.id=rule_row.accounting_subject_id AND subject.deleted_flag=0
+                WHERE rule_row.tenant_id=?
+                ORDER BY subject.subject_code
+                """, tenantId);
+        List<Map<String, Object>> mappings = jdbcTemplate.queryForList("""
+                SELECT mapping.category_code categoryCode,mapping.category_name categoryName,
+                       source.subject_code fulfillmentCode,source.subject_name fulfillmentName,
+                       target.subject_code expenseCode,target.subject_name expenseName,mapping.status
+                FROM accounting_cost_carryover_mapping mapping
+                JOIN cost_subject source ON source.tenant_id=mapping.tenant_id AND source.id=mapping.fulfillment_subject_id
+                JOIN cost_subject target ON target.tenant_id=mapping.tenant_id AND target.id=mapping.expense_subject_id
+                WHERE mapping.tenant_id=? ORDER BY mapping.category_code
+                """, tenantId);
+        List<Map<String, Object>> legacyReviews = jdbcTemplate.queryForList("""
+                SELECT source_subject_code sourceSubjectCode,source_subject_name sourceSubjectName,
+                       suggested_subject_code suggestedSubjectCode,review_status reviewStatus,review_note reviewNote
+                FROM accounting_subject_legacy_review
+                WHERE tenant_id=? ORDER BY source_subject_code
+                """, tenantId);
+        List<Map<String, String>> reportRoutes = List.of(
+                Map.of("label", "成本明细账", "path", "/cost/ledger"),
+                Map.of("label", "成本汇总", "path", "/cost/summary"),
+                Map.of("label", "项目利润", "path", "/cost/control"),
+                Map.of("label", "收款与应收", "path", "/revenue-operations"),
+                Map.of("label", "付款与应付", "path", "/payment/applications"),
+                Map.of("label", "会计凭证", "path", "/accounting-entry"));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("policies", policies);
+        result.put("carryoverMappings", mappings);
+        result.put("legacyReviews", legacyReviews);
+        result.put("reportRoutes", reportRoutes);
+        return result;
     }
 
     public List<CostSubjectVO> getBidOptions() {
@@ -139,6 +200,7 @@ public class CostSubjectService {
         subject.setId(null);
         subject.setTenantId(UserContext.getCurrentTenantId());
         subject.setDeletedFlag(0);
+        subject.setLedgerFlag(0);
         assertStandardAccountingSubjectNotCreated(subject.getSubjectCode());
         assertGenericStructureEditable(subject.getSubjectCode());
         validateParentForSave(subject, null);
@@ -436,8 +498,9 @@ public class CostSubjectService {
         referenceCounts.put("结算明细", countReference(
                 "SELECT COUNT(*) FROM stl_settlement_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
         Long accountingLines = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM accounting_entry_line WHERE tenant_id=? AND deleted_flag=0 AND (cost_subject_id=? OR account_code=?)",
-                Long.class, tenantId, subjectId, subject.getSubjectCode());
+                "SELECT COUNT(*) FROM accounting_entry_line WHERE tenant_id=? AND deleted_flag=0 "
+                        + "AND (cost_subject_id=? OR accounting_subject_id=? OR account_code=?)",
+                Long.class, tenantId, subjectId, subjectId, subject.getSubjectCode());
         referenceCounts.put("会计凭证明细", accountingLines == null ? 0L : accountingLines);
         referenceCounts.put("V2历史映射", countReference(
                 "SELECT COUNT(*) FROM cost_subject_mapping_item WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)",
@@ -592,6 +655,7 @@ public class CostSubjectService {
         vo.setSortOrder(subject.getSortOrder());
         vo.setStatus(subject.getStatus());
         vo.setDefaultTargetRatio(subject.getDefaultTargetRatio());
+        vo.setLedgerFlag(subject.getLedgerFlag());
         vo.setCreatedBy(subject.getCreatedBy() != null ? subject.getCreatedBy().toString() : null);
         vo.setCreatedAt(subject.getCreatedAt() != null ? DateTimeUtils.DTF.format(subject.getCreatedAt()) : null);
         vo.setUpdatedAt(subject.getUpdatedAt() != null ? DateTimeUtils.DTF.format(subject.getUpdatedAt()) : null);

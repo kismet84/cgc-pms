@@ -37,7 +37,7 @@ const domainModules = {
 const runtimeExportHashes = {
   commercial: 'bb9aaf1406c228e7231246efb440d0e060c38876b11016d6e7fff1d73ad71ee1',
   'supply-chain': 'e548592d2a6465aed7839d569119e5ae7871a9ecc464c4a6e3e393bcea9a5c78',
-  finance: 'cefd96ba3dd5285737480353a26211801c6b6582e071e63d492e2b06eb8ddc53',
+  finance: '87156b421223d2b523a6bdb7713a1982685026b2bb9df49dd12ccbc94ebe004b',
   'system-management': 'd0f17314a8d9d61d2765e77d5ae3a781b453bff1acc4c4b5a18425cfadf6381a',
 } as const
 
@@ -51,7 +51,7 @@ const typeExportHashes = {
 const requestSurfaceHashes = {
   commercial: 'feedbb0e660149d81577edbe33f3492ccd689a8705579e6cbc1936d9b99eb479',
   'supply-chain': '1731f8c4bafd410bc6b98b5d8ead39b5df300346c0f83684a2c847db35669fe6',
-  finance: 'f16dee2379e1a3c2cf3708288d108b6c4a88da59a39fb163ef3b19fa4d710f49',
+  finance: '346859928443e2b2e7cdc5e3fdb6997c145359a37ff3f7c162f53356111c8704',
   'system-management': 'd589588c009b1d6021783ca81ef2b48ccb89f7740dbd9fef9aa2d3e503151350',
 } as const
 
@@ -86,7 +86,7 @@ describe('M94 frontend service boundaries', () => {
       finance: read('src/services/cost-subject/finance-allocation.ts'),
     }
 
-    expect(modules.taxonomy).toContain("'/cost-subjects/tree'")
+    expect(modules.taxonomy).toContain("'/cost-subjects/accounting-tree'")
     expect(modules.taxonomy).not.toContain('/bid-transfer')
     expect(modules.mapping).toContain("'/cost-subject-v2/mapping-versions'")
     expect(modules.mapping).not.toContain('/finance-allocation')

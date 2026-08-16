@@ -40,6 +40,9 @@ public class CostSubject extends BaseEntity {
 
     private BigDecimal defaultTargetRatio;
 
+    /** 1=固定总账会计科目；0=项目成本/业务分类。 */
+    private Integer ledgerFlag;
+
     @TableField(insertStrategy = FieldStrategy.ALWAYS, updateStrategy = FieldStrategy.ALWAYS)
     private Long createdBy;
 

@@ -965,10 +965,11 @@ class CostSubjectServiceTest {
     @Transactional
     @DisplayName("标准总账科目进入统一目录且仅允许维护名称与排序")
     void governedAccountingSubjectUsesUnifiedCatalog() {
-        CostSubject subject = findSubjectByCode("1122-AR");
+        CostSubject subject = findSubjectByCode("1122");
         if (subject == null) {
-            subject = createSubject("1122-AR", "应收账款", 0L, "ASSET", 1, 20);
+            subject = createSubject("1122", "应收账款", 0L, "ASSET", 1, 20);
             subject.setSubjectType("GENERAL_LEDGER");
+            subject.setLedgerFlag(1);
             costSubjectMapper.updateById(subject);
         }
         assertNotNull(subject);
@@ -976,9 +977,9 @@ class CostSubjectServiceTest {
         subject.setSubjectName("项目应收账款");
         subject.setSortOrder(subject.getSortOrder() + 1);
         costSubjectService.update(subject);
-        assertEquals("项目应收账款", findSubjectByCode("1122-AR").getSubjectName());
+        assertEquals("项目应收账款", findSubjectByCode("1122").getSubjectName());
 
-        subject.setSubjectCode("1122-AR-CHANGED");
+        subject.setSubjectCode("1122-CHANGED");
         CostSubject governedSubject = subject;
         BusinessException error = assertThrows(BusinessException.class,
                 () -> costSubjectService.update(governedSubject));

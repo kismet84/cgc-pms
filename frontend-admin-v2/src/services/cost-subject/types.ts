@@ -9,7 +9,45 @@ export interface CostSubjectRecord {
   sortOrder: number
   status: string
   defaultTargetRatio?: string | null
+  ledgerFlag?: number
   children?: CostSubjectRecord[]
+}
+
+export interface AccountingDimensionPolicy {
+  subjectCode: string
+  subjectName: string
+  projectRequirement: string
+  contractRequirement: string
+  partnerRequirement: string
+  departmentRequirement: string
+  employeeRequirement: string
+  allowedContractTypes?: string | null
+  allowedPartnerTypes?: string | null
+}
+
+export interface AccountingCarryoverMapping {
+  categoryCode: string
+  categoryName: string
+  fulfillmentCode: string
+  fulfillmentName: string
+  expenseCode: string
+  expenseName: string
+  status: string
+}
+
+export interface AccountingLegacyReview {
+  sourceSubjectCode: string
+  sourceSubjectName: string
+  suggestedSubjectCode?: string | null
+  reviewStatus: string
+  reviewNote?: string | null
+}
+
+export interface AccountingCatalogOverview {
+  policies: AccountingDimensionPolicy[]
+  carryoverMappings: AccountingCarryoverMapping[]
+  legacyReviews: AccountingLegacyReview[]
+  reportRoutes: Array<{ label: string; path: string }>
 }
 
 export type AccountCategory =

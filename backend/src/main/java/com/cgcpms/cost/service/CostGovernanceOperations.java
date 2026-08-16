@@ -75,7 +75,7 @@ final class CostGovernanceOperations extends CostSubjectV2Support {
                            AND r.status='DISABLE' AND r.deleted_flag=0)
                          THEN 'DISABLE' ELSE NULL END overheadRuleStatus
                 FROM cost_subject s
-                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST'
+                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id
                                   AND c.parent_id=s.id AND c.deleted_flag=0)
                 ORDER BY s.subject_code,s.id LIMIT 500
@@ -155,7 +155,7 @@ final class CostGovernanceOperations extends CostSubjectV2Support {
                     JOIN accounting_entry e ON e.tenant_id=l.tenant_id AND e.id=l.entry_id
                     JOIN cost_subject s ON s.tenant_id=l.tenant_id AND s.id=l.cost_subject_id
                     WHERE l.tenant_id=? AND e.deleted_flag=0 AND e.entry_status='POSTED' AND e.source_type='MANUAL'
-                      AND l.direction='DEBIT' AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                      AND l.direction='DEBIT' AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                     """ + entryScope + " UNION ALL " + """
                     SELECT 'EXPENSE_APPLICATION' sourceType,x.id sourceId,x.project_id projectId,
                            x.expense_code sourceCode,x.description sourceName,
@@ -164,7 +164,7 @@ final class CostGovernanceOperations extends CostSubjectV2Support {
                                AND b.source_id=x.id),0) remainingAmount
                     FROM expense_application x JOIN cost_subject s ON s.tenant_id=x.tenant_id AND s.id=x.cost_subject_id
                     WHERE x.tenant_id=? AND x.deleted_flag=0 AND x.approval_status='APPROVED'
-                      AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                      AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                     """ + expenseScope + ") finance_source WHERE remainingAmount>0 ORDER BY sourceCode LIMIT 300",
                     financeArguments.toArray()));
         }
@@ -204,7 +204,7 @@ final class CostGovernanceOperations extends CostSubjectV2Support {
                 FROM cost_subject s
                 LEFT JOIN project_cost_subject_scope sc ON sc.tenant_id=s.tenant_id AND sc.project_id=?
                   AND sc.cost_subject_id=s.id
-                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST'
+                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id
                                   AND c.parent_id=s.id AND c.deleted_flag=0)
                 ORDER BY s.subject_code,s.id
@@ -1224,7 +1224,7 @@ final class CostGovernanceOperations extends CostSubjectV2Support {
                   AND ci.cost_status IN ('CONFIRMED','POSTED')
                   AND ci.recognition_role IN ('ACTUAL','COMMITTED')
                   AND ci.source_type NOT IN (?,?)
-                  AND (ci.classification_status='UNCLASSIFIED' OR s.account_category='COST')
+                  AND (ci.classification_status='UNCLASSIFIED' OR (s.account_category='COST' AND s.ledger_flag=0))
                   AND NOT EXISTS (
                     SELECT 1 FROM cost_recalculation_batch own_batch
                     WHERE own_batch.tenant_id=ci.tenant_id AND own_batch.id=ci.adjustment_batch_id

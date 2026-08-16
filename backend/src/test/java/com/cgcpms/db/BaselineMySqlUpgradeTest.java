@@ -106,7 +106,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("304", current.info().current().getVersion().getVersion());
+        assertEquals("306", current.info().current().getVersion().getVersion());
         assertEquals(20, count(current, """
                 SELECT COUNT(*) FROM information_schema.columns
                 WHERE table_schema=DATABASE()

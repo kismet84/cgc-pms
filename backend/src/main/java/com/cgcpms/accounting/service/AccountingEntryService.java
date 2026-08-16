@@ -16,6 +16,7 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -35,6 +36,8 @@ public class AccountingEntryService {
     private final CostSubjectMapper subjectMapper;
     private final AccountingPeriodGuard periodGuard;
     private final ProjectAccessChecker projectAccessChecker;
+    private final JdbcTemplate jdbcTemplate;
+    private final AccountingCostCarryoverService costCarryoverService;
 
     public IPage<AccountingEntry> getPage(long pageNo, long pageSize,
                                            String entryType, String sourceType,
@@ -133,18 +136,48 @@ public class AccountingEntryService {
             throw new BusinessException("PAYMENT_CASH_JOURNAL_ARCHIVE_REQUIRED",
                     "付款凭证必须显式关联已归档现金日记后才能过账");
         }
+        lockProjectForPosting(entry);
         periodGuard.assertWritable(entry.getEntryDate());
+        costCarryoverService.assertCurrentSnapshotForPost(entry);
+        AccountingEntry original = null;
+        if (entry.getOriginalEntryId() != null) {
+            original = requireExistingForUpdate(entry.getOriginalEntryId());
+            costCarryoverService.assertSourceReversalAllowed(original);
+        }
         entry.setEntryStatus("POSTED");
         entry.setPostedAt(LocalDateTime.now());
         entry.setPostedBy(UserContext.getCurrentUserId());
         entry.setPeriodId(periodGuard.findPeriodId(entry.getEntryDate()));
         updateOrThrow(entry);
-        if (entry.getOriginalEntryId() != null) {
-            AccountingEntry original = requireExistingForUpdate(entry.getOriginalEntryId());
+        if (AccountingCostCarryoverService.SOURCE_TYPE.equals(entry.getSourceType())) {
+            jdbcTemplate.update("""
+                    UPDATE accounting_cost_carryover SET status='POSTED'
+                    WHERE tenant_id=? AND id=? AND entry_id=? AND status='DRAFT'
+                    """, entry.getTenantId(), entry.getSourceId(), entry.getId());
+        }
+        if (original != null) {
             original.setEntryStatus("REVERSED");
             original.setReversedAt(LocalDateTime.now());
             original.setReversedEntryId(entry.getId());
             updateOrThrow(original);
+            if (AccountingCostCarryoverService.SOURCE_TYPE.equals(original.getSourceType())) {
+                jdbcTemplate.update("""
+                        UPDATE accounting_cost_carryover SET status='REVERSED'
+                        WHERE tenant_id=? AND id=? AND entry_id=? AND status='POSTED'
+                        """, original.getTenantId(), original.getSourceId(), original.getId());
+            }
+        }
+    }
+
+    private void lockProjectForPosting(AccountingEntry entry) {
+        if (entry.getProjectId() == null) return;
+        List<Long> projects = jdbcTemplate.queryForList("""
+                SELECT id FROM pm_project
+                WHERE tenant_id=? AND id=? AND deleted_flag=0
+                FOR UPDATE
+                """, Long.class, entry.getTenantId(), entry.getProjectId());
+        if (projects.size() != 1) {
+            throw new BusinessException("ENTRY_PROJECT_INVALID", "凭证所属项目不存在");
         }
     }
 
@@ -173,6 +206,9 @@ public class AccountingEntryService {
         reversal.setSourceId(entry.getId());
         reversal.setProjectId(entry.getProjectId());
         reversal.setContractId(entry.getContractId());
+        reversal.setPartnerId(entry.getPartnerId());
+        reversal.setDepartmentId(entry.getDepartmentId());
+        reversal.setEmployeeId(entry.getEmployeeId());
         reversal.setPayApplicationId(entry.getPayApplicationId());
         reversal.setEntryStatus("DRAFT");
         reversal.setReviewStatus("PENDING");
@@ -189,7 +225,8 @@ public class AccountingEntryService {
             AccountingEntryLine line = new AccountingEntryLine();
             line.setTenantId(entry.getTenantId()); line.setEntryId(reversal.getId()); line.setLineNo(lineNo++);
             line.setDirection("DEBIT".equals(old.getDirection()) ? "CREDIT" : "DEBIT");
-            line.setCostSubjectId(old.getCostSubjectId()); line.setAccountCode(old.getAccountCode());
+            line.setCostSubjectId(old.getCostSubjectId()); line.setAccountingSubjectId(old.getAccountingSubjectId());
+            line.setAccountCode(old.getAccountCode());
             line.setAccountName(old.getAccountName()); line.setAmount(old.getAmount());
             line.setSummary("冲销：" + old.getSummary()); lineMapper.insert(line);
         }
@@ -224,6 +261,9 @@ public class AccountingEntryService {
         reversal.setSourceId(reversalRecord.getId());
         reversal.setProjectId(original.getProjectId());
         reversal.setContractId(original.getContractId());
+        reversal.setPartnerId(original.getPartnerId());
+        reversal.setDepartmentId(original.getDepartmentId());
+        reversal.setEmployeeId(original.getEmployeeId());
         reversal.setPayApplicationId(original.getPayApplicationId());
         reversal.setPayRecordId(reversalRecord.getId());
         reversal.setEntryStatus("DRAFT");
@@ -244,6 +284,7 @@ public class AccountingEntryService {
             line.setLineNo(lineNo++);
             line.setDirection("DEBIT".equals(oldLine.getDirection()) ? "CREDIT" : "DEBIT");
             line.setCostSubjectId(oldLine.getCostSubjectId());
+            line.setAccountingSubjectId(oldLine.getAccountingSubjectId());
             line.setAccountCode(oldLine.getAccountCode());
             line.setAccountName(oldLine.getAccountName());
             line.setAmount(oldLine.getAmount());

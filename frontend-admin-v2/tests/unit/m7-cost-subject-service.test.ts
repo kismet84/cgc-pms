@@ -6,6 +6,7 @@ import {
   createFinanceAllocationRequest,
   createOverheadAllocationRule,
   executeOverheadAllocation,
+  loadAccountingCatalogOverview,
   loadBidTransferRequests,
   loadCostSubjectTree,
   loadFinanceAllocationRequests,
@@ -43,6 +44,27 @@ describe('cost subject service', () => {
 
     expect(subject?.id).toBe('901001')
     expect(subject?.defaultTargetRatio).toBe('25')
+  })
+
+  it('loads the accounting catalog and governance overview from dedicated endpoints', async () => {
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({
+        policies: [],
+        carryoverMappings: [],
+        legacyReviews: [],
+        reportRoutes: [],
+      })
+
+    await loadCostSubjectTree()
+    await loadAccountingCatalogOverview()
+
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/cost-subjects/accounting-tree', {
+      signal: undefined,
+    })
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/cost-subjects/accounting-overview', {
+      signal: undefined,
+    })
   })
 
   it('uses separate draft and submit endpoints for transfer and allocation workflows', async () => {
@@ -200,11 +222,10 @@ describe('cost subject service', () => {
       method: 'POST',
       body: command,
     })
-    expect(apiRequest).toHaveBeenNthCalledWith(
-      3,
-      '/overhead-allocation/rules/801',
-      { method: 'PUT', body: command },
-    )
+    expect(apiRequest).toHaveBeenNthCalledWith(3, '/overhead-allocation/rules/801', {
+      method: 'PUT',
+      body: command,
+    })
     expect(apiRequest).toHaveBeenNthCalledWith(
       4,
       '/overhead-allocation/rules/801/status?status=DISABLE',

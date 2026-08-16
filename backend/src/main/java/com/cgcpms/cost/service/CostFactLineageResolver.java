@@ -103,7 +103,7 @@ public class CostFactLineageResolver {
         List<Long> subjects = jdbc.queryForList("""
                 SELECT s.id FROM cost_subject s
                 WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0
-                  AND s.status='ENABLE' AND s.account_category='COST'
+                  AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject child
                     WHERE child.tenant_id=s.tenant_id AND child.parent_id=s.id AND child.deleted_flag=0)
                 FOR UPDATE

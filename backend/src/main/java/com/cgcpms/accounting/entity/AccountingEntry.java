@@ -41,6 +41,9 @@ public class AccountingEntry extends BaseEntity {
 
     private Long projectId;
     private Long contractId;
+    private Long partnerId;
+    private Long departmentId;
+    private Long employeeId;
     private Long payApplicationId;
     private Long payRecordId;
     private Long cashJournalId;

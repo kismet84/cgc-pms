@@ -1,5 +1,6 @@
 import {
   type AccountingEntryDetail,
+  type AccountingCostCarryoverCommand,
   type AccountingEntryPage,
   type AccountingEntryQuery,
   type CashForecastCycleRecord,
@@ -20,6 +21,11 @@ export const loadAccountingEntries = (query: AccountingEntryQuery = {}, signal?:
   apiRequest<AccountingEntryPage>(withQuery('/accounting-entry/workspace', query), { signal })
 export const loadAccountingEntryDetail = (id: string, signal?: AbortSignal) =>
   apiRequest<AccountingEntryDetail>(`/accounting-entry/workspace/${requiredId(id)}`, { signal })
+export const createAccountingCostCarryover = (body: AccountingCostCarryoverCommand) =>
+  apiRequest<string, AccountingCostCarryoverCommand>('/accounting-entry/cost-carryovers', {
+    method: 'POST',
+    body,
+  })
 
 export const loadFinanceOperationsWorkspace = (projectId?: string, signal?: AbortSignal) =>
   apiRequest<FinanceOperationsWorkspace>(

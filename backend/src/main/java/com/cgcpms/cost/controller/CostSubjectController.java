@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.math.BigDecimal;
 
 @RestController
@@ -32,6 +33,19 @@ public class CostSubjectController {
     public ApiResponse<List<CostSubjectTreeNodeVO>> getTree(
             @RequestParam(required = false) String category) {
         return ApiResponse.success(costSubjectService.getTree(category));
+    }
+
+    @GetMapping("/accounting-tree")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
+    public ApiResponse<List<CostSubjectTreeNodeVO>> getAccountingTree(
+            @RequestParam(required = false) String category) {
+        return ApiResponse.success(costSubjectService.getAccountingTree(category));
+    }
+
+    @GetMapping("/accounting-overview")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
+    public ApiResponse<Map<String, Object>> getAccountingOverview() {
+        return ApiResponse.success(costSubjectService.getAccountingOverview());
     }
 
     @GetMapping

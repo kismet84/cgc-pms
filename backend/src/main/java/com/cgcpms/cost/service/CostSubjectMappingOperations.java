@@ -135,7 +135,7 @@ final class CostSubjectMappingOperations extends CostSubjectV2Support {
         List<Map<String, Object>> subjects = jdbc.queryForList("""
                 SELECT s.id,s.subject_code,s.subject_name,s.subject_type
                 FROM cost_subject s
-                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST' AND s.ledger_flag=0
                   AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id
                                   AND c.parent_id=s.id AND c.deleted_flag=0)
                 ORDER BY s.subject_code,s.id

@@ -56,7 +56,8 @@ public class PayApplicationEntryGenerationStrategy implements EntryGenerationStr
                 || !"ENABLE".equals(subject.getStatus()) || !"COST".equals(subject.getAccountCategory())) {
             throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户、非成本类或已停用");
         }
-        CostSubject payableSubject = subjectResolver.require(AccountingSubjectCatalog.PAYABLE, "LIABILITY");
+        CostSubject fulfillmentSubject = subjectResolver.requireFulfillmentSubject(subject);
+        CostSubject payableSubject = subjectResolver.requirePayableSubject(subject);
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode("AP-CONF-" + sourceId);
@@ -64,21 +65,23 @@ public class PayApplicationEntryGenerationStrategy implements EntryGenerationStr
         entry.setEntryDate(LocalDate.now());
         entry.setProjectId(application.getProjectId());
         entry.setContractId(application.getContractId());
+        entry.setPartnerId(application.getPartnerId());
         entry.setPayApplicationId(sourceId);
         entry.setLines(List.of(
-                line("DEBIT", subject.getSubjectCode(), subject.getSubjectName(), subject.getId(), amount,
+                line("DEBIT", fulfillmentSubject, subject.getId(), amount,
                         "付款申请确认成本：" + application.getApplyCode()),
-                line("CREDIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
+                line("CREDIT", payableSubject, null, amount,
                         "付款申请确认应付：" + application.getApplyCode())));
         return entry;
     }
 
-    private static AccountingEntryLine line(String direction, String accountCode, String accountName,
+    private static AccountingEntryLine line(String direction, CostSubject accountingSubject,
                                             Long costSubjectId, BigDecimal amount, String summary) {
         AccountingEntryLine line = new AccountingEntryLine();
         line.setDirection(direction);
-        line.setAccountCode(accountCode);
-        line.setAccountName(accountName);
+        line.setAccountingSubjectId(accountingSubject.getId());
+        line.setAccountCode(accountingSubject.getSubjectCode());
+        line.setAccountName(accountingSubject.getSubjectName());
         line.setCostSubjectId(costSubjectId);
         line.setAmount(amount);
         line.setSummary(summary);

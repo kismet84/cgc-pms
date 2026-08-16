@@ -70,8 +70,9 @@ public class InvoiceAdvanceEntryGenerationStrategy implements EntryGenerationStr
                 || !"ENABLE".equals(subject.getStatus()) || !"COST".equals(subject.getAccountCategory())) {
             throw new BusinessException("PAYMENT_COST_SUBJECT_INVALID", "费用分类科目不存在、跨租户、非成本类或已停用");
         }
-        CostSubject payableSubject = subjectResolver.require(AccountingSubjectCatalog.PAYABLE, "LIABILITY");
-        CostSubject prepaymentSubject = subjectResolver.require(AccountingSubjectCatalog.PREPAYMENT, "ASSET");
+        if (PREPAY_RECLASS_ENTRY_TYPE.equals(entryType)) return null;
+        CostSubject fulfillmentSubject = subjectResolver.requireFulfillmentSubject(subject);
+        CostSubject payableSubject = subjectResolver.requirePayableSubject(subject);
 
         AccountingEntry entry = new AccountingEntry();
         entry.setEntryCode((AP_CONFIRMATION_ENTRY_TYPE.equals(entryType) ? "ADV-AP-" : "ADV-RECLASS-") + sourceId);
@@ -80,26 +81,22 @@ public class InvoiceAdvanceEntryGenerationStrategy implements EntryGenerationStr
         entry.setProjectId(invoice.getProjectId());
         entry.setContractId(invoice.getContractId());
         entry.setPayApplicationId(application.getId());
-        entry.setLines(AP_CONFIRMATION_ENTRY_TYPE.equals(entryType)
-                ? List.of(
-                    line("DEBIT", subject.getSubjectCode(), subject.getSubjectName(), subject.getId(), amount,
+        entry.setPartnerId(invoice.getPartnerId());
+        entry.setLines(List.of(
+                    line("DEBIT", fulfillmentSubject, subject.getId(), amount,
                             "预付款发票确认成本：" + invoice.getInvoiceNo()),
-                    line("CREDIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
-                            "预付款发票确认应付：" + invoice.getInvoiceNo()))
-                : List.of(
-                    line("DEBIT", payableSubject.getSubjectCode(), payableSubject.getSubjectName(), null, amount,
-                            "预付款发票冲减应付：" + invoice.getInvoiceNo()),
-                    line("CREDIT", prepaymentSubject.getSubjectCode(), prepaymentSubject.getSubjectName(), null, amount,
-                            "预付款发票结转：" + invoice.getInvoiceNo())));
+                    line("CREDIT", payableSubject, null, amount,
+                            "预付款发票确认应付：" + invoice.getInvoiceNo())));
         return entry;
     }
 
-    private static AccountingEntryLine line(String direction, String accountCode, String accountName,
+    private static AccountingEntryLine line(String direction, CostSubject accountingSubject,
                                             Long costSubjectId, BigDecimal amount, String summary) {
         AccountingEntryLine line = new AccountingEntryLine();
         line.setDirection(direction);
-        line.setAccountCode(accountCode);
-        line.setAccountName(accountName);
+        line.setAccountingSubjectId(accountingSubject.getId());
+        line.setAccountCode(accountingSubject.getSubjectCode());
+        line.setAccountName(accountingSubject.getSubjectName());
         line.setCostSubjectId(costSubjectId);
         line.setAmount(amount);
         line.setSummary(summary);
