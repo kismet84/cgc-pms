@@ -1,6 +1,7 @@
 package com.cgcpms.cost.controller;
 
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.service.CostSubjectService;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
@@ -46,6 +47,17 @@ public class CostSubjectController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
     public ApiResponse<Map<String, Object>> getAccountingOverview() {
         return ApiResponse.success(costSubjectService.getAccountingOverview());
+    }
+
+    @PutMapping("/accounting-legacy-reviews/{sourceSubjectCode}")
+    @AuditedOperation(type = "UPDATE", businessType = "ACCOUNTING_SUBJECT_LEGACY_REVIEW",
+            businessIdExpression = "#sourceSubjectCode")
+    @PreAuthorize("hasAuthority('accounting:subject-review') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> reviewAccountingLegacySubject(
+            @PathVariable String sourceSubjectCode,
+            @Valid @RequestBody AccountingLegacyReviewCommand command) {
+        costSubjectService.reviewAccountingLegacySubject(sourceSubjectCode, command.reviewStatus(), command.reviewNote());
+        return ApiResponse.success();
     }
 
     @GetMapping
@@ -108,6 +120,11 @@ public class CostSubjectController {
     public record TargetRatioRequest(
             @NotBlank String subjectCode,
             @NotNull @DecimalMin("0.0000") @DecimalMax("100.0000") BigDecimal ratio) {
+    }
+
+    public record AccountingLegacyReviewCommand(
+            @NotBlank @Pattern(regexp = "CONFIRMED|IGNORED") String reviewStatus,
+            @Size(max = 500) String reviewNote) {
     }
 
     public record CostSubjectCommand(

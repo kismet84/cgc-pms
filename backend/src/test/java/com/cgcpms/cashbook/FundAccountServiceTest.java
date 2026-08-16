@@ -56,6 +56,7 @@ class FundAccountServiceTest {
 
         assertTrue(created.getBankAccountNo().startsWith("****"));
         assertTrue(created.getBankAccountNo().endsWith("7890"));
+        assertEquals("1002.02", created.getAccountingSubjectCode());
         BusinessException duplicate = assertThrows(BusinessException.class,
                 () -> fundAccountService.createFundAccount(command));
         assertEquals("FUND_ACCOUNT_CODE_DUPLICATE", duplicate.getCode());
@@ -87,6 +88,19 @@ class FundAccountServiceTest {
     }
 
     @Test
+    void bankAccountRequiresExplicitCompatibleAccountingSubject() {
+        FundAccountCommand missing = command("BANK-SVC-SUBJECT-1", "6222021234560101", new BigDecimal("1.00"));
+        missing.setAccountingSubjectCode(null);
+        assertEquals("FUND_ACCOUNT_ACCOUNTING_SUBJECT_REQUIRED",
+                assertThrows(BusinessException.class, () -> fundAccountService.createFundAccount(missing)).getCode());
+
+        FundAccountCommand invalid = command("BANK-SVC-SUBJECT-2", "6222021234560102", new BigDecimal("1.00"));
+        invalid.setAccountingSubjectCode("1001");
+        assertEquals("FUND_ACCOUNT_ACCOUNTING_SUBJECT_REQUIRED",
+                assertThrows(BusinessException.class, () -> fundAccountService.createFundAccount(invalid)).getCode());
+    }
+
+    @Test
     void openingBalanceCannotChangeAfterJournalExists() {
         var created = fundAccountService.createFundAccount(
                 command("BANK-SVC-002", "6222020000000002", new BigDecimal("100.00")));
@@ -115,6 +129,7 @@ class FundAccountServiceTest {
         command.setAccountCode(code);
         command.setAccountName(code);
         command.setAccountType(CashbookConstants.AccountType.BANK);
+        command.setAccountingSubjectCode("1002.02");
         command.setBankName("Test Bank");
         command.setBankAccountNo(accountNo);
         command.setOpeningDate(LocalDate.of(2026, 7, 1));

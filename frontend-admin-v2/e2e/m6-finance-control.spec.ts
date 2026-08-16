@@ -118,6 +118,7 @@ async function install(page: Page, writes: string[]) {
           accountCode: 'BANK-001',
           accountName: '项目基本户',
           accountType: 'BANK',
+          accountingSubjectCode: '1002.01',
           bankName: '中国建设银行',
           openingDate: '2026-01-01',
           openingBalance: '5000000.00',

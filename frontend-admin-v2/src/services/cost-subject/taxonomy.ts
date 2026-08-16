@@ -1,6 +1,11 @@
 import { apiRequest } from '../request'
 import { normalizeSubject, requiredId } from './normalize'
-import type { AccountingCatalogOverview, CostSubjectCommand, CostSubjectRecord } from './types'
+import type {
+  AccountingCatalogOverview,
+  AccountingLegacyReviewStatus,
+  CostSubjectCommand,
+  CostSubjectRecord,
+} from './types'
 
 export function loadCostSubjectTree(signal?: AbortSignal): Promise<CostSubjectRecord[]> {
   return apiRequest<CostSubjectRecord[]>('/cost-subjects/accounting-tree', { signal }).then(
@@ -12,6 +17,16 @@ export function loadAccountingCatalogOverview(
   signal?: AbortSignal,
 ): Promise<AccountingCatalogOverview> {
   return apiRequest<AccountingCatalogOverview>('/cost-subjects/accounting-overview', { signal })
+}
+
+export function reviewAccountingLegacySubject(
+  sourceSubjectCode: string,
+  reviewStatus: AccountingLegacyReviewStatus,
+): Promise<void> {
+  return apiRequest<void, { reviewStatus: AccountingLegacyReviewStatus }>(
+    `/cost-subjects/accounting-legacy-reviews/${encodeURIComponent(sourceSubjectCode)}`,
+    { method: 'PUT', body: { reviewStatus } },
+  )
 }
 
 export function loadCostSubject(id: string): Promise<CostSubjectRecord> {

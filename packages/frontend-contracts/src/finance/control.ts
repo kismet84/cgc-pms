@@ -6,17 +6,20 @@ export interface FundAccountRecord {
   accountCode: string;
   accountName: string;
   accountType: string;
+  accountingSubjectCode?: "1001" | "1002.01" | "1002.02" | "1002.03" | null;
   bankName?: string | null;
   bankAccountNo?: string | null;
   openingDate: string;
   openingBalance: FinanceDecimalString;
   enabledFlag: number;
   version: number;
+  remark?: string | null;
 }
 export interface FundAccountCommand {
   accountCode: string;
   accountName: string;
   accountType: "CASH" | "BANK";
+  accountingSubjectCode: "1001" | "1002.01" | "1002.02" | "1002.03";
   bankName?: string;
   bankAccountNo?: string;
   openingDate: string;

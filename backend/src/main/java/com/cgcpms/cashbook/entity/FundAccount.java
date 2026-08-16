@@ -29,6 +29,7 @@ public class FundAccount extends BaseEntity {
     private String accountCode;
     private String accountName;
     private String accountType;
+    private String accountingSubjectCode;
     private String bankName;
     private String bankAccountNo;
 

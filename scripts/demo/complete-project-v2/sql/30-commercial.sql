@@ -40,10 +40,10 @@ VALUES
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO fund_account
-  (id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,enabled_flag,version,
+  (id,tenant_id,account_code,account_name,account_type,accounting_subject_code,opening_date,opening_balance,enabled_flag,version,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000002301,0,'M52-FUND-001','演示基本账户','BANK','2025-01-01',5000000,1,0,
+  (520000000000002301,0,'M52-FUND-001','演示基本账户','BANK','1002.01','2025-01-01',5000000,1,0,
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO pay_application

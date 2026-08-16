@@ -53,6 +53,7 @@ vi.mock('@/services/cost-subject', () => ({
   overrideClassification: vi.fn(),
   reverseBidTransfer: vi.fn(),
   reverseFinanceAllocation: vi.fn(),
+  reviewAccountingLegacySubject: vi.fn(),
   saveProjectScope: vi.fn(),
   submitBidTransferRequest: vi.fn(),
   submitFinanceAllocationRequest: vi.fn(),
@@ -402,6 +403,25 @@ describe('M7 cost-subject center', () => {
     expect(wrapper.text()).toContain('科目余额表')
     expect(costSubject.loadMappingVersions).not.toHaveBeenCalled()
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
+  })
+
+  it('lets authorized finance users confirm a pending historical subject mapping', async () => {
+    useSessionStore().replaceUserInfo(user(['cost:query', 'accounting:subject-review']))
+    vi.mocked(costSubject.reviewAccountingLegacySubject).mockResolvedValue(undefined)
+    const wrapper = mount(CostSubjectTaxonomyPage, { attachTo: document.body })
+    await flushPromises()
+
+    const open = wrapper.findAll('button').find((button) => button.text().includes('确认映射'))
+    expect(open).toBeTruthy()
+    await open?.trigger('click')
+    await flushPromises()
+    const confirm = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>('button'),
+    ).findLast((button) => button.textContent?.trim() === '确认映射')!
+    confirm.click()
+    await flushPromises()
+
+    expect(costSubject.reviewAccountingLegacySubject).toHaveBeenCalledWith('1122-AR', 'CONFIRMED')
   })
 
   it('keeps the fixed accounting structure read-only for administrators', async () => {

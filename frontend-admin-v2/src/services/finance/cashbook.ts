@@ -25,10 +25,14 @@ export const createCashJournal = (command: CashJournalCreateCommand) =>
 
 export const loadFundAccounts = (signal?: AbortSignal) =>
   apiRequest<FundAccountRecord[]>('/fund-accounts', { signal })
+export const loadManagedFundAccounts = (signal?: AbortSignal) =>
+  apiRequest<FundAccountRecord[]>('/fund-accounts/manage', { signal })
 export const loadBidFundAccountOptions = (signal?: AbortSignal) =>
   apiRequest<BidFundAccountOption[]>('/fund-accounts/bid-options', { signal })
 export const createFundAccount = (body: FundAccountCommand) =>
   apiRequest<FundAccountRecord>('/fund-accounts', { method: 'POST', body })
+export const updateFundAccount = (id: string, body: FundAccountCommand) =>
+  apiRequest<FundAccountRecord>(`/fund-accounts/${requiredId(id)}`, { method: 'PUT', body })
 export const archiveCashJournal = (id: string) =>
   apiRequest<CashJournalPage['records'][number]>(
     `/cash-journal-entries/${requiredId(id)}/archive`,

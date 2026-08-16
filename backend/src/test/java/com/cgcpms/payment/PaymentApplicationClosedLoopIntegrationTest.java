@@ -1304,6 +1304,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         account.setAccountCode("PAYMENT-CLOSED-LOOP-ACCOUNT");
         account.setAccountName("付款闭环测试账户");
         account.setAccountType("BANK");
+        account.setAccountingSubjectCode("1002.02");
         account.setOpeningDate(LocalDate.now().minusYears(1));
         account.setOpeningBalance(new BigDecimal("10000.00"));
         account.setEnabledFlag(1);

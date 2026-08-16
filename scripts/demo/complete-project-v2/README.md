@@ -1,12 +1,12 @@
 # 完整演示项目 v2
 
-此数据包面向 V216 schema，显式创建一套可追踪的全业务闭环演示项目。默认数据库基线不执行本目录内容，也不复用会随最终 schema 漂移的历史 Flyway fixture。
+此数据包最初面向 V216 schema，当前主线加载最低要求 V307，并为演示银行账户显式绑定 `1002.01` 基本账户科目。默认数据库基线不执行本目录内容，也不复用会随最终 schema 漂移的历史 Flyway fixture。
 
 安全边界：
 
 - 仅允许 `dev`、`test`、`demo`，MySQL Docker 端口必须绑定 `127.0.0.1`。
 - 仓库必须存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`；加载器不执行全库 clean、drop 或 reset，项目收敛阶段只删除 package 明确拥有的两个冗余项目及其冗余闭环记录。
-- 目标库必须已有 `sys_bootstrap_state`、`SUPER_ADMIN`、完成的平台管理员 bootstrap，以及 V216 的项目、合作方、成本来源权威字典。
+- 目标库必须已迁移到至少 V307，并已有 `sys_bootstrap_state`、`SUPER_ADMIN`、完成的平台管理员 bootstrap，以及 V216 建立的项目、合作方、成本来源权威字典。
 - 同一 package 通过 `sys_bootstrap_state` 的 23 个阶段键续载；已完成且版本相同的阶段跳过。`ROLE_TEST_ACCOUNTS` 当前为 v7，`ROLE_WORKFLOW_STATUS_DATA` 当前为 v5；角色账号、工作流状态与结算来源阶段升级版本时会各重放一次，用于删除六个历史演示账号并把夹具收敛到 V293 的九类系统角色、七类项目角色和审批矩阵；重放只能清理旧账号与旧授权，不能恢复迁移前的宽权限。含 `NOW()` 相对期限的角色驾驶舱阶段每次加载都会重放，避免自然时间推进改变逾期计数。相关 SQL 必须保持幂等。
 - 不提供通用自动清理。需要重建时创建新的本地 demo 空库。
 

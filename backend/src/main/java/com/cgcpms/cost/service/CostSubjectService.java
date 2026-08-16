@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
 import java.math.BigDecimal;
@@ -167,6 +168,62 @@ public class CostSubjectService {
         result.put("legacyReviews", legacyReviews);
         result.put("reportRoutes", reportRoutes);
         return result;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void reviewAccountingLegacySubject(String sourceSubjectCode, String reviewStatus, String reviewNote) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long userId = UserContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            throw new BusinessException("USER_CONTEXT_REQUIRED", "缺少用户或租户上下文");
+        }
+        if (!"CONFIRMED".equals(reviewStatus) && !"IGNORED".equals(reviewStatus)) {
+            throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_STATUS_INVALID", "历史科目复核状态不合法");
+        }
+        String code = sourceSubjectCode == null ? "" : sourceSubjectCode.trim();
+        Map<String, Object> review = jdbcTemplate.query("""
+                SELECT suggested_subject_code,review_status
+                FROM accounting_subject_legacy_review
+                WHERE tenant_id=? AND source_subject_code=? FOR UPDATE
+                """, rs -> rs.next() ? Map.of(
+                        "suggestedCode", rs.getString("suggested_subject_code") == null
+                                ? "" : rs.getString("suggested_subject_code"),
+                        "status", rs.getString("review_status")) : null,
+                tenantId, code);
+        if (review == null) {
+            throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_NOT_FOUND", "历史科目复核记录不存在");
+        }
+        if (!"PENDING".equals(review.get("status"))) {
+            throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_ALREADY_FINISHED", "历史科目已完成复核");
+        }
+        String suggestedCode = review.get("suggestedCode").toString();
+        if ("CONFIRMED".equals(reviewStatus)) {
+            if (!StringUtils.hasText(suggestedCode) || countReference("""
+                    SELECT COUNT(*) FROM cost_subject subject
+                    WHERE subject.tenant_id=? AND subject.subject_code=? AND subject.ledger_flag=1
+                      AND subject.status='ENABLE' AND subject.deleted_flag=0
+                      AND NOT EXISTS (SELECT 1 FROM cost_subject child
+                                      WHERE child.tenant_id=subject.tenant_id AND child.parent_id=subject.id
+                                        AND child.deleted_flag=0)
+                    """, tenantId, suggestedCode) != 1) {
+                throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_TARGET_INVALID", "建议正式科目不存在、未启用或非末级");
+            }
+        }
+        String note = StringUtils.hasText(reviewNote) ? reviewNote.trim()
+                : "CONFIRMED".equals(reviewStatus)
+                ? "已确认后续业务使用建议正式科目"
+                : "保留历史快照，不建立统一正式科目映射";
+        if (note.length() > 500) {
+            throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_NOTE_TOO_LONG", "复核说明不能超过500个字符");
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE accounting_subject_legacy_review
+                SET review_status=?,review_note=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP
+                WHERE tenant_id=? AND source_subject_code=? AND review_status='PENDING'
+                """, reviewStatus, note, userId, tenantId, code);
+        if (updated != 1) {
+            throw new BusinessException("ACCOUNTING_LEGACY_REVIEW_CONCURRENT_MODIFICATION", "历史科目复核状态已变化，请刷新后重试");
+        }
     }
 
     public List<CostSubjectVO> getBidOptions() {
