@@ -211,6 +211,25 @@ function messageOf(value: unknown): string {
       : '请求失败，请稍后重试'
 }
 
+function validationSummary(result: Record<string, unknown>): string {
+  if (result.passed === true) {
+    return '方案覆盖全部权威成本来源，且未发现科目或规则冲突。'
+  }
+  const missing = Array.isArray(result.missingSourceTypes)
+    ? result.missingSourceTypes.map(String)
+    : []
+  const conflictCount = Array.isArray(result.conflicts) ? result.conflicts.length : 0
+  const invalidSubjectCount = Number(result.invalidSubjectCount || 0)
+  const issues: string[] = []
+  if (missing.length) {
+    const preview = missing.slice(0, 3).join('、')
+    issues.push(`缺少 ${missing.length} 类来源：${preview}${missing.length > 3 ? ' 等' : ''}`)
+  }
+  if (conflictCount) issues.push(`${conflictCount} 组规则冲突`)
+  if (invalidSubjectCount) issues.push(`${invalidSubjectCount} 个无效科目`)
+  return issues.length ? issues.join('；') : '方案未通过，请核对报告明细。'
+}
+
 function overheadSubjectLabel(id: string): string {
   const subject = options.value.costSubjects.find((item) => item.id === id)
   return subject ? `${subject.subjectCode} · ${subject.subjectName}` : id
@@ -414,9 +433,9 @@ async function validatePlan(record: MappingVersionRecord): Promise<void> {
     validationResult.value = await validateRulePlan(record.id)
     await loadPage()
     showToast(
-      'success',
-      '系统校验完成',
-      validationResult.value.passed ? '方案通过校验。' : '存在缺失来源或冲突，请查看报告。',
+      validationResult.value.passed ? 'success' : 'warning',
+      validationResult.value.passed ? '系统校验通过' : '系统校验未通过',
+      validationSummary(validationResult.value),
     )
   } catch (value) {
     showToast('error', '校验失败', messageOf(value))
@@ -588,6 +607,17 @@ onBeforeUnmount(() => controller?.abort())
             @update:page-no="versionPageNo = $event"
         /></template>
       </V2Card>
+      <V2Card v-if="validationResult" title="最近校验报告">
+        <V2PageState
+          :kind="validationResult.passed ? 'empty' : 'error'"
+          :title="validationResult.passed ? '系统校验通过' : '系统校验未通过'"
+          :description="validationSummary(validationResult)"
+        >
+          <pre class="cost-subject-page__report">{{
+            JSON.stringify(validationResult, null, 2)
+          }}</pre>
+        </V2PageState>
+      </V2Card>
       <V2Card title="方案规则明细"
         ><template #actions
           ><V2Button
@@ -703,9 +733,6 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
-      </V2Card>
-      <V2Card v-if="validationResult" title="最近校验报告">
-        <pre class="cost-subject-page__report">{{ JSON.stringify(validationResult, null, 2) }}</pre>
       </V2Card>
     </template>
 

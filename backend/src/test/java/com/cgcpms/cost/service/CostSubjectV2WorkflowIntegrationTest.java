@@ -770,6 +770,31 @@ class CostSubjectV2WorkflowIntegrationTest {
     }
 
     @Test
+    void standardInitialPlanCoversEveryGovernedSource() {
+        List<String> requiredSources = List.of(
+                "MAT_RECEIPT", "MAT_REQUISITION", "SUB_MEASURE", "VAR_ORDER", "CT_CHANGE", "CT_CONTRACT",
+                "QUALITY_SAFETY_CONSEQUENCE", "OVERHEAD_ALLOCATION", "OVERHEAD_ALLOCATION_CLEARING",
+                "ACCOUNTING_ENTRY_LINE", "EXPENSE_APPLICATION", "FINANCE_COST_ALLOCATION",
+                "FINANCE_COST_ALLOCATION_REVERSAL", "BID_COST", "BID_COST_WRITE_OFF", "MATERIAL_RETURN",
+                "MATERIAL_RETURN_REVERSAL", "SUPPLIER_RETURN", "SUPPLIER_RETURN_REVERSAL");
+
+        Map<String, Object> generated = service.generateInitialPlan();
+        assertEquals(requiredSources.size(), number(generated.get("generatedRuleCount")));
+        Map<?, ?> main = (Map<?, ?>) generated.get("main");
+        long planId = number(main.get("id"));
+        List<?> rules = (List<?>) generated.get("rules");
+        assertEquals(requiredSources.size(), rules.size());
+        List<String> actualSources = rules.stream()
+                .map(item -> String.valueOf(((Map<?, ?>) item).get("sourceType")))
+                .toList();
+        assertTrue(actualSources.containsAll(requiredSources));
+
+        Map<String, Object> report = service.validateMappingVersion(planId);
+        assertEquals(Boolean.TRUE, report.get("passed"));
+        assertEquals(List.of(), report.get("missingSourceTypes"));
+    }
+
+    @Test
     void rulePlanApprovalRevalidatesCurrentFactsBeforeRetiringActivePlan() {
         List<String> requiredSources = List.of(
                 "MAT_RECEIPT", "MAT_REQUISITION", "SUB_MEASURE", "VAR_ORDER", "CT_CHANGE", "CT_CONTRACT",
