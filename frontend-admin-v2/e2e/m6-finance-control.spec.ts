@@ -111,7 +111,7 @@ async function install(page: Page, writes: string[]) {
           },
         ],
       })
-    if (path === '/api/fund-accounts')
+    if (path === '/api/fund-accounts' || path === '/api/fund-accounts/manage')
       return fulfill(route, [
         {
           id: 'FA1',

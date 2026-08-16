@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-16T16:51:25.442Z",
+  "generation_time": "2026-08-16T16:54:51.035Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,7 +50,7 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4188,
+  "tracked_file_count": 4192,
   "repository_file_count": 4192,
   "included_file_count": 2928,
   "excluded_file_count": 1264,
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 409,
-      "fingerprint": "182708487251154ba8634df4544dfee1a38fcce44853db7b11e7033e969dd0a6"
+      "fingerprint": "9d5f40bb8b09945cc895f55a91b8fb723764871496912a3f94c64b389fa4787e"
     },
     {
       "id": "mobile",
@@ -134,15 +134,13 @@
       "fingerprint": "e4f77667ea53aeacf00f41d114c3fc6cb297f1d3028d946919fa1157f9d5c558"
     }
   ],
-  "generation_base_commit": "cc456c24e5e3e69c8e057e8769a71f9fb35874e6",
+  "generation_base_commit": "b40fece47e180ef3e2b5292a4f9197b8d5706f5c",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
     "previous_generation_base_commit": "cc456c24e5e3e69c8e057e8769a71f9fb35874e6",
     "stale_modules": [
-      "backend",
-      "delivery_tooling",
-      "repository_meta"
+      "frontend_v2"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
