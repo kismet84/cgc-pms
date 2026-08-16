@@ -552,6 +552,37 @@ describe('M7 cost-subject center', () => {
     wrapper.unmount()
   })
 
+  it('shows failed validation details beside the selected rule plan', async () => {
+    useSessionStore().replaceUserInfo(
+      user(['cost:subject:mapping:query', 'cost:subject:rule:query', 'cost:subject:mapping:edit']),
+    )
+    vi.mocked(costSubject.validateRulePlan).mockResolvedValue({
+      passed: false,
+      itemCount: 25,
+      ruleCount: 9,
+      invalidSubjectCount: 0,
+      conflicts: [],
+      missingSourceTypes: ['VAR_ORDER', 'CT_CHANGE', 'CT_CONTRACT'],
+    })
+    const wrapper = mount(CostSubjectRulesPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '系统校验')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(costSubject.validateRulePlan).toHaveBeenCalledWith('2')
+    expect(wrapper.text()).toContain('最近校验报告')
+    expect(wrapper.text()).toContain('系统校验未通过')
+    expect(wrapper.text()).toContain('缺少 3 类来源：VAR_ORDER、CT_CHANGE、CT_CONTRACT')
+    expect(wrapper.text().indexOf('最近校验报告')).toBeLessThan(
+      wrapper.text().indexOf('方案规则明细'),
+    )
+    wrapper.unmount()
+  })
+
   it('creates, disables and executes overhead rules without manual identifiers', async () => {
     useSessionStore().replaceUserInfo(
       user([
