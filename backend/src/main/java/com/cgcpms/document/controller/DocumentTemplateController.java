@@ -15,6 +15,7 @@ import com.cgcpms.document.provider.DocumentBusinessTypeService;
 import com.cgcpms.document.service.PaymentSystemTemplateService;
 import com.cgcpms.document.service.SettlementSystemTemplateService;
 import com.cgcpms.document.service.ProcurementSystemTemplateService;
+import com.cgcpms.document.service.SystemDocumentTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -41,6 +42,7 @@ public class DocumentTemplateController {
     private final PaymentSystemTemplateService paymentSystemTemplateService;
     private final SettlementSystemTemplateService settlementSystemTemplateService;
     private final ProcurementSystemTemplateService procurementSystemTemplateService;
+    private final SystemDocumentTemplateService systemDocumentTemplateService;
     private final DocumentBusinessTypeService businessTypeService;
 
     @PostMapping
@@ -197,6 +199,29 @@ public class DocumentTemplateController {
                                          @RequestParam(required = false) Integer expectedLockVersion) {
         service.bindDefault(versionId, expectedLockVersion);
         return ApiResponse.success();
+    }
+
+    @GetMapping("/system/status")
+    @PreAuthorize("hasAuthority('document:template:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<java.util.List<SystemDocumentTemplateService.SystemTemplateStatus>> systemTemplateStatus() {
+        return ApiResponse.success(systemDocumentTemplateService.statuses());
+    }
+
+    @PostMapping("/system/{businessType:[A-Z][A-Z0-9_]+}")
+    @AuditedOperation(type = "INSTALL_SYSTEM_DOCUMENT_TEMPLATE", businessType = "DOCUMENT_TEMPLATE",
+            businessIdExpression = "0")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<SystemDocumentTemplateService.InstallResult> installSystemTemplate(
+            @PathVariable String businessType) {
+        return ApiResponse.success(systemDocumentTemplateService.install(businessType));
+    }
+
+    @PostMapping("/system/install")
+    @AuditedOperation(type = "INSTALL_ALL_SYSTEM_DOCUMENT_TEMPLATES", businessType = "DOCUMENT_TEMPLATE",
+            businessIdExpression = "0")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<java.util.List<SystemDocumentTemplateService.InstallResult>> installAllSystemTemplates() {
+        return ApiResponse.success(systemDocumentTemplateService.installAll());
     }
 
     @PostMapping("/system/payment")

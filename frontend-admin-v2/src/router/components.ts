@@ -100,6 +100,8 @@ export const PermissionListPage = () =>
 export const DictionaryPage = () => import('../pages/system/DictionaryPage.vue')
 export const AuditPage = () => import('../pages/system/AuditPage.vue')
 export const DocumentTemplatePage = () => import('../pages/system/DocumentTemplatePage.vue')
+export const DocumentTemplateDesignerPage = () =>
+  import('../pages/system/DocumentTemplateDesignerPage.vue')
 export const DataMaintenancePage = () => import('../pages/system/DataMaintenancePage.vue')
 
 export const navigationComponents = {

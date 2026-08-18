@@ -31,7 +31,7 @@ public class ContractApprovalDocumentDataProvider implements DocumentDataProvide
     public String displayName() { return "合同审批"; }
     public String schemaVersion() { return SCHEMA; }
     public String queryAuthority() { return "contract:query"; }
-    public String defaultTemplatePolicy() { return "NONE"; }
+    public String defaultTemplatePolicy() { return "SYSTEM"; }
     public DocumentTemplateFieldCatalog.Catalog fieldCatalog() { return CATALOG; }
     public DocumentDataSnapshot load(Long id) { return createSnapshot(id, true); }
     public DocumentDataSnapshot loadPreview(Long id) { return createSnapshot(id, false); }

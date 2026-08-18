@@ -66,8 +66,7 @@ class SettlementSystemTemplateServiceIntegrationTest {
     @Test
     void upgradesOutdatedSystemTemplateIntoNewImmutableDefaultVersion() {
         DocumentTemplateVersion first = systemTemplateService.ensureCurrentTenantTemplate();
-        String legacyContent = first.getTemplateContent()
-                .replace(" font-family: 'CGC PMS Document Font', sans-serif;", "");
+        String legacyContent = first.getTemplateContent().replace("flow-root", "legacy-flow-root");
         DocumentTemplateVersion legacyDraft = templateService.createNextDraft(first.getTemplateId(),
                 new DocumentTemplateService.DraftCommand("settlement.v2", legacyContent,
                         first.getFieldManifest(), "legacy system template"));
@@ -77,7 +76,8 @@ class SettlementSystemTemplateServiceIntegrationTest {
         DocumentTemplateVersion upgraded = systemTemplateService.ensureCurrentTenantTemplate();
 
         assertEquals(legacyPublished.getVersionNo() + 1, upgraded.getVersionNo());
-        assertTrue(upgraded.getTemplateContent().contains("CGC PMS Document Font"));
+        assertTrue(upgraded.getTemplateContent().contains("flow-root"));
+        assertTrue(upgraded.getDesignSchema().contains("layoutVersion"), upgraded.getDesignSchema());
         assertEquals(upgraded.getId(), templateService.requireDefaultVersion("SETTLEMENT").getId());
     }
 
@@ -125,6 +125,10 @@ class SettlementSystemTemplateServiceIntegrationTest {
         settlement.put("unpaidAmount", "86400.00");
         settlement.put("warrantyAmount", "5600.00");
         settlement.put("finalizedAt", "2026-07-17 12:00:00");
+        settlement.put("status", "FINALIZED");
+        settlement.put("createdAt", "2026-07-17 10:00:00");
+        settlement.put("updatedAt", "2026-07-17 12:00:00");
+        settlement.put("remark", "");
         return Map.ofEntries(
                 Map.entry("settlement", settlement),
                 Map.entry("project", Map.of("name", "示范项目")),

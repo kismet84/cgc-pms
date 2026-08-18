@@ -1,198 +1,172 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import {
-  V2ActionMenu,
-  V2Badge,
-  V2Button,
-  V2Card,
-  V2ConfirmDialog,
-  V2Dialog,
-  V2Input,
-  V2PageState,
-  V2Pagination,
-  V2Stack,
-  showToast,
-} from '@/components'
-import { isApiClientError } from '@/services/request'
-import DocumentCanvas from '@/components/document/DocumentCanvas.vue'
-import { workflowModule } from '@/pages/system/workflow-business-modules'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { V2Badge, V2Button, V2Card, V2ConfirmDialog, V2PageState, showToast } from '@/components'
 import {
   bindDefaultDocumentVersion,
-  createDocumentTemplate,
-  createDocumentVersion,
-  deleteDocumentTemplate,
   disableDocumentVersion,
   enableDocumentVersion,
+  installAllSystemDocumentTemplates,
+  installSystemDocumentTemplate,
   loadDocumentBusinessTypes,
-  loadDocumentFieldCatalog,
   loadDocumentTemplate,
   loadDocumentTemplates,
-  publishDocumentVersion,
-  previewDocumentTemplateHtml,
+  loadSystemDocumentTemplateStatuses,
   previewDocumentTemplateVersionHtml,
-  updateDocumentVersion,
-  type DocumentBusinessType,
+  publishDocumentVersion,
   type DocumentBusinessTypeOption,
-  type DocumentDesignSchema,
-  type DocumentFieldCatalog,
-  type DocumentDraft,
   type DocumentTemplateDetail,
   type DocumentTemplateSummary,
   type DocumentTemplateVersion,
+  type SystemDocumentTemplateStatus,
 } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
-import {
-  blankDocumentDesign,
-  convertLegacyDocumentDesign,
-} from './documentTemplateSchema'
+import { workflowModule } from '@/pages/system/workflow-business-modules'
 
-type EditorMode = 'create' | 'version' | 'edit'
-type VersionAction = {
-  kind: 'publish' | 'disable' | 'enable' | 'default'
-  version: DocumentTemplateVersion
-}
-type BusinessOption = {
-  value: DocumentBusinessType
-  label: string
-}
-
+const route = useRoute()
+const router = useRouter()
 const session = useSessionStore()
-const businessType = ref<DocumentBusinessType>('')
-const businessTypes = ref<DocumentBusinessTypeOption[]>([])
-const catalog = ref<DocumentFieldCatalog | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 const detailLoading = ref(false)
-const saving = ref(false)
+const installing = ref('')
 const error = ref('')
+const search = ref('')
+const businessTypes = ref<DocumentBusinessTypeOption[]>([])
 const templates = ref<DocumentTemplateSummary[]>([])
-const detail = ref<DocumentTemplateDetail | null>(null)
-const selectedTemplateId = ref('')
-const selectedVersionId = ref('')
-const pageNo = ref(1)
-const pageSize = 10
-const editorOpen = ref(false)
-const editorMode = ref<EditorMode>('create')
-const canvasValid = ref(false)
-const conversionIssues = ref<string[]>([])
-const conversionNotices = ref<string[]>([])
+const statuses = ref<SystemDocumentTemplateStatus[]>([])
+const detail = ref<DocumentTemplateDetail>()
+const businessType = ref(String(route.query.businessType ?? ''))
+const selectedTemplateId = ref(String(route.query.templateId ?? ''))
+const selectedVersionId = ref(String(route.query.versionId ?? ''))
 const previewHtml = ref('')
-const previewError = ref('')
 const previewLoading = ref(false)
-const versionPreviewHtml = ref('')
-const versionPreviewError = ref('')
-const versionPreviewLoading = ref(false)
-const versionAction = ref<VersionAction | null>(null)
-const deleteOpen = ref(false)
-let controller: AbortController | null = null
-let previewTimer: ReturnType<typeof setTimeout> | undefined
+const previewError = ref('')
+const pendingAction = ref<'installAll' | 'publish' | 'disable' | 'enable' | 'default'>()
+const actionLoading = ref(false)
 let previewRequest = 0
-let versionPreviewRequest = 0
 
-const form = reactive({
-  templateCode: '',
-  templateName: '',
-  schemaVersion: '',
-  designSchema: blankDocumentDesign(''),
-  previewBusinessId: '',
-  remark: '',
-})
-const businessOptions = computed<BusinessOption[]>(() =>
-  businessTypes.value.map((item) => ({
-    value: item.businessType,
-    label: item.displayName,
-  })),
+const canEdit = computed(() => session.hasAdminOrPermission('document:template:edit'))
+const canPublish = computed(() => session.hasAdminOrPermission('document:template:publish'))
+const selectedVersion = computed(() =>
+  detail.value?.versions.find((item) => item.id === selectedVersionId.value),
 )
-const businessGroups = computed(() => {
-  const groups = new Map<string, { key: string; label: string; options: BusinessOption[] }>()
-  for (const option of businessOptions.value) {
-    const module = workflowModule(option.value)
-    const group = groups.get(module.key) ?? { ...module, options: [] }
-    group.options.push(option)
+const selectedStatus = computed(() =>
+  statuses.value.find((item) => item.businessType === businessType.value),
+)
+const selectedBusinessName = computed(
+  () =>
+    businessTypes.value.find((item) => item.businessType === businessType.value)?.displayName ??
+    '业务单据',
+)
+const confirmDescription = computed(() =>
+  pendingAction.value === 'installAll'
+    ? '将在当前租户校验并安装全部 28 类系统模板。任一定义失败时，本次安装全部回滚。'
+    : actionConfirm(pendingAction.value ?? ''),
+)
+const filteredBusinessGroups = computed(() => {
+  const keyword = search.value.trim().toLowerCase()
+  const groups = new Map<
+    string,
+    {
+      key: string
+      label: string
+      rows: Array<{
+        business: DocumentBusinessTypeOption
+        templates: DocumentTemplateSummary[]
+        status?: SystemDocumentTemplateStatus
+      }>
+    }
+  >()
+  for (const business of businessTypes.value) {
+    const rows = templates.value.filter((item) => item.businessType === business.businessType)
+    const searchable = [
+      business.displayName,
+      business.businessType,
+      ...rows.flatMap((item) => [item.templateName, item.templateCode]),
+    ]
+      .join(' ')
+      .toLowerCase()
+    if (keyword && !searchable.includes(keyword)) continue
+    const module = workflowModule(business.businessType)
+    const group = groups.get(module.key) ?? { ...module, rows: [] }
+    group.rows.push({
+      business,
+      templates: rows,
+      status: statuses.value.find((item) => item.businessType === business.businessType),
+    })
     groups.set(module.key, group)
   }
   return [...groups.values()]
 })
-const selectedBusiness = computed(() =>
-  businessTypes.value.find((item) => item.businessType === businessType.value),
-)
-const canEdit = computed(() => session.hasAdminOrPermission('document:template:edit'))
-const canPublish = computed(() => session.hasAdminOrPermission('document:template:publish'))
-const canPreviewVersion = computed(
-  () => canEdit.value && session.hasAdminOrPermission('document:generate'),
-)
-const selectedVersion = computed(
-  () => detail.value?.versions.find((item) => item.id === selectedVersionId.value) ?? null,
-)
-const pagedTemplates = computed(() =>
-  templates.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
-)
 
-async function refresh(preferredTemplateId?: string, preferredVersionId?: string): Promise<void> {
-  pageNo.value = 1
-  controller?.abort()
-  const current = new AbortController()
-  controller = current
+onMounted(load)
+onBeforeUnmount(() => {
+  previewRequest += 1
+})
+
+async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    if (!businessTypes.value.length)
-      businessTypes.value = (await loadDocumentBusinessTypes(current.signal)).filter(
-        (item) => item.businessType !== 'COST_SUBJECT_MAPPING',
+    const [types, allTemplates, systemStatuses] = await Promise.all([
+      loadDocumentBusinessTypes(),
+      loadDocumentTemplates(''),
+      loadSystemDocumentTemplateStatuses(),
+    ])
+    statuses.value = systemStatuses
+    businessTypes.value = systemStatuses.map((status) => {
+      const available = types.find((item) => item.businessType === status.businessType)
+      return (
+        available ?? {
+          businessType: status.businessType,
+          displayName: status.templateName,
+          schemaVersion: status.schemaVersion,
+          providerReady: true,
+          fieldCount: 0,
+        }
       )
-    if (
-      !businessType.value ||
-      !businessTypes.value.some((item) => item.businessType === businessType.value)
-    ) {
+    })
+    templates.value = allTemplates
+    if (!businessTypes.value.some((item) => item.businessType === businessType.value)) {
       businessType.value = businessTypes.value[0]?.businessType ?? ''
     }
-    if (!businessType.value) throw new Error('服务端未返回审批业务类型')
-    const currentBusiness = businessTypes.value.find(
-      (item) => item.businessType === businessType.value,
-    )
-    if (currentBusiness?.providerReady) {
-      ;[templates.value, catalog.value] = await Promise.all([
-        loadDocumentTemplates(businessType.value, current.signal),
-        loadDocumentFieldCatalog(businessType.value, current.signal),
-      ])
-    } else {
-      templates.value = await loadDocumentTemplates(businessType.value, current.signal)
-      catalog.value = null
+    const candidates = templates.value.filter((item) => item.businessType === businessType.value)
+    if (!candidates.some((item) => item.id === selectedTemplateId.value)) {
+      selectedTemplateId.value = candidates[0]?.id ?? ''
     }
-    const target =
-      templates.value.find((item) => item.id === preferredTemplateId) ?? templates.value[0]
-    if (target) await selectTemplate(target.id, preferredVersionId)
+    if (selectedTemplateId.value)
+      await selectTemplate(selectedTemplateId.value, selectedVersionId.value)
     else {
-      detail.value = null
-      selectedTemplateId.value = ''
+      detail.value = undefined
       selectedVersionId.value = ''
+      syncUrl()
     }
   } catch (value) {
-    if (!current.signal.aborted) {
-      templates.value = []
-      detail.value = null
-      error.value = messageOf(value)
-    }
+    error.value = messageOf(value)
   } finally {
-    if (controller === current) loading.value = false
+    loading.value = false
   }
 }
 
 async function refreshPage(): Promise<void> {
-  await refresh()
-  if (!error.value) showToast('success', '业务模板已刷新')
+  await load()
+  if (!error.value) showToast('success', '业务单据模板已刷新')
 }
 
-async function selectBusinessType(value: DocumentBusinessType): Promise<void> {
-  if (value === businessType.value) return
-  businessType.value = value
-  templates.value = []
-  detail.value = null
-  selectedTemplateId.value = ''
+async function selectBusiness(type: string): Promise<void> {
+  businessType.value = type
+  const candidates = templates.value.filter((item) => item.businessType === type)
+  selectedTemplateId.value = candidates[0]?.id ?? ''
   selectedVersionId.value = ''
-  await refresh()
+  if (selectedTemplateId.value) await selectTemplate(selectedTemplateId.value)
+  else {
+    detail.value = undefined
+    previewHtml.value = ''
+    syncUrl()
+  }
 }
 
-async function selectTemplate(id: string, preferredVersionId?: string): Promise<void> {
+async function selectTemplate(id: string, preferredVersionId = ''): Promise<void> {
   detailLoading.value = true
   try {
     detail.value = await loadDocumentTemplate(id)
@@ -201,956 +175,657 @@ async function selectTemplate(id: string, preferredVersionId?: string): Promise<
       detail.value.versions.find((item) => item.id === preferredVersionId)?.id ??
       detail.value.versions[0]?.id ??
       ''
+    syncUrl()
+    await loadPreview()
   } catch (value) {
-    detail.value = null
     showToast('error', '模板详情加载失败', messageOf(value))
   } finally {
     detailLoading.value = false
   }
 }
 
-function blankDraft(): void {
-  const schemaVersion = catalog.value?.schemaVersion ?? selectedBusiness.value?.schemaVersion ?? ''
-  Object.assign(form, {
-    templateCode: '',
-    templateName: '',
-    schemaVersion,
-    designSchema: blankDocumentDesign(schemaVersion),
-    previewBusinessId: '',
-    remark: '',
-  })
-  conversionIssues.value = []
-  conversionNotices.value = []
+async function selectVersion(id: string): Promise<void> {
+  selectedVersionId.value = id
+  syncUrl()
+  await loadPreview()
 }
 
-function openCreate(): void {
-  if (!selectedBusiness.value?.providerReady) return
-  editorMode.value = 'create'
-  blankDraft()
-  editorOpen.value = true
-}
-
-function openNewVersion(): void {
-  if (!detail.value) return
-  editorMode.value = 'version'
-  blankDraft()
-  form.templateCode = detail.value.template.templateCode
-  form.templateName = detail.value.template.templateName
-  const source = selectedVersion.value
-  if (source && applyVersion(source)) {
-    showToast('warning', '旧版模板已转为画布草稿', '原版本保持不变；保存后生成新版。')
-  }
-  editorOpen.value = true
-}
-
-function openTemplateEditor(): void {
-  if (!selectedVersion.value) return
-  if (selectedVersion.value.status === 'DRAFT') openEdit(selectedVersion.value)
-  else openNewVersion()
-}
-
-function openEdit(version: DocumentTemplateVersion): void {
-  editorMode.value = 'edit'
-  Object.assign(form, {
-    templateCode: detail.value?.template.templateCode ?? '',
-    templateName: detail.value?.template.templateName ?? '',
-    remark: version.remark ?? '',
-  })
-  if (applyVersion(version)) {
-    showToast('warning', '旧版草稿已转为画布', '保存后将使用画布模型。')
-  }
-  selectedVersionId.value = version.id
-  editorOpen.value = true
-}
-
-async function saveDraft(): Promise<void> {
-  if (!form.schemaVersion.trim() || !canvasValid.value || conversionIssues.value.length) {
-    showToast(
-      'warning',
-      '模板草稿无效',
-      conversionIssues.value[0] ?? '请修复越出页面安全区域的元素。',
-    )
-    return
-  }
-  saving.value = true
-  try {
-    const draft: DocumentDraft = {
-      schemaVersion: form.schemaVersion.trim(),
-      remark: form.remark.trim() || undefined,
-      designSchema: JSON.stringify({
-        ...form.designSchema,
-        schemaVersion: form.schemaVersion.trim(),
-      }),
-    }
-    let templateId = selectedTemplateId.value
-    let versionId = selectedVersionId.value
-    if (editorMode.value === 'create') {
-      if (!form.templateName.trim()) {
-        throw new Error('模板名称不能为空')
-      }
-      const version = await createDocumentTemplate({
-        ...draft,
-        templateName: form.templateName.trim(),
-        businessType: businessType.value,
-      })
-      templateId = version.templateId
-      versionId = version.id
-    } else if (editorMode.value === 'version') {
-      const version = await createDocumentVersion(requiredTemplateId(), draft)
-      templateId = version.templateId
-      versionId = version.id
-    } else {
-      await updateDocumentVersion(requiredVersionId(), draft)
-    }
-    editorOpen.value = false
-    await refresh(templateId, versionId)
-    showToast('success', '模板草稿已保存', '最新版本与锁信息已载入。')
-  } catch (value) {
-    showToast('error', '模板保存失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
-async function confirmVersionAction(): Promise<void> {
-  if (!versionAction.value || !detail.value) return
-  saving.value = true
-  try {
-    const { kind, version } = versionAction.value
-    if (kind === 'publish') await publishDocumentVersion(version.id)
-    else if (kind === 'disable') await disableDocumentVersion(version.id)
-    else if (kind === 'enable') await enableDocumentVersion(version.id)
-    else {
-      await bindDefaultDocumentVersion(
-        version.id,
-        detail.value.defaultBinding?.lockVersion ?? detail.value.template.defaultLockVersion ?? 0,
-      )
-    }
-    versionAction.value = null
-    await refresh(selectedTemplateId.value, version.id)
-    showToast('success', '模板状态已更新', '服务端版本和默认绑定已重新读取。')
-  } catch (value) {
-    showToast('error', '模板状态更新失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
-async function confirmDeleteTemplate(): Promise<void> {
-  if (!detail.value) return
-  saving.value = true
-  try {
-    await deleteDocumentTemplate(detail.value.template.id)
-    deleteOpen.value = false
-    await refresh()
-    showToast('success', '模板已删除')
-  } catch (value) {
-    showToast('error', '模板删除失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
-function applyVersion(version: DocumentTemplateVersion): boolean {
-  conversionIssues.value = []
-  conversionNotices.value = []
-  form.schemaVersion = catalog.value?.schemaVersion ?? version.schemaVersion
-  if (version.designSchema) {
-    try {
-      form.designSchema = {
-        ...(JSON.parse(version.designSchema) as DocumentDesignSchema),
-        schemaVersion: form.schemaVersion,
-      }
-      return false
-    } catch {
-      showToast('warning', '原画布模型无法读取', '已按字段清单生成新画布草稿。')
-    }
-  }
-  form.designSchema = designFromLegacy(version)
-  return true
-}
-
-function importHistoricalVersion(version: DocumentTemplateVersion): void {
-  const converted = applyVersion(version)
-  showToast(
-    'success',
-    `已导入 V${version.versionNo}`,
-    conversionIssues.value.length
-      ? conversionIssues.value.join('；')
-      : conversionNotices.value.length
-        ? conversionNotices.value.join('；')
-        : converted
-          ? '旧版字段已转换为画布，可继续二次设计。'
-          : '可继续二次设计并保存为新模板或新版本。',
-  )
-}
-
-function designFromLegacy(version: DocumentTemplateVersion): DocumentDesignSchema {
-  const converted = convertLegacyDocumentDesign({
-    version,
-    schemaVersion: form.schemaVersion,
-    templateName: form.templateName,
-    catalogFields: catalog.value?.fields ?? [],
-  })
-  conversionIssues.value.push(...converted.issues)
-  conversionNotices.value.push(...converted.notices)
-  return converted.designSchema
-}
-
-async function refreshPreview(): Promise<void> {
+async function loadPreview(): Promise<void> {
+  const version = selectedVersion.value
   const request = ++previewRequest
-  if (!editorOpen.value || !businessType.value || !canvasValid.value) {
-    previewHtml.value = ''
-    previewError.value = ''
-    previewLoading.value = false
-    return
-  }
-  previewLoading.value = true
+  previewHtml.value = ''
   previewError.value = ''
+  if (!version) return
+  previewLoading.value = true
   try {
-    const html = (
-      await previewDocumentTemplateHtml({
-        businessType: businessType.value,
-        designSchema: JSON.stringify(form.designSchema),
-        businessId: form.previewBusinessId.trim() || undefined,
-      })
-    ).html
-    if (request === previewRequest) previewHtml.value = html
+    const result = await previewDocumentTemplateVersionHtml(version.id)
+    if (request === previewRequest) previewHtml.value = result.html
   } catch (value) {
-    if (request === previewRequest) {
-      previewHtml.value = ''
-      previewError.value = messageOf(value)
-    }
+    if (request === previewRequest) previewError.value = messageOf(value)
   } finally {
     if (request === previewRequest) previewLoading.value = false
   }
 }
 
-async function refreshVersionPreview(): Promise<void> {
-  const request = ++versionPreviewRequest
-  versionPreviewHtml.value = ''
-  versionPreviewError.value = ''
-  versionPreviewLoading.value = false
-  const versionId = selectedVersionId.value
-  if (!versionId || !canPreviewVersion.value) return
-  versionPreviewLoading.value = true
+function syncUrl(): void {
+  router.replace({
+    query: {
+      ...route.query,
+      businessType: businessType.value || undefined,
+      templateId: selectedTemplateId.value || undefined,
+      versionId: selectedVersionId.value || undefined,
+    },
+  })
+}
+
+function createTemplate(): void {
+  router.push({
+    path: '/system/document-templates/new',
+    query: { businessType: businessType.value },
+  })
+}
+
+function createVersion(): void {
+  if (!detail.value) return
+  router.push({
+    path: `/system/document-templates/${detail.value.template.id}/versions/new`,
+    query: { sourceVersionId: selectedVersionId.value },
+  })
+}
+
+function editDraft(): void {
+  if (!detail.value || !selectedVersion.value) return
+  router.push(
+    `/system/document-templates/${detail.value.template.id}/versions/${selectedVersion.value.id}/edit`,
+  )
+}
+
+async function installOne(): Promise<void> {
+  if (!businessType.value) return
+  installing.value = businessType.value
   try {
-    const html = (await previewDocumentTemplateVersionHtml(versionId)).html
-    if (request === versionPreviewRequest && versionId === selectedVersionId.value) {
-      versionPreviewHtml.value = html
-    }
+    const result = await installSystemDocumentTemplate(businessType.value)
+    showToast('success', installMessage(result.action, result.bindingAction))
+    businessType.value = result.businessType
+    selectedTemplateId.value = result.templateId
+    selectedVersionId.value = result.versionId
+    await load()
   } catch (value) {
-    if (request === versionPreviewRequest && versionId === selectedVersionId.value) {
-      versionPreviewError.value = messageOf(value)
-    }
+    showToast('error', '系统模板安装失败', messageOf(value))
   } finally {
-    if (request === versionPreviewRequest) versionPreviewLoading.value = false
+    installing.value = ''
   }
 }
 
-watch(
-  () => [
-    editorOpen.value,
-    businessType.value,
-    JSON.stringify(form.designSchema),
-    form.previewBusinessId,
-    canvasValid.value,
-  ],
-  () => {
-    clearTimeout(previewTimer)
-    previewTimer = setTimeout(() => void refreshPreview(), 250)
-  },
-)
-
-watch(
-  () => [selectedVersionId.value, canPreviewVersion.value],
-  () => void refreshVersionPreview(),
-  { immediate: true },
-)
-
-function requiredTemplateId(): string {
-  if (!selectedTemplateId.value) throw new Error('请选择模板')
-  return selectedTemplateId.value
+async function installAll(): Promise<void> {
+  installing.value = 'ALL'
+  try {
+    const results = await installAllSystemDocumentTemplates()
+    const changed = results.filter((item) => item.action !== 'UNCHANGED').length
+    const preserved = results.filter((item) => item.bindingAction === 'PRESERVED_CUSTOM').length
+    showToast(
+      'success',
+      `28 类模板校验完成，新增或升级 ${changed} 类；保留自定义默认 ${preserved} 类`,
+    )
+    await load()
+  } catch (value) {
+    showToast('error', '安装全部失败，当前事务已回滚', messageOf(value))
+  } finally {
+    installing.value = ''
+  }
 }
 
-function requiredVersionId(): string {
-  if (!selectedVersionId.value) throw new Error('请选择版本')
-  return selectedVersionId.value
+async function versionAction(kind: 'publish' | 'disable' | 'enable' | 'default'): Promise<void> {
+  const version = selectedVersion.value
+  if (!version || !detail.value) return
+  try {
+    if (kind === 'publish') await publishDocumentVersion(version.id)
+    if (kind === 'disable') await disableDocumentVersion(version.id)
+    if (kind === 'enable') await enableDocumentVersion(version.id)
+    if (kind === 'default') {
+      await bindDefaultDocumentVersion(version.id, detail.value.defaultBinding?.lockVersion ?? 0)
+    }
+    showToast('success', '版本状态已更新')
+    await load()
+  } catch (value) {
+    showToast('error', '版本操作失败', messageOf(value))
+  }
 }
 
-function messageOf(value: unknown): string {
-  return isApiClientError(value) || value instanceof Error ? value.message : '请求失败'
+function requestAction(kind: 'installAll' | 'publish' | 'disable' | 'enable' | 'default'): void {
+  pendingAction.value = kind
 }
 
-function statusTone(status: string): 'success' | 'warning' | 'neutral' {
-  return status === 'PUBLISHED' ? 'success' : status === 'DRAFT' ? 'warning' : 'neutral'
+async function confirmAction(): Promise<void> {
+  const action = pendingAction.value
+  if (!action) return
+  actionLoading.value = true
+  try {
+    if (action === 'installAll') await installAll()
+    else await versionAction(action)
+    pendingAction.value = undefined
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+function actionConfirm(kind: string): string {
+  return (
+    {
+      publish: '发布后版本不可修改，确定发布吗？',
+      disable: '确定停用此已发布版本吗？',
+      enable: '确定重新启用此版本吗？',
+      default: '确定将此版本设为当前业务默认吗？',
+    }[kind] ?? '确定继续吗？'
+  )
+}
+
+function installMessage(action: string, binding: string): string {
+  const actionText =
+    { CREATED: '系统模板已创建', UPGRADED: '系统模板已升级', UNCHANGED: '系统模板已是最新' }[
+      action
+    ] ?? action
+  const bindingText =
+    binding === 'PRESERVED_CUSTOM' ? '；租户自定义默认保持不变' : '；系统默认已更新'
+  return actionText + bindingText
 }
 
 function versionStatusLabel(status: DocumentTemplateVersion['status']): string {
   return { DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '已停用' }[status]
 }
 
-function versionActionLabel(kind: VersionAction['kind']): string {
-  return { publish: '发布', disable: '停用', enable: '启用', default: '设为默认' }[kind]
+function messageOf(value: unknown): string {
+  return value instanceof Error ? value.message : '请求失败'
 }
-
-onMounted(() => void refresh())
-onBeforeUnmount(() => {
-  controller?.abort()
-  previewRequest += 1
-  versionPreviewRequest += 1
-  clearTimeout(previewTimer)
-})
 </script>
 
 <template>
-  <V2Stack class="document-template-page" :gap="4">
+  <section class="template-page">
     <V2Card title="业务单据模板" :heading-level="1">
       <template #actions>
-        <V2Button size="small" variant="secondary" @click="refreshPage">刷新</V2Button>
+        <V2Button size="small" variant="secondary" :disabled="loading" @click="refreshPage"
+          >刷新</V2Button
+        >
         <V2Button
-          v-if="canEdit"
+          v-if="canPublish"
           size="small"
-          :disabled="!selectedBusiness?.providerReady"
-          @click="openCreate"
-          >新增模板</V2Button
+          variant="secondary"
+          :loading="installing === 'ALL'"
+          @click="requestAction('installAll')"
+          >安装全部</V2Button
+        >
+        <V2Button v-if="canEdit" size="small" :disabled="!businessType" @click="createTemplate"
+          >新建模板</V2Button
         >
       </template>
     </V2Card>
+    <p class="page-summary">28 类正式工程单据，显式安装、追加升级、租户默认安全保留。</p>
 
-    <V2PageState v-if="loading" kind="loading" title="正在读取业务模板" description="请稍候。" />
-    <V2PageState v-else-if="error" kind="error" title="业务模板加载失败" :description="error">
-      <template #actions><V2Button @click="refresh()">重试</V2Button></template>
+    <V2PageState
+      v-if="loading"
+      title="正在加载业务单据模板"
+      description="正在读取业务类型、系统目录和租户模板。"
+    />
+    <V2PageState v-else-if="error" title="模板平台加载失败" :description="error">
+      <template #actions><V2Button @click="load">重试</V2Button></template>
     </V2PageState>
-    <V2Card v-else class="document-template-page__workbench">
-      <div class="document-template-page__columns">
-        <section
-          class="document-template-page__column"
-          aria-labelledby="document-business-types-title"
-        >
-          <header class="document-template-page__column-heading">
-            <h2 id="document-business-types-title">1.业务模块</h2>
-          </header>
-          <div
-            class="document-template-page__business-list"
-            aria-labelledby="document-business-types-title"
-          >
-            <section
-              v-for="group in businessGroups"
-              :key="group.key"
-              class="document-template-page__business-group"
-            >
-              <div class="document-template-page__business-group-heading">
-                <h3>{{ group.label }}</h3>
-                <span>{{ group.options.length }}</span>
-              </div>
-              <div class="document-template-page__business-options">
-                <button
-                  v-for="option in group.options"
-                  :key="option.value"
-                  type="button"
-                  class="document-template-page__business-option"
-                  :class="{ 'is-selected': option.value === businessType }"
-                  :aria-pressed="option.value === businessType"
-                  @click="selectBusinessType(option.value)"
-                >
-                  <span>{{ option.label }}</span>
-                </button>
-              </div>
-            </section>
-          </div>
-        </section>
 
-        <section class="document-template-page__column" aria-labelledby="document-templates-title">
-          <header class="document-template-page__column-heading">
-            <h2 id="document-templates-title">2.模板与版本</h2>
-            <div class="document-template-page__column-actions">
-              <V2Button v-if="canEdit && selectedVersion" size="small" @click="openTemplateEditor">
-                编辑模板
-              </V2Button>
-              <V2Button v-if="canEdit && detail" size="small" @click="openNewVersion">
-                新建版本
-              </V2Button>
-              <V2Button
-                v-if="canEdit && detail"
-                size="small"
-                variant="danger"
-                @click="deleteOpen = true"
-              >
-                删除模板
-              </V2Button>
-            </div>
-          </header>
-          <V2PageState
-            v-if="!templates.length"
-            kind="empty"
-            title="暂无模板"
-            description="当前业务类型没有模板。"
-          />
-          <div v-else class="document-template-page__list">
-            <V2Button
-              v-for="item in pagedTemplates"
-              :key="item.id"
-              variant="ghost"
-              :class="{ 'is-selected': item.id === selectedTemplateId }"
-              :aria-pressed="item.id === selectedTemplateId"
-              @click="selectTemplate(item.id)"
-            >
-              <strong>{{ item.templateName }}</strong>
-              <V2Badge :tone="item.enabled === 1 ? 'success' : 'neutral'">
-                {{ item.enabled === 1 ? '启用' : '停用' }}
-              </V2Badge>
-            </V2Button>
-          </div>
-          <section v-if="detail" class="document-template-page__versions" aria-label="模板版本">
-            <h3>版本</h3>
-            <div
-              v-for="(version, index) in detail.versions"
-              :key="version.id"
-              class="document-template-page__version-row"
-              :class="{ 'is-selected': version.id === selectedVersionId }"
-            >
+    <div v-else class="template-workbench">
+      <aside class="template-nav">
+        <div class="search-box">
+          <input v-model="search" placeholder="搜索业务、模板名称或编码" />
+        </div>
+        <div class="nav-scroll">
+          <section v-for="group in filteredBusinessGroups" :key="group.key" class="module-group">
+            <h2>{{ group.label }}</h2>
+            <div v-for="row in group.rows" :key="row.business.businessType" class="business-group">
               <button
                 type="button"
-                class="document-template-page__version-button"
-                :aria-pressed="version.id === selectedVersionId"
-                @click="selectedVersionId = version.id"
+                class="business-row"
+                :class="{ active: row.business.businessType === businessType }"
+                @click="selectBusiness(row.business.businessType)"
               >
-                <span>
-                  <strong>V{{ version.versionNo }}</strong>
-                  <V2Badge :tone="statusTone(version.status)">
-                    {{ versionStatusLabel(version.status) }}
-                  </V2Badge>
-                </span>
-                <small>
-                  {{ version.schemaVersion }} ·
-                  {{
-                    detail.defaultBinding?.templateVersionId === version.id
-                      ? '默认版本'
-                      : '普通版本'
-                  }}
-                </small>
+                <span
+                  ><strong>{{ row.business.displayName }}</strong></span
+                >
+                <V2Badge
+                  :tone="
+                    row.status?.current ? 'success' : row.status?.installed ? 'warning' : 'neutral'
+                  "
+                >
+                  {{ row.status?.current ? '最新' : row.status?.installed ? '待升级' : '未安装' }}
+                </V2Badge>
               </button>
-              <V2ActionMenu
-                v-if="(canEdit && version.status === 'DRAFT') || canPublish"
-                :label="`${detail.template.templateCode} V${version.versionNo}更多操作`"
-                :placement="index >= detail.versions.length - 3 ? 'top-end' : 'bottom-end'"
+              <button
+                v-for="template in row.templates"
+                :key="template.id"
+                type="button"
+                class="template-row"
+                :class="{ active: template.id === selectedTemplateId }"
+                @click="selectTemplate(template.id)"
               >
-                <V2Button
-                  v-if="canEdit && version.status === 'DRAFT'"
-                  size="small"
-                  variant="ghost"
-                  @click="openEdit(version)"
-                >
-                  编辑
-                </V2Button>
-                <V2Button
-                  v-if="canPublish && version.status === 'DRAFT'"
-                  size="small"
-                  @click="versionAction = { kind: 'publish', version }"
-                >
-                  发布
-                </V2Button>
-                <V2Button
-                  v-if="canPublish && version.status === 'PUBLISHED'"
-                  size="small"
-                  variant="secondary"
-                  @click="versionAction = { kind: 'default', version }"
-                >
-                  设为默认
-                </V2Button>
-                <V2Button
-                  v-if="canPublish && version.status === 'PUBLISHED'"
-                  size="small"
-                  variant="danger"
-                  @click="versionAction = { kind: 'disable', version }"
-                >
-                  停用
-                </V2Button>
-                <V2Button
-                  v-if="canPublish && version.status === 'DISABLED'"
-                  size="small"
-                  @click="versionAction = { kind: 'enable', version }"
-                >
-                  启用
-                </V2Button>
-              </V2ActionMenu>
+                <span>{{ template.templateName }}</span
+                ><small>{{ template.templateCode }}</small>
+              </button>
             </div>
           </section>
-          <V2Pagination
-            :total="templates.length"
-            :page-no="pageNo"
-            :page-size="pageSize"
-            label="业务模板分页"
-            @update:page-no="pageNo = $event"
-          />
-        </section>
+          <p v-if="!filteredBusinessGroups.length" class="empty-nav">没有匹配的业务或模板。</p>
+        </div>
+      </aside>
 
-        <section class="document-template-page__column" aria-labelledby="document-preview-title">
-          <header class="document-template-page__column-heading">
-            <h2 id="document-preview-title">3.HTML预览</h2>
-          </header>
-          <V2PageState
-            v-if="detailLoading"
-            kind="loading"
-            title="正在读取预览"
-            description="请稍候。"
-          />
-          <V2PageState
-            v-else-if="!selectedVersion"
-            kind="empty"
-            title="请选择模板版本"
-            description="选择模板和版本后查看服务端HTML。"
-          />
-          <V2PageState
-            v-else-if="!canPreviewVersion"
-            kind="empty"
-            title="无 HTML 预览权限"
-            description="需要模板编辑和单据生成权限。"
-          />
-          <V2PageState
-            v-else-if="versionPreviewLoading"
-            kind="loading"
-            title="正在生成 HTML 预览"
-            description="请稍候。"
-          />
-          <V2PageState
-            v-else-if="versionPreviewError"
-            kind="error"
-            title="HTML 预览失败"
-            :description="versionPreviewError"
-          />
-          <V2PageState
-            v-else-if="!versionPreviewHtml"
-            kind="empty"
-            title="暂无 HTML 预览"
-            description="服务端未返回可预览内容。"
-          />
-          <div v-else class="document-template-page__html-preview">
-            <div class="document-template-page__preview-meta">
-              <strong>V{{ selectedVersion.versionNo }}</strong>
-              <V2Badge :tone="statusTone(selectedVersion.status)">
-                {{ versionStatusLabel(selectedVersion.status) }}
-              </V2Badge>
-              <span>{{ selectedVersion.schemaVersion }}</span>
-            </div>
-            <iframe title="选中模板版本 HTML 预览" sandbox="" :srcdoc="versionPreviewHtml"></iframe>
-            <details class="document-template-page__version-detail">
-              <summary>版本信息</summary>
-              <strong>内容哈希</strong>
-              <code>{{ selectedVersion.contentHash }}</code>
-              <strong>字段清单</strong>
-              <pre>{{ selectedVersion.fieldManifest }}</pre>
-            </details>
-          </div>
-        </section>
-      </div>
-    </V2Card>
-
-    <V2Dialog
-      v-model:open="editorOpen"
-      :title="
-        editorMode === 'create'
-          ? '新增业务模板'
-          : editorMode === 'version'
-            ? '新建模板版本'
-            : '编辑模板草稿'
-      "
-      description="可视化画布保存后由服务端生成 HTML 和字段清单；发布与默认绑定仍使用独立命令。"
-      :close-disabled="saving"
-      :close-on-backdrop="false"
-      fullscreen
-    >
-      <div class="document-template-page__form">
-        <section
-          v-if="editorMode !== 'edit' && detail?.versions.length"
-          class="document-template-page__history-import"
-          aria-label="导入历史模板"
-        >
+      <div class="template-detail">
+        <div class="detail-toolbar">
           <div>
-            <strong>导入历史模板</strong>
-            <small>一键载入历史版本后继续设计</small>
+            <p>{{ selectedBusinessName }}</p>
+            <h2>
+              {{ detail?.template.templateName || selectedStatus?.templateName || '尚未安装模板' }}
+            </h2>
+            <span v-if="detail">{{ detail.template.templateCode }}</span>
           </div>
-          <V2Button
-            v-for="version in detail.versions"
-            :key="version.id"
-            size="small"
-            variant="secondary"
-            @click="importHistoricalVersion(version)"
-          >
-            导入 V{{ version.versionNo }} · {{ versionStatusLabel(version.status) }}
-          </V2Button>
-        </section>
-        <V2Input
-          v-model="form.templateCode"
-          label="模板编码"
-          :placeholder="editorMode === 'create' ? '保存时自动生成' : undefined"
-          disabled
-        />
-        <V2Input
-          v-model="form.templateName"
-          label="模板名称"
-          required
-          :disabled="editorMode !== 'create'"
-        />
-        <V2Input v-model="form.schemaVersion" label="契约版本" required disabled />
-        <V2Input v-model="form.remark" label="备注" />
-      </div>
-      <p
-        v-if="conversionIssues.length"
-        class="document-template-page__conversion-warning"
-        role="alert"
-      >
-        历史模板未完全转换：{{ conversionIssues.join('；') }}。保存已阻止。
-      </p>
-      <p
-        v-if="conversionNotices.length"
-        class="document-template-page__conversion-warning"
-        role="status"
-      >
-        历史模板兼容处理：{{ conversionNotices.join('；') }}。可继续设计并保存。
-      </p>
-      <DocumentCanvas
-        v-model="form.designSchema"
-        :fields="catalog?.fields ?? []"
-        :disabled="saving"
-        :preview-html="previewHtml"
-        :preview-loading="previewLoading"
-        :preview-error="previewError"
-        :preview-business-id="form.previewBusinessId"
-        @update:valid="canvasValid = $event"
-        @update:preview-business-id="form.previewBusinessId = $event"
-      />
-      <template #footer>
-        <V2Button variant="secondary" :disabled="saving" @click="editorOpen = false">取消</V2Button>
-        <V2Button
-          :loading="saving"
-          :disabled="!canvasValid || Boolean(conversionIssues.length)"
-          @click="saveDraft"
-          >保存草稿</V2Button
-        >
-      </template>
-    </V2Dialog>
+          <div class="detail-actions">
+            <V2Button
+              v-if="canPublish"
+              variant="secondary"
+              :loading="installing === businessType"
+              @click="installOne"
+            >
+              {{ selectedStatus?.installed ? '检查升级' : '安装系统模板' }}
+            </V2Button>
+            <V2Button
+              v-if="canEdit && detail && selectedVersion?.status === 'DRAFT'"
+              @click="editDraft"
+              >编辑草稿</V2Button
+            >
+            <V2Button v-else-if="canEdit && detail" @click="createVersion">创建新版</V2Button>
+          </div>
+        </div>
 
+        <div v-if="!detail" class="no-template">
+          <strong>当前业务暂无租户模板</strong>
+          <span>可安装受版本控制的系统模板，或新建租户自定义模板。</span>
+        </div>
+
+        <div v-else class="detail-grid">
+          <section class="preview-panel">
+            <div class="preview-toolbar">
+              <span>大幅预览</span>
+              <span v-if="selectedVersion"
+                >V{{ selectedVersion.versionNo }} ·
+                {{ versionStatusLabel(selectedVersion.status) }}</span
+              >
+            </div>
+            <div class="preview-stage">
+              <iframe v-if="previewHtml" title="业务单据模板预览" :srcdoc="previewHtml" />
+              <div v-else class="preview-state">
+                {{ previewLoading ? '正在生成服务端预览…' : previewError || '选择版本查看预览' }}
+              </div>
+            </div>
+          </section>
+
+          <aside class="version-panel">
+            <div class="status-card">
+              <h3>系统模板状态</h3>
+              <dl>
+                <div>
+                  <dt>目录状态</dt>
+                  <dd>
+                    {{
+                      selectedStatus?.current
+                        ? '已是最新'
+                        : selectedStatus?.installed
+                          ? '可升级'
+                          : '未安装'
+                    }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>默认绑定</dt>
+                  <dd>
+                    {{
+                      selectedStatus?.defaultBinding === 'CUSTOM'
+                        ? '保留自定义'
+                        : selectedStatus?.defaultBinding === 'SYSTEM'
+                          ? '系统模板'
+                          : '未绑定'
+                    }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>页面方向</dt>
+                  <dd>{{ selectedStatus?.orientation === 'LANDSCAPE' ? 'A4 横向' : 'A4 纵向' }}</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="version-list">
+              <h3>版本历史</h3>
+              <button
+                v-for="version in detail.versions"
+                :key="version.id"
+                type="button"
+                :class="{ active: version.id === selectedVersionId }"
+                @click="selectVersion(version.id)"
+              >
+                <span
+                  ><strong>V{{ version.versionNo }}</strong
+                  ><V2Badge
+                    :tone="
+                      version.status === 'PUBLISHED'
+                        ? 'success'
+                        : version.status === 'DRAFT'
+                          ? 'warning'
+                          : 'neutral'
+                    "
+                    >{{ versionStatusLabel(version.status) }}</V2Badge
+                  ></span
+                >
+                <small>{{ version.publishedAt || '尚未发布' }}</small>
+              </button>
+            </div>
+            <div v-if="selectedVersion" class="version-actions">
+              <V2Button
+                v-if="selectedVersion.status === 'DRAFT' && canPublish"
+                size="small"
+                @click="requestAction('publish')"
+                >发布</V2Button
+              >
+              <V2Button
+                v-if="selectedVersion.status === 'PUBLISHED' && canPublish"
+                size="small"
+                variant="secondary"
+                @click="requestAction('default')"
+                >设为默认</V2Button
+              >
+              <V2Button
+                v-if="selectedVersion.status === 'PUBLISHED' && canPublish"
+                size="small"
+                variant="secondary"
+                @click="requestAction('disable')"
+                >停用</V2Button
+              >
+              <V2Button
+                v-if="selectedVersion.status === 'DISABLED' && canPublish"
+                size="small"
+                variant="secondary"
+                @click="requestAction('enable')"
+                >启用</V2Button
+              >
+              <V2Button v-if="canEdit" size="small" variant="secondary" @click="createVersion"
+                >复制为新版</V2Button
+              >
+            </div>
+          </aside>
+        </div>
+        <div v-if="detailLoading" class="detail-loading">正在加载模板详情…</div>
+      </div>
+    </div>
     <V2ConfirmDialog
-      :open="Boolean(versionAction)"
-      title="确认模板状态变更"
-      :description="
-        versionAction
-          ? `${versionActionLabel(versionAction.kind)} V${versionAction.version.versionNo}？`
-          : ''
-      "
-      :confirm-text="versionAction ? versionActionLabel(versionAction.kind) : '确认'"
-      :danger="versionAction?.kind === 'disable'"
-      :loading="saving"
-      @close="versionAction = null"
-      @confirm="confirmVersionAction"
+      :open="Boolean(pendingAction)"
+      :title="pendingAction === 'installAll' ? '确认安装全部系统模板' : '确认版本操作'"
+      :description="confirmDescription"
+      :confirm-text="pendingAction === 'installAll' ? '安装全部' : '确认执行'"
+      :danger="pendingAction === 'disable'"
+      :loading="actionLoading"
+      @close="pendingAction = undefined"
+      @confirm="confirmAction"
     />
-    <V2ConfirmDialog
-      :open="deleteOpen"
-      title="确认删除模板"
-      :description="detail ? `删除“${detail.template.templateName}”？仅未发布草稿允许删除。` : ''"
-      confirm-text="删除"
-      danger
-      :loading="saving"
-      @close="deleteOpen = false"
-      @confirm="confirmDeleteTemplate"
-    />
-  </V2Stack>
+  </section>
 </template>
 
 <style scoped>
-.document-template-page {
-  height: 100%;
-  min-height: 0;
-}
-
-.document-template-page__workbench {
-  flex: 1;
-  min-height: 0;
-}
-
-.document-template-page__workbench :deep(.v2-card__body) {
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-}
-
-.document-template-page__columns {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-  grid-template-columns: minmax(13rem, 0.6fr) minmax(19rem, 0.9fr) minmax(24rem, 1.5fr);
-}
-
-.document-template-page__column {
-  min-width: 0;
-  min-height: 0;
-  padding: 0 var(--v2-space-4) var(--v2-space-4);
-  overflow-y: auto;
-}
-
-.document-template-page__column + .document-template-page__column {
-  border-left: 1px solid var(--v2-color-border-subtle);
-}
-
-.document-template-page__column-heading {
-  position: sticky;
-  z-index: 1;
-  top: 0;
+.template-page {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--v2-space-2);
-  min-height: 3.5rem;
-  margin-bottom: var(--v2-space-3);
-  padding: var(--v2-space-3) 0;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.page-summary {
+  margin: 0;
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-13);
+}
+.detail-toolbar p {
+  margin: 0 0 4px;
+  color: var(--v2-color-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.detail-toolbar h2 {
+  margin: 0;
+  color: var(--v2-color-text-strong);
+}
+.detail-toolbar span {
+  color: var(--v2-color-text-secondary);
+  font-size: 13px;
+}
+.detail-actions,
+.version-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.template-workbench {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  height: calc(100vh - 210px);
+  min-height: 620px;
+  border: 1px solid var(--v2-color-border);
   background: var(--v2-color-surface);
+  overflow: hidden;
+}
+.template-nav {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--v2-color-border);
+}
+.search-box {
+  padding: 14px;
   border-bottom: 1px solid var(--v2-color-border-subtle);
 }
-
-.document-template-page__column-heading h2 {
-  margin: 0;
-  font-size: var(--v2-font-size-14);
+.search-box input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--v2-color-border);
+  border-radius: 4px;
 }
-
-.document-template-page__column-actions {
+.nav-scroll {
+  overflow: auto;
+  padding: 8px 0 24px;
+}
+.module-group h2 {
+  margin: 14px 16px 6px;
+  color: var(--v2-color-text-secondary);
+  font-size: 12px;
+}
+.business-row,
+.template-row {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--v2-space-2);
+  width: 100%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
 }
-
-.document-template-page__business-list {
-  display: grid;
-  gap: var(--v2-space-4);
-}
-
-.document-template-page__business-group,
-.document-template-page__business-options {
-  display: grid;
-  gap: var(--v2-space-2);
-}
-
-.document-template-page__business-group-heading {
-  display: flex;
-  align-items: center;
+.business-row {
   justify-content: space-between;
-  padding-bottom: var(--v2-space-1);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.business-row span,
+.template-row {
+  min-width: 0;
+}
+.business-row strong,
+.template-row span,
+.template-row small {
+  display: block;
+}
+.template-row small {
+  margin-top: 2px;
   color: var(--v2-color-text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.business-row.active {
+  background: var(--v2-color-primary-soft);
+  color: var(--v2-color-primary);
+}
+.template-row {
+  flex-direction: column;
+  padding: 8px 18px 8px 32px;
+  color: var(--v2-color-text-secondary);
+}
+.template-row.active {
+  background: var(--v2-color-surface-subtle);
+  color: var(--v2-color-text-strong);
+  border-left: 3px solid var(--v2-color-primary);
+}
+.empty-nav {
+  padding: 24px;
+  color: var(--v2-color-text-muted);
+}
+.template-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--v2-color-border);
 }
-
-.document-template-page__business-group-heading h3 {
-  margin: 0;
-  color: var(--v2-color-text);
-  font-size: var(--v2-font-size-14);
+.detail-toolbar h2 {
+  font-size: 18px;
 }
-
-.document-template-page__business-group-heading span {
-  font-size: var(--v2-font-size-11);
-}
-
-.document-template-page__business-option {
-  padding: var(--v2-space-2) var(--v2-space-3);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-
-.document-template-page__business-option.is-selected,
-.document-template-page__version-row.is-selected {
-  border-color: var(--v2-color-primary);
-  box-shadow: inset 0 0 0 1px var(--v2-color-primary);
-}
-
-.document-template-page__list {
-  display: grid;
-  gap: var(--v2-space-2);
-}
-
-.document-template-page__list > .v2-button {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  text-align: left;
-}
-
-.document-template-page__list > .v2-button.is-selected {
-  text-decoration: underline;
-}
-
-.document-template-page__list span {
-  color: var(--v2-color-text-muted);
-}
-
-.document-template-page__versions {
-  display: grid;
-  gap: var(--v2-space-2);
-  margin-top: var(--v2-space-4);
-  padding-top: var(--v2-space-3);
-  border-top: 1px solid var(--v2-color-border);
-}
-
-.document-template-page__versions h3 {
-  margin: 0;
-  font-size: var(--v2-font-size-14);
-}
-
-.document-template-page__version-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+.no-template {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--v2-space-2);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--v2-color-text-secondary);
 }
-
-.document-template-page__version-button {
+.detail-grid {
   display: grid;
-  gap: var(--v2-space-1);
+  grid-template-columns: minmax(0, 1fr) 280px;
+  min-height: 0;
+  flex: 1;
+}
+.preview-panel {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: var(--v2-space-2) var(--v2-space-3);
-  color: inherit;
-  font: inherit;
+  background: var(--v2-color-canvas);
+  overflow: hidden;
+}
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--v2-color-surface);
+  border-bottom: 1px solid var(--v2-color-border);
+  color: var(--v2-color-text-secondary);
+  font-size: 13px;
+}
+.preview-stage {
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+}
+.preview-stage iframe {
+  width: min(100%, 780px);
+  height: 100%;
+  min-height: 900px;
+  border: 0;
+  background: var(--v2-color-surface);
+  box-shadow: var(--v2-shadow-float);
+}
+.preview-state {
+  margin: auto;
+  color: var(--v2-color-text-secondary);
+}
+.version-panel {
+  overflow: auto;
+  border-left: 1px solid var(--v2-color-border);
+  padding: 16px;
+}
+.version-panel h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.status-card {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+}
+.status-card dl {
+  margin: 0;
+}
+.status-card dl div {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.status-card dt {
+  color: var(--v2-color-text-secondary);
+}
+.status-card dd {
+  margin: 0;
+  color: var(--v2-color-text-strong);
+}
+.version-list {
+  padding: 16px 0;
+}
+.version-list button {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--v2-color-border-subtle);
+  border-radius: 4px;
+  background: var(--v2-color-surface);
   text-align: left;
   cursor: pointer;
-  background: transparent;
-  border: 0;
 }
-
-.document-template-page__version-button > span {
+.version-list button.active {
+  border-color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+.version-list button span {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: var(--v2-space-2);
 }
-
-.document-template-page__version-button small,
-.document-template-page__preview-meta span {
+.version-list small {
+  display: block;
+  margin-top: 4px;
   color: var(--v2-color-text-muted);
 }
-
-.document-template-page__html-preview {
+.detail-loading {
+  position: absolute;
+  inset: 64px 0 0;
   display: grid;
-  gap: var(--v2-space-3);
+  place-items: center;
+  background: var(--v2-dialog-surface);
+  color: var(--v2-color-text-secondary);
 }
-
-.document-template-page__preview-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--v2-space-2);
-}
-
-.document-template-page__html-preview iframe {
-  width: 100%;
-  min-height: 42rem;
-  background: white;
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-
-.document-template-page__version-detail {
-  display: grid;
-  gap: var(--v2-space-2);
-}
-
-.document-template-page__version-detail summary {
-  cursor: pointer;
-  font-weight: var(--v2-font-weight-semibold);
-}
-
-.document-template-page__version-detail code {
-  overflow-wrap: anywhere;
-}
-
-.document-template-page__version-detail pre {
-  max-height: calc(var(--v2-space-12) * 3);
-  padding: var(--v2-space-3);
-  overflow: auto;
-  background: var(--v2-color-surface-subtle);
-  border-radius: var(--v2-radius-md);
-}
-
-.document-template-page__form {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--v2-space-4);
-}
-
-.document-template-page__history-import {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: var(--v2-space-2);
-  flex-wrap: wrap;
-  padding: var(--v2-space-3);
-  background: var(--v2-color-surface-subtle);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-
-.document-template-page__history-import > div {
-  display: grid;
-  gap: var(--v2-space-1);
-  margin-right: auto;
-}
-
-.document-template-page__history-import small {
-  color: var(--v2-color-text-muted);
-}
-
-.document-template-page__conversion-warning {
-  margin: 0;
-  padding: var(--v2-space-3);
-  color: var(--v2-color-danger-text);
-  background: var(--v2-color-danger-soft);
-  border-radius: var(--v2-radius-md);
-}
-
 @media (max-width: 1180px) {
-  .document-template-page {
-    height: auto;
+  .template-workbench {
+    grid-template-columns: 280px minmax(0, 1fr);
   }
-
-  .document-template-page__workbench {
-    flex: initial;
-  }
-
-  .document-template-page__workbench :deep(.v2-card__body),
-  .document-template-page__columns {
-    height: auto;
-  }
-
-  .document-template-page__columns {
-    grid-template-columns: 1fr;
-  }
-
-  .document-template-page__column {
-    overflow-y: visible;
-  }
-
-  .document-template-page__column + .document-template-page__column {
-    border-top: 1px solid var(--v2-color-border-subtle);
-    border-left: 0;
-  }
-
-  .document-template-page__column-heading {
-    position: static;
-  }
-}
-
-@media (max-width: 980px) {
-  .document-template-page__form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 680px) {
-  .document-template-page__form {
-    grid-template-columns: 1fr;
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr) 240px;
   }
 }
 </style>

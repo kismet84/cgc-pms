@@ -5,6 +5,9 @@ import com.cgcpms.document.catalog.DocumentTemplateFieldCatalog;
 import com.cgcpms.document.provider.DocumentDataProvider;
 import com.cgcpms.document.provider.DocumentDataProviderRegistry;
 import com.cgcpms.document.provider.DocumentDataSnapshot;
+import com.cgcpms.document.render.DocumentRenderer;
+import com.cgcpms.document.render.RestrictedTemplateEngine;
+import com.cgcpms.document.service.SystemDocumentTemplateCatalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +36,9 @@ class DocumentProviderCoverageTest {
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private DocumentDataProviderRegistry registry;
+    @Autowired private SystemDocumentTemplateCatalog systemTemplateCatalog;
+    @Autowired private RestrictedTemplateEngine templateEngine;
+    @Autowired private DocumentRenderer renderer;
 
     @BeforeEach
     void setUp() {
@@ -55,6 +63,31 @@ class DocumentProviderCoverageTest {
                 () -> "missing providers: " + enabledTypes.stream().filter(type -> !registry.has(type)).toList());
 
         enabledTypes.forEach(type -> assertProvider(type, registry.require(type)));
+    }
+
+    @Test
+    void allTwentyEightSystemDefinitionsCompileEverySafeFieldAndRenderPdf() throws Exception {
+        List<SystemDocumentTemplateCatalog.ValidatedDefinition> definitions = systemTemplateCatalog.validateAll();
+        String outputDirectory = System.getProperty("document.pdf.qa.output", "").trim();
+        if (!outputDirectory.isEmpty()) Files.createDirectories(Path.of(outputDirectory));
+
+        assertEquals(28, definitions.size());
+        assertFalse(definitions.stream().anyMatch(value ->
+                SystemDocumentTemplateCatalog.EXCLUDED_BUSINESS_TYPE.equals(value.definition().businessType())));
+        for (SystemDocumentTemplateCatalog.ValidatedDefinition value : definitions) {
+            DocumentDataProvider provider = registry.require(value.definition().businessType());
+            assertEquals("SYSTEM", provider.defaultTemplatePolicy());
+            assertEquals(provider.schemaVersion(), value.definition().schemaVersion());
+            assertTrue(value.designSchema().contains("\"layoutVersion\":2"));
+            assertTrue(value.designSchema().contains("\"type\":\"SIGNATURE_GRID\""));
+            String html = templateEngine.render(value.templateContent(), provider.sampleData().values());
+            var rendered = renderer.render(html);
+            assertTrue(rendered.content().length > 1_000, value.definition().businessType());
+            assertTrue(rendered.pageCount() >= 1, value.definition().businessType());
+            if (!outputDirectory.isEmpty()) {
+                Files.write(Path.of(outputDirectory, value.definition().businessType() + ".pdf"), rendered.content());
+            }
+        }
     }
 
     private void assertProvider(String type, DocumentDataProvider provider) {

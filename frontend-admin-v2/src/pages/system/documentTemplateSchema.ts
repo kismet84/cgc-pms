@@ -4,6 +4,7 @@ import type {
   DocumentCatalogField,
   DocumentDesignSchema,
   DocumentTemplateVersion,
+  DocumentFlowSection,
 } from '@/services/system-management'
 
 export interface LegacyDesignConversion {
@@ -14,14 +15,102 @@ export interface LegacyDesignConversion {
 
 export function blankDocumentDesign(schemaVersion: string): DocumentDesignSchema {
   return {
+    layoutVersion: 2,
     schemaVersion,
     page: {
       size: 'A4',
       orientation: 'PORTRAIT',
       marginMm: { top: 12, right: 12, bottom: 12, left: 12 },
     },
-    elements: [],
+    elements: [
+      {
+        id: 'document-title',
+        type: 'TEXT',
+        text: '业务单据',
+        xMm: 12,
+        yMm: 18,
+        widthMm: 186,
+        heightMm: 14,
+        fontSizePt: 18,
+        align: 'CENTER',
+        repeat: 'BODY',
+        zIndex: 1,
+      },
+    ],
     tables: [],
+    sections: [
+      {
+        id: 'generation-note',
+        type: 'NOTE',
+        title: '生成说明',
+        text: '本单据由 CGC-PMS 根据当前业务数据生成。',
+      },
+      {
+        id: 'signature-grid',
+        type: 'SIGNATURE_GRID',
+        title: '签认栏',
+        labels: ['编制', '复核', '审批', '日期'],
+      },
+    ],
+  }
+}
+
+export function convertDocumentDesignToFlow(design: DocumentDesignSchema): DocumentDesignSchema {
+  if (design.layoutVersion === 2) return design
+  const scalarElements = design.elements.filter(
+    (item) =>
+      item.type === 'FIELD' &&
+      item.repeat !== 'HEADER' &&
+      item.repeat !== 'FOOTER' &&
+      item.fieldPath,
+  )
+  const sections: DocumentFlowSection[] = []
+  if (scalarElements.length) {
+    sections.push({
+      id: 'converted-fields',
+      type: 'FIELD_GRID',
+      title: '业务信息',
+      columns: scalarElements.length === 1 ? 1 : 2,
+      cells: scalarElements.map((item) => ({
+        label: item.text || item.fieldPath!,
+        fieldPath: item.fieldPath!,
+      })),
+    })
+  }
+  design.tables.forEach((table, index) =>
+    sections.push({
+      id: `converted-table-${index + 1}`,
+      type: 'COLLECTION_TABLE',
+      title: '业务明细',
+      collectionPath: table.collectionPath,
+      columns: table.columns.map((column) => ({
+        fieldPath: column.fieldPath,
+        header: column.header,
+      })),
+    }),
+  )
+  sections.push(
+    {
+      id: 'generation-note',
+      type: 'NOTE',
+      title: '生成说明',
+      text: '由旧画布转换为流式草稿，请预览确认后保存。',
+    },
+    {
+      id: 'signature-grid',
+      type: 'SIGNATURE_GRID',
+      title: '签认栏',
+      labels: ['编制', '复核', '审批', '日期'],
+    },
+  )
+  return {
+    ...design,
+    layoutVersion: 2,
+    elements: design.elements.filter(
+      (item) => item.type !== 'FIELD' || item.repeat === 'HEADER' || item.repeat === 'FOOTER',
+    ),
+    tables: [],
+    sections,
   }
 }
 

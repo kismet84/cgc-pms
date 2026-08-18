@@ -14,9 +14,43 @@ import {
   SettlementWorkspacePage,
   SupplierSourcingPage,
   WorkflowWorkbenchPage,
+  DocumentTemplateDesignerPage,
 } from './components'
 
 export const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/system/document-templates/new',
+    name: 'DocumentTemplateCreate',
+    component: DocumentTemplateDesignerPage,
+    meta: {
+      shell: true,
+      permission: 'document:template:edit',
+      adminOnly: true,
+      adminBypassesPermission: true,
+    },
+  },
+  {
+    path: '/system/document-templates/:templateId/versions/new',
+    name: 'DocumentTemplateVersionCreate',
+    component: DocumentTemplateDesignerPage,
+    meta: {
+      shell: true,
+      permission: 'document:template:edit',
+      adminOnly: true,
+      adminBypassesPermission: true,
+    },
+  },
+  {
+    path: '/system/document-templates/:templateId/versions/:versionId/edit',
+    name: 'DocumentTemplateVersionEdit',
+    component: DocumentTemplateDesignerPage,
+    meta: {
+      shell: true,
+      permission: 'document:template:edit',
+      adminOnly: true,
+      adminBypassesPermission: true,
+    },
+  },
   {
     path: '/supplier-sourcing',
     name: 'LegacySupplierSourcing',

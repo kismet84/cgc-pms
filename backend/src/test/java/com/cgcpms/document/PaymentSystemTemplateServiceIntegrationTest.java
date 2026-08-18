@@ -67,8 +67,7 @@ class PaymentSystemTemplateServiceIntegrationTest {
     @Test
     void upgradesAnOutdatedSystemTemplateIntoANewImmutableDefaultVersion() {
         DocumentTemplateVersion first = systemTemplateService.ensureCurrentTenantTemplate();
-        String legacyContent = first.getTemplateContent()
-                .replace(" font-family: 'CGC PMS Document Font', sans-serif;", "");
+        String legacyContent = first.getTemplateContent().replace("flow-root", "legacy-flow-root");
         DocumentTemplateVersion legacyDraft = templateService.createNextDraft(first.getTemplateId(),
                 new DocumentTemplateService.DraftCommand("payment.v2", legacyContent,
                         first.getFieldManifest(), "legacy system template"));
@@ -78,8 +77,8 @@ class PaymentSystemTemplateServiceIntegrationTest {
         DocumentTemplateVersion upgraded = systemTemplateService.ensureCurrentTenantTemplate();
 
         assertEquals(legacyPublished.getVersionNo() + 1, upgraded.getVersionNo());
-        assertTrue(upgraded.getTemplateContent().contains("@bottom-center"));
-        assertTrue(upgraded.getTemplateContent().contains("CGC PMS Document Font"));
+        assertTrue(upgraded.getTemplateContent().contains("flow-root"));
+        assertTrue(upgraded.getDesignSchema().contains("layoutVersion"), upgraded.getDesignSchema());
         assertEquals(upgraded.getId(), templateService.requireDefaultVersion("PAYMENT").getId());
     }
 
@@ -107,6 +106,9 @@ class PaymentSystemTemplateServiceIntegrationTest {
                 "type", "VAT_SPECIAL",
                 "date", "2026-07-17",
                 "amount", String.format("%d.00", index + 1),
+                "taxAmount", "0.00",
+                "sellerName", "示范销方",
+                "buyerName", "示范购方",
                 "verifyStatus", "VERIFIED")).toList());
         RenderedDocument longPdf = renderer.render(templateEngine.render(version.getTemplateContent(), longDetail));
         assertTrue(longPdf.pageCount() > 1);
@@ -120,12 +122,16 @@ class PaymentSystemTemplateServiceIntegrationTest {
 
     private Map<String, Object> sample() {
         return Map.ofEntries(
-                Map.entry("payment", Map.of("applyCode", "PAY-2026-001", "approvalStatus", "APPROVED",
-                        "applyAmount", "123456.78", "approvedAmount", "120000.00", "payType", "PROGRESS",
-                        "createdAt", "2026-07-17T12:00:00", "applyReason", "工程进度款",
-                        "expenseCategory", "工程款")),
-                Map.entry("project", Map.of("name", "示范项目", "code", "PRJ-001")),
-                Map.entry("contract", Map.of("name", "施工合同", "code", "CT-001")),
+                Map.entry("payment", Map.ofEntries(
+                        Map.entry("applyCode", "PAY-2026-001"), Map.entry("approvalStatus", "APPROVED"),
+                        Map.entry("applyAmount", "123456.78"), Map.entry("approvedAmount", "120000.00"),
+                        Map.entry("payType", "PROGRESS"), Map.entry("createdAt", "2026-07-17T12:00:00"),
+                        Map.entry("applyReason", "工程进度款"), Map.entry("expenseCategory", "工程款"),
+                        Map.entry("actualPayAmount", "0.00"), Map.entry("payStatus", "PENDING"),
+                        Map.entry("updatedAt", "2026-07-17T12:30:00"), Map.entry("remark", ""))),
+                Map.entry("project", Map.of("name", "示范项目", "code", "PRJ-001", "address", "示范路1号",
+                        "ownerUnit", "示范建设单位")),
+                Map.entry("contract", Map.of("name", "施工合同", "code", "CT-001", "amount", "500000.00")),
                 Map.entry("payee", Map.of("name", "示范供应商", "bankName", "示范银行",
                         "bankAccount", "****1234", "contactPhone", "138****5678")),
                 Map.entry("sources", List.of(Map.of("type", "SETTLEMENT", "referenceId", "11",
@@ -133,7 +139,8 @@ class PaymentSystemTemplateServiceIntegrationTest {
                 Map.entry("basis", List.of(Map.of("type", "SUB_MEASURE", "referenceId", "21",
                         "amount", "120000.00", "remark", "进度计量"))),
                 Map.entry("invoices", List.of(Map.of("number", "INV-001", "type", "VAT_SPECIAL",
-                        "date", "2026-07-16", "amount", "120000.00", "verifyStatus", "VERIFIED"))),
+                        "date", "2026-07-16", "amount", "120000.00", "taxAmount", "10800.00",
+                        "sellerName", "示范供应商", "buyerName", "示范建设单位", "verifyStatus", "VERIFIED"))),
                 Map.entry("attachments", List.of(Map.of("name", "付款依据.pdf", "type", "PAYMENT_PROOF",
                         "size", "1024"))),
                 Map.entry("approvalRecords", List.of(Map.of("node", "财务审核", "action", "审核通过",

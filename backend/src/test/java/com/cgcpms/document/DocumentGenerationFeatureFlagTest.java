@@ -10,7 +10,6 @@ import com.cgcpms.document.render.RestrictedTemplateEngine;
 import com.cgcpms.document.service.DocumentGenerationPersistenceService;
 import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
-import com.cgcpms.document.service.ProcurementSystemTemplateService;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,8 +36,7 @@ class DocumentGenerationFeatureFlagTest {
         DocumentGenerationProperties properties = new DocumentGenerationProperties();
         properties.setEnabled(true);
         DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
-                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), files, properties,
-                mock(ProcurementSystemTemplateService.class));
+                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), files, properties);
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         try {
             BusinessException error = assertThrows(BusinessException.class,
@@ -63,7 +61,7 @@ class DocumentGenerationFeatureFlagTest {
         ObjectProvider<FileService> fileServiceProvider = mock(ObjectProvider.class);
         DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
                 templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider,
-                new DocumentGenerationProperties(), mock(ProcurementSystemTemplateService.class));
+                new DocumentGenerationProperties());
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         try {
             BusinessException error = assertThrows(BusinessException.class,
@@ -91,8 +89,7 @@ class DocumentGenerationFeatureFlagTest {
         DocumentGenerationProperties properties = new DocumentGenerationProperties();
         properties.setEnabled(true);
         DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
-                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties,
-                mock(ProcurementSystemTemplateService.class));
+                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties);
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         try {
             BusinessException error = assertThrows(BusinessException.class,
