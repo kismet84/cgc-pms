@@ -194,6 +194,22 @@ async function installMocks(page: Page, identity: Identity) {
         ],
       })
     }
+    if (path === '/api/document-templates/system/status') {
+      return success(route, [
+        {
+          businessType: 'PAYMENT',
+          templateCode: 'SYSTEM_PAYMENT_V1',
+          templateName: '付款申请单',
+          schemaVersion: 'payment.v2',
+          orientation: 'PORTRAIT',
+          templateId: '41',
+          versionId: '42',
+          installed: true,
+          current: true,
+          defaultBinding: 'SYSTEM',
+        },
+      ])
+    }
     if (path === '/api/document-templates/preview-html') {
       return success(route, { html: '<html><body>付款申请预览</body></html>' })
     }
