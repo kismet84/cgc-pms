@@ -63,7 +63,33 @@ export interface DocumentCanvasTable {
   columns: DocumentCanvasTableColumn[]
 }
 
+export interface DocumentFlowGridCell {
+  label: string
+  fieldPath?: string
+  text?: string
+  colSpan?: 1 | 2 | 3
+}
+
+export type DocumentFlowSection =
+  | {
+      id: string
+      type: 'FIELD_GRID'
+      title?: string
+      columns: 1 | 2 | 3
+      cells: DocumentFlowGridCell[]
+    }
+  | {
+      id: string
+      type: 'COLLECTION_TABLE'
+      title?: string
+      collectionPath: string
+      columns: Array<{ fieldPath: string; header: string }>
+    }
+  | { id: string; type: 'NOTE'; title?: string; fieldPath?: string; text?: string }
+  | { id: string; type: 'SIGNATURE_GRID'; title?: string; labels: string[] }
+
 export interface DocumentDesignSchema {
+  layoutVersion?: 1 | 2
   schemaVersion: string
   page: {
     size: 'A4'
@@ -72,6 +98,28 @@ export interface DocumentDesignSchema {
   }
   elements: DocumentCanvasElement[]
   tables: DocumentCanvasTable[]
+  sections?: DocumentFlowSection[]
+}
+
+export interface SystemDocumentTemplateStatus {
+  businessType: DocumentBusinessType
+  templateCode: string
+  templateName: string
+  schemaVersion: string
+  orientation: DocumentPageOrientation
+  templateId?: string | null
+  versionId?: string | null
+  installed: boolean
+  current: boolean
+  defaultBinding: 'UNBOUND' | 'SYSTEM' | 'CUSTOM'
+}
+
+export interface SystemDocumentTemplateInstallResult {
+  businessType: DocumentBusinessType
+  templateId: string
+  versionId: string
+  action: 'CREATED' | 'UPGRADED' | 'UNCHANGED'
+  bindingAction: 'BOUND' | 'UPDATED_SYSTEM' | 'PRESERVED_CUSTOM'
 }
 
 export interface DocumentTemplateSummary {
@@ -208,6 +256,37 @@ export function loadDocumentBusinessTypes(
   )
 }
 
+export function loadSystemDocumentTemplateStatuses(
+  signal?: AbortSignal,
+): Promise<SystemDocumentTemplateStatus[]> {
+  return apiRequest<SystemDocumentTemplateStatus[]>('/document-templates/system/status', {
+    signal,
+  }).then((rows) =>
+    rows.map((row) => ({
+      ...row,
+      templateId: row.templateId == null ? row.templateId : String(row.templateId),
+      versionId: row.versionId == null ? row.versionId : String(row.versionId),
+    })),
+  )
+}
+
+export function installSystemDocumentTemplate(
+  businessType: DocumentBusinessType,
+): Promise<SystemDocumentTemplateInstallResult> {
+  return apiRequest<SystemDocumentTemplateInstallResult>(
+    `/document-templates/system/${encodeURIComponent(businessType)}`,
+    { method: 'POST' },
+  ).then(normalizeInstallResult)
+}
+
+export function installAllSystemDocumentTemplates(): Promise<
+  SystemDocumentTemplateInstallResult[]
+> {
+  return apiRequest<SystemDocumentTemplateInstallResult[]>('/document-templates/system/install', {
+    method: 'POST',
+  }).then((rows) => rows.map(normalizeInstallResult))
+}
+
 export function loadDocumentFieldCatalog(
   businessType: DocumentBusinessType,
   signal?: AbortSignal,
@@ -333,6 +412,12 @@ function normalizeGeneration(row: DocumentGenerationRecord): DocumentGenerationR
     businessId: String(row.businessId),
     fileId: row.fileId == null ? row.fileId : String(row.fileId),
   }
+}
+
+function normalizeInstallResult(
+  row: SystemDocumentTemplateInstallResult,
+): SystemDocumentTemplateInstallResult {
+  return { ...row, templateId: String(row.templateId), versionId: String(row.versionId) }
 }
 
 function normalizeDocumentDetail(row: DocumentTemplateDetail): DocumentTemplateDetail {

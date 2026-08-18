@@ -1,532 +1,265 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DocumentTemplatePage from '@/pages/system/DocumentTemplatePage.vue'
+import DocumentTemplateDesignerPage from '@/pages/system/DocumentTemplateDesignerPage.vue'
 import * as service from '@/services/system-management'
-import { useSessionStore } from '@/stores/session'
 
-vi.mock('@/services/system-management', () => ({
-  bindDefaultDocumentVersion: vi.fn(),
-  createDocumentTemplate: vi.fn(),
-  createDocumentVersion: vi.fn(),
-  deleteDocumentTemplate: vi.fn(),
-  disableDocumentVersion: vi.fn(),
-  enableDocumentVersion: vi.fn(),
-  loadDocumentBusinessTypes: vi.fn(),
-  loadDocumentFieldCatalog: vi.fn(),
-  loadDocumentTemplate: vi.fn(),
-  loadDocumentTemplates: vi.fn(),
-  publishDocumentVersion: vi.fn(),
-  previewDocumentTemplateHtml: vi.fn(),
-  previewDocumentTemplateVersionHtml: vi.fn(),
-  updateDocumentVersion: vi.fn(),
+const route = {
+  query: {} as Record<string, string>,
+  params: {} as Record<string, string>,
+}
+const router = { replace: vi.fn(), push: vi.fn() }
+
+vi.mock('vue-router', async () => {
+  const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
+  return {
+    ...actual,
+    useRoute: () => route,
+    useRouter: () => router,
+    onBeforeRouteLeave: vi.fn(),
+  }
+})
+
+vi.mock('@/stores/session', () => ({
+  useSessionStore: () => ({ hasAdminOrPermission: () => true }),
 }))
 
-const paymentTemplate = {
-  id: 'template-payment',
-  templateCode: 'PAYMENT-001',
-  templateName: '付款申请模板',
-  businessType: 'PAYMENT' as const,
-  enabled: 1,
-}
-const settlementTemplate = {
-  id: 'template-settlement',
-  templateCode: 'SETTLEMENT-001',
-  templateName: '结算模板',
-  businessType: 'SETTLEMENT' as const,
-  enabled: 1,
-}
-const paymentDetail = {
-  template: paymentTemplate,
-  versions: [
-    {
-      id: 'version-1',
-      templateId: paymentTemplate.id,
-      versionNo: 1,
-      status: 'PUBLISHED' as const,
-      schemaVersion: 'payment.v1',
-      templateContent: '<p>v1</p>',
-      fieldManifest: '["payment.code"]',
-      contentHash: 'hash-v1',
-      designSchema: JSON.stringify({
-        schemaVersion: 'payment.v1',
-        page: {
-          size: 'A4',
-          orientation: 'PORTRAIT',
-          marginMm: { top: 12, right: 12, bottom: 12, left: 12 },
-        },
-        elements: [
-          {
-            id: 'historical-code',
-            type: 'FIELD',
-            xMm: 10,
-            yMm: 10,
-            widthMm: 60,
-            heightMm: 10,
-            fieldPath: 'payment.code',
-          },
-        ],
-        tables: [],
-      }),
-      publishedAt: '2026-08-01',
-    },
-    {
-      id: 'version-2',
-      templateId: paymentTemplate.id,
-      versionNo: 2,
-      status: 'DRAFT' as const,
-      schemaVersion: 'payment.v2',
-      templateContent: '<p>v2</p>',
-      fieldManifest: '["payment.code","payment.amount"]',
-      contentHash: 'hash-v2',
-    },
-  ],
-  defaultBinding: {
-    templateId: paymentTemplate.id,
-    templateVersionId: 'version-1',
-    lockVersion: 1,
+vi.mock('@/services/system-management', async () => {
+  const actual = await vi.importActual<typeof import('@/services/system-management')>(
+    '@/services/system-management',
+  )
+  return {
+    ...actual,
+    loadDocumentBusinessTypes: vi.fn(),
+    loadDocumentTemplates: vi.fn(),
+    loadSystemDocumentTemplateStatuses: vi.fn(),
+    loadDocumentTemplate: vi.fn(),
+    previewDocumentTemplateVersionHtml: vi.fn(),
+    installSystemDocumentTemplate: vi.fn(),
+    installAllSystemDocumentTemplates: vi.fn(),
+    loadDocumentFieldCatalog: vi.fn(),
+    previewDocumentTemplateHtml: vi.fn(),
+    createDocumentTemplate: vi.fn(),
+    createDocumentVersion: vi.fn(),
+    updateDocumentVersion: vi.fn(),
+  }
+})
+
+const types = [
+  {
+    businessType: 'PAYMENT',
+    displayName: '付款申请',
+    schemaVersion: 'payment.v2',
+    providerReady: true,
+    fieldCount: 2,
   },
-}
-const settlementDetail = {
-  template: settlementTemplate,
-  versions: [
-    {
-      id: 'settlement-version-1',
-      templateId: settlementTemplate.id,
-      versionNo: 1,
-      status: 'DRAFT' as const,
-      schemaVersion: 'settlement.v1',
-      templateContent: '<p>settlement</p>',
-      fieldManifest: '["settlement.code"]',
-      contentHash: 'settlement-hash',
-    },
-  ],
+  {
+    businessType: 'SETTLEMENT',
+    displayName: '工程结算',
+    schemaVersion: 'settlement.v2',
+    providerReady: true,
+    fieldCount: 2,
+  },
+]
+const templates = [
+  {
+    id: 't1',
+    templateCode: 'SYSTEM_PAYMENT_APPLICATION_V1',
+    templateName: '付款申请单',
+    businessType: 'PAYMENT',
+    enabled: 1,
+  },
+  {
+    id: 't2',
+    templateCode: 'SYSTEM_SETTLEMENT_V1',
+    templateName: '工程结算单',
+    businessType: 'SETTLEMENT',
+    enabled: 1,
+  },
+]
+const versions = {
+  t1: {
+    template: templates[0],
+    versions: [
+      {
+        id: 'v1',
+        templateId: 't1',
+        versionNo: 1,
+        status: 'PUBLISHED',
+        schemaVersion: 'payment.v2',
+        templateContent: '',
+        fieldManifest: '[]',
+        contentHash: 'a',
+      },
+    ],
+  },
+  t2: {
+    template: templates[1],
+    versions: [
+      {
+        id: 'v2',
+        templateId: 't2',
+        versionNo: 2,
+        status: 'DRAFT',
+        schemaVersion: 'settlement.v2',
+        templateContent: '',
+        fieldManifest: '[]',
+        contentHash: 'b',
+      },
+    ],
+  },
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setActivePinia(createPinia())
-  useSessionStore().replaceUserInfo({
-    userId: '1',
-    username: 'admin',
-    realName: '管理员',
-    tenantId: '1001',
-    roles: ['ADMIN'],
-    permissions: ['document:template:edit', 'document:template:publish', 'document:generate'],
+  route.query = {}
+  route.params = {}
+  vi.mocked(service.loadDocumentBusinessTypes).mockResolvedValue(types)
+  vi.mocked(service.loadDocumentTemplates).mockResolvedValue(templates)
+  vi.mocked(service.loadSystemDocumentTemplateStatuses).mockResolvedValue(
+    types.map((item, index) => ({
+      businessType: item.businessType,
+      templateCode: templates[index]!.templateCode,
+      templateName: templates[index]!.templateName,
+      schemaVersion: item.schemaVersion,
+      orientation: 'PORTRAIT',
+      templateId: templates[index]!.id,
+      versionId: index ? 'v2' : 'v1',
+      installed: true,
+      current: true,
+      defaultBinding: 'SYSTEM',
+    })),
+  )
+  vi.mocked(service.loadDocumentTemplate).mockImplementation(
+    async (id) => versions[id as keyof typeof versions] as never,
+  )
+  vi.mocked(service.previewDocumentTemplateVersionHtml).mockResolvedValue({
+    html: '<html>preview</html>',
   })
-  vi.mocked(service.loadDocumentTemplates).mockImplementation(async (businessType) =>
-    businessType === 'SETTLEMENT' ? [settlementTemplate] : [paymentTemplate],
-  )
-  vi.mocked(service.loadDocumentTemplate).mockImplementation(async (id) =>
-    id === settlementTemplate.id ? settlementDetail : paymentDetail,
-  )
-  vi.mocked(service.loadDocumentBusinessTypes).mockResolvedValue([
-    {
-      businessType: 'PAYMENT',
-      displayName: '付款申请单',
-      schemaVersion: 'payment.v2',
-      providerReady: true,
-      fieldCount: 2,
-    },
-    {
-      businessType: 'SETTLEMENT',
-      displayName: '结算单',
-      schemaVersion: 'settlement.v1',
-      providerReady: true,
-      fieldCount: 1,
-    },
-    {
-      businessType: 'COST_SUBJECT_MAPPING',
-      displayName: '成本科目映射',
-      schemaVersion: 'cost-subject-mapping.v1',
-      providerReady: true,
-      fieldCount: 4,
-    },
-  ])
   vi.mocked(service.loadDocumentFieldCatalog).mockImplementation(async (businessType) => ({
     businessType,
-    schemaVersion: businessType === 'SETTLEMENT' ? 'settlement.v1' : 'payment.v2',
+    schemaVersion: businessType === 'PAYMENT' ? 'payment.v2' : 'settlement.v2',
     fields: [
       {
-        path: businessType === 'SETTLEMENT' ? 'settlement.code' : 'payment.code',
+        path: 'document.code',
         label: '单据编号',
         valueType: 'TEXT',
         nullable: false,
-        group: '基本信息',
-        collectionPath: null,
         masked: false,
+      },
+      {
+        path: 'items.name',
+        label: '明细名称',
+        valueType: 'TEXT',
+        nullable: false,
+        masked: false,
+        collectionPath: 'items',
       },
     ],
   }))
-  vi.mocked(service.previewDocumentTemplateHtml).mockResolvedValue({ html: '<p>preview</p>' })
-  vi.mocked(service.previewDocumentTemplateVersionHtml).mockImplementation(async (versionId) => ({
-    html: `<p>rendered-${versionId}</p>`,
-  }))
-  vi.mocked(service.deleteDocumentTemplate).mockResolvedValue()
+  vi.mocked(service.previewDocumentTemplateHtml).mockResolvedValue({ html: '<html>draft</html>' })
 })
 
-describe('M7 document template page', () => {
-  it('loads server-rendered HTML and changes versions without reloading template details', async () => {
+describe('DocumentTemplatePage', () => {
+  it('restores URL selection and exposes searchable two-pane workbench', async () => {
+    route.query = { businessType: 'SETTLEMENT', templateId: 't2', versionId: 'v2' }
     const wrapper = mount(DocumentTemplatePage)
     await flushPromises()
 
-    expect(wrapper.findAll('.document-template-page__workbench')).toHaveLength(1)
-    expect(
-      wrapper.findAll('.document-template-page__columns > section').map((item) => item.text()),
-    ).toHaveLength(3)
-    expect(
-      wrapper.findAll('.document-template-page__column-heading h2').map((item) => item.text()),
-    ).toEqual(['1.业务模块', '2.模板与版本', '3.HTML预览'])
-    expect(
-      wrapper
-        .findAll('.document-template-page__business-group-heading h3')
-        .map((item) => item.text()),
-    ).toEqual(['资金财务', '分包结算'])
-    expect(
-      wrapper
-        .findAll('.document-template-page__business-group-heading span')
-        .map((item) => item.text()),
-    ).toEqual(['1', '1'])
-    expect(wrapper.text()).not.toContain('基础资料')
-    expect(wrapper.text()).not.toContain('成本科目映射')
-    expect(service.loadDocumentTemplates).toHaveBeenCalledWith('PAYMENT', expect.any(AbortSignal))
-    expect(service.loadDocumentFieldCatalog).toHaveBeenCalledWith(
-      'PAYMENT',
-      expect.any(AbortSignal),
-    )
-    expect(service.loadDocumentTemplate).toHaveBeenCalledWith(paymentTemplate.id)
-    expect(wrapper.get('button[aria-pressed="true"]').text()).toContain('付款申请单')
-    expect(wrapper.text()).not.toContain('PAYMENT-001')
-    expect(wrapper.text()).toContain('hash-v1')
-    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
-      '<p>rendered-version-1</p>',
-    )
-    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('version-1')
+    expect(service.loadDocumentTemplates).toHaveBeenCalledWith('')
+    expect(service.loadDocumentTemplate).toHaveBeenCalledWith('t2')
+    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('v2')
+    expect(wrapper.find('.template-workbench').exists()).toBe(true)
+    expect(wrapper.find('.preview-stage iframe').attributes('srcdoc')).toContain('preview')
 
-    const requestCount = vi.mocked(service.loadDocumentTemplate).mock.calls.length
-    await wrapper
-      .get('.document-template-page__version-button[aria-pressed="false"]')
-      .trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('hash-v2')
-    expect(wrapper.text()).toContain('payment.amount')
-    expect(service.loadDocumentTemplate).toHaveBeenCalledTimes(requestCount)
-    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenLastCalledWith('version-2')
-    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
-      '<p>rendered-version-2</p>',
-    )
-    wrapper.unmount()
+    await wrapper.find('.search-box input').setValue('SYSTEM_PAYMENT')
+    expect(wrapper.find('.template-nav').text()).toContain('付款申请单')
+    expect(wrapper.find('.template-nav').text()).not.toContain('工程结算单')
   })
 
-  it('keeps the newest version preview when requests finish out of order', async () => {
-    let resolveV1!: (value: { html: string }) => void
-    let resolveV2!: (value: { html: string }) => void
-    vi.mocked(service.previewDocumentTemplateVersionHtml).mockImplementation(
-      (versionId) =>
-        new Promise((resolve) => {
-          if (versionId === 'version-1') resolveV1 = resolve
-          else resolveV2 = resolve
-        }),
+  it('opens dedicated designer routes and installs all explicitly', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(service.installAllSystemDocumentTemplates).mockResolvedValue(
+      types.map((item, index) => ({
+        businessType: item.businessType,
+        templateId: templates[index]!.id,
+        versionId: index ? 'v2' : 'v1',
+        action: 'UNCHANGED',
+        bindingAction: 'UPDATED_SYSTEM',
+      })),
     )
     const wrapper = mount(DocumentTemplatePage)
     await flushPromises()
-    await wrapper
-      .get('.document-template-page__version-button[aria-pressed="false"]')
-      .trigger('click')
-    resolveV2({ html: '<p>newest</p>' })
-    await flushPromises()
-    resolveV1({ html: '<p>stale</p>' })
-    await flushPromises()
 
-    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toBe(
-      '<p>newest</p>',
-    )
-    wrapper.unmount()
-  })
-
-  it('does not request or expose template source without preview permissions', async () => {
-    useSessionStore().replaceUserInfo({
-      userId: '2',
-      username: 'reader',
-      realName: '只读用户',
-      tenantId: '1001',
-      roles: [],
-      permissions: ['document:template:query'],
+    await wrapper.get('.v2-card__actions button:last-child').trigger('click')
+    expect(router.push).toHaveBeenCalledWith({
+      path: '/system/document-templates/new',
+      query: { businessType: 'PAYMENT' },
     })
-    const wrapper = mount(DocumentTemplatePage)
-    await flushPromises()
 
-    expect(wrapper.text()).toContain('无 HTML 预览权限')
-    expect(service.previewDocumentTemplateVersionHtml).not.toHaveBeenCalled()
-    expect(wrapper.find('iframe[title="选中模板版本 HTML 预览"]').exists()).toBe(false)
-    expect(wrapper.html()).not.toContain('&lt;p&gt;v1&lt;/p&gt;')
-    wrapper.unmount()
-  })
-
-  it('allows an admin role to use server preview without explicit permission codes', async () => {
-    useSessionStore().replaceUserInfo({
-      userId: '1',
-      username: 'admin',
-      realName: '管理员',
-      tenantId: '1001',
-      roles: ['ADMIN'],
-      permissions: [],
-    })
-    const wrapper = mount(DocumentTemplatePage)
-    await flushPromises()
-
-    expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('version-1')
-    expect(wrapper.get('iframe[title="选中模板版本 HTML 预览"]').attributes('srcdoc')).toContain(
-      '<p>rendered-version-1</p>',
-    )
-    wrapper.unmount()
-  })
-
-  it('shows edit and delete entries and opens the editor full screen', async () => {
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
-    await flushPromises()
-
-    expect(wrapper.findAll('button').some((item) => item.text() === '编辑模板')).toBe(true)
-    expect(wrapper.findAll('button').some((item) => item.text() === '删除模板')).toBe(true)
-    await wrapper
+    const installAll = wrapper
       .findAll('button')
-      .find((item) => item.text() === '编辑模板')!
-      .trigger('click')
+      .find((button) => button.text().includes('安装全部'))!
+    await installAll.trigger('click')
+    wrapper.findComponent({ name: 'V2ConfirmDialog' }).vm.$emit('confirm')
     await flushPromises()
-    expect(document.querySelector('.v2-dialog__panel--fullscreen')).not.toBeNull()
-
-    ;(document.querySelector<HTMLButtonElement>('.v2-dialog__close') as HTMLButtonElement).click()
-    await flushPromises()
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '删除模板')!
-      .trigger('click')
-    await flushPromises()
-    ;[...document.querySelectorAll<HTMLButtonElement>('.v2-dialog__footer button')]
-      .find((item) => item.textContent?.trim() === '删除')!
-      .click()
-    await flushPromises()
-    expect(service.deleteDocumentTemplate).toHaveBeenCalledWith(paymentTemplate.id)
-
-    wrapper.unmount()
-    host.remove()
+    expect(service.installAllSystemDocumentTemplates).toHaveBeenCalledTimes(1)
   })
+})
 
-  it('offers enable after a version is disabled', async () => {
-    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
-      ...paymentDetail,
-      versions: [{ ...paymentDetail.versions[0]!, status: 'DISABLED' }],
-    })
-    const wrapper = mount(DocumentTemplatePage)
-    await flushPromises()
-
-    expect(wrapper.findAll('button').some((item) => item.text() === '启用')).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('imports a historical version into the new-template canvas', async () => {
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '新增模板')!
-      .trigger('click')
-    await flushPromises()
-    const importButton = [
-      ...document.querySelectorAll<HTMLButtonElement>('.v2-dialog__body button'),
-    ].find((item) => item.textContent?.includes('导入 V1'))!
-    importButton.click()
-    await flushPromises()
-
-    expect(document.querySelector('.document-canvas__element')?.textContent).toContain(
-      '{{payment.code}}',
-    )
-    wrapper.unmount()
-    host.remove()
-  })
-
-  it('opens a published legacy template as a canvas draft', async () => {
-    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
-      ...paymentDetail,
-      versions: [
-        {
-          ...paymentDetail.versions[0]!,
-          designSchema: undefined,
-          templateContent: '<style>@page{size:A4 landscape}</style>',
-        },
-      ],
-    })
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '编辑模板')!
-      .trigger('click')
-    await flushPromises()
-
-    expect(document.querySelector('.document-canvas')).not.toBeNull()
-    expect(document.querySelector('.document-template-page__textarea')).toBeNull()
-    expect(document.querySelector('.document-template-page__conversion-warning')).toBeNull()
-    expect(document.querySelector('.document-canvas__element code')?.textContent).toContain(
-      '{{payment.code}}',
-    )
-    expect(document.querySelector('[data-testid="orientation-toggle"]')?.textContent).toContain(
-      '横向 A4',
-    )
-    wrapper.unmount()
-    host.remove()
-  })
-
-  it('upgrades an old draft to the current field-catalog schema before editing', async () => {
-    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
-      ...paymentDetail,
-      versions: [
-        {
-          ...paymentDetail.versions[1]!,
-          schemaVersion: 'payment.v1',
-          designSchema: undefined,
-          fieldManifest: '["payment.code"]',
-        },
-      ],
-    })
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '编辑模板')!
-      .trigger('click')
-    await flushPromises()
-
-    expect(document.querySelector<HTMLInputElement>('input[aria-label="契约版本"]')?.value).toBe(
-      'payment.v2',
-    )
-    wrapper.unmount()
-    host.remove()
-  })
-
-  it('keeps an unsupported legacy field as an editable placeholder without blocking save', async () => {
-    vi.mocked(service.loadDocumentTemplate).mockResolvedValue({
-      ...paymentDetail,
-      versions: [
-        {
-          ...paymentDetail.versions[0]!,
-          designSchema: undefined,
-          fieldManifest: '["payment.code","retired.value"]',
-        },
-      ],
-    })
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
-    await flushPromises()
-
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '编辑模板')!
-      .trigger('click')
-    await flushPromises()
-
-    expect(
-      document.querySelector('.document-template-page__conversion-warning')?.textContent,
-    ).toContain('retired.value')
-    expect(
-      [...document.querySelectorAll('.document-canvas__element')].some((element) =>
-        element.textContent?.includes('retired.value：________'),
-      ),
-    ).toBe(true)
-    expect(
-      document.querySelector<HTMLButtonElement>('.v2-dialog__footer button:last-child')?.disabled,
-    ).toBe(false)
-    wrapper.unmount()
-    host.remove()
-  })
-
-  it('changes business type once and selects its first template and version', async () => {
-    const wrapper = mount(DocumentTemplatePage)
-    await flushPromises()
-
-    const settlement = wrapper
-      .findAll('.document-template-page__business-option')
-      .find((item) => item.text().includes('结算单'))!
-    await settlement.trigger('click')
-    await flushPromises()
-
-    expect(service.loadDocumentTemplates).toHaveBeenLastCalledWith(
-      'SETTLEMENT',
-      expect.any(AbortSignal),
-    )
-    expect(service.loadDocumentTemplate).toHaveBeenLastCalledWith(settlementTemplate.id)
-    expect(wrapper.text()).toContain('settlement-hash')
-    const selectedSettlement = wrapper
-      .findAll('.document-template-page__business-option')
-      .find((item) => item.text().includes('结算单'))!
-    expect(selectedSettlement.attributes('aria-pressed')).toBe('true')
-
-    const requestCount = vi.mocked(service.loadDocumentTemplates).mock.calls.length
-    await selectedSettlement.trigger('click')
-    expect(service.loadDocumentTemplates).toHaveBeenCalledTimes(requestCount)
-    wrapper.unmount()
-  })
-
-  it('submits design schema while leaving HTML and field manifest server-owned', async () => {
+describe('DocumentTemplateDesignerPage', () => {
+  it('creates v2 draft and returns with persisted selection', async () => {
+    route.query = { businessType: 'PAYMENT' }
     vi.mocked(service.createDocumentTemplate).mockResolvedValue({
-      ...paymentDetail.versions[1]!,
-      designSchema: '{}',
+      id: 'draft-1',
+      templateId: 'new-template',
+      versionNo: 1,
+      status: 'DRAFT',
+      schemaVersion: 'payment.v2',
+      templateContent: '',
+      fieldManifest: '[]',
+      contentHash: 'c',
     })
-    const host = document.createElement('div')
-    document.body.append(host)
-    const wrapper = mount(DocumentTemplatePage, { attachTo: host })
+    const wrapper = mount(DocumentTemplateDesignerPage, {
+      global: {
+        stubs: {
+          DocumentFlowDesigner: {
+            props: ['modelValue'],
+            emits: ['update:modelValue', 'update:valid'],
+            template: '<div class="flow-designer-stub">流式设计器</div>',
+          },
+        },
+      },
+    })
     await flushPromises()
 
-    await wrapper
-      .findAll('button')
-      .find((item) => item.text() === '新增模板')!
-      .trigger('click')
-    await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(service.previewDocumentTemplateHtml).not.toHaveBeenCalled()
-    const inputs = [...document.querySelectorAll<HTMLInputElement>('.v2-dialog__panel input')]
-    expect(inputs.find((item) => item.getAttribute('aria-label') === '模板编码')?.disabled).toBe(
-      true,
-    )
-    inputs.find((item) => item.getAttribute('aria-label') === '模板名称')!.value = '付款画布模板'
-    inputs
-      .find((item) => item.getAttribute('aria-label') === '模板名称')!
-      .dispatchEvent(new Event('input'))
-    ;[...document.querySelectorAll<HTMLButtonElement>('.document-canvas__field')]
-      .find((item) => item.textContent?.includes('单据编号'))!
-      .click()
-    await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    expect(service.previewDocumentTemplateHtml).toHaveBeenCalledTimes(1)
-    ;[...document.querySelectorAll<HTMLButtonElement>('.v2-dialog__footer button')]
-      .find((item) => item.textContent?.includes('保存草稿'))!
-      .click()
+    expect(wrapper.text()).toContain('新建业务单据模板')
+    expect(wrapper.text()).toContain('流式设计器')
+    const save = wrapper.findAll('button').find((button) => button.text().includes('保存'))!
+    await save.trigger('click')
     await flushPromises()
 
-    expect(service.createDocumentTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        templateName: '付款画布模板',
-        businessType: 'PAYMENT',
-        designSchema: expect.stringContaining('"fieldPath":"payment.code"'),
-      }),
-    )
     const command = vi.mocked(service.createDocumentTemplate).mock.calls[0]![0]
-    expect(command.templateContent).toBeUndefined()
-    expect(command.fieldManifest).toBeUndefined()
-    wrapper.unmount()
-    host.remove()
+    expect(JSON.parse(command.designSchema!)).toMatchObject({
+      layoutVersion: 2,
+      sections: expect.any(Array),
+    })
+    expect(router.replace).toHaveBeenCalledWith({
+      path: '/system/document-templates',
+      query: { businessType: 'PAYMENT', templateId: 'new-template', versionId: 'draft-1' },
+    })
+  })
+
+  it('loads edit mode and keeps published versions immutable', async () => {
+    route.params = { templateId: 't1', versionId: 'v1' }
+    vi.mocked(service.loadDocumentTemplate).mockResolvedValue(versions.t1 as never)
+    const wrapper = mount(DocumentTemplateDesignerPage, {
+      global: { stubs: { DocumentFlowDesigner: { template: '<div>designer</div>' } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已发布版本不可修改')
+    const save = wrapper.findAll('button').find((button) => button.text().includes('保存'))!
+    expect(save.attributes('disabled')).toBeDefined()
   })
 })

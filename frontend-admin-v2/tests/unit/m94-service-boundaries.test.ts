@@ -38,21 +38,21 @@ const runtimeExportHashes = {
   commercial: 'bb9aaf1406c228e7231246efb440d0e060c38876b11016d6e7fff1d73ad71ee1',
   'supply-chain': 'e548592d2a6465aed7839d569119e5ae7871a9ecc464c4a6e3e393bcea9a5c78',
   finance: '70adeced10792fca49335e6e8b077618c00b9dc60f4801b47793cd57d56c26b5',
-  'system-management': 'd0f17314a8d9d61d2765e77d5ae3a781b453bff1acc4c4b5a18425cfadf6381a',
+  'system-management': 'a945c4b35b0a94f7515ed6f2123a4de61278a658406e894642a33deb06fae78e',
 } as const
 
 const typeExportHashes = {
   commercial: '73aa6feb3d3f10fcd745d52db41970d4a1485a35ceeaa238124a1d542664c56d',
   'supply-chain': 'ce12c8439b8d68390f35469a12f95d9429e6a9712bba78f50ce95c0a7738baf1',
   finance: 'cac6868daf44392f2730fedc01b29ed60b4048a29d41b6394adb01a12fc2306a',
-  'system-management': 'e7b850bffe82a57df7885434cc591ae74246979ba597b9c32737f2ccfd668806',
+  'system-management': '8c0847f81e0ea6b5293838a77beafaebd3c8900cd1cd4010ff01b033a964f825',
 } as const
 
 const requestSurfaceHashes = {
   commercial: 'feedbb0e660149d81577edbe33f3492ccd689a8705579e6cbc1936d9b99eb479',
   'supply-chain': '1731f8c4bafd410bc6b98b5d8ead39b5df300346c0f83684a2c847db35669fe6',
   finance: 'ce8fa34f528ae88b65b74195c4a5d355e90fe75281e3b0f23726fa2842038edf',
-  'system-management': 'd589588c009b1d6021783ca81ef2b48ccb89f7740dbd9fef9aa2d3e503151350',
+  'system-management': '44b00ac8561f7f1340ad1a541581eb8e63cbec754d6df09a8c69f65f6fd4d930',
 } as const
 
 const hash = (values: string[]) =>

@@ -17,7 +17,6 @@ import com.cgcpms.document.render.RestrictedTemplateEngine;
 import com.cgcpms.document.service.DocumentGenerationPersistenceService;
 import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
-import com.cgcpms.document.service.ProcurementSystemTemplateService;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,7 +52,6 @@ class DocumentGenerationServiceTest {
     @Mock private BusinessObjectAuthorizer authorizer;
     @Mock private ObjectProvider<FileService> fileServiceProvider;
     @Mock private DocumentDataProvider provider;
-    @Mock private ProcurementSystemTemplateService procurementSystemTemplateService;
 
     private DocumentGenerationService service;
 
@@ -64,8 +62,7 @@ class DocumentGenerationServiceTest {
         properties.setEnabled(true);
         properties.setPaymentEnabled(true);
         service = new DocumentGenerationService(mapper, templateService, registry, templateEngine, renderer,
-                persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties,
-                procurementSystemTemplateService);
+                persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties);
     }
 
     private void stubFormalGeneration() {
@@ -143,13 +140,13 @@ class DocumentGenerationServiceTest {
     }
 
     @Test
-    void systemGenerationPersistsDisabledFeatureAsRetryableFailure() {
+    void systemGenerationPersistsDisabledFeatureWithoutInstallingATemplate() {
         DocumentGenerationProperties disabledOrder = new DocumentGenerationProperties();
         disabledOrder.setEnabled(true);
         disabledOrder.setPurchaseOrderEnabled(false);
         DocumentGenerationService systemService = new DocumentGenerationService(
                 mapper, templateService, registry, templateEngine, renderer, persistence, authorizer,
-                new ObjectMapper(), fileServiceProvider, disabledOrder, procurementSystemTemplateService);
+                new ObjectMapper(), fileServiceProvider, disabledOrder);
         DocumentTemplateVersion version = new DocumentTemplateVersion();
         version.setId(801L);
         version.setTemplateId(800L);
@@ -162,7 +159,6 @@ class DocumentGenerationServiceTest {
                         "PURCHASE_ORDER:301:INSTANCE:401", TestUserContext.TENANT_0, TestUserContext.USER_ADMIN));
 
         assertEquals("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED", error.getCode());
-        verify(procurementSystemTemplateService).ensureCurrentTenantTemplate("PURCHASE_ORDER");
         verify(persistence).start(any(DocumentGeneration.class));
         verify(persistence).fail(anyLong(), eq(TestUserContext.TENANT_0),
                 eq("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED"));

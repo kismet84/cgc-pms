@@ -1,0 +1,5896 @@
+[
+  {
+    "templateCode": "SYSTEM_BID_COST_TARGET_TRANSFER_V1",
+    "templateName": "投标成本转入单",
+    "businessType": "BID_COST_TARGET_TRANSFER",
+    "schemaVersion": "bid-cost-target-transfer.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "bid-cost-target-transfer.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "投标成本转入单 ·",
+          "fieldPath": "transfer.bidCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "投标成本转入单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-transfer",
+          "type": "FIELD_GRID",
+          "title": "转入概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "投标成本编码",
+              "fieldPath": "transfer.bidCode"
+            },
+            {
+              "label": "投标项目名称",
+              "fieldPath": "transfer.bidProjectName"
+            },
+            {
+              "label": "项目编码",
+              "fieldPath": "transfer.projectCode"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "transfer.projectName"
+            },
+            {
+              "label": "目标成本版本号",
+              "fieldPath": "transfer.targetVersionNo"
+            },
+            {
+              "label": "目标成本版本名",
+              "fieldPath": "transfer.targetVersionName"
+            },
+            {
+              "label": "映射版本编码",
+              "fieldPath": "transfer.mappingVersionCode"
+            },
+            {
+              "label": "映射版本名",
+              "fieldPath": "transfer.mappingVersionName"
+            },
+            {
+              "label": "转入单号",
+              "fieldPath": "transfer.transferCode"
+            },
+            {
+              "label": "转入总额",
+              "fieldPath": "transfer.totalAmount"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "transfer.status"
+            }
+          ]
+        },
+        {
+          "id": "note-transfer-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "transfer.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "转入明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.sourceSubjectCode",
+              "header": "源科目编码"
+            },
+            {
+              "fieldPath": "items.sourceSubjectName",
+              "header": "源科目名称"
+            },
+            {
+              "fieldPath": "items.targetSubjectCode",
+              "header": "目标科目编码"
+            },
+            {
+              "fieldPath": "items.targetSubjectName",
+              "header": "目标科目名称"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "转入金额"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "过账时间",
+              "fieldPath": "transfer.postedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_BID_COST_TARGET_TRANSFER_REVERSAL_V1",
+    "templateName": "投标成本转入冲销单",
+    "businessType": "BID_COST_TARGET_TRANSFER_REVERSAL",
+    "schemaVersion": "bid-cost-transfer-reversal.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "bid-cost-transfer-reversal.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "投标成本转入冲销单 ·",
+          "fieldPath": "reversal.originalTransferCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "投标成本转入冲销单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-reversal",
+          "type": "FIELD_GRID",
+          "title": "冲销概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "原转入单号",
+              "fieldPath": "reversal.originalTransferCode"
+            },
+            {
+              "label": "投标成本编码",
+              "fieldPath": "reversal.bidCode"
+            },
+            {
+              "label": "投标项目名称",
+              "fieldPath": "reversal.bidProjectName"
+            },
+            {
+              "label": "项目编码",
+              "fieldPath": "reversal.projectCode"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "reversal.projectName"
+            },
+            {
+              "label": "目标成本版本号",
+              "fieldPath": "reversal.targetVersionNo"
+            },
+            {
+              "label": "目标成本版本名",
+              "fieldPath": "reversal.targetVersionName"
+            },
+            {
+              "label": "映射版本编码",
+              "fieldPath": "reversal.mappingVersionCode"
+            },
+            {
+              "label": "映射版本名",
+              "fieldPath": "reversal.mappingVersionName"
+            },
+            {
+              "label": "冲销单号",
+              "fieldPath": "reversal.transferCode"
+            },
+            {
+              "label": "冲销总额",
+              "fieldPath": "reversal.totalAmount"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "reversal.status"
+            }
+          ]
+        },
+        {
+          "id": "note-reversal-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "reversal.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "冲销明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.sourceSubjectCode",
+              "header": "源科目编码"
+            },
+            {
+              "fieldPath": "items.sourceSubjectName",
+              "header": "源科目名称"
+            },
+            {
+              "fieldPath": "items.targetSubjectCode",
+              "header": "目标科目编码"
+            },
+            {
+              "fieldPath": "items.targetSubjectName",
+              "header": "目标科目名称"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "冲销金额"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "过账时间",
+              "fieldPath": "reversal.postedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_CONTRACT_APPROVAL_V1",
+    "templateName": "合同审批单",
+    "businessType": "CONTRACT_APPROVAL",
+    "schemaVersion": "contract-approval.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "contract-approval.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "合同审批单 ·",
+          "fieldPath": "contract.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "合同审批单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "合同编号",
+              "fieldPath": "contract.code"
+            },
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            },
+            {
+              "label": "合同类型",
+              "fieldPath": "contract.type"
+            },
+            {
+              "label": "甲方",
+              "fieldPath": "contract.partyA"
+            },
+            {
+              "label": "乙方",
+              "fieldPath": "contract.partyB"
+            },
+            {
+              "label": "合同金额",
+              "fieldPath": "contract.amount"
+            },
+            {
+              "label": "当前合同金额",
+              "fieldPath": "contract.currentAmount"
+            },
+            {
+              "label": "税率",
+              "fieldPath": "contract.taxRate"
+            },
+            {
+              "label": "税额",
+              "fieldPath": "contract.taxAmount"
+            },
+            {
+              "label": "不含税金额",
+              "fieldPath": "contract.amountWithoutTax"
+            },
+            {
+              "label": "签订日期",
+              "fieldPath": "contract.signedDate"
+            },
+            {
+              "label": "开始日期",
+              "fieldPath": "contract.startDate"
+            },
+            {
+              "label": "结束日期",
+              "fieldPath": "contract.endDate"
+            },
+            {
+              "label": "付款方式",
+              "fieldPath": "contract.paymentMethod"
+            },
+            {
+              "label": "结算方式",
+              "fieldPath": "contract.settlementMethod"
+            },
+            {
+              "label": "已付金额",
+              "fieldPath": "contract.paidAmount"
+            },
+            {
+              "label": "应付金额",
+              "fieldPath": "contract.payableAmount"
+            },
+            {
+              "label": "结算金额",
+              "fieldPath": "contract.settlementAmount"
+            },
+            {
+              "label": "合同状态",
+              "fieldPath": "contract.status"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "contract.approvalStatus"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "note-contract-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "contract.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "contract.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "contract.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_COST_CORRECTIVE_ACTION_V1",
+    "templateName": "成本纠偏单",
+    "businessType": "COST_CORRECTIVE_ACTION",
+    "schemaVersion": "cost-corrective-action.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "cost-corrective-action.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "成本纠偏单 ·",
+          "fieldPath": "action.projectCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "成本纠偏单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-action",
+          "type": "FIELD_GRID",
+          "title": "成本纠偏概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "项目编码",
+              "fieldPath": "action.projectCode"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "action.projectName"
+            },
+            {
+              "label": "预测编码",
+              "fieldPath": "action.forecastCode"
+            },
+            {
+              "label": "预测名称",
+              "fieldPath": "action.forecastName"
+            },
+            {
+              "label": "预测日期",
+              "fieldPath": "action.forecastDate"
+            },
+            {
+              "label": "成本偏差",
+              "fieldPath": "action.costVarianceAmount"
+            },
+            {
+              "label": "措施编码",
+              "fieldPath": "action.actionCode"
+            },
+            {
+              "label": "措施标题",
+              "fieldPath": "action.actionTitle"
+            },
+            {
+              "label": "根因",
+              "fieldPath": "action.rootCause"
+            },
+            {
+              "label": "预计节约金额",
+              "fieldPath": "action.expectedSavingAmount"
+            },
+            {
+              "label": "实际节约金额",
+              "fieldPath": "action.actualSavingAmount"
+            },
+            {
+              "label": "负责人",
+              "fieldPath": "action.responsibleUserName"
+            },
+            {
+              "label": "截止日期",
+              "fieldPath": "action.dueDate"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "action.status"
+            },
+            {
+              "label": "完成时间",
+              "fieldPath": "action.completedAt"
+            }
+          ]
+        },
+        {
+          "id": "note-action-actionPlan",
+          "type": "NOTE",
+          "title": "行动计划",
+          "fieldPath": "action.actionPlan"
+        },
+        {
+          "id": "note-action-resultDescription",
+          "type": "NOTE",
+          "title": "结果说明",
+          "fieldPath": "action.resultDescription"
+        },
+        {
+          "id": "note-action-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "action.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "科目成本明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.subjectCode",
+              "header": "成本科目编码"
+            },
+            {
+              "fieldPath": "items.subjectName",
+              "header": "成本科目名称"
+            },
+            {
+              "fieldPath": "items.bidCostAmount",
+              "header": "投标成本"
+            },
+            {
+              "fieldPath": "items.targetCostAmount",
+              "header": "目标成本"
+            },
+            {
+              "fieldPath": "items.responsibilityAmount",
+              "header": "责任成本"
+            },
+            {
+              "fieldPath": "items.committedCostAmount",
+              "header": "承诺成本"
+            },
+            {
+              "fieldPath": "items.actualCostAmount",
+              "header": "实际成本"
+            },
+            {
+              "fieldPath": "items.estimatedRemainingAmount",
+              "header": "预计剩余成本"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "科目成本明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.subjectCode",
+              "header": "成本科目编码"
+            },
+            {
+              "fieldPath": "items.subjectName",
+              "header": "成本科目名称"
+            },
+            {
+              "fieldPath": "items.forecastAtCompletionAmount",
+              "header": "完工预测"
+            },
+            {
+              "fieldPath": "items.costVarianceAmount",
+              "header": "成本偏差"
+            },
+            {
+              "fieldPath": "items.responsibleUserName",
+              "header": "负责人"
+            },
+            {
+              "fieldPath": "items.responsibilityUnit",
+              "header": "责任单位"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "备注"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_COST_TARGET_V1",
+    "templateName": "目标成本单",
+    "businessType": "COST_TARGET",
+    "schemaVersion": "cost-target.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "cost-target.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "目标成本单 ·",
+          "fieldPath": "target.versionNo",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "目标成本单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-target",
+          "type": "FIELD_GRID",
+          "title": "目标成本概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "版本号",
+              "fieldPath": "target.versionNo"
+            },
+            {
+              "label": "版本名称",
+              "fieldPath": "target.versionName"
+            },
+            {
+              "label": "目标成本总额",
+              "fieldPath": "target.totalTargetAmount"
+            },
+            {
+              "label": "投标成本总额",
+              "fieldPath": "target.totalBidCostAmount"
+            },
+            {
+              "label": "责任预算总额",
+              "fieldPath": "target.totalResponsibilityAmount"
+            },
+            {
+              "label": "来源合同金额",
+              "fieldPath": "target.sourceContractAmount"
+            },
+            {
+              "label": "目标成本率",
+              "fieldPath": "target.targetCostRate"
+            },
+            {
+              "label": "是否生效",
+              "fieldPath": "target.active"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "target.approvalStatus"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "target.status"
+            },
+            {
+              "label": "生效日期",
+              "fieldPath": "target.effectiveDate"
+            }
+          ]
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "成本科目明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.subjectCode",
+              "header": "成本科目编码"
+            },
+            {
+              "fieldPath": "items.subjectName",
+              "header": "成本科目名称"
+            },
+            {
+              "fieldPath": "items.subjectType",
+              "header": "成本科目类型"
+            },
+            {
+              "fieldPath": "items.targetAmount",
+              "header": "目标金额"
+            },
+            {
+              "fieldPath": "items.bidCostAmount",
+              "header": "投标成本金额"
+            },
+            {
+              "fieldPath": "items.responsibilityAmount",
+              "header": "责任预算金额"
+            },
+            {
+              "fieldPath": "items.responsibilityUnit",
+              "header": "责任单位"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "target.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "target.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_CT_CHANGE_V1",
+    "templateName": "合同变更单",
+    "businessType": "CT_CHANGE",
+    "schemaVersion": "contract-change.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "contract-change.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "合同变更单 ·",
+          "fieldPath": "change.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "合同变更单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-change",
+          "type": "FIELD_GRID",
+          "title": "变更概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "变更编号",
+              "fieldPath": "change.code"
+            },
+            {
+              "label": "变更名称",
+              "fieldPath": "change.name"
+            },
+            {
+              "label": "变更类型",
+              "fieldPath": "change.type"
+            },
+            {
+              "label": "变更前金额",
+              "fieldPath": "change.beforeAmount"
+            },
+            {
+              "label": "变更金额",
+              "fieldPath": "change.amount"
+            },
+            {
+              "label": "变更后金额",
+              "fieldPath": "change.afterAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "change.approvalStatus"
+            },
+            {
+              "label": "是否生效",
+              "fieldPath": "change.effective"
+            },
+            {
+              "label": "是否已生成成本",
+              "fieldPath": "change.costGenerated"
+            }
+          ]
+        },
+        {
+          "id": "note-change-reason",
+          "type": "NOTE",
+          "title": "变更原因",
+          "fieldPath": "change.reason"
+        },
+        {
+          "id": "note-change-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "change.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "change.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "change.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_EXPENSE_V1",
+    "templateName": "费用申请单",
+    "businessType": "EXPENSE",
+    "schemaVersion": "expense.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "expense.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "费用申请单 ·",
+          "fieldPath": "expense.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "费用申请单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-expense",
+          "type": "FIELD_GRID",
+          "title": "费用概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "费用申请编号",
+              "fieldPath": "expense.code"
+            },
+            {
+              "label": "费用类别",
+              "fieldPath": "expense.category"
+            },
+            {
+              "label": "费用日期",
+              "fieldPath": "expense.date"
+            },
+            {
+              "label": "申请金额",
+              "fieldPath": "expense.amount"
+            },
+            {
+              "label": "已转付款金额",
+              "fieldPath": "expense.convertedAmount"
+            },
+            {
+              "label": "已付金额",
+              "fieldPath": "expense.paidAmount"
+            },
+            {
+              "label": "可转付款金额",
+              "fieldPath": "expense.availableToConvert"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "expense.status"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "expense.approvalStatus"
+            }
+          ]
+        },
+        {
+          "id": "note-expense-description",
+          "type": "NOTE",
+          "title": "费用说明",
+          "fieldPath": "expense.description"
+        },
+        {
+          "id": "note-expense-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "expense.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "expense.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "expense.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_FINANCE_COST_ALLOCATION_V1",
+    "templateName": "财务成本分摊单",
+    "businessType": "FINANCE_COST_ALLOCATION",
+    "schemaVersion": "finance-cost-allocation.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "finance-cost-allocation.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "财务成本分摊单 ·",
+          "fieldPath": "allocation.subjectCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "财务成本分摊单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-allocation",
+          "type": "FIELD_GRID",
+          "title": "分摊概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "分摊批次号",
+              "fieldPath": "allocation.batchCode"
+            },
+            {
+              "label": "来源类型",
+              "fieldPath": "allocation.sourceType"
+            },
+            {
+              "label": "来源金额",
+              "fieldPath": "allocation.sourceAmount"
+            },
+            {
+              "label": "分摊依据",
+              "fieldPath": "allocation.allocationBasis"
+            },
+            {
+              "label": "会计期间",
+              "fieldPath": "allocation.accountingPeriod"
+            },
+            {
+              "label": "成本科目编码",
+              "fieldPath": "allocation.subjectCode"
+            },
+            {
+              "label": "成本科目名称",
+              "fieldPath": "allocation.subjectName"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "allocation.status"
+            }
+          ]
+        },
+        {
+          "id": "note-allocation-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "allocation.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "项目分摊明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.projectCode",
+              "header": "项目编码"
+            },
+            {
+              "fieldPath": "items.projectName",
+              "header": "项目名称"
+            },
+            {
+              "fieldPath": "items.basisValue",
+              "header": "依据值"
+            },
+            {
+              "fieldPath": "items.allocatedAmount",
+              "header": "分摊金额"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "过账时间",
+              "fieldPath": "allocation.postedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_FINANCE_COST_ALLOCATION_REVERSAL_V1",
+    "templateName": "财务成本分摊冲销单",
+    "businessType": "FINANCE_COST_ALLOCATION_REVERSAL",
+    "schemaVersion": "finance-allocation-reversal.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "finance-allocation-reversal.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "财务成本分摊冲销单 ·",
+          "fieldPath": "reversal.subjectCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "财务成本分摊冲销单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-reversal",
+          "type": "FIELD_GRID",
+          "title": "冲销概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "原分摊批次号",
+              "fieldPath": "reversal.originalBatchCode"
+            },
+            {
+              "label": "冲销批次号",
+              "fieldPath": "reversal.batchCode"
+            },
+            {
+              "label": "来源类型",
+              "fieldPath": "reversal.sourceType"
+            },
+            {
+              "label": "冲销金额",
+              "fieldPath": "reversal.sourceAmount"
+            },
+            {
+              "label": "分摊依据",
+              "fieldPath": "reversal.allocationBasis"
+            },
+            {
+              "label": "会计期间",
+              "fieldPath": "reversal.accountingPeriod"
+            },
+            {
+              "label": "成本科目编码",
+              "fieldPath": "reversal.subjectCode"
+            },
+            {
+              "label": "成本科目名称",
+              "fieldPath": "reversal.subjectName"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "reversal.status"
+            }
+          ]
+        },
+        {
+          "id": "note-reversal-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "reversal.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "项目冲销明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.projectCode",
+              "header": "项目编码"
+            },
+            {
+              "fieldPath": "items.projectName",
+              "header": "项目名称"
+            },
+            {
+              "fieldPath": "items.basisValue",
+              "header": "依据值"
+            },
+            {
+              "fieldPath": "items.allocatedAmount",
+              "header": "冲销金额"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "过账时间",
+              "fieldPath": "reversal.postedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_MATERIAL_RECEIPT_V1",
+    "templateName": "材料验收单",
+    "businessType": "MATERIAL_RECEIPT",
+    "schemaVersion": "material-receipt.v2",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "material-receipt.v2",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "材料验收单 ·",
+          "fieldPath": "receipt.receiptCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "材料验收单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-receipt",
+          "type": "FIELD_GRID",
+          "title": "验收概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "验收单号",
+              "fieldPath": "receipt.receiptCode"
+            },
+            {
+              "label": "系统批次号",
+              "fieldPath": "receipt.systemBatchNo"
+            },
+            {
+              "label": "送货单号",
+              "fieldPath": "receipt.deliveryNoteNo"
+            },
+            {
+              "label": "验收日期",
+              "fieldPath": "receipt.receiptDate"
+            },
+            {
+              "label": "验收模式",
+              "fieldPath": "receipt.receiptMode"
+            },
+            {
+              "label": "质量状态",
+              "fieldPath": "receipt.qualityStatus"
+            },
+            {
+              "label": "验收金额",
+              "fieldPath": "receipt.totalAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "receipt.approvalStatus"
+            },
+            {
+              "label": "是否已生成成本",
+              "fieldPath": "receipt.costGenerated"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-order",
+          "type": "FIELD_GRID",
+          "title": "采购订单号信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "采购订单号",
+              "fieldPath": "order.code"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-supplier",
+          "type": "FIELD_GRID",
+          "title": "供应商信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "供应商名称",
+              "fieldPath": "supplier.name"
+            }
+          ]
+        },
+        {
+          "id": "note-receipt-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "receipt.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "材料验收明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.specification",
+              "header": "规格型号"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.actualQuantity",
+              "header": "实收数量"
+            },
+            {
+              "fieldPath": "items.qualifiedQuantity",
+              "header": "合格数量"
+            },
+            {
+              "fieldPath": "items.acceptedQuantity",
+              "header": "验收数量"
+            },
+            {
+              "fieldPath": "items.unqualifiedQuantity",
+              "header": "不合格数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "材料验收明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "金额"
+            },
+            {
+              "fieldPath": "items.useLocation",
+              "header": "使用部位"
+            },
+            {
+              "fieldPath": "items.batchNo",
+              "header": "材料批次号"
+            },
+            {
+              "fieldPath": "items.dispositionType",
+              "header": "不合格处置类型"
+            },
+            {
+              "fieldPath": "items.dispositionStatus",
+              "header": "不合格处置状态"
+            },
+            {
+              "fieldPath": "items.dispositionReason",
+              "header": "不合格原因"
+            },
+            {
+              "fieldPath": "items.orderedQuantity",
+              "header": "订单数量"
+            }
+          ]
+        },
+        {
+          "id": "table-items-3",
+          "type": "COLLECTION_TABLE",
+          "title": "材料验收明细（3）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.receivedQuantity",
+              "header": "累计收货数量"
+            },
+            {
+              "fieldPath": "items.remainingQuantity",
+              "header": "剩余数量"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "receipt.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "receipt.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_MATERIAL_REQUISITION_V1",
+    "templateName": "材料领用单",
+    "businessType": "MATERIAL_REQUISITION",
+    "schemaVersion": "material-requisition.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "material-requisition.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "材料领用单 ·",
+          "fieldPath": "requisition.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "材料领用单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-requisition",
+          "type": "FIELD_GRID",
+          "title": "领用概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "领料单号",
+              "fieldPath": "requisition.code"
+            },
+            {
+              "label": "领料日期",
+              "fieldPath": "requisition.date"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "requisition.approvalStatus"
+            },
+            {
+              "label": "领料总额",
+              "fieldPath": "requisition.totalAmount"
+            },
+            {
+              "label": "是否已出库",
+              "fieldPath": "requisition.stockOut"
+            },
+            {
+              "label": "出库时间",
+              "fieldPath": "requisition.stockOutAt"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-partner",
+          "type": "FIELD_GRID",
+          "title": "往来单位",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "往来单位",
+              "fieldPath": "partner.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-warehouse",
+          "type": "FIELD_GRID",
+          "title": "仓库编码信息",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "仓库编码",
+              "fieldPath": "warehouse.code"
+            },
+            {
+              "label": "仓库名称",
+              "fieldPath": "warehouse.name"
+            }
+          ]
+        },
+        {
+          "id": "note-requisition-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "requisition.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "材料领用明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.specification",
+              "header": "规格型号"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.quantity",
+              "header": "领用数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "金额"
+            },
+            {
+              "fieldPath": "items.useLocation",
+              "header": "使用部位"
+            },
+            {
+              "fieldPath": "items.batchNo",
+              "header": "材料批次号"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "材料领用明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "requisition.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "requisition.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_OWNER_SETTLEMENT_V1",
+    "templateName": "业主结算单",
+    "businessType": "OWNER_SETTLEMENT",
+    "schemaVersion": "owner-settlement.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "owner-settlement.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "业主结算单 ·",
+          "fieldPath": "settlement.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "业主结算单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-settlement",
+          "type": "FIELD_GRID",
+          "title": "结算信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "业主结算编号",
+              "fieldPath": "settlement.code"
+            },
+            {
+              "label": "结算期间",
+              "fieldPath": "settlement.period"
+            },
+            {
+              "label": "结算日期",
+              "fieldPath": "settlement.date"
+            },
+            {
+              "label": "含税结算金额",
+              "fieldPath": "settlement.grossAmount"
+            },
+            {
+              "label": "税额",
+              "fieldPath": "settlement.taxAmount"
+            },
+            {
+              "label": "保留金",
+              "fieldPath": "settlement.retentionAmount"
+            },
+            {
+              "label": "应收净额",
+              "fieldPath": "settlement.netReceivableAmount"
+            },
+            {
+              "label": "到期日期",
+              "fieldPath": "settlement.dueDate"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "settlement.status"
+            }
+          ]
+        },
+        {
+          "id": "note-settlement-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "settlement.remark"
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PAY_REQUEST_V1",
+    "templateName": "付款申请单",
+    "businessType": "PAY_REQUEST",
+    "schemaVersion": "pay-request.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "pay-request.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "付款申请单 ·",
+          "fieldPath": "payment.applyCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "付款申请单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-payment",
+          "type": "FIELD_GRID",
+          "title": "付款申请",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "申请编号",
+              "fieldPath": "payment.applyCode"
+            },
+            {
+              "label": "申请金额",
+              "fieldPath": "payment.applyAmount"
+            },
+            {
+              "label": "批准金额",
+              "fieldPath": "payment.approvedAmount"
+            },
+            {
+              "label": "实付金额",
+              "fieldPath": "payment.actualPayAmount"
+            },
+            {
+              "label": "付款类型",
+              "fieldPath": "payment.payType"
+            },
+            {
+              "label": "付款状态",
+              "fieldPath": "payment.payStatus"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "payment.approvalStatus"
+            },
+            {
+              "label": "费用类别",
+              "fieldPath": "payment.expenseCategory"
+            },
+            {
+              "label": "申请事由",
+              "fieldPath": "payment.applyReason"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "项目编号",
+              "fieldPath": "project.code"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            },
+            {
+              "label": "项目地址",
+              "fieldPath": "project.address"
+            },
+            {
+              "label": "建设单位",
+              "fieldPath": "project.ownerUnit"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "合同编号",
+              "fieldPath": "contract.code"
+            },
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            },
+            {
+              "label": "合同金额",
+              "fieldPath": "contract.amount"
+            }
+          ]
+        },
+        {
+          "id": "grid-payee",
+          "type": "FIELD_GRID",
+          "title": "收款信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "收款单位",
+              "fieldPath": "payee.name"
+            }
+          ]
+        },
+        {
+          "id": "note-payment-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "payment.remark"
+        },
+        {
+          "id": "table-basis-1",
+          "type": "COLLECTION_TABLE",
+          "title": "付款依据",
+          "collectionPath": "basis",
+          "columns": [
+            {
+              "fieldPath": "basis.type",
+              "header": "付款依据类型"
+            },
+            {
+              "fieldPath": "basis.amount",
+              "header": "付款依据金额"
+            },
+            {
+              "fieldPath": "basis.remark",
+              "header": "付款依据备注"
+            }
+          ]
+        },
+        {
+          "id": "table-sources-1",
+          "type": "COLLECTION_TABLE",
+          "title": "付款来源",
+          "collectionPath": "sources",
+          "columns": [
+            {
+              "fieldPath": "sources.type",
+              "header": "付款来源类型"
+            },
+            {
+              "fieldPath": "sources.amount",
+              "header": "付款来源金额"
+            },
+            {
+              "fieldPath": "sources.paidAmount",
+              "header": "付款来源已付金额"
+            }
+          ]
+        },
+        {
+          "id": "table-invoices-1",
+          "type": "COLLECTION_TABLE",
+          "title": "发票明细",
+          "collectionPath": "invoices",
+          "columns": [
+            {
+              "fieldPath": "invoices.number",
+              "header": "发票号码"
+            },
+            {
+              "fieldPath": "invoices.type",
+              "header": "发票类型"
+            },
+            {
+              "fieldPath": "invoices.amount",
+              "header": "发票金额"
+            },
+            {
+              "fieldPath": "invoices.taxAmount",
+              "header": "发票税额"
+            },
+            {
+              "fieldPath": "invoices.date",
+              "header": "开票日期"
+            },
+            {
+              "fieldPath": "invoices.sellerName",
+              "header": "销方名称"
+            },
+            {
+              "fieldPath": "invoices.buyerName",
+              "header": "购方名称"
+            },
+            {
+              "fieldPath": "invoices.verifyStatus",
+              "header": "验真状态"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "申请时间",
+              "fieldPath": "payment.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "payment.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PAYMENT_APPLICATION_V1",
+    "templateName": "付款申请单（历史兼容）",
+    "businessType": "PAYMENT",
+    "schemaVersion": "payment.v2",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "payment.v2",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "付款申请单（历史兼容） ·",
+          "fieldPath": "payment.applyCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "付款申请单（历史兼容）",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-payment",
+          "type": "FIELD_GRID",
+          "title": "付款申请",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "申请编号",
+              "fieldPath": "payment.applyCode"
+            },
+            {
+              "label": "申请金额",
+              "fieldPath": "payment.applyAmount"
+            },
+            {
+              "label": "批准金额",
+              "fieldPath": "payment.approvedAmount"
+            },
+            {
+              "label": "实付金额",
+              "fieldPath": "payment.actualPayAmount"
+            },
+            {
+              "label": "付款类型",
+              "fieldPath": "payment.payType"
+            },
+            {
+              "label": "付款状态",
+              "fieldPath": "payment.payStatus"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "payment.approvalStatus"
+            },
+            {
+              "label": "费用类别",
+              "fieldPath": "payment.expenseCategory"
+            },
+            {
+              "label": "申请事由",
+              "fieldPath": "payment.applyReason"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "项目编号",
+              "fieldPath": "project.code"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            },
+            {
+              "label": "项目地址",
+              "fieldPath": "project.address"
+            },
+            {
+              "label": "建设单位",
+              "fieldPath": "project.ownerUnit"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "合同编号",
+              "fieldPath": "contract.code"
+            },
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            },
+            {
+              "label": "合同金额",
+              "fieldPath": "contract.amount"
+            }
+          ]
+        },
+        {
+          "id": "grid-payee",
+          "type": "FIELD_GRID",
+          "title": "收款信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "收款单位",
+              "fieldPath": "payee.name"
+            }
+          ]
+        },
+        {
+          "id": "note-payment-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "payment.remark"
+        },
+        {
+          "id": "table-basis-1",
+          "type": "COLLECTION_TABLE",
+          "title": "付款依据",
+          "collectionPath": "basis",
+          "columns": [
+            {
+              "fieldPath": "basis.type",
+              "header": "付款依据类型"
+            },
+            {
+              "fieldPath": "basis.amount",
+              "header": "付款依据金额"
+            },
+            {
+              "fieldPath": "basis.remark",
+              "header": "付款依据备注"
+            }
+          ]
+        },
+        {
+          "id": "table-sources-1",
+          "type": "COLLECTION_TABLE",
+          "title": "付款来源",
+          "collectionPath": "sources",
+          "columns": [
+            {
+              "fieldPath": "sources.type",
+              "header": "付款来源类型"
+            },
+            {
+              "fieldPath": "sources.amount",
+              "header": "付款来源金额"
+            },
+            {
+              "fieldPath": "sources.paidAmount",
+              "header": "付款来源已付金额"
+            }
+          ]
+        },
+        {
+          "id": "table-invoices-1",
+          "type": "COLLECTION_TABLE",
+          "title": "发票明细",
+          "collectionPath": "invoices",
+          "columns": [
+            {
+              "fieldPath": "invoices.number",
+              "header": "发票号码"
+            },
+            {
+              "fieldPath": "invoices.type",
+              "header": "发票类型"
+            },
+            {
+              "fieldPath": "invoices.amount",
+              "header": "发票金额"
+            },
+            {
+              "fieldPath": "invoices.taxAmount",
+              "header": "发票税额"
+            },
+            {
+              "fieldPath": "invoices.date",
+              "header": "开票日期"
+            },
+            {
+              "fieldPath": "invoices.sellerName",
+              "header": "销方名称"
+            },
+            {
+              "fieldPath": "invoices.buyerName",
+              "header": "购方名称"
+            },
+            {
+              "fieldPath": "invoices.verifyStatus",
+              "header": "验真状态"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "申请时间",
+              "fieldPath": "payment.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "payment.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PRODUCTION_MEASUREMENT_V1",
+    "templateName": "产值计量单",
+    "businessType": "PRODUCTION_MEASUREMENT",
+    "schemaVersion": "production-measurement.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "production-measurement.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "产值计量单 ·",
+          "fieldPath": "measurement.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "产值计量单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-measurement",
+          "type": "FIELD_GRID",
+          "title": "计量概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "产值计量编号",
+              "fieldPath": "measurement.code"
+            },
+            {
+              "label": "计量周期编号",
+              "fieldPath": "measurement.periodCode"
+            },
+            {
+              "label": "计量周期名称",
+              "fieldPath": "measurement.periodName"
+            },
+            {
+              "label": "计量日期",
+              "fieldPath": "measurement.date"
+            },
+            {
+              "label": "本期申报金额",
+              "fieldPath": "measurement.currentReportedAmount"
+            },
+            {
+              "label": "累计申报金额",
+              "fieldPath": "measurement.cumulativeReportedAmount"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "measurement.status"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "measurement.approvalStatus"
+            }
+          ]
+        },
+        {
+          "id": "note-measurement-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "measurement.remark"
+        },
+        {
+          "id": "table-lines-1",
+          "type": "COLLECTION_TABLE",
+          "title": "计量清单（1）",
+          "collectionPath": "lines",
+          "columns": [
+            {
+              "fieldPath": "lines.itemCode",
+              "header": "清单编码"
+            },
+            {
+              "fieldPath": "lines.itemName",
+              "header": "清单名称"
+            },
+            {
+              "fieldPath": "lines.specification",
+              "header": "规格型号"
+            },
+            {
+              "fieldPath": "lines.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "lines.sourceType",
+              "header": "来源类型"
+            },
+            {
+              "fieldPath": "lines.contractQuantity",
+              "header": "合同数量"
+            },
+            {
+              "fieldPath": "lines.priorApprovedQuantity",
+              "header": "上期累计数量"
+            },
+            {
+              "fieldPath": "lines.currentReportedQuantity",
+              "header": "本期申报数量"
+            }
+          ]
+        },
+        {
+          "id": "table-lines-2",
+          "type": "COLLECTION_TABLE",
+          "title": "计量清单（2）",
+          "collectionPath": "lines",
+          "columns": [
+            {
+              "fieldPath": "lines.itemCode",
+              "header": "清单编码"
+            },
+            {
+              "fieldPath": "lines.itemName",
+              "header": "清单名称"
+            },
+            {
+              "fieldPath": "lines.cumulativeReportedQuantity",
+              "header": "累计申报数量"
+            },
+            {
+              "fieldPath": "lines.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "lines.currentReportedAmount",
+              "header": "本期申报金额"
+            },
+            {
+              "fieldPath": "lines.cumulativeReportedAmount",
+              "header": "累计申报金额"
+            }
+          ]
+        },
+        {
+          "id": "table-submissions-1",
+          "type": "COLLECTION_TABLE",
+          "title": "业主报量明细（1）",
+          "collectionPath": "submissions",
+          "columns": [
+            {
+              "fieldPath": "submissions.code",
+              "header": "业主报量编号"
+            },
+            {
+              "fieldPath": "submissions.revisionNo",
+              "header": "报量版本"
+            },
+            {
+              "fieldPath": "submissions.submittedAt",
+              "header": "报送时间"
+            },
+            {
+              "fieldPath": "submissions.externalDocumentNo",
+              "header": "外部文号"
+            },
+            {
+              "fieldPath": "submissions.submittedAmount",
+              "header": "报送金额"
+            },
+            {
+              "fieldPath": "submissions.confirmedAmount",
+              "header": "确认金额"
+            },
+            {
+              "fieldPath": "submissions.deductedAmount",
+              "header": "扣减金额"
+            },
+            {
+              "fieldPath": "submissions.status",
+              "header": "报量状态"
+            }
+          ]
+        },
+        {
+          "id": "table-submissions-2",
+          "type": "COLLECTION_TABLE",
+          "title": "业主报量明细（2）",
+          "collectionPath": "submissions",
+          "columns": [
+            {
+              "fieldPath": "submissions.code",
+              "header": "业主报量编号"
+            },
+            {
+              "fieldPath": "submissions.remark",
+              "header": "报量备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "measurement.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "measurement.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_APPROVAL_V1",
+    "templateName": "项目立项审批单",
+    "businessType": "PROJECT_APPROVAL",
+    "schemaVersion": "project-approval.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-approval.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "项目立项审批单 ·",
+          "fieldPath": "project.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "项目立项审批单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "项目编号",
+              "fieldPath": "project.code"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            },
+            {
+              "label": "项目类型",
+              "fieldPath": "project.type"
+            },
+            {
+              "label": "项目地址",
+              "fieldPath": "project.address"
+            },
+            {
+              "label": "建设单位",
+              "fieldPath": "project.ownerUnit"
+            },
+            {
+              "label": "监理单位",
+              "fieldPath": "project.supervisorUnit"
+            },
+            {
+              "label": "设计单位",
+              "fieldPath": "project.designUnit"
+            },
+            {
+              "label": "合同金额",
+              "fieldPath": "project.contractAmount"
+            },
+            {
+              "label": "目标成本",
+              "fieldPath": "project.targetCost"
+            },
+            {
+              "label": "最终中标价",
+              "fieldPath": "project.finalBidPrice"
+            },
+            {
+              "label": "计划开始日期",
+              "fieldPath": "project.plannedStartDate"
+            },
+            {
+              "label": "计划结束日期",
+              "fieldPath": "project.plannedEndDate"
+            },
+            {
+              "label": "实际开始日期",
+              "fieldPath": "project.actualStartDate"
+            },
+            {
+              "label": "实际结束日期",
+              "fieldPath": "project.actualEndDate"
+            },
+            {
+              "label": "项目状态",
+              "fieldPath": "project.status"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "project.approvalStatus"
+            }
+          ]
+        },
+        {
+          "id": "note-project-initiationBasis",
+          "type": "NOTE",
+          "title": "立项依据",
+          "fieldPath": "project.initiationBasis"
+        },
+        {
+          "id": "note-project-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "project.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "project.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "project.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_BUDGET_V1",
+    "templateName": "项目预算单",
+    "businessType": "PROJECT_BUDGET",
+    "schemaVersion": "project-budget.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-budget.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "项目预算单 ·",
+          "fieldPath": "budget.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "项目预算单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-budget",
+          "type": "FIELD_GRID",
+          "title": "预算概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "预算编号",
+              "fieldPath": "budget.code"
+            },
+            {
+              "label": "预算版本",
+              "fieldPath": "budget.versionNo"
+            },
+            {
+              "label": "预算名称",
+              "fieldPath": "budget.name"
+            },
+            {
+              "label": "预算总额",
+              "fieldPath": "budget.totalAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "budget.approvalStatus"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "budget.status"
+            },
+            {
+              "label": "是否生效",
+              "fieldPath": "budget.active"
+            }
+          ]
+        },
+        {
+          "id": "note-budget-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "budget.remark"
+        },
+        {
+          "id": "table-lines-1",
+          "type": "COLLECTION_TABLE",
+          "title": "科目预算明细",
+          "collectionPath": "lines",
+          "columns": [
+            {
+              "fieldPath": "lines.subjectName",
+              "header": "成本科目"
+            },
+            {
+              "fieldPath": "lines.budgetAmount",
+              "header": "预算金额"
+            },
+            {
+              "fieldPath": "lines.reservedAmount",
+              "header": "预留金额"
+            },
+            {
+              "fieldPath": "lines.consumedAmount",
+              "header": "已消耗金额"
+            },
+            {
+              "fieldPath": "lines.availableAmount",
+              "header": "可用金额"
+            },
+            {
+              "fieldPath": "lines.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "生效时间",
+              "fieldPath": "budget.effectiveAt"
+            },
+            {
+              "label": "创建时间",
+              "fieldPath": "budget.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "budget.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_COMMENCEMENT_V1",
+    "templateName": "项目开工单",
+    "businessType": "PROJECT_COMMENCEMENT",
+    "schemaVersion": "project-commencement.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-commencement.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "项目开工单 ·",
+          "fieldPath": "commencement.plannedStartDate",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "项目开工单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-commencement",
+          "type": "FIELD_GRID",
+          "title": "开工概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "拟开工日期",
+              "fieldPath": "commencement.plannedStartDate"
+            },
+            {
+              "label": "实际开工日期",
+              "fieldPath": "commencement.actualStartDate"
+            },
+            {
+              "label": "开工依据类型",
+              "fieldPath": "commencement.basisType"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "commencement.approvalStatus"
+            }
+          ]
+        },
+        {
+          "id": "note-commencement-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "commencement.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "commencement.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "commencement.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_CORRECTIVE_ACTION_V1",
+    "templateName": "项目纠偏单",
+    "businessType": "PROJECT_CORRECTIVE_ACTION",
+    "schemaVersion": "project-corrective-action.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-corrective-action.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "项目纠偏单 ·",
+          "fieldPath": "corrective.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "项目纠偏单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-corrective",
+          "type": "FIELD_GRID",
+          "title": "纠偏概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "纠偏编号",
+              "fieldPath": "corrective.code"
+            },
+            {
+              "label": "完成期限",
+              "fieldPath": "corrective.dueDate"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "corrective.status"
+            }
+          ]
+        },
+        {
+          "id": "note-corrective-reason",
+          "type": "NOTE",
+          "title": "纠偏原因",
+          "fieldPath": "corrective.reason"
+        },
+        {
+          "id": "note-corrective-actionPlan",
+          "type": "NOTE",
+          "title": "纠偏措施",
+          "fieldPath": "corrective.actionPlan"
+        },
+        {
+          "id": "note-corrective-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "corrective.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "corrective.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "corrective.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_FINAL_ACCEPTANCE_V1",
+    "templateName": "项目竣工验收单",
+    "businessType": "PROJECT_FINAL_ACCEPTANCE",
+    "schemaVersion": "project-final-acceptance.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-final-acceptance.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "项目竣工验收单 ·",
+          "fieldPath": "acceptance.closeoutCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "项目竣工验收单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-acceptance",
+          "type": "FIELD_GRID",
+          "title": "验收概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "收尾编码",
+              "fieldPath": "acceptance.closeoutCode"
+            },
+            {
+              "label": "项目编码",
+              "fieldPath": "acceptance.projectCode"
+            },
+            {
+              "label": "项目名称",
+              "fieldPath": "acceptance.projectName"
+            },
+            {
+              "label": "验收编码",
+              "fieldPath": "acceptance.acceptanceCode"
+            },
+            {
+              "label": "验收日期",
+              "fieldPath": "acceptance.acceptanceDate"
+            },
+            {
+              "label": "组织单位",
+              "fieldPath": "acceptance.organizer"
+            },
+            {
+              "label": "参验方",
+              "fieldPath": "acceptance.participantSummary"
+            },
+            {
+              "label": "验收结论",
+              "fieldPath": "acceptance.conclusion"
+            },
+            {
+              "label": "状态",
+              "fieldPath": "acceptance.status"
+            }
+          ]
+        },
+        {
+          "id": "note-acceptance-acceptanceSummary",
+          "type": "NOTE",
+          "title": "验收摘要",
+          "fieldPath": "acceptance.acceptanceSummary"
+        },
+        {
+          "id": "note-acceptance-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "acceptance.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "分项验收明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.taskCode",
+              "header": "任务编码"
+            },
+            {
+              "fieldPath": "items.taskName",
+              "header": "任务名称"
+            },
+            {
+              "fieldPath": "items.workArea",
+              "header": "施工区域"
+            },
+            {
+              "fieldPath": "items.qualityInspectionCode",
+              "header": "质量检查编码"
+            },
+            {
+              "fieldPath": "items.qualityInspectionDate",
+              "header": "质量检查日期"
+            },
+            {
+              "fieldPath": "items.qualityConclusion",
+              "header": "质量结论"
+            },
+            {
+              "fieldPath": "items.acceptanceCode",
+              "header": "分项验收编码"
+            },
+            {
+              "fieldPath": "items.acceptanceName",
+              "header": "分项验收名称"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "分项验收明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.taskCode",
+              "header": "任务编码"
+            },
+            {
+              "fieldPath": "items.taskName",
+              "header": "任务名称"
+            },
+            {
+              "fieldPath": "items.acceptanceDate",
+              "header": "分项验收日期"
+            },
+            {
+              "fieldPath": "items.conclusion",
+              "header": "分项结论"
+            },
+            {
+              "fieldPath": "items.status",
+              "header": "分项状态"
+            },
+            {
+              "fieldPath": "items.confirmedAt",
+              "header": "确认时间"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "批准时间",
+              "fieldPath": "acceptance.approvedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_PERIOD_PLAN_V1",
+    "templateName": "项目期间计划单",
+    "businessType": "PROJECT_PERIOD_PLAN",
+    "schemaVersion": "project-period-plan.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-period-plan.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "项目期间计划单 ·",
+          "fieldPath": "period.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "项目期间计划单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-period",
+          "type": "FIELD_GRID",
+          "title": "期间概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "期间计划编号",
+              "fieldPath": "period.code"
+            },
+            {
+              "label": "期间计划名称",
+              "fieldPath": "period.name"
+            },
+            {
+              "label": "期间类型",
+              "fieldPath": "period.type"
+            },
+            {
+              "label": "开始日期",
+              "fieldPath": "period.startDate"
+            },
+            {
+              "label": "结束日期",
+              "fieldPath": "period.endDate"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "period.status"
+            }
+          ]
+        },
+        {
+          "id": "note-period-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "period.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "期间任务明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.taskCode",
+              "header": "任务编号"
+            },
+            {
+              "fieldPath": "items.taskName",
+              "header": "任务名称"
+            },
+            {
+              "fieldPath": "items.targetProgress",
+              "header": "目标进度"
+            },
+            {
+              "fieldPath": "items.plannedQuantity",
+              "header": "计划工程量"
+            },
+            {
+              "fieldPath": "items.actualProgress",
+              "header": "实际进度"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PROJECT_SCHEDULE_V1",
+    "templateName": "项目进度计划单",
+    "businessType": "PROJECT_SCHEDULE",
+    "schemaVersion": "project-schedule.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "project-schedule.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "项目进度计划单 ·",
+          "fieldPath": "schedule.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "项目进度计划单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-schedule",
+          "type": "FIELD_GRID",
+          "title": "计划概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "计划编号",
+              "fieldPath": "schedule.code"
+            },
+            {
+              "label": "计划名称",
+              "fieldPath": "schedule.name"
+            },
+            {
+              "label": "计划类型",
+              "fieldPath": "schedule.type"
+            },
+            {
+              "label": "计划版本",
+              "fieldPath": "schedule.versionNo"
+            },
+            {
+              "label": "计划开始日期",
+              "fieldPath": "schedule.plannedStartDate"
+            },
+            {
+              "label": "计划结束日期",
+              "fieldPath": "schedule.plannedEndDate"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "schedule.status"
+            }
+          ]
+        },
+        {
+          "id": "grid-progress",
+          "type": "FIELD_GRID",
+          "title": "进度快照",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "快照日期",
+              "fieldPath": "progress.snapshotDate"
+            },
+            {
+              "label": "计划进度",
+              "fieldPath": "progress.planned"
+            },
+            {
+              "label": "实际进度",
+              "fieldPath": "progress.actual"
+            },
+            {
+              "label": "偏差",
+              "fieldPath": "progress.deviation"
+            },
+            {
+              "label": "进度状态",
+              "fieldPath": "progress.status"
+            }
+          ]
+        },
+        {
+          "id": "note-schedule-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "schedule.remark"
+        },
+        {
+          "id": "table-tasks-1",
+          "type": "COLLECTION_TABLE",
+          "title": "任务进度明细（1）",
+          "collectionPath": "tasks",
+          "columns": [
+            {
+              "fieldPath": "tasks.code",
+              "header": "任务编号"
+            },
+            {
+              "fieldPath": "tasks.name",
+              "header": "任务名称"
+            },
+            {
+              "fieldPath": "tasks.workArea",
+              "header": "工作区域"
+            },
+            {
+              "fieldPath": "tasks.plannedStartDate",
+              "header": "计划开始日期"
+            },
+            {
+              "fieldPath": "tasks.plannedEndDate",
+              "header": "计划结束日期"
+            },
+            {
+              "fieldPath": "tasks.weightPercent",
+              "header": "权重"
+            },
+            {
+              "fieldPath": "tasks.plannedQuantity",
+              "header": "计划工程量"
+            },
+            {
+              "fieldPath": "tasks.unit",
+              "header": "单位"
+            }
+          ]
+        },
+        {
+          "id": "table-tasks-2",
+          "type": "COLLECTION_TABLE",
+          "title": "任务进度明细（2）",
+          "collectionPath": "tasks",
+          "columns": [
+            {
+              "fieldPath": "tasks.code",
+              "header": "任务编号"
+            },
+            {
+              "fieldPath": "tasks.name",
+              "header": "任务名称"
+            },
+            {
+              "fieldPath": "tasks.actualQuantity",
+              "header": "实际工程量"
+            },
+            {
+              "fieldPath": "tasks.actualProgress",
+              "header": "实际进度"
+            },
+            {
+              "fieldPath": "tasks.status",
+              "header": "任务状态"
+            },
+            {
+              "fieldPath": "tasks.remark",
+              "header": "任务备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "启用时间",
+              "fieldPath": "schedule.activatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PURCHASE_ORDER_V1",
+    "templateName": "采购订单",
+    "businessType": "PURCHASE_ORDER",
+    "schemaVersion": "purchase-order.v2",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "purchase-order.v2",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "采购订单 ·",
+          "fieldPath": "purchaseOrder.orderCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "采购订单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-purchaseOrder",
+          "type": "FIELD_GRID",
+          "title": "订单概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "采购订单号",
+              "fieldPath": "purchaseOrder.orderCode"
+            },
+            {
+              "label": "订单类型",
+              "fieldPath": "purchaseOrder.orderType"
+            },
+            {
+              "label": "订单日期",
+              "fieldPath": "purchaseOrder.orderDate"
+            },
+            {
+              "label": "交付日期",
+              "fieldPath": "purchaseOrder.deliveryDate"
+            },
+            {
+              "label": "交付条款",
+              "fieldPath": "purchaseOrder.deliveryTerms"
+            },
+            {
+              "label": "是否例外采购",
+              "fieldPath": "purchaseOrder.exceptionPurchase"
+            },
+            {
+              "label": "订单总金额",
+              "fieldPath": "purchaseOrder.totalAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "purchaseOrder.approvalStatus"
+            },
+            {
+              "label": "履约状态",
+              "fieldPath": "purchaseOrder.orderStatus"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-request",
+          "type": "FIELD_GRID",
+          "title": "申请关联",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "采购申请编号",
+              "fieldPath": "request.code"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-supplier",
+          "type": "FIELD_GRID",
+          "title": "供应商信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "供应商名称",
+              "fieldPath": "supplier.name"
+            }
+          ]
+        },
+        {
+          "id": "note-purchaseOrder-exceptionReason",
+          "type": "NOTE",
+          "title": "例外采购原因",
+          "fieldPath": "purchaseOrder.exceptionReason"
+        },
+        {
+          "id": "note-purchaseOrder-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "purchaseOrder.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "采购材料明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.specification",
+              "header": "规格型号"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.quantity",
+              "header": "数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "items.taxRate",
+              "header": "税率"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "含税金额"
+            },
+            {
+              "fieldPath": "items.taxAmount",
+              "header": "税额"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "采购材料明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.amountWithoutTax",
+              "header": "不含税金额"
+            },
+            {
+              "fieldPath": "items.receivedQuantity",
+              "header": "已收数量"
+            },
+            {
+              "fieldPath": "items.priceSource",
+              "header": "价格来源"
+            },
+            {
+              "fieldPath": "items.quantityAdjustReason",
+              "header": "数量调整原因"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "purchaseOrder.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "purchaseOrder.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_PURCHASE_REQUEST_V1",
+    "templateName": "采购申请单",
+    "businessType": "PURCHASE_REQUEST",
+    "schemaVersion": "purchase-request.v3",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "purchase-request.v3",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "采购申请单 ·",
+          "fieldPath": "purchaseRequest.requestCode",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "采购申请单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-purchaseRequest",
+          "type": "FIELD_GRID",
+          "title": "申请概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "申请编号",
+              "fieldPath": "purchaseRequest.requestCode"
+            },
+            {
+              "label": "预计总金额",
+              "fieldPath": "purchaseRequest.totalAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "purchaseRequest.approvalStatus"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "purchaseRequest.status"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "note-purchaseRequest-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "purchaseRequest.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "申请材料明细（1）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.specification",
+              "header": "规格型号"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.quantity",
+              "header": "申请数量"
+            },
+            {
+              "fieldPath": "items.approvedQuantity",
+              "header": "审批数量"
+            },
+            {
+              "fieldPath": "items.estimatedUnitPrice",
+              "header": "预计单价"
+            },
+            {
+              "fieldPath": "items.estimatedAmount",
+              "header": "预计金额"
+            },
+            {
+              "fieldPath": "items.useLocation",
+              "header": "使用部位"
+            }
+          ]
+        },
+        {
+          "id": "table-items-2",
+          "type": "COLLECTION_TABLE",
+          "title": "申请材料明细（2）",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.materialName",
+              "header": "材料名称"
+            },
+            {
+              "fieldPath": "items.plannedDate",
+              "header": "计划到货日期"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "purchaseRequest.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "purchaseRequest.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_SETTLEMENT_V1",
+    "templateName": "工程结算单",
+    "businessType": "SETTLEMENT",
+    "schemaVersion": "settlement.v2",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "settlement.v2",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "工程结算单 ·",
+          "fieldPath": "settlement.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "工程结算单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-settlement",
+          "type": "FIELD_GRID",
+          "title": "结算信息",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "结算编号",
+              "fieldPath": "settlement.code"
+            },
+            {
+              "label": "结算类型",
+              "fieldPath": "settlement.type"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "settlement.status"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "settlement.approvalStatus"
+            },
+            {
+              "label": "定案状态",
+              "fieldPath": "settlement.finalStatus"
+            },
+            {
+              "label": "合同金额",
+              "fieldPath": "settlement.contractAmount"
+            },
+            {
+              "label": "变更金额",
+              "fieldPath": "settlement.changeAmount"
+            },
+            {
+              "label": "累计计量金额",
+              "fieldPath": "settlement.measuredAmount"
+            },
+            {
+              "label": "扣款金额",
+              "fieldPath": "settlement.deductionAmount"
+            },
+            {
+              "label": "已付金额",
+              "fieldPath": "settlement.paidAmount"
+            },
+            {
+              "label": "定案金额",
+              "fieldPath": "settlement.finalAmount"
+            },
+            {
+              "label": "未付金额",
+              "fieldPath": "settlement.unpaidAmount"
+            },
+            {
+              "label": "质保金额",
+              "fieldPath": "settlement.warrantyAmount"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-partner",
+          "type": "FIELD_GRID",
+          "title": "往来单位",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "结算对象",
+              "fieldPath": "partner.name"
+            }
+          ]
+        },
+        {
+          "id": "note-settlement-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "settlement.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "结算明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.name",
+              "header": "结算明细名称"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.quantity",
+              "header": "数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "金额"
+            },
+            {
+              "fieldPath": "items.sourceType",
+              "header": "来源类型"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "table-variations-1",
+          "type": "COLLECTION_TABLE",
+          "title": "变更明细",
+          "collectionPath": "variations",
+          "columns": [
+            {
+              "fieldPath": "variations.code",
+              "header": "变更编号"
+            },
+            {
+              "fieldPath": "variations.name",
+              "header": "变更名称"
+            },
+            {
+              "fieldPath": "variations.type",
+              "header": "变更类型"
+            },
+            {
+              "fieldPath": "variations.direction",
+              "header": "变更方向"
+            },
+            {
+              "fieldPath": "variations.confirmedAmount",
+              "header": "确认金额"
+            },
+            {
+              "fieldPath": "variations.status",
+              "header": "审批状态"
+            }
+          ]
+        },
+        {
+          "id": "table-payments-1",
+          "type": "COLLECTION_TABLE",
+          "title": "付款明细",
+          "collectionPath": "payments",
+          "columns": [
+            {
+              "fieldPath": "payments.applyCode",
+              "header": "付款申请编号"
+            },
+            {
+              "fieldPath": "payments.payType",
+              "header": "付款类型"
+            },
+            {
+              "fieldPath": "payments.applyAmount",
+              "header": "申请金额"
+            },
+            {
+              "fieldPath": "payments.approvedAmount",
+              "header": "批准金额"
+            },
+            {
+              "fieldPath": "payments.actualPayAmount",
+              "header": "实付金额"
+            },
+            {
+              "fieldPath": "payments.status",
+              "header": "付款状态"
+            },
+            {
+              "fieldPath": "payments.payDate",
+              "header": "付款日期"
+            },
+            {
+              "fieldPath": "payments.voucherNo",
+              "header": "付款凭证号"
+            }
+          ]
+        },
+        {
+          "id": "table-costs-1",
+          "type": "COLLECTION_TABLE",
+          "title": "成本明细",
+          "collectionPath": "costs",
+          "columns": [
+            {
+              "fieldPath": "costs.subjectName",
+              "header": "成本科目"
+            },
+            {
+              "fieldPath": "costs.type",
+              "header": "成本类型"
+            },
+            {
+              "fieldPath": "costs.sourceType",
+              "header": "成本来源类型"
+            },
+            {
+              "fieldPath": "costs.amount",
+              "header": "成本含税金额"
+            },
+            {
+              "fieldPath": "costs.taxAmount",
+              "header": "成本税额"
+            },
+            {
+              "fieldPath": "costs.amountWithoutTax",
+              "header": "成本不含税金额"
+            },
+            {
+              "fieldPath": "costs.date",
+              "header": "成本日期"
+            },
+            {
+              "fieldPath": "costs.status",
+              "header": "成本状态"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "定案时间",
+              "fieldPath": "settlement.finalizedAt"
+            },
+            {
+              "label": "创建时间",
+              "fieldPath": "settlement.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "settlement.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_SUB_MEASURE_V1",
+    "templateName": "分包计量单",
+    "businessType": "SUB_MEASURE",
+    "schemaVersion": "sub-measure.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "sub-measure.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "分包计量单 ·",
+          "fieldPath": "measure.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "分包计量单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-measure",
+          "type": "FIELD_GRID",
+          "title": "计量概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "计量编号",
+              "fieldPath": "measure.code"
+            },
+            {
+              "label": "计量期间",
+              "fieldPath": "measure.period"
+            },
+            {
+              "label": "计量日期",
+              "fieldPath": "measure.date"
+            },
+            {
+              "label": "报量金额",
+              "fieldPath": "measure.reportedAmount"
+            },
+            {
+              "label": "审定金额",
+              "fieldPath": "measure.approvedAmount"
+            },
+            {
+              "label": "扣款金额",
+              "fieldPath": "measure.deductionAmount"
+            },
+            {
+              "label": "净额",
+              "fieldPath": "measure.netAmount"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "measure.approvalStatus"
+            },
+            {
+              "label": "业务状态",
+              "fieldPath": "measure.status"
+            },
+            {
+              "label": "是否已生成成本",
+              "fieldPath": "measure.costGenerated"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-partner",
+          "type": "FIELD_GRID",
+          "title": "往来单位",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "分包单位",
+              "fieldPath": "partner.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-task",
+          "type": "FIELD_GRID",
+          "title": "任务信息",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "任务编号",
+              "fieldPath": "task.code"
+            },
+            {
+              "label": "任务名称",
+              "fieldPath": "task.name"
+            }
+          ]
+        },
+        {
+          "id": "note-measure-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "measure.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "计量清单",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.name",
+              "header": "清单项名称"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.contractQuantity",
+              "header": "合同数量"
+            },
+            {
+              "fieldPath": "items.currentQuantity",
+              "header": "本期数量"
+            },
+            {
+              "fieldPath": "items.cumulativeQuantity",
+              "header": "累计数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "金额"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "measure.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "measure.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_TECHNICAL_SCHEME_V1",
+    "templateName": "技术方案审批单",
+    "businessType": "TECHNICAL_SCHEME",
+    "schemaVersion": "technical-scheme.v1",
+    "orientation": "PORTRAIT",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "technical-scheme.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 186,
+          "heightMm": 7,
+          "text": "技术方案审批单 ·",
+          "fieldPath": "scheme.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 186,
+          "heightMm": 12,
+          "text": "技术方案审批单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 269,
+          "widthMm": 186,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-scheme",
+          "type": "FIELD_GRID",
+          "title": "方案概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "方案编号",
+              "fieldPath": "scheme.code"
+            },
+            {
+              "label": "方案名称",
+              "fieldPath": "scheme.name"
+            },
+            {
+              "label": "方案类型",
+              "fieldPath": "scheme.type"
+            },
+            {
+              "label": "计划生效日期",
+              "fieldPath": "scheme.plannedEffectiveDate"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "scheme.status"
+            }
+          ]
+        },
+        {
+          "id": "note-scheme-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "scheme.remark"
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "批准时间",
+              "fieldPath": "scheme.approvedAt"
+            },
+            {
+              "label": "创建时间",
+              "fieldPath": "scheme.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "scheme.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "templateCode": "SYSTEM_VAR_ORDER_V1",
+    "templateName": "工程签证单",
+    "businessType": "VAR_ORDER",
+    "schemaVersion": "variation-order.v1",
+    "orientation": "LANDSCAPE",
+    "designSchema": {
+      "layoutVersion": 2,
+      "schemaVersion": "variation-order.v1",
+      "page": {
+        "size": "A4",
+        "orientation": "LANDSCAPE",
+        "marginMm": {
+          "top": 12,
+          "right": 12,
+          "bottom": 14,
+          "left": 12
+        }
+      },
+      "elements": [
+        {
+          "id": "document-header",
+          "type": "FIELD",
+          "xMm": 12,
+          "yMm": 12,
+          "widthMm": 273,
+          "heightMm": 7,
+          "text": "工程签证单 ·",
+          "fieldPath": "variation.code",
+          "fontSizePt": 9,
+          "align": "LEFT",
+          "repeat": "HEADER",
+          "zIndex": 1
+        },
+        {
+          "id": "document-title",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 22,
+          "widthMm": 273,
+          "heightMm": 12,
+          "text": "工程签证单",
+          "fontSizePt": 18,
+          "align": "CENTER",
+          "repeat": "BODY",
+          "zIndex": 1
+        },
+        {
+          "id": "document-footer",
+          "type": "TEXT",
+          "xMm": 12,
+          "yMm": 182,
+          "widthMm": 273,
+          "heightMm": 6,
+          "text": "CGC-PMS 系统生成",
+          "fontSizePt": 8,
+          "align": "CENTER",
+          "repeat": "FOOTER",
+          "zIndex": 1
+        }
+      ],
+      "tables": [],
+      "sections": [
+        {
+          "id": "grid-variation",
+          "type": "FIELD_GRID",
+          "title": "签证概要",
+          "columns": 3,
+          "cells": [
+            {
+              "label": "签证编号",
+              "fieldPath": "variation.code"
+            },
+            {
+              "label": "签证名称",
+              "fieldPath": "variation.name"
+            },
+            {
+              "label": "事件日期",
+              "fieldPath": "variation.eventDate"
+            },
+            {
+              "label": "索赔期限",
+              "fieldPath": "variation.claimDeadline"
+            },
+            {
+              "label": "原因类别",
+              "fieldPath": "variation.causeCategory"
+            },
+            {
+              "label": "责任方",
+              "fieldPath": "variation.responsibleParty"
+            },
+            {
+              "label": "签证类型",
+              "fieldPath": "variation.type"
+            },
+            {
+              "label": "变更方向",
+              "fieldPath": "variation.direction"
+            },
+            {
+              "label": "申报金额",
+              "fieldPath": "variation.reportedAmount"
+            },
+            {
+              "label": "审批金额",
+              "fieldPath": "variation.approvedAmount"
+            },
+            {
+              "label": "确认金额",
+              "fieldPath": "variation.confirmedAmount"
+            },
+            {
+              "label": "预计成本",
+              "fieldPath": "variation.estimatedCostAmount"
+            },
+            {
+              "label": "业主是否确认",
+              "fieldPath": "variation.ownerConfirmed"
+            },
+            {
+              "label": "业主确认状态",
+              "fieldPath": "variation.ownerStatus"
+            },
+            {
+              "label": "影响天数",
+              "fieldPath": "variation.impactDays"
+            },
+            {
+              "label": "审批状态",
+              "fieldPath": "variation.approvalStatus"
+            },
+            {
+              "label": "是否已生成成本",
+              "fieldPath": "variation.costGenerated"
+            }
+          ]
+        },
+        {
+          "id": "grid-project",
+          "type": "FIELD_GRID",
+          "title": "项目信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "项目名称",
+              "fieldPath": "project.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-contract",
+          "type": "FIELD_GRID",
+          "title": "合同信息",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "合同名称",
+              "fieldPath": "contract.name"
+            }
+          ]
+        },
+        {
+          "id": "grid-partner",
+          "type": "FIELD_GRID",
+          "title": "往来单位",
+          "columns": 1,
+          "cells": [
+            {
+              "label": "往来单位",
+              "fieldPath": "partner.name"
+            }
+          ]
+        },
+        {
+          "id": "note-variation-description",
+          "type": "NOTE",
+          "title": "事件描述",
+          "fieldPath": "variation.description"
+        },
+        {
+          "id": "note-variation-remark",
+          "type": "NOTE",
+          "title": "备注",
+          "fieldPath": "variation.remark"
+        },
+        {
+          "id": "table-items-1",
+          "type": "COLLECTION_TABLE",
+          "title": "签证明细",
+          "collectionPath": "items",
+          "columns": [
+            {
+              "fieldPath": "items.name",
+              "header": "明细名称"
+            },
+            {
+              "fieldPath": "items.unit",
+              "header": "单位"
+            },
+            {
+              "fieldPath": "items.quantity",
+              "header": "数量"
+            },
+            {
+              "fieldPath": "items.unitPrice",
+              "header": "单价"
+            },
+            {
+              "fieldPath": "items.amount",
+              "header": "金额"
+            },
+            {
+              "fieldPath": "items.claimUnitPrice",
+              "header": "索赔单价"
+            },
+            {
+              "fieldPath": "items.claimAmount",
+              "header": "索赔金额"
+            },
+            {
+              "fieldPath": "items.remark",
+              "header": "明细备注"
+            }
+          ]
+        },
+        {
+          "id": "system-record",
+          "type": "FIELD_GRID",
+          "title": "系统记录",
+          "columns": 2,
+          "cells": [
+            {
+              "label": "创建时间",
+              "fieldPath": "variation.createdAt"
+            },
+            {
+              "label": "更新时间",
+              "fieldPath": "variation.updatedAt"
+            }
+          ]
+        },
+        {
+          "id": "generation-note",
+          "type": "NOTE",
+          "title": "生成说明",
+          "text": "本单据由 CGC-PMS 根据当前业务数据生成，请结合原始业务资料复核。"
+        },
+        {
+          "id": "signature-grid",
+          "type": "SIGNATURE_GRID",
+          "title": "签认栏",
+          "labels": [
+            "编制",
+            "复核",
+            "审批",
+            "日期"
+          ]
+        }
+      ]
+    }
+  }
+]

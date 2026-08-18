@@ -1,5 +1,6 @@
 package com.cgcpms.document;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.document.controller.DocumentGenerationController;
 import com.cgcpms.document.controller.DocumentTemplateController;
 import org.junit.jupiter.api.Test;
@@ -60,16 +61,39 @@ class DocumentControllerAuthorizationTest {
         assertPolicy(DocumentTemplateController.class, "enable", publish);
         assertPolicy(DocumentTemplateController.class, "delete", edit);
         assertPolicy(DocumentTemplateController.class, "bindDefault", publish);
+        assertPolicy(DocumentTemplateController.class, "systemTemplateStatus", query);
+        assertPolicy(DocumentTemplateController.class, "installSystemTemplate", publish);
+        assertPolicy(DocumentTemplateController.class, "installAllSystemTemplates", publish);
         assertPolicy(DocumentTemplateController.class, "provisionPaymentSystemTemplate", publish);
         assertPolicy(DocumentTemplateController.class, "provisionSettlementSystemTemplate", publish);
+        assertPolicy(DocumentTemplateController.class, "provisionPurchaseRequestSystemTemplate", publish);
+        assertPolicy(DocumentTemplateController.class, "provisionPurchaseOrderSystemTemplate", publish);
+        assertPolicy(DocumentTemplateController.class, "provisionMaterialReceiptSystemTemplate", publish);
+
+        assertAudit(DocumentTemplateController.class, "installSystemTemplate", "INSTALL_SYSTEM_DOCUMENT_TEMPLATE");
+        assertAudit(DocumentTemplateController.class, "installAllSystemTemplates", "INSTALL_ALL_SYSTEM_DOCUMENT_TEMPLATES");
+        assertAudit(DocumentTemplateController.class, "provisionPaymentSystemTemplate", "PROVISION_SYSTEM_PAYMENT");
+        assertAudit(DocumentTemplateController.class, "provisionSettlementSystemTemplate", "PROVISION_SYSTEM_SETTLEMENT");
+        assertAudit(DocumentTemplateController.class, "provisionPurchaseRequestSystemTemplate", "PROVISION_SYSTEM_PURCHASE_REQUEST");
+        assertAudit(DocumentTemplateController.class, "provisionPurchaseOrderSystemTemplate", "PROVISION_SYSTEM_PURCHASE_ORDER");
+        assertAudit(DocumentTemplateController.class, "provisionMaterialReceiptSystemTemplate", "PROVISION_SYSTEM_MATERIAL_RECEIPT");
     }
 
     private void assertPolicy(Class<?> controller, String methodName, String expected) {
-        Method method = Arrays.stream(controller.getDeclaredMethods())
+        Method method = method(controller, methodName);
+        PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+        assertEquals(expected, annotation.value(), controller.getSimpleName() + "." + methodName);
+    }
+
+    private void assertAudit(Class<?> controller, String methodName, String expectedType) {
+        AuditedOperation annotation = method(controller, methodName).getAnnotation(AuditedOperation.class);
+        assertEquals(expectedType, annotation.type(), controller.getSimpleName() + "." + methodName);
+    }
+
+    private Method method(Class<?> controller, String methodName) {
+        return Arrays.stream(controller.getDeclaredMethods())
                 .filter(candidate -> candidate.getName().equals(methodName))
                 .findFirst()
                 .orElseThrow();
-        PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
-        assertEquals(expected, annotation.value(), controller.getSimpleName() + "." + methodName);
     }
 }

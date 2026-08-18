@@ -48,7 +48,6 @@ public class DocumentGenerationService {
     private final ObjectMapper objectMapper;
     private final ObjectProvider<FileService> fileServiceProvider;
     private final DocumentGenerationProperties properties;
-    private final ProcurementSystemTemplateService procurementSystemTemplateService;
 
     public DocumentGeneration generate(String businessType, Long businessId, String idempotencyKey,
                                        Long retryOfGenerationId) {
@@ -70,10 +69,6 @@ public class DocumentGenerationService {
         UserContext.Snapshot previous = UserContext.capture();
         try {
             UserContext.restore(new UserContext.Snapshot(requestedBy, "document-system", tenantId, List.of()));
-            String normalizedType = normalizeBusinessType(businessType);
-            if (List.of("PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT").contains(normalizedType)) {
-                procurementSystemTemplateService.ensureCurrentTenantTemplate(normalizedType);
-            }
             return generateInternal(businessType, businessId, idempotencyKey, retryOfGenerationId, true);
         } finally {
             UserContext.restore(previous);

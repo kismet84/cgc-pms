@@ -53,7 +53,7 @@ describe('M94 navigation and router boundaries', () => {
 
   it('freezes route path, name, component, redirect and meta contracts', () => {
     expect(hash(routes.map(routeContract))).toBe(
-      '92182bcf693670f14e63d355bac64bc4b144161140b968d474e9e0aad79f6120',
+      'e69dd18537214780a51c05e504a9b01a88b3aeffbb3d3b37ed1680d2ed50398f',
     )
   })
 
