@@ -15,7 +15,7 @@
 
 ## G3：补证与质量——完成
 
-1. `DEP-001`：前端 audit 与固定摘要 Trivy 当前库 manifest 扫描通过；JAR 二次扫描保留给同 SHA CI。
+1. `DEP-001`：前端 audit、固定摘要 Trivy 当前库 manifest 扫描与同 SHA 构建 JAR 供应链扫描通过。
 2. `DR-001`：隔离恢复演练通过。
 3. `PERF-001`：固定 JVM PDF 基准、Dashboard 查询预算与 bundle 预算通过。
 4. `ARCH-001`：对照第94条职责证据关闭行数型误报。
@@ -32,4 +32,4 @@
 
 - 原有载体 `AUDIT-PROMETHEUS-SCRAPE-AUTH` 已由实现覆盖并从 `current-issues.json` 移除。
 - 新增后续项 0；关闭后续项 1；净变化 -1。
-- 当前开放风险 0；本地零悬空通过。Git 交付、远端同 SHA CI、发布和非本地环境均未授权。
+- 当前开放风险 0；零悬空通过。受保护 Git 交付已完成；发布和非本地环境未执行。

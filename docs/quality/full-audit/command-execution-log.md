@@ -169,3 +169,17 @@
 - 本地运行态：实际绑定端口为 backend `127.0.0.1:8080`、frontend `127.0.0.1:5173`；health `UP`，Vite 两个就绪资源 200，未配置机器密钥时 Prometheus 403 fail-closed。首次沿用旧证据端口 `18080/4173` 被拒绝，分类 `tool_invocation`，通过 `docker port` 读取实际监听后复验通过。
 - 临时产物：精确删除本轮 lint 生成的未跟踪 `frontend-admin-v2/.ci-artifacts/lint-check.txt`；无业务数据或用户成果受影响。
 - Codemap：在全部文档写入完成后重新生成 `html/json/lock`，随后执行 `--verify`；退出码 0。
+
+## 受保护 Git 交付（2026-08-20）
+
+- 实现分支：`codex/mainline-98-full-audit-remediation`；最终源 SHA `aaf8e478b2f6063effcc1a38b8cfe0b59586361b`。
+- 实现提交：`abf4bdb0 fix(audit): close full-repository findings`、`4224e45d fix(ci): allow cold-cache order checks`、`44e0caa8 test(e2e): wait for requisition list readiness`、`aaf8e478 test(audit): initialize lazy metrics fixture`。
+- 本地提交前/推送前门禁：README sync、`git diff --check`、Codemap `--verify`、前端 lint/build、644 单测、98/98 浏览器契约通过；最终后端 `mvnw -C verify` 为 2,946 tests、0 failure、0 error、28 skipped，JaCoCo 通过。
+- 失败分类：Push run `32278404439` 的 `backend-order-sensitive` 在冷缓存依赖下载阶段超过原 10 分钟，归类 `environment_prerequisite`，门禁 timeout 调整为 25 分钟并由 workflow contract 固化；该旧运行随后被新提交取消，不作证据。
+- 失败分类：Push run `32280263719` 的 `OperationAuditServiceTest` 在 Spring 懒加载下先读取未注册指标，归类 `quality_or_security`；测试夹具显式初始化指标所有者后，定向 5/5 与完整 2,946 项回归通过。该失败运行不作交付证据。
+- Push CI：[32282560741](https://github.com/kismet84/cgc-pms/actions/runs/32282560741)，事件 `push`，HEAD `aaf8e478b2f6063effcc1a38b8cfe0b59586361b`，16 个 required jobs 全部成功；含准确构建 JAR 的 `supply-chain-security`。
+- Pre-PR：`verify-pre-pr-ci.ps1 -HeadSha aaf8e478...` 返回 `PASS`，绑定 Push run `32282560741`。
+- PR CI：[32282564507](https://github.com/kismet84/cgc-pms/actions/runs/32282564507)，事件 `pull_request`，同一 HEAD，独立全量运行成功；未复用为控制面变更的替代证据。
+- 合并：[PR #458](https://github.com/kismet84/cgc-pms/pull/458) 受保护 squash 合并；merge SHA `45b457d45abedebc0a09358eece6d8b60801c6ee`。
+- Post-merge：`verify-post-merge-ci.ps1 -Repository kismet84/cgc-pms -MergeSha 45b457d4...` 返回 `PASS / REUSED_PUSH_CI`，源树与合并树一致，并同时绑定 Push run `32282560741`、PR run `32282564507`。
+- 边界：未执行 Tag、Release、部署、生产或任何非本地环境操作。
