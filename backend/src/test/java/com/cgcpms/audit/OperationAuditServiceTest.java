@@ -3,11 +3,14 @@ package com.cgcpms.audit;
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.audit.entity.OperationAuditLog;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
+import com.cgcpms.audit.service.OperationAuditService;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -34,6 +37,14 @@ class OperationAuditServiceTest {
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @BeforeEach
+    void initializeAuditMetrics() {
+        applicationContext.getBean(OperationAuditService.class);
+    }
 
     @Test
     @DisplayName("事件发布返回前应完成审计写入")
