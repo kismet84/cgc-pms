@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-10T17:01:04+08:00",
+  "updatedAt": "2026-08-20T00:17:00+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -235,31 +235,6 @@
       "sourceRefs": [
         "docs/archive/v1.5/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md",
         "docs/archive/v1.5/quality/第55条主线-支线-候选与工程观察证据化收口验收报告-2026-07-28.md"
-      ]
-    },
-    {
-      "issueKey": "AUDIT-PROMETHEUS-SCRAPE-AUTH",
-      "title": "Prometheus抓取认证方案缺失",
-      "status": "FROZEN",
-      "classification": "OPERATIONAL_RISK",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "Prometheus抓取配置未携带机器凭据；后端匿名拒绝、管理员JWT可访问，但当前15分钟用户JWT不适合作为长期抓取身份，直接启用监控Compose无法成功抓取。",
-      "acceptanceCriteria": "使用可轮换的非公开机器身份和Secret文件完成无/错凭据拒绝、普通用户JWT拒绝、认证抓取连续成功、旧凭据失效、凭据不入库及Prometheus UI非公网监听验证。",
-      "deferReason": "项目仅有本地开发环境；非本地监控网络、Secret和真实运行验收不适用，除非用户明确修改根环境规则，否则不得重开。",
-      "candidate": {
-        "userValue": "避免生产监控盲区，同时保持指标端点不匿名暴露。",
-        "minimalLoop": "优先复用Spring Security Basic机器身份、Prometheus password_file和Spring Boot configtree，只补一个可轮换监控角色。",
-        "nonGoals": "不公开Actuator，不在仓库写静态密码，不新增监控平台。",
-        "dependencies": "目标环境网络拓扑、Secret文件载体、凭据保管与轮换责任人、Prometheus UI访问边界。",
-        "risk": "错误放行会泄露运行指标；短期JWT会造成周期性抓取中断。",
-        "readyPreconditions": "认证机制、凭据轮换责任人、目标环境验证和回滚方案明确。"
-      },
-      "sourceRefs": [
-        "deploy/monitoring/prometheus.yml",
-        "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
-        "docs/archive/v1.5/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
-        "docs/archive/v1.5/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
       ]
     }
   ]

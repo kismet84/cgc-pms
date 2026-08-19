@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type {
   DocumentCatalogField,
   DocumentDesignSchema,
   DocumentFlowSection,
 } from '@/services/system-management'
+import { documentScreenPreviewHtml } from './documentPreviewHtml'
 
 const props = defineProps<{
   modelValue: DocumentDesignSchema
@@ -20,10 +21,15 @@ const emit = defineEmits<{
 }>()
 
 const selectedId = ref(props.modelValue.sections?.[0]?.id ?? '')
+const previewFrame = ref<HTMLIFrameElement>()
 const fieldSearch = ref('')
 let sequence = 0
 const sections = computed(() => props.modelValue.sections ?? [])
 const selected = computed(() => sections.value.find((item) => item.id === selectedId.value))
+const selectedIndex = computed(() =>
+  sections.value.findIndex((item) => item.id === selectedId.value),
+)
+const screenPreviewHtml = computed(() => documentScreenPreviewHtml(props.previewHtml ?? ''))
 const filteredFields = computed(() => {
   const keyword = fieldSearch.value.trim().toLowerCase()
   return props.fields.filter(
@@ -40,6 +46,8 @@ const collectionGroups = computed(() => {
     })
   return [...groups.entries()]
 })
+
+watch(selectedId, syncPreviewSelection)
 
 function commit(next: DocumentFlowSection[]): void {
   const value = { ...props.modelValue, layoutVersion: 2 as const, tables: [], sections: next }
@@ -163,9 +171,59 @@ function move(id: string, offset: number): void {
 }
 
 function remove(id: string): void {
+  if (props.disabled) return
   const next = sections.value.filter((item) => item.id !== id)
-  selectedId.value = next[0]?.id ?? ''
+  const removedIndex = sections.value.findIndex((item) => item.id === id)
+  selectedId.value = next[Math.min(Math.max(removedIndex, 0), next.length - 1)]?.id ?? ''
   commit(next)
+}
+
+function bindPreview(event: Event): void {
+  const frame = event.currentTarget as HTMLIFrameElement
+  previewFrame.value = frame
+  const document = frame.contentDocument
+  if (!document) return
+  const previewSections = document.querySelectorAll<HTMLElement>('.flow-section')
+  previewSections.forEach((element, index) => {
+    const section = sections.value[index]
+    if (!section) return
+    element.dataset.editorSectionId = section.id
+    element.tabIndex = 0
+    element.setAttribute('role', 'button')
+    element.setAttribute(
+      'aria-label',
+      `选择第 ${index + 1} 个区块：${section.title || section.type}`,
+    )
+  })
+  document.addEventListener('click', selectPreviewSection)
+  document.addEventListener('keydown', selectPreviewSectionByKeyboard)
+  syncPreviewSelection()
+}
+
+function selectPreviewSection(event: Event): void {
+  const target = event.target as HTMLElement | null
+  const element = target?.closest?.('[data-editor-section-id]') as HTMLElement | null
+  const id = element?.dataset.editorSectionId
+  if (id) selectedId.value = id
+}
+
+function selectPreviewSectionByKeyboard(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  selectPreviewSection(event)
+}
+
+function syncPreviewSelection(): void {
+  const document = previewFrame.value?.contentDocument
+  if (!document) return
+  const selectionColor = getComputedStyle(previewFrame.value!).getPropertyValue(
+    '--v2-color-primary',
+  )
+  document.querySelectorAll<HTMLElement>('[data-editor-section-id]').forEach((element) => {
+    const active = element.dataset.editorSectionId === selectedId.value
+    element.style.cursor = 'pointer'
+    element.style.outline = active ? `2px solid ${selectionColor.trim() || 'rgb(37 99 235)'}` : ''
+    element.style.outlineOffset = active ? '2px' : ''
+  })
 }
 
 function validSection(section: DocumentFlowSection): boolean {
@@ -212,13 +270,19 @@ function validSection(section: DocumentFlowSection): boolean {
     <section class="flow-designer__stage" aria-label="设计画布">
       <div class="stage-toolbar">
         <span>A4 {{ modelValue.page.orientation === 'LANDSCAPE' ? '横向' : '纵向' }}</span>
-        <span>{{ sections.length }} 个流式区块</span>
+        <span>点击预览区块选择 · {{ sections.length }} 个流式区块</span>
       </div>
       <div
         class="paper"
         :class="{ 'paper--landscape': modelValue.page.orientation === 'LANDSCAPE' }"
       >
-        <iframe v-if="previewHtml" title="单据实时预览" :srcdoc="previewHtml" />
+        <iframe
+          v-if="screenPreviewHtml"
+          title="单据实时预览"
+          sandbox="allow-same-origin"
+          :srcdoc="screenPreviewHtml"
+          @load="bindPreview"
+        />
         <div v-else class="paper-outline">
           <h1>业务单据</h1>
           <button
@@ -250,6 +314,9 @@ function validSection(section: DocumentFlowSection): boolean {
     <aside class="flow-designer__properties">
       <div class="panel-tabs"><strong>属性</strong><span>排版</span></div>
       <template v-if="selected">
+        <p class="selected-section-label">
+          已选第 {{ selectedIndex + 1 }} 个区块 · {{ selected.title || selected.type }}
+        </p>
         <label>区块类型<input :value="selected.type" disabled /></label>
         <label
           >区块标题<input
@@ -296,7 +363,15 @@ function validSection(section: DocumentFlowSection): boolean {
         <div class="property-actions">
           <button type="button" @click="move(selected.id, -1)">上移</button>
           <button type="button" @click="move(selected.id, 1)">下移</button>
-          <button type="button" class="danger" @click="remove(selected.id)">删除</button>
+          <button
+            type="button"
+            class="danger"
+            :disabled="disabled"
+            :aria-label="`删除第 ${selectedIndex + 1} 个区块：${selected.title || selected.type}`"
+            @click="remove(selected.id)"
+          >
+            删除此区块
+          </button>
         </div>
       </template>
       <p v-else class="empty-tip">选择画布区块后编辑属性。</p>
@@ -478,6 +553,14 @@ function validSection(section: DocumentFlowSection): boolean {
   padding: 14px 16px 0;
   color: var(--v2-color-text-secondary);
   font-size: 13px;
+}
+.selected-section-label {
+  margin: 14px 16px 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--v2-color-primary-soft);
+  color: var(--v2-color-primary);
+  font-size: 12px;
 }
 .flow-designer__properties input,
 .flow-designer__properties select,

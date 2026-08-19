@@ -23,6 +23,9 @@ function Get-ComposeServiceBlock([string]$Compose, [string]$ServiceName) {
 
 $dockerfile = Read-RepoText 'backend\Dockerfile'
 $compose = Read-RepoText 'deploy\docker-compose.prod.yml'
+$monitoringCompose = Read-RepoText 'deploy\docker-compose.monitoring.yml'
+$prometheus = Read-RepoText 'deploy\monitoring\prometheus.yml'
+$gitignore = Read-RepoText '.gitignore'
 $logicalDockerfile = [regex]::Replace($dockerfile, '\\\r?\n\s*', ' ')
 $javaOptsMatch = [regex]::Match(
   $logicalDockerfile,
@@ -69,6 +72,8 @@ if ($dockerfile -match '(?m)^\s*ENV\s+SPRING_DATASOURCE_URL(?:\s|=)') {
 }
 
 $backend = Get-ComposeServiceBlock $compose 'backend'
+$mysql = Get-ComposeServiceBlock $compose 'mysql'
+$monitoringBackend = Get-ComposeServiceBlock $monitoringCompose 'backend'
 if ($backend -notmatch '(?mi)^    mem_limit:\s*["'']?1g["'']?\s*$') {
   throw 'Production backend service must declare service-level mem_limit: 1G'
 }
@@ -81,6 +86,40 @@ if ($backend -notmatch "(?m)^      -\s*[^#\r\n]+:${escapedHeapDumpPath}(?::[a-z,
   throw "Production backend service must mount persistent storage at HeapDumpPath: $heapDumpPath"
 }
 
+if ($mysql -notmatch '(?m)^      MYSQL_DATABASE:\s*\$\{MYSQL_DATABASE:-cgc_pms\}\s*$') {
+  throw 'Production MySQL service must use MYSQL_DATABASE with the cgc_pms default'
+}
+if ($backend -notmatch 'jdbc:mysql://mysql:3306/\$\{MYSQL_DATABASE:-cgc_pms\}\?') {
+  throw 'Production backend JDBC URL must use the same MYSQL_DATABASE parameter as MySQL initialization'
+}
+if ($backend -notmatch '(?m)^      -\s*backend-logs:/var/log/cgc-pms\s*$') {
+  throw 'Production backend must persist the configured /var/log/cgc-pms log directory'
+}
+if ($compose -notmatch '(?m)^  backend-logs:\s*$') {
+  throw 'Production Compose must declare the backend-logs volume'
+}
+if ($monitoringCompose -notmatch '(?m)^      - "127\.0\.0\.1:9090:9090"\s*$') {
+  throw 'Prometheus UI must bind to loopback instead of all host interfaces'
+}
+if ($monitoringCompose -notmatch '/run/secrets/monitoring_scrape_password:ro') {
+  throw 'Prometheus must receive its scrape password through a read-only secret file mount'
+}
+if ($backend -notmatch '(?m)^      MONITORING_SCRAPE_PASSWORD_FILE:\s*/run/secrets/monitoring_scrape_password\s*$' -or
+    $monitoringBackend -notmatch '(?m)^      MONITORING_SCRAPE_PASSWORD_FILE:\s*/run/secrets/monitoring_scrape_password\s*$') {
+  throw 'Backend monitoring identity must read the same mounted secret file in production and local monitoring overlays'
+}
+if ($compose -match '(?m)^\s*MONITORING_SCRAPE_PASSWORD:\s*\S+' -or
+    $monitoringCompose -match '(?m)^\s*MONITORING_SCRAPE_PASSWORD:\s*\S+') {
+  throw 'Compose files must not carry a plaintext monitoring scrape password'
+}
+if ($prometheus -notmatch '(?m)^    basic_auth:\s*$' -or
+    $prometheus -notmatch "(?m)^      password_file: '/run/secrets/monitoring_scrape_password'\s*$") {
+  throw 'Prometheus backend scrape must use Basic authentication with password_file'
+}
+if ($gitignore -notmatch '(?m)^deploy/secrets/\s*$') {
+  throw 'Local deployment secret files must be excluded from Git'
+}
+
 [pscustomobject]@{
   ok = $true
   maxRamPercentage = $maxRamPercentage
@@ -88,4 +127,7 @@ if ($backend -notmatch "(?m)^      -\s*[^#\r\n]+:${escapedHeapDumpPath}(?::[a-z,
   backendMemoryLimit = '1G'
   businessTimezone = 'Asia/Shanghai'
   datasourceFallback = $false
+  databaseNameSingleSource = $true
+  persistentLogPath = '/var/log/cgc-pms'
+  prometheusMachineAuth = $true
 } | ConvertTo-Json

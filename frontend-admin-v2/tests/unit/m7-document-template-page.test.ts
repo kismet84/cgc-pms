@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import DocumentFlowDesigner from '@/components/document/DocumentFlowDesigner.vue'
 import DocumentTemplatePage from '@/pages/system/DocumentTemplatePage.vue'
 import DocumentTemplateDesignerPage from '@/pages/system/DocumentTemplateDesignerPage.vue'
 import * as service from '@/services/system-management'
@@ -112,6 +114,7 @@ const versions = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  sessionStorage.removeItem('document-template-collapsed-modules')
   route.query = {}
   route.params = {}
   vi.mocked(service.loadDocumentBusinessTypes).mockResolvedValue(types)
@@ -171,10 +174,29 @@ describe('DocumentTemplatePage', () => {
     expect(service.previewDocumentTemplateVersionHtml).toHaveBeenCalledWith('v2')
     expect(wrapper.find('.template-workbench').exists()).toBe(true)
     expect(wrapper.find('.preview-stage iframe').attributes('srcdoc')).toContain('preview')
+    expect(wrapper.find('.preview-stage iframe').attributes('srcdoc')).toContain(
+      'data-document-screen-preview',
+    )
+    expect(wrapper.find('.preview-stage iframe').attributes('sandbox')).toBe('')
 
-    await wrapper.find('.search-box input').setValue('SYSTEM_PAYMENT')
-    expect(wrapper.find('.template-nav').text()).toContain('付款申请单')
-    expect(wrapper.find('.template-nav').text()).not.toContain('工程结算单')
+    const moduleGroups = wrapper.findAll('details.module-group')
+    expect(moduleGroups.length).toBeGreaterThan(0)
+    expect(moduleGroups.every((group) => group.attributes('open') !== undefined)).toBe(true)
+    await moduleGroups[0]!.get('summary').trigger('click')
+    expect((moduleGroups[0]!.element as HTMLDetailsElement).open).toBe(false)
+    await moduleGroups[0]!.trigger('toggle')
+    expect(sessionStorage.getItem('document-template-collapsed-modules')).toBe('["finance"]')
+
+    wrapper.unmount()
+    const restored = mount(DocumentTemplatePage)
+    await flushPromises()
+    expect((restored.findAll('details.module-group')[0]!.element as HTMLDetailsElement).open).toBe(
+      false,
+    )
+
+    await restored.find('.search-box input').setValue('SYSTEM_PAYMENT')
+    expect(restored.find('.template-nav').text()).toContain('付款申请单')
+    expect(restored.find('.template-nav').text()).not.toContain('工程结算单')
   })
 
   it('opens dedicated designer routes and installs all explicitly', async () => {
@@ -204,6 +226,65 @@ describe('DocumentTemplatePage', () => {
     wrapper.findComponent({ name: 'V2ConfirmDialog' }).vm.$emit('confirm')
     await flushPromises()
     expect(service.installAllSystemDocumentTemplates).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DocumentFlowDesigner', () => {
+  it('selects the exact preview section before deleting it and removes screen-only page reserves', async () => {
+    const design = {
+      layoutVersion: 2 as const,
+      schemaVersion: 'measurement.v1',
+      page: {
+        size: 'A4' as const,
+        orientation: 'LANDSCAPE' as const,
+        marginMm: { top: 12, right: 12, bottom: 12, left: 12 },
+      },
+      elements: [],
+      tables: [],
+      sections: [
+        {
+          id: 'signature-1',
+          type: 'SIGNATURE_GRID' as const,
+          title: '签认栏',
+          labels: ['编制', '复核'],
+        },
+        {
+          id: 'signature-2',
+          type: 'SIGNATURE_GRID' as const,
+          title: '签认栏',
+          labels: ['审批', '日期'],
+        },
+      ],
+    }
+    const wrapper = mount(DocumentFlowDesigner, {
+      props: {
+        modelValue: design,
+        fields: [],
+        previewHtml:
+          '<html><head></head><body><div class="page-header"></div><div class="page-footer"></div><main><section class="flow-section"><h2>签认栏</h2></section><section class="flow-section"><h2>签认栏</h2></section></main></body></html>',
+      },
+    })
+    const iframe = wrapper.get('iframe')
+    expect(iframe.attributes('sandbox')).toBe('allow-same-origin')
+    expect(iframe.attributes('srcdoc')).toContain('data-document-screen-preview')
+    expect(iframe.attributes('srcdoc')).toContain('height:0!important')
+
+    const previewDocument = window.document.implementation.createHTMLDocument('preview')
+    Object.defineProperty(iframe.element, 'contentDocument', { value: previewDocument })
+    previewDocument.body.innerHTML =
+      '<main><section class="flow-section"><h2>签认栏</h2></section><section class="flow-section"><h2>签认栏</h2></section></main>'
+    await iframe.trigger('load')
+    const previewSections = previewDocument.querySelectorAll<HTMLElement>('.flow-section')
+    expect(previewSections[1]!.dataset.editorSectionId).toBe('signature-2')
+    previewSections[1]!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await nextTick()
+    expect(wrapper.text()).toContain('已选第 2 个区块')
+
+    await wrapper.get('button[aria-label="删除第 2 个区块：签认栏"]').trigger('click')
+    const updates = wrapper.emitted('update:modelValue')!
+    expect(updates.at(-1)![0]).toMatchObject({
+      sections: [{ id: 'signature-1' }],
+    })
   })
 })
 

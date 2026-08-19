@@ -51,7 +51,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const result = await listSiteFiles(props.businessType, props.businessId, requestController.signal)
+    const result = await listSiteFiles(
+      props.businessType,
+      props.businessId,
+      requestController.signal,
+    )
     if (generation === loadGeneration) files.value = result
   } catch (value) {
     if (generation === loadGeneration && !requestController.signal.aborted) {

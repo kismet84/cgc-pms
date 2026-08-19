@@ -723,6 +723,25 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("生成文档临时链接异常不得泄露对象存储错误文本")
+    void generatedDocumentPresignFailureUsesStablePublicMessage() throws Exception {
+        SysFile file = insertFile("PAYMENT", 30_029L, TestUserContext.TENANT_0,
+                "generated.pdf", "application/pdf");
+        file.setDocumentType("GENERATED_DOCUMENT");
+        sysFileMapper.updateById(file);
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenThrow(new IllegalStateException("internal-endpoint:9000 secret-access-key"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> fileService.getGeneratedDocumentPresignedUrl(file.getId()));
+
+        assertEquals("FILE_URL_ERROR", exception.getCode());
+        assertEquals("生成下载链接失败", exception.getMessage());
+        assertFalse(exception.getMessage().contains("internal-endpoint"));
+        assertFalse(exception.getMessage().contains("secret-access-key"));
+    }
+
+    @Test
     @DisplayName("无金额权限拒绝整改业务中的非证据文件")
     void employeeWithoutAmountPermissionCannotDownloadOtherRectificationDocuments() {
         authenticate("ROLE_EMPLOYEE", "quality:safety:query");

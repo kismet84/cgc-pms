@@ -130,12 +130,11 @@ const projectOptions = computed(() =>
   })),
 )
 const subjectOptions = computed(() =>
-  options.value.costSubjects
-    .map((item) => ({
-      value: item.id,
-      label: `${item.subjectCode} · ${item.subjectName}${item.overheadRuleStatus === 'DISABLE' ? '（间接费规则已停用）' : ''}`,
-      disabled: item.status !== 'ENABLE' || item.overheadRuleStatus === 'DISABLE',
-    })),
+  options.value.costSubjects.map((item) => ({
+    value: item.id,
+    label: `${item.subjectCode} · ${item.subjectName}${item.overheadRuleStatus === 'DISABLE' ? '（间接费规则已停用）' : ''}`,
+    disabled: item.status !== 'ENABLE' || item.overheadRuleStatus === 'DISABLE',
+  })),
 )
 const activePlanOptions = computed(() =>
   options.value.rulePlans

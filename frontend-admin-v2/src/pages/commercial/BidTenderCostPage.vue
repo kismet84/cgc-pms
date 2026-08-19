@@ -20,10 +20,7 @@ import {
 import { uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import { localDateInputValue } from '@/services/workspace-context'
-import {
-  loadEnabledDictDataByCode,
-  type DictDataRecord,
-} from '@/services/system-management'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { dashboardStatusLabel } from '@/shared/display'
@@ -208,11 +205,7 @@ onBeforeUnmount(() => controller?.abort())
       <V2Card v-if="canMaintain" title="登记现金流水">
         <div class="bid-cost-ledger__form">
           <V2Select v-model="form.bidCostId" label="关联投标" :options="bidOptions" />
-          <V2Select
-            v-model="form.direction"
-            label="收支方向"
-            :options="directionOptions"
-          />
+          <V2Select v-model="form.direction" label="收支方向" :options="directionOptions" />
           <V2Input v-model="form.amount" label="金额" type="number" />
           <label>业务日期<input v-model="form.businessDate" type="date" /></label>
           <V2Select

@@ -90,8 +90,7 @@ class AsyncConfigTest {
         applicationContext.getBean("taskExecutor", Executor.class);
 
         assertNotNull(meterRegistry.find("executor.completed")
-                .tag("name", "cgc.pms.async")
-                .tag("executor", "taskExecutor")
+                .tag("name", "taskExecutor")
                 .functionCounter());
     }
 

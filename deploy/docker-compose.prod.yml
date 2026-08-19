@@ -244,7 +244,7 @@ services:
       # useSSL=true + requireSSL=true + verifyServerCertificate=true for production security.
       # MySQL 8.0 auto-generates self-signed certs; JDBC connector 8.0+ trusts them by default.
       # For external CA-signed MySQL, mount the CA cert as a truststore and set trustCertificateKeyStoreUrl.
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=false"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-cgc_pms}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=false"
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       # ---- Redis ----
@@ -277,8 +277,13 @@ services:
       CGCPMS_BOOTSTRAP_ADMIN_PASSWORD: ${CGCPMS_BOOTSTRAP_ADMIN_PASSWORD:-}
       # ---- CORS ----
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set in .env}
+      # ---- Prometheus machine identity; blank values keep scrape access fail-closed ----
+      MONITORING_SCRAPE_USERNAME: cgcpms-monitor
+      MONITORING_SCRAPE_PASSWORD_FILE: /run/secrets/monitoring_scrape_password
     volumes:
       - backend-heapdumps:/var/lib/cgc-pms/heapdumps
+      - backend-logs:/var/log/cgc-pms
+      - ${MONITORING_SCRAPE_PASSWORD_FILE:?MONITORING_SCRAPE_PASSWORD_FILE must point to a local secret file}:/run/secrets/monitoring_scrape_password:ro
     # Backend port NOT exposed to host — only accessible via internal Docker network (frontend → backend proxy)
     # ports:
     #   - "8080:8080"
@@ -342,3 +347,4 @@ volumes:
   redis-data:
   minio-data:
   backend-heapdumps:
+  backend-logs:

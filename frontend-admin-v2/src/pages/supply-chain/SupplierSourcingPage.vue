@@ -311,6 +311,21 @@ async function loadPage(resetPages = false): Promise<void> {
   }
 }
 
+function changeEventPage(nextPage: number): void {
+  pageNo.value = nextPage
+  void loadPage()
+}
+
+function changePerformancePage(nextPage: number): void {
+  performancePageNo.value = nextPage
+  void loadPage()
+}
+
+function changeReturnPage(nextPage: number): void {
+  returnPageNo.value = nextPage
+  void loadPage()
+}
+
 async function selectEvent(id: string): Promise<void> {
   selectedId.value = id
   traceController?.abort()
@@ -572,7 +587,7 @@ onBeforeUnmount(() => {
             :page-no="pageNo"
             :page-size="pageSize"
             label="招采事件分页"
-            @update:page-no="pageNo = $event; loadPage()"
+            @update:page-no="changeEventPage"
           />
         </template>
       </V2Card>
@@ -875,7 +890,7 @@ onBeforeUnmount(() => {
               :page-no="performancePageNo"
               :page-size="pageSize"
               label="履约评价分页"
-              @update:page-no="performancePageNo = $event; loadPage()"
+              @update:page-no="changePerformancePage"
             />
           </section>
           <section>
@@ -907,7 +922,7 @@ onBeforeUnmount(() => {
               :page-no="returnPageNo"
               :page-size="pageSize"
               label="供应商退货分页"
-              @update:page-no="returnPageNo = $event; loadPage()"
+              @update:page-no="changeReturnPage"
             />
           </section>
         </div>

@@ -1,24 +1,32 @@
 # =============================================================================
 # CGC-PMS Docker Compose — Prometheus monitoring stack
 # =============================================================================
-# Usage:
-#   docker compose -f docker-compose.monitoring.yml up -d
+# Usage (overlay the local development stack so backend receives the same secret file):
+#   docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.monitoring.yml up -d backend prometheus
 #
 # Prerequisites:
 #   Backend must be running (docker-compose.dev.yml up -d)
 # =============================================================================
 
 services:
+  backend:
+    environment:
+      MONITORING_SCRAPE_USERNAME: cgcpms-monitor
+      MONITORING_SCRAPE_PASSWORD_FILE: /run/secrets/monitoring_scrape_password
+    volumes:
+      - ${MONITORING_SCRAPE_PASSWORD_FILE:?MONITORING_SCRAPE_PASSWORD_FILE must point to a local secret file}:/run/secrets/monitoring_scrape_password:ro
+
   prometheus:
     image: prom/prometheus:v3.8.0
     container_name: cgc-pms-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
+      - ${MONITORING_SCRAPE_PASSWORD_FILE:?MONITORING_SCRAPE_PASSWORD_FILE must point to a local secret file}:/run/secrets/monitoring_scrape_password:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -29,8 +37,3 @@ services:
 
 volumes:
   prometheus-data:
-
-networks:
-  cgc-pms-dev-net:
-    external: true
-    name: deploy_cgc-pms-dev-net

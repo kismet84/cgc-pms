@@ -1,9 +1,8 @@
 # =============================================================================
 # Prometheus monitoring configuration for CGC-PMS
 # =============================================================================
-# Usage:
-#   docker compose -f docker-compose.monitoring.yml up -d
-#   Or include in deploy/docker-compose.dev.yml
+# Usage from deploy/:
+#   docker compose --env-file .env -f docker-compose.dev.yml -f docker-compose.monitoring.yml up -d backend prometheus
 # =============================================================================
 
 global:
@@ -18,6 +17,9 @@ rule_files:
 scrape_configs:
   - job_name: 'cgc-pms-backend'
     metrics_path: '/api/actuator/prometheus'
+    basic_auth:
+      username: 'cgcpms-monitor'
+      password_file: '/run/secrets/monitoring_scrape_password'
     static_configs:
       - targets: ['backend:8080']
         labels:

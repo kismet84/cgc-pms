@@ -18,3 +18,12 @@ groups:
         annotations:
           summary: 'CGC-PMS 财务定时任务失败'
           description: '过去 5 分钟存在财务对账或预警任务失败；按 operation 与脱敏日志排查。'
+
+      - alert: CgcPmsOperationAuditPersistenceFailures
+        expr: increase(operation_audit_persistence_total{outcome="failure"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'CGC-PMS 通用操作审计持久化失败'
+          description: '过去 5 分钟存在操作审计写入失败；对比 attempt、success、failure 分母并按脱敏日志补偿核查。'
