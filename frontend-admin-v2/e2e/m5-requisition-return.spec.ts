@@ -395,9 +395,10 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     })
     await install(page)
     await page.goto('/inventory/material-requisition?period=2026-07')
-    await expect(
-      page.getByRole('region', { name: '领料申请列表' }).getByText('示范项目', { exact: true }),
-    ).toBeVisible()
+    const list = page.getByRole('region', { name: '领料申请列表' })
+    await expect(list).toBeVisible({ timeout: 15_000 })
+    await expect(list.getByRole('button', { name: 'REQ-001', exact: true })).toBeVisible()
+    await expect(list.getByText('示范项目', { exact: true })).toBeVisible()
     await expect
       .poll(() => listRequests.some((url) => url.includes('dateFrom=2026-07-01')))
       .toBe(true)

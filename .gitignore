@@ -67,6 +67,7 @@ deploy/mysql/data/
 deploy/redis/data/
 deploy/minio/data/
 deploy/ssl/
+deploy/secrets/
 
 # Test / snapshot artifacts
 local-evidence/

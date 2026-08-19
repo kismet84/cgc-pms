@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -33,7 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {"management.endpoints.web.exposure.include=health,info,metrics,prometheus",
-        "management.prometheus.metrics.export.enabled=true"
+        "management.prometheus.metrics.export.enabled=true",
+        "monitoring.scrape.username=metrics-probe",
+        "monitoring.scrape.password=metrics-secret"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
@@ -122,7 +127,7 @@ class ActuatorMetricsTest {
     void shouldExposePrometheusEndpointForCpuMemoryAndProcessMetrics() throws Exception {
         mockMvc.perform(get("/api/actuator/prometheus")
                         .contextPath("/api")
-                        .cookie(adminCookie()))
+                        .header(HttpHeaders.AUTHORIZATION, basicAuthorization("metrics-probe", "metrics-secret")))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("system_cpu_usage")))
@@ -141,6 +146,16 @@ class ActuatorMetricsTest {
         mockMvc.perform(get("/api/actuator/prometheus")
                         .contextPath("/api"))
                 .andExpect(status().is4xxClientError());
+
+        mockMvc.perform(get("/api/actuator/prometheus")
+                        .contextPath("/api")
+                        .header(HttpHeaders.AUTHORIZATION, basicAuthorization("metrics-probe", "wrong-secret")))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/actuator/prometheus")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -176,8 +191,7 @@ class ActuatorMetricsTest {
         assertHasMeter("jvm.threads.live");
         assertHasMeter("hikaricp.connections.max");
         assertNotNull(meterRegistry.find("executor.completed")
-                .tag("name", "cgc.pms.async")
-                .tag("executor", "taskExecutor")
+                .tag("name", "taskExecutor")
                 .functionCounter());
     }
 
@@ -206,6 +220,11 @@ class ActuatorMetricsTest {
     private Cookie adminCookie() {
         String token = tokenFactory.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of());
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private String basicAuthorization(String username, String password) {
+        String credentials = username + ":" + password;
+        return "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
     }
 
     @RestController

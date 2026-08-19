@@ -743,7 +743,11 @@ onBeforeUnmount(() => controller?.abort())
       :close-disabled="saving"
       @close="overheadDialog = false"
     >
-      <form id="overhead-rule-form" class="cost-subject-page__form" @submit.prevent="saveOverheadRule">
+      <form
+        id="overhead-rule-form"
+        class="cost-subject-page__form"
+        @submit.prevent="saveOverheadRule"
+      >
         <V2Select
           v-model="overheadForm.costSubjectId"
           :options="overheadSubjectOptions"
@@ -762,7 +766,9 @@ onBeforeUnmount(() => controller?.abort())
       <template #footer
         ><V2Button variant="secondary" :disabled="saving" @click="overheadDialog = false"
           >取消</V2Button
-        ><V2Button type="submit" form="overhead-rule-form" :loading="saving">保存规则</V2Button></template
+        ><V2Button type="submit" form="overhead-rule-form" :loading="saving"
+          >保存规则</V2Button
+        ></template
       >
     </V2Dialog>
 
@@ -779,11 +785,26 @@ onBeforeUnmount(() => controller?.abort())
         @submit.prevent="runOverheadAllocation"
       >
         <V2Input v-model="overheadExecutionForm.period" type="month" label="分摊期间" required />
-        <dl v-if="overheadExecutionResult" class="cost-subject-page__summary cost-subject-page__span">
-          <div><dt>规则数</dt><dd>{{ overheadExecutionResult.ruleCount }}</dd></div>
-          <div><dt>新增批次</dt><dd>{{ overheadExecutionResult.createdRunCount }}</dd></div>
-          <div><dt>成本事实</dt><dd>{{ overheadExecutionResult.costItemCount }}</dd></div>
-          <div><dt>分摊金额</dt><dd>{{ formatAmount(overheadExecutionResult.allocatedAmount) }}</dd></div>
+        <dl
+          v-if="overheadExecutionResult"
+          class="cost-subject-page__summary cost-subject-page__span"
+        >
+          <div>
+            <dt>规则数</dt>
+            <dd>{{ overheadExecutionResult.ruleCount }}</dd>
+          </div>
+          <div>
+            <dt>新增批次</dt>
+            <dd>{{ overheadExecutionResult.createdRunCount }}</dd>
+          </div>
+          <div>
+            <dt>成本事实</dt>
+            <dd>{{ overheadExecutionResult.costItemCount }}</dd>
+          </div>
+          <div>
+            <dt>分摊金额</dt>
+            <dd>{{ formatAmount(overheadExecutionResult.allocatedAmount) }}</dd>
+          </div>
         </dl>
       </form>
       <template #footer

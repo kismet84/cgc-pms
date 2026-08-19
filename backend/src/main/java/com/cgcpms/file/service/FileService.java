@@ -789,7 +789,7 @@ public class FileService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to generate presigned URL: bucket={}, object={}", bucket, object, e);
-            throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败: " + e.getMessage());
+            throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败");
         }
     }
 

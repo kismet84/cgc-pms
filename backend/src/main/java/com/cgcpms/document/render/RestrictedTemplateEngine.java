@@ -19,7 +19,7 @@ public class RestrictedTemplateEngine {
             Pattern.DOTALL);
     private static final Pattern DATA_IMAGE = Pattern.compile("data:image/(?:png|jpeg|jpg|gif);base64,([A-Za-z0-9+/=\\r\\n]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern FORBIDDEN = Pattern.compile(
-            "<(?:script|iframe|object|embed|base|link)\\b|@import\\b|javascript\\s*:|file\\s*:|https?\\s*:|(?<!:)//|expression\\s*\\(|behavior\\s*:",
+            "<(?:script|iframe|object|embed|base|link)\\b|(?:\\s|/)on[a-z0-9_-]+\\s*=|@import\\b|javascript\\s*:|file\\s*:|https?\\s*:|(?<!:)//|expression\\s*\\(|behavior\\s*:",
             Pattern.CASE_INSENSITIVE);
 
     private final DocumentGenerationProperties properties;

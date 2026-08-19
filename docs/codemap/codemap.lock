@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-18T19:18:34.149Z",
+  "generation_time": "2026-08-19T17:26:38.207Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,9 +50,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4199,
-  "repository_file_count": 4199,
-  "included_file_count": 2935,
+  "tracked_file_count": 4223,
+  "repository_file_count": 4223,
+  "included_file_count": 2959,
   "excluded_file_count": 1264,
   "modules": [
     {
@@ -70,8 +70,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1946,
-      "fingerprint": "a6a7644b16a9873954353d79e3392df40c82377c33a3cbe48638062b631e5c63"
+      "file_count": 1947,
+      "fingerprint": "04b0821d1de78759a16ab645394cf47a086c315dfc4162fdaceceeb0fcf28d61"
     },
     {
       "id": "delivery_tooling",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 283,
-      "fingerprint": "40265f31e05371dcf03ac01f40fa1a8a5c357775ac6331f05c7d616b3f472d01"
+      "fingerprint": "528b9f8784a8de7100b82a4690fec657dec2b5a17242fcca47a2bd8742939248"
     },
     {
       "id": "desktop_launcher",
@@ -98,16 +98,16 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 147,
-      "fingerprint": "7d6c7f85619dd315d2e2e7f5c8d268f7e1031dc0bea65908e0661fe685e35839"
+      "file_count": 169,
+      "fingerprint": "02c1993fb33d130f2f77d424f211ecf03a210f9c7d6df8f2b0d7a8a72b6cb62a"
     },
     {
       "id": "frontend_v2",
       "scope": [
         "frontend-admin-v2/**"
       ],
-      "file_count": 411,
-      "fingerprint": "5545aabb58365b0ab8fb66428c5cfaaea4f95167ccf8767245e8b1e7cfd5038f"
+      "file_count": 412,
+      "fingerprint": "359fedc90d78f5188aca5e4b71106a05e659354bb8cb8c5c8530ae97e198acb4"
     },
     {
       "id": "mobile",
@@ -123,7 +123,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "382581ea58bbfb97a9a006d81488d0a3875382c84516bb95eeaf4dd70dcbf723"
+      "fingerprint": "da84021b8d8fe7b89fb607b8dbae4cef99939e5799f6ca59516758013cd4db6a"
     },
     {
       "id": "shared_packages",
@@ -134,13 +134,13 @@
       "fingerprint": "e4f77667ea53aeacf00f41d114c3fc6cb297f1d3028d946919fa1157f9d5c558"
     }
   ],
-  "generation_base_commit": "edeadaead425e7bd75d66faffafa09dbdc715e99",
+  "generation_base_commit": "44e0caa8febd7605c94ba4bd1b95370396363272",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "681480f46abff5ffe7a687d1378b2b0ce7a766e3",
+    "previous_generation_base_commit": "4224e45d86a63a900f3d18ac4cc810b288cb74aa",
     "stale_modules": [
-      "frontend_v2"
+      "backend"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

@@ -43,11 +43,14 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final List<String> SKIP_PATHS = List.of(
-            SecurityConfig.AUTH_WHITELIST_PATHS,
-            SecurityConfig.DOC_WHITELIST_PATHS,
-            SecurityConfig.HEALTH_WHITELIST_PATHS
-    ).stream().flatMap(java.util.Arrays::stream).toList();
+    private static final List<String> SKIP_PATHS = java.util.stream.Stream.concat(
+            List.of(
+                    SecurityConfig.AUTH_WHITELIST_PATHS,
+                    SecurityConfig.DOC_WHITELIST_PATHS,
+                    SecurityConfig.HEALTH_WHITELIST_PATHS
+            ).stream().flatMap(java.util.Arrays::stream),
+            java.util.stream.Stream.of(SecurityConfig.PROMETHEUS_PATH)
+    ).toList();
 
     private final JwtUtils jwtUtils;
     private final JwtProperties jwtProperties;
@@ -82,8 +85,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path))
-                || shouldSkipDevLogin(path);
+        String requestPath = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (!contextPath.isEmpty() && requestPath.startsWith(contextPath)) {
+            requestPath = requestPath.substring(contextPath.length());
+        }
+        String normalizedRequestPath = requestPath;
+        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path)
+                        || pathMatcher.match(pattern, normalizedRequestPath))
+                || shouldSkipDevLogin(path)
+                || shouldSkipDevLogin(normalizedRequestPath);
     }
 
     @Override

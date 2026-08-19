@@ -22,15 +22,18 @@ import {
 } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 import { workflowModule } from '@/pages/system/workflow-business-modules'
+import { documentScreenPreviewHtml } from '@/components/document/documentPreviewHtml'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const collapsedModulesStorageKey = 'document-template-collapsed-modules'
 const loading = ref(true)
 const detailLoading = ref(false)
 const installing = ref('')
 const error = ref('')
 const search = ref('')
+const collapsedModuleKeys = ref(readCollapsedModules())
 const businessTypes = ref<DocumentBusinessTypeOption[]>([])
 const templates = ref<DocumentTemplateSummary[]>([])
 const statuses = ref<SystemDocumentTemplateStatus[]>([])
@@ -39,6 +42,7 @@ const businessType = ref(String(route.query.businessType ?? ''))
 const selectedTemplateId = ref(String(route.query.templateId ?? ''))
 const selectedVersionId = ref(String(route.query.versionId ?? ''))
 const previewHtml = ref('')
+const screenPreviewHtml = computed(() => documentScreenPreviewHtml(previewHtml.value))
 const previewLoading = ref(false)
 const previewError = ref('')
 const pendingAction = ref<'installAll' | 'publish' | 'disable' | 'enable' | 'default'>()
@@ -218,6 +222,25 @@ function syncUrl(): void {
   })
 }
 
+function readCollapsedModules(): string[] {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(collapsedModulesStorageKey) || '[]') as unknown
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+function rememberModuleState(key: string, event: Event): void {
+  const open = (event.currentTarget as HTMLDetailsElement).open
+  collapsedModuleKeys.value = open
+    ? collapsedModuleKeys.value.filter((item) => item !== key)
+    : [...new Set([...collapsedModuleKeys.value, key])]
+  sessionStorage.setItem(collapsedModulesStorageKey, JSON.stringify(collapsedModuleKeys.value))
+}
+
 function createTemplate(): void {
   router.push({
     path: '/system/document-templates/new',
@@ -376,8 +399,17 @@ function messageOf(value: unknown): string {
           <input v-model="search" placeholder="搜索业务、模板名称或编码" />
         </div>
         <div class="nav-scroll">
-          <section v-for="group in filteredBusinessGroups" :key="group.key" class="module-group">
-            <h2>{{ group.label }}</h2>
+          <details
+            v-for="group in filteredBusinessGroups"
+            :key="group.key"
+            class="module-group"
+            :open="!collapsedModuleKeys.includes(group.key)"
+            @toggle="rememberModuleState(group.key, $event)"
+          >
+            <summary>
+              <span>{{ group.label }}</span>
+              <small>{{ group.rows.length }}</small>
+            </summary>
             <div v-for="row in group.rows" :key="row.business.businessType" class="business-group">
               <button
                 type="button"
@@ -408,7 +440,7 @@ function messageOf(value: unknown): string {
                 ><small>{{ template.templateCode }}</small>
               </button>
             </div>
-          </section>
+          </details>
           <p v-if="!filteredBusinessGroups.length" class="empty-nav">没有匹配的业务或模板。</p>
         </div>
       </aside>
@@ -455,7 +487,12 @@ function messageOf(value: unknown): string {
               >
             </div>
             <div class="preview-stage">
-              <iframe v-if="previewHtml" title="业务单据模板预览" :srcdoc="previewHtml" />
+              <iframe
+                v-if="screenPreviewHtml"
+                title="业务单据模板预览"
+                sandbox=""
+                :srcdoc="screenPreviewHtml"
+              />
               <div v-else class="preview-state">
                 {{ previewLoading ? '正在生成服务端预览…' : previewError || '选择版本查看预览' }}
               </div>
@@ -634,10 +671,33 @@ function messageOf(value: unknown): string {
   overflow: auto;
   padding: 8px 0 24px;
 }
-.module-group h2 {
+.module-group summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin: 14px 16px 6px;
   color: var(--v2-color-text-secondary);
   font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.module-group summary::-webkit-details-marker {
+  display: none;
+}
+.module-group summary::before {
+  content: '▾';
+  width: 14px;
+  color: var(--v2-color-text-muted);
+}
+.module-group:not([open]) summary::before {
+  content: '▸';
+}
+.module-group summary span {
+  flex: 1;
+}
+.module-group summary small {
+  font-weight: 400;
 }
 .business-row,
 .template-row {

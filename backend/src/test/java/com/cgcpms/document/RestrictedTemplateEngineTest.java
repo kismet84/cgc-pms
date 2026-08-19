@@ -42,6 +42,18 @@ class RestrictedTemplateEngineTest {
     }
 
     @Test
+    void rejectsInlineEventHandlersRegardlessOfCaseOrSpacing() {
+        for (String template : List.of(
+                "<img src='data:image/png;base64,iVBORw0KGgo=' onerror=alert(1)>",
+                "<div ONCLICK = \"parent.document.body.innerHTML='owned'\">预览</div>",
+                "<svg on_load='alert(1)'></svg>",
+                "<math/onmouseover=alert(1)>x</math>")) {
+            BusinessException error = assertThrows(BusinessException.class, () -> engine.validate(template));
+            assertEquals("DOCUMENT_TEMPLATE_RESOURCE_FORBIDDEN", error.getCode());
+        }
+    }
+
+    @Test
     void rejectsUnsupportedExpressionsAndOversizedCollections() {
         BusinessException expression = assertThrows(BusinessException.class,
                 () -> engine.render("<html>{{ payment.amount + 1 }}</html>", Map.of()));

@@ -3,6 +3,8 @@ package com.cgcpms.audit.service;
 import com.cgcpms.audit.entity.OperationAuditLog;
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,14 +22,21 @@ public class OperationAuditService {
     private static final Logger log = LoggerFactory.getLogger(OperationAuditService.class);
 
     private final OperationAuditLogMapper mapper;
+    private final Counter attempts;
+    private final Counter successes;
+    private final Counter failures;
 
-    public OperationAuditService(OperationAuditLogMapper mapper) {
+    public OperationAuditService(OperationAuditLogMapper mapper, MeterRegistry meterRegistry) {
         this.mapper = mapper;
+        this.attempts = auditCounter(meterRegistry, "attempt");
+        this.successes = auditCounter(meterRegistry, "success");
+        this.failures = auditCounter(meterRegistry, "failure");
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @EventListener
     public void handleAuditEvent(OperationAuditEvent event) {
+        attempts.increment();
         try {
             OperationAuditLog entity = new OperationAuditLog();
             entity.setTenantId(event.tenantId());
@@ -44,8 +53,17 @@ public class OperationAuditService {
             entity.setDurationMs(event.durationMs());
             entity.setCreatedAt(event.createdAt());
             mapper.insert(entity);
+            successes.increment();
         } catch (Exception e) {
+            failures.increment();
             log.error("Failed to persist audit log: operationType={}, userId={}", event.operationType(), event.userId(), e);
         }
+    }
+
+    private Counter auditCounter(MeterRegistry meterRegistry, String outcome) {
+        return Counter.builder("operation.audit.persistence")
+                .description("Best-effort operation audit persistence outcomes")
+                .tag("outcome", outcome)
+                .register(meterRegistry);
     }
 }

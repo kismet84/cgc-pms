@@ -77,7 +77,10 @@ describe('BusinessAttachmentPanel', () => {
     let resolveFirst: ((value: Awaited<ReturnType<typeof listSiteFiles>>) => void) | undefined
     vi.mocked(listSiteFiles)
       .mockImplementationOnce(
-        () => new Promise((resolve) => { resolveFirst = resolve }),
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          }),
       )
       .mockResolvedValueOnce([
         { id: '22', originalName: 'new-business.pdf', virusScanStatus: 'CLEAN' },

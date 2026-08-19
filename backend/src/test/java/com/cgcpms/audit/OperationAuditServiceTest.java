@@ -3,10 +3,14 @@ package com.cgcpms.audit;
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.audit.entity.OperationAuditLog;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
+import com.cgcpms.audit.service.OperationAuditService;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -17,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -29,6 +34,17 @@ class OperationAuditServiceTest {
 
     @MockitoBean
     private OperationAuditLogMapper mapper;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @BeforeEach
+    void initializeAuditMetrics() {
+        applicationContext.getBean(OperationAuditService.class);
+    }
 
     @Test
     @DisplayName("事件发布返回前应完成审计写入")
@@ -53,7 +69,6 @@ class OperationAuditServiceTest {
     @Test
     @DisplayName("Mapper 异常不传播 — catch 后不抛回调用方")
     void testMapperExceptionNotPropagated() throws Exception {
-        // 设计一个极端情况：插入超长路径来尝试触发异常，或直接验证 catch 不 throw
         OperationAuditEvent event = OperationAuditEvent.builder()
                 .tenantId(0L)
                 .userId(1L)
@@ -69,8 +84,14 @@ class OperationAuditServiceTest {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // 不应抛出任何异常（包括 Mapper 异常不应该传播）
+        double attemptsBefore = counter("attempt");
+        double failuresBefore = counter("failure");
+        doThrow(new IllegalStateException("audit storage unavailable"))
+                .when(mapper).insert(any(OperationAuditLog.class));
+
         assertDoesNotThrow(() -> publisher.publishEvent(event));
+        assertEquals(attemptsBefore + 1, counter("attempt"));
+        assertEquals(failuresBefore + 1, counter("failure"));
     }
 
     @Test
@@ -144,5 +165,12 @@ class OperationAuditServiceTest {
             assertFalse(name.contentEquals("requestBody") || name.contentEquals("responseBody"),
                     "实体不应包含 requestBody/responseBody 字段: " + name);
         }
+    }
+
+    private double counter(String outcome) {
+        return meterRegistry.get("operation.audit.persistence")
+                .tag("outcome", outcome)
+                .counter()
+                .count();
     }
 }

@@ -194,6 +194,8 @@ services:
       CGCPMS_BOOTSTRAP_ADMIN_EMAIL: ${CGCPMS_BOOTSTRAP_ADMIN_EMAIL:-}
       CGCPMS_BOOTSTRAP_ADMIN_PASSWORD: ${CGCPMS_BOOTSTRAP_ADMIN_PASSWORD:-}
       CGCPMS_DEV_LOGIN_USERNAME: ${CGCPMS_DEV_LOGIN_USERNAME:-admin}
+      # Optional machine identity for Prometheus. Empty values keep scrape access fail-closed.
+      MONITORING_SCRAPE_USERNAME: cgcpms-monitor
     command: java -jar target/cgc-pms-backend.jar
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/actuator/health >/dev/null || exit 1"]
