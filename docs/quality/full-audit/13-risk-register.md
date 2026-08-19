@@ -11,7 +11,7 @@
 | DEPLOY-001 | P2 | 本轮修复并复验 | MySQL 初始化与 JDBC 共用 `MYSQL_DATABASE` | 静态契约与 Compose overlay 展开通过 | 未执行非本地 fresh deploy |
 | OBS-002 | P2 | 本轮修复并复验 | 通用审计增加 attempt/success/failure 指标与失败告警；关键命令继续强审计 | 故障注入计数 failure 且不传播；强审计现有分母/hash 证据 | 不为普通操作引入第二套 outbox |
 | OBS-003 | P2 | 本轮发现、修复并复验 | 删除与 Spring Boot 自动线程池观测重复的 Micrometer binder | Prometheus registry 无同名异标签告警；`executor.completed{name="taskExecutor"}` 存在 | 保留 Boot 原生观测，不维护第二套标签契约 |
-| DEP-001 | P2 | 本轮补证并关闭 | 执行固定摘要 Trivy 当前库 manifest 扫描 | backend manifest HIGH/CRITICAL 0；前端 audit 0 | BOM 空版本与 JAR 二次扫描必须由同 SHA CI 覆盖 |
+| DEP-001 | P2 | 本轮补证并关闭 | 执行固定摘要 Trivy 当前库 manifest 扫描，并由同 SHA CI 扫描构建 JAR | backend manifest HIGH/CRITICAL 0；前端 audit 0；`supply-chain-security` 通过 | 后续代码或依赖变化必须重新扫描 |
 | DR-001 | P2 | 本轮补证并关闭 | 隔离执行现有恢复演练 | MySQL 行、MinIO 对象、SHA、交叉引用通过，23.9 秒 | 未触碰当前开发数据库/桶 |
 | PERF-001 | P3 | 本轮补证并关闭 | 固定 JVM PDF 基准 + 查询预算 + bundle 预算 | 20/120/200 页各 30 次无失败；Dashboard 4 项预算通过 | 不是生产 SLA 或真实容量签认 |
 | ARCH-001 | P3 | 证据不足/无明确价值而关闭 | 对照第94条职责审查，行数不等于多职责；保留事务/锁/补偿门面 | 第94条职责拆分报告、全量测试/构建 | 出现职责混杂或冲突证据时重新登记 |
@@ -33,4 +33,4 @@
 - 关闭后续项：1（`AUDIT-PROMETHEUS-SCRAPE-AUTH` 已由 `OPS-001` 实现覆盖，并已从 Backlog 去重移除）。
 - 后续项净变化：-1。
 - 无载体遗留项：0。
-- 本地零悬空裁决：通过；Git/远端/生产不在本轮授权。
+- 零悬空裁决：通过；受保护 Git 交付已完成，生产/目标环境不存在且不在本轮范围。
