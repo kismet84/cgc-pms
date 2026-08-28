@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-28T17:08:42.723Z",
+  "generation_time": "2026-08-28T17:44:50.257Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 171,
-      "fingerprint": "9df1c7ee1dfab5d4c89bc5cb6b62dbca898e64d8d1218838f8d7b0297c427337"
+      "fingerprint": "22f7bcb4afc638fbb528632bdfe3d30b72a1602af53cae7a6ca158a11d8cb068"
     },
     {
       "id": "frontend_v2",
@@ -134,13 +134,13 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "10c128e30e313ab248da65b2cbd4748d1734c55d",
+  "generation_base_commit": "2e4a37118337b49d89bb7bc8c778d666d463b8a7",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "15afddfce07c3d95ac1561d3169df4fb2c29a242",
+    "previous_generation_base_commit": "10c128e30e313ab248da65b2cbd4748d1734c55d",
     "stale_modules": [
-      "delivery_tooling"
+      "documentation"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

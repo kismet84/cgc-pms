@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-28T17:08:42.723Z",
-  "generation_base_commit": "10c128e30e313ab248da65b2cbd4748d1734c55d",
+  "generated_at": "2026-08-28T17:44:50.257Z",
+  "generation_base_commit": "2e4a37118337b49d89bb7bc8c778d666d463b8a7",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
