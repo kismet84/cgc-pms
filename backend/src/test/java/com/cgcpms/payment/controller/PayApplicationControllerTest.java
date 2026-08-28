@@ -7,6 +7,7 @@ import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.system.dict.service.SysDictDataService;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -66,6 +68,9 @@ class PayApplicationControllerTest {
     @Autowired
     private OperationAuditLogMapper operationAuditLogMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockitoBean
     private SysDictDataService sysDictDataService;
 
@@ -75,6 +80,18 @@ class PayApplicationControllerTest {
 
     @BeforeEach
     void allowConfiguredDictionaryValues() {
+        Integer adminCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
+        if (adminCount != null && adminCount == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user
+                        (id,tenant_id,username,password,real_name,status,is_admin,deleted_flag)
+                    VALUES (?,?,'admin','{noop}test','付款接口测试管理员','ENABLE',1,0)
+                    """, ADMIN_ID, TENANT_ID);
+        } else {
+            jdbcTemplate.update("UPDATE sys_user SET tenant_id=?,status='ENABLE',is_admin=1,deleted_flag=0 WHERE id=?",
+                    TENANT_ID, ADMIN_ID);
+        }
         doAnswer(invocation -> {
             String value = invocation.getArgument(1);
             return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
@@ -117,7 +134,7 @@ class PayApplicationControllerTest {
     void testAuditedOperationsPresent() throws Exception {
         assertAudit("create", new Class<?>[] {com.cgcpms.payment.entity.PayApplication.class},
                 "CREATE", "PAYMENT", "#app.id");
-        assertAudit("update", new Class<?>[] {Long.class, com.cgcpms.payment.entity.PayApplication.class},
+        assertAudit("update", new Class<?>[] {Long.class, PayApplicationUpdateRequest.class},
                 "UPDATE", "PAYMENT", "#id");
         assertAudit("batchSaveSources", new Class<?>[] {Long.class, List.class},
                 "UPDATE_SOURCES", "PAYMENT", "#id");
@@ -264,6 +281,7 @@ class PayApplicationControllerTest {
                   "applyCode": "CLIENT-UPDATE",
                   "applyAmount": 1200.00,
                   "payType": "PROGRESS",
+                  "expectedVersion": 0,
                   "applyReason": "%s"
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID, reason);

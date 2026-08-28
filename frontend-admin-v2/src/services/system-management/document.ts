@@ -119,7 +119,7 @@ export interface SystemDocumentTemplateInstallResult {
   templateId: string
   versionId: string
   action: 'CREATED' | 'UPGRADED' | 'UNCHANGED'
-  bindingAction: 'BOUND' | 'UPDATED_SYSTEM' | 'PRESERVED_CUSTOM'
+  bindingAction: 'BOUND' | 'UPDATED_SYSTEM' | 'UNCHANGED_SYSTEM' | 'PRESERVED_CUSTOM'
 }
 
 export interface DocumentTemplateSummary {

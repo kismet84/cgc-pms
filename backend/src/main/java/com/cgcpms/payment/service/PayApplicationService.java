@@ -22,6 +22,8 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.entity.PaymentApplicationSource;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import com.cgcpms.payment.mapper.PayApplicationBasisMapper;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
@@ -59,7 +61,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-// TODO: 拆分超大文件 (667行) — 拆分为 PayApplicationQueryService + PayApplicationWriteService + PayApplicationAssembler
 public class PayApplicationService {
 
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
@@ -256,8 +257,8 @@ public class PayApplicationService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void update(PayApplication app) {
-        PayApplication existing = payApplicationMapper.selectById(app.getId());
+    public void update(Long id, PayApplicationUpdateRequest request) {
+        PayApplication existing = payApplicationMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
         checkProjectAccess(existing.getProjectId(), "编辑付款申请");
@@ -265,6 +266,11 @@ public class PayApplicationService {
         if (!"DRAFT".equals(existing.getApprovalStatus()) && !"REJECTED".equals(existing.getApprovalStatus()))
             throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑");
 
+        if (!Objects.equals(request.expectedVersion(), existing.getVersion())) {
+            throw paymentApplicationConflict();
+        }
+
+        PayApplication app = toUpdateEntity(id, request);
         app.setTenantId(existing.getTenantId());
         app.setApplyCode(existing.getApplyCode());
         app.setApprovalStatus("DRAFT");
@@ -273,13 +279,49 @@ public class PayApplicationService {
         app.setIntegrityVersion(existing.getIntegrityVersion());
         app.setActualPayAmount(existing.getActualPayAmount());
         app.setApprovedAmount(existing.getApprovedAmount());
-        app.setVersion(existing.getVersion());
+        app.setVersion(request.expectedVersion());
         normalizeBusinessDictionaryFields(app, existing);
         validateProjectAndContract(
                 app.getProjectId() != null ? app.getProjectId() : existing.getProjectId(),
                 app.getContractId() != null ? app.getContractId() : existing.getContractId(),
                 "编辑付款申请");
-        payApplicationMapper.updateById(app);
+        if (payApplicationMapper.updateById(app) != 1) {
+            throw paymentApplicationConflict();
+        }
+        if (request.sources() != null) {
+            List<PaymentApplicationSource> sources = request.sources().stream()
+                    .map(this::toSourceEntity)
+                    .toList();
+            sourceService.save(id, sources);
+        }
+    }
+
+    private PayApplication toUpdateEntity(Long id, PayApplicationUpdateRequest request) {
+        PayApplication app = new PayApplication();
+        app.setId(id);
+        app.setProjectId(request.projectId());
+        app.setContractId(request.contractId());
+        app.setPartnerId(request.partnerId());
+        app.setCostSubjectId(request.costSubjectId());
+        app.setBudgetLineId(request.budgetLineId());
+        app.setExpenseCategory(request.expenseCategory());
+        app.setApplyAmount(request.applyAmount());
+        app.setPayType(request.payType());
+        app.setApplyReason(request.applyReason());
+        app.setRemark(request.remark());
+        return app;
+    }
+
+    private PaymentApplicationSource toSourceEntity(PayApplicationUpdateRequest.SourceInput input) {
+        PaymentApplicationSource source = new PaymentApplicationSource();
+        source.setSourceType(input.sourceType());
+        source.setSourceRefId(input.sourceRefId());
+        source.setSourceAmount(input.sourceAmount());
+        return source;
+    }
+
+    private BusinessException paymentApplicationConflict() {
+        return new BusinessException("PAY_APP_STATUS_CONFLICT", "付款申请已被其他用户修改，请刷新后重试");
     }
 
     private void normalizeBusinessDictionaryFields(PayApplication app, PayApplication existing) {
@@ -796,6 +838,7 @@ public class PayApplicationService {
         vo.setPayStatus(app.getPayStatus());
         vo.setApprovalStatus(app.getApprovalStatus());
         vo.setApplyReason(app.getApplyReason());
+        vo.setVersion(app.getVersion());
         vo.setCreatedBy(app.getCreatedBy() != null ? app.getCreatedBy().toString() : null);
         vo.setCreatedAt(app.getCreatedAt() != null ? app.getCreatedAt().format(DateTimeUtils.DTF) : null);
         vo.setUpdatedAt(app.getUpdatedAt() != null ? app.getUpdatedAt().format(DateTimeUtils.DTF) : null);

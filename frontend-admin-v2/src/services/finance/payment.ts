@@ -13,6 +13,7 @@ import {
   type PaymentApplicationPage,
   type PaymentApplicationQuery,
   type PaymentApplicationSourceRecord,
+  type PaymentApplicationUpdateCommand,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 import { requiredId, withQuery } from './support'
@@ -100,8 +101,12 @@ export const savePaymentBasis = (
     method: 'POST',
     body,
   })
-export const updatePayment = (id: string, body: PaymentApplicationCommand) =>
-  apiRequest<void>(`/pay-applications/${requiredId(id)}`, { method: 'PUT', body })
+export const updatePayment = (id: string, body: PaymentApplicationUpdateCommand) =>
+  apiRequest<void>(`/pay-applications/${requiredId(id)}`, {
+    method: 'PUT',
+    body,
+    notifyError: false,
+  })
 export const deletePayment = (id: string) =>
   apiRequest<void>(`/pay-applications/${requiredId(id)}`, { method: 'DELETE' })
 export const submitPayment = (id: string) =>

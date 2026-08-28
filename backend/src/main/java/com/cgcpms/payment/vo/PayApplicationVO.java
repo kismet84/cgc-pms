@@ -25,6 +25,7 @@ public class PayApplicationVO {
     private String payStatus;
     private String approvalStatus;
     private String applyReason;
+    private Integer version;
     private String projectName;
     private String contractName;
     private String partnerName;

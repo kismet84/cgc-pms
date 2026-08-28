@@ -210,6 +210,9 @@ jobs:
       - name: Verify backup failure atomicity
         shell: bash
         run: bash ./scripts/ci/test-backup-atomicity.sh
+      - name: Verify backend artifact scan failure closure
+        shell: bash
+        run: bash ./scripts/ci/test-backend-artifact-scan.sh
       - name: Verify Codemap generator and current snapshot
         run: |
           node scripts/codemap/test-generate-codemap.mjs
@@ -422,7 +425,7 @@ jobs:
 
   supply-chain-security:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs:
       [pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]
     if: needs.pr-push-evidence.outputs.run-full == 'true'
@@ -431,26 +434,21 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-backend
       - name: Download backend jar
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: artifacts/backend
       - name: Scan built backend jar
-        run: |
-          mkdir -p .trivy-cache
-          docker run --rm \
-            -v "$PWD/.trivy-cache:/root/.cache/trivy" \
-            -v "$PWD/artifacts/backend:/workspace:ro" \
-            aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 \
-            rootfs \
-            --scanners vuln \
-            --pkg-types library \
-            --severity HIGH,CRITICAL \
-            --exit-code 1 \
-            --format table \
-            --timeout 10m \
-            /workspace
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+          SCAN_OUTPUT_DIR: artifacts/backend
+          EXPECTED_GIT_SHA: ${{ github.sha }}
+        run: bash ./scripts/ci/scan-backend-artifact.sh artifacts/backend/cgc-pms-backend.jar
       - name: Download frontend build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -496,6 +494,9 @@ jobs:
           name: ${{ env.SBOM_ARTIFACT }}
           path: |
             artifacts/backend/cgc-pms-backend.spdx.json
+            artifacts/backend/backend-artifact-metadata.txt
+            artifacts/backend/backend-artifact-trivy.json
+            artifacts/backend/backend-artifact-trivy.stderr.log
             artifacts/frontend-dist.spdx.json
           retention-days: 30
 

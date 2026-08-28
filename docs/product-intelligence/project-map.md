@@ -1,5 +1,13 @@
 # CGC-PMS 项目地图
 
+## 2026-08-28 主线99：每日审计并发一致性、供应链扫描与依赖安全整改本地完成
+
+- 状态：`IMPLEMENTED / G0-G5_LOCAL_PASSED / ISSUE_CLOSED / GIT_NOT_AUTHORIZED`；唯一载体为[`第99条计划`](../plans/第99条主线-每日审计并发一致性供应链扫描与依赖安全整改任务计划书.md)与[`质量报告`](../quality/2026-08-28-issue-099-每日审计并发一致性供应链扫描与依赖安全整改.md)。
+- 目标链：`付款旧版本更新 → MyBatis 乐观锁 → affectedRows=1/并发冲突`；`${GITHUB_SHA} → Maven 构建 JAR → 统一制品 Trivy → SBOM/报告`；`系统模板安装 → 四态绑定结果 → 真实 UI 提示`；`Boot 3.5.16 → Tomcat 10.1.59 → 精确制品与本地回归`。
+- 不变量：付款金额、状态、权限、租户、事务与公共 API 不变；模板自定义默认不被覆盖；扫描缺产物/零库/解析告警失败关闭；付款服务不做结构拆分，只删除失真 TODO。
+- 验证：后端 2950、前端 649、真实 MySQL 恰好一胜一冲突、真实浏览器专用 409 提示、最终 JAR 162 库、Tomcat 10.1.59、精确 SPDX Trivy HIGH/CRITICAL 0。
+- 边界：仅本地 dev/test/demo；不实施 Boot 4/前端大版本升级，不建设第二扫描平台，不连接或规划生产/目标环境；Git 未授权、未执行。
+
 ## 2026-08-12 主线92：审计遗留可靠性、安全与验证治理已合并并完成 post-merge
 
 - 状态：`IMPLEMENTED / G0-G5_PASSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；源 HEAD `c7488482cb0f`，实现 PR #435，合并 SHA `04e45327dcaa`。

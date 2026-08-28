@@ -153,6 +153,7 @@ $backendAction = Read-RepoText '.github\actions\setup-backend\action.yml'
 $frontendAction = Read-RepoText '.github\actions\setup-frontend\action.yml'
 $dependabot = Read-RepoText '.github\dependabot.yml'
 $dependencyScanScript = Read-RepoText 'scripts\ci\scan-backend-dependencies.sh'
+$artifactScanScript = Read-RepoText 'scripts\ci\scan-backend-artifact.sh'
 $minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
 $prodCompose = Read-RepoText 'deploy\docker-compose.prod.yml'
 $frontendDockerfile = Read-RepoText 'frontend-admin-v2\Dockerfile'
@@ -174,7 +175,7 @@ Assert-ImmutableActionRefs $postMergeWorkflow 'post-merge workflow'
 Assert-ImmutableActionRefs $supplyChainRescan 'supply-chain rescan workflow'
 Assert-ImmutableActionRefs $backendAction 'backend setup action'
 Assert-ImmutableActionRefs $frontendAction 'frontend setup action'
-Assert-ImmutableImageRefs "$workflow`n$dependencyScanScript`n$minioScript" 'CI execution inputs'
+Assert-ImmutableImageRefs "$workflow`n$dependencyScanScript`n$artifactScanScript`n$minioScript" 'CI execution inputs'
 Assert-ImmutableThirdPartyImageRefs $prodCompose 'production compose'
 Assert-ImmutableDockerfileBaseRefs $frontendDockerfile 'frontend Dockerfile'
 Assert-Contains $prodCompose @(
@@ -184,7 +185,9 @@ Assert-Contains $prodCompose @(
 ) 'production application image digests'
 Assert-Contains $supplyChainRescan @(
   'schedule:','cron:','workflow_dispatch:','permissions:','contents: read',
-  'bash ./scripts/ci/scan-backend-dependencies.sh','pnpm audit','${{ github.sha }}'
+  './mvnw -q -DskipTests package','bash ./scripts/ci/scan-backend-artifact.sh',
+  'EXPECTED_GIT_SHA: ${{ github.sha }}','backend-artifact-trivy.json',
+  'backend-${{ github.sha }}.jar','pnpm audit','${{ github.sha }}'
 ) 'scheduled supply-chain rescan'
 Assert-Contains $workflow @(
   'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
@@ -291,7 +294,7 @@ $timeoutMinutes = @{
   'frontend-test' = 10
   'frontend-dependency-audit' = 10
   'frontend-v2-gate' = 10
-  'supply-chain-security' = 15
+  'supply-chain-security' = 20
   'e2e' = 25
   'sql-safety-scan' = 10
   'build-summary' = 5
@@ -300,7 +303,7 @@ foreach ($entry in $timeoutMinutes.GetEnumerator()) {
   Assert-Contains (Get-JobBlock $workflow $entry.Key) @("timeout-minutes: $($entry.Value)") "$($entry.Key) timeout"
 }
 
-Assert-ActionStepInputs $workflow 'actions/checkout' 15 @(
+Assert-ActionStepInputs $workflow 'actions/checkout' 16 @(
   '(?m)^          persist-credentials: false\r?$'
 ) 'checkout'
 
@@ -387,6 +390,7 @@ Assert-Contains $mysqlUpgradeStep @(
 Assert-Contains $reliabilityContracts @(
   './scripts/ci/test-runtime-deployment-contract.ps1',
   'bash ./scripts/ci/test-backup-atomicity.sh',
+  'bash ./scripts/ci/test-backend-artifact-scan.sh',
   './scripts/ci/test-backup-restore-drill.ps1',
   'node scripts/codemap/test-generate-codemap.mjs',
   'node scripts/codemap/generate-codemap.mjs --verify'
@@ -408,15 +412,15 @@ Assert-Contains $frontendV2 @(
 Assert-Contains $supplyChain @(
   '[pr-push-evidence, backend-test, backend-dependency-scan, frontend-build]',
   'contents: read','id-token: write','attestations: write',
-  'run: |','mkdir -p .trivy-cache',
+  'bash ./scripts/ci/scan-backend-artifact.sh artifacts/backend/cgc-pms-backend.jar',
+  'EXPECTED_GIT_SHA: ${{ github.sha }}','SCAN_OUTPUT_DIR: artifacts/backend',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: artifacts/backend',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: artifacts/frontend-dist',
   'subject-path: artifacts/backend/cgc-pms-backend.jar',
   'sbom-path: artifacts/backend/cgc-pms-backend.spdx.json',
   'subject-path: artifacts/frontend-dist.tar.gz',
   'sbom-path: artifacts/frontend-dist.spdx.json',
-  'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436',
-  'artifacts/backend:/workspace:ro','retention-days: 30'
+  'artifacts/backend/backend-artifact-trivy.json','retention-days: 30'
 ) 'supply-chain-security'
 foreach ($forbidden in @('uses: actions/cache@','TRIVY_CACHE_DATE','Restore Trivy vulnerability databases')) {
   if ($supplyChain.Contains($forbidden)) { throw "supply-chain-security contains branch-scoped Trivy cache: $forbidden" }
@@ -447,7 +451,7 @@ Assert-ActionStepInputs $workflow 'actions/upload-artifact' 9 @(
   '(?m)^          retention-days: (?:7|14|30)\r?$'
 ) 'artifact upload'
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@[0-9a-f]{40}').Count -ne 3) { throw 'artifact download count changed' }
-if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 3) { throw 'backend setup composite usage count changed' }
+if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 4) { throw 'backend setup composite usage count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-frontend').Count -ne 7) { throw 'frontend setup composite usage count changed' }
 if ($workflow.Contains('uses: ./.github/workflows/')) { throw 'reusable workflow split would change the current check boundary' }
 
@@ -513,6 +517,7 @@ Assert-Rejected {
 
 foreach ($scriptName in @(
   'verify-mysql-grants.sh','run-frontend-lint.sh','scan-backend-dependencies.sh',
+  'scan-backend-artifact.sh','test-backend-artifact-scan.sh',
   'start-e2e-minio.sh','start-e2e-backend.sh'
 )) {
   $scriptText = Read-RepoText "scripts\ci\$scriptName"
@@ -529,6 +534,11 @@ Assert-Contains $dependencyScanScript @(
   'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436',
   '--pkg-types library','--skip-dirs /workspace/backend/target','/workspace/backend'
 ) 'backend dependency scan script'
+Assert-Contains $artifactScanScript @(
+  'EXPECTED_GIT_SHA','jar tf','backend artifact contains no BOOT-INF/lib libraries','artifact_sha256=',
+  'trivy_library_package_count','--format json','--list-all-pkgs','python_command=python3',
+  'aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436'
+) 'backend artifact scan script'
 
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @(

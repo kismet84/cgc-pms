@@ -53,6 +53,7 @@ class SystemDocumentTemplateServiceIntegrationTest {
         assertEquals(SystemDocumentTemplateService.InstallAction.CREATED, first.action());
         assertEquals(SystemDocumentTemplateService.BindingAction.BOUND, first.bindingAction());
         assertEquals(SystemDocumentTemplateService.InstallAction.UNCHANGED, second.action());
+        assertEquals(SystemDocumentTemplateService.BindingAction.UNCHANGED_SYSTEM, second.bindingAction());
         assertEquals(first.templateId(), second.templateId());
         assertEquals(first.versionId(), second.versionId());
         assertEquals(first.versionId(), templateService.requireDefaultVersion("PAYMENT").getId());

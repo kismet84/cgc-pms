@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-19T17:51:42.997Z",
+  "generation_time": "2026-08-28T16:20:19.274Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,9 +50,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4223,
-  "repository_file_count": 4223,
-  "included_file_count": 2959,
+  "tracked_file_count": 4228,
+  "repository_file_count": 4228,
+  "included_file_count": 2964,
   "excluded_file_count": 1264,
   "modules": [
     {
@@ -70,8 +70,8 @@
       "scope": [
         "backend/**"
       ],
-      "file_count": 1947,
-      "fingerprint": "04b0821d1de78759a16ab645394cf47a086c315dfc4162fdaceceeb0fcf28d61"
+      "file_count": 1948,
+      "fingerprint": "4e2977df8aa89a4a83527b7253da363a911500533c46a092d12c2b7fd74289dc"
     },
     {
       "id": "delivery_tooling",
@@ -82,8 +82,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 283,
-      "fingerprint": "528b9f8784a8de7100b82a4690fec657dec2b5a17242fcca47a2bd8742939248"
+      "file_count": 285,
+      "fingerprint": "7e4cab822b9d716f79652b8ee8a6402b55412aaa0df1382598786ca775031fd7"
     },
     {
       "id": "desktop_launcher",
@@ -98,8 +98,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 169,
-      "fingerprint": "428b2ea418e1b0137ea0e86a8756e1c7059eb815f4acfbb8a22240c3a5157339"
+      "file_count": 171,
+      "fingerprint": "e54cc01232780e6bac9320cb86cd7e005670e179f197b771f765289d4e252aca"
     },
     {
       "id": "frontend_v2",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 412,
-      "fingerprint": "359fedc90d78f5188aca5e4b71106a05e659354bb8cb8c5c8530ae97e198acb4"
+      "fingerprint": "f4dc29ca1a4de23e83b32e38da43dae99722aade1b3e76edd40a7fdf203137e4"
     },
     {
       "id": "mobile",
@@ -131,16 +131,20 @@
         "packages/**"
       ],
       "file_count": 38,
-      "fingerprint": "e4f77667ea53aeacf00f41d114c3fc6cb297f1d3028d946919fa1157f9d5c558"
+      "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "45b457d45abedebc0a09358eece6d8b60801c6ee",
+  "generation_base_commit": "15304fa422a29b777f41e31226ac54c932c659c6",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "44e0caa8febd7605c94ba4bd1b95370396363272",
+    "previous_generation_base_commit": "45b457d45abedebc0a09358eece6d8b60801c6ee",
     "stale_modules": [
-      "documentation"
+      "backend",
+      "delivery_tooling",
+      "documentation",
+      "frontend_v2",
+      "shared_packages"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

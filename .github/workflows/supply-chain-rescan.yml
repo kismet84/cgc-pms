@@ -12,27 +12,38 @@ permissions:
 jobs:
   backend-dependency-rescan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-backend
-      - name: Scan backend dependencies
+      - name: Build and scan exact backend artifact
         shell: bash
         env:
           TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+          SCAN_OUTPUT_DIR: artifacts
+          EXPECTED_GIT_SHA: ${{ github.sha }}
         run: |
           set -o pipefail
           mkdir -p artifacts
           echo "commit=${GITHUB_SHA}" > "artifacts/backend-${GITHUB_SHA}.log"
-          bash ./scripts/ci/scan-backend-dependencies.sh 2>&1 | tee -a "artifacts/backend-${GITHUB_SHA}.log"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          (cd backend && ./mvnw -q -DskipTests package)
+          bash ./scripts/ci/scan-backend-artifact.sh backend/target/cgc-pms-backend.jar \
+            2>&1 | tee -a "artifacts/backend-${GITHUB_SHA}.log"
+          cp backend/target/cgc-pms-backend.jar "artifacts/backend-${GITHUB_SHA}.jar"
       - name: Upload backend rescan result
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: supply-chain-backend-${{ github.sha }}
-          path: artifacts/backend-${{ github.sha }}.log
+          path: |
+            artifacts/backend-${{ github.sha }}.log
+            artifacts/backend-${{ github.sha }}.jar
+            artifacts/backend-artifact-metadata.txt
+            artifacts/backend-artifact-trivy.json
+            artifacts/backend-artifact-trivy.stderr.log
           if-no-files-found: error
           retention-days: 30
 

@@ -1,5 +1,13 @@
 # CGC-PMS v1.6 迭代方向决策
 
+## 2026-08-28 第99条审计整改收口裁决
+
+- `ISSUE-099-001` 已完成本地 G0～G5 并关闭；五项确认问题修复复验，付款服务行数型结构误报按第94/98条证据关闭。
+- 付款并发 CAS/聚合事务、精确制品扫描、模板四态、Tomcat 10.1.59 与 MinIO 注释已实现；验收见[第99条质量报告](../quality/2026-08-28-issue-099-每日审计并发一致性供应链扫描与依赖安全整改.md)。
+- Spring Boot 4 PR #456、前端批量升级 PR #460 与第99条去重；第99条只允许 Boot 3.5.16 内的 Tomcat 窄升级，不合并批量升级范围。
+- 付款服务行数型结构项已由第94/98条裁决且本轮无新增职责冲突证据；文件行数不构成 Ready 或重构授权，第99条只删除失真 TODO。
+- Git、PR、合并、发布仍未授权；项目仅有本地 dev/test/demo，生产/目标环境发布裁决不适用。
+
 ## 2026-08-10 竞品调研后裁决
 
 当前无已批准的 V1.6 Ready Issue。事实入口以[项目地图](project-map.md)、[竞品情报](competitor-analysis.md)、[Current Focus](../backlog/current-focus.md)和[当前问题源](../backlog/current-issues.json)为准。

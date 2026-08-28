@@ -93,9 +93,8 @@ public class SystemDocumentTemplateService {
             return BindingAction.BOUND;
         }
         if (!Objects.equals(binding.getTemplateId(), template.getId())) return BindingAction.PRESERVED_CUSTOM;
-        if (!Objects.equals(binding.getTemplateVersionId(), version.getId())) {
-            templateService.bindDefault(version.getId(), binding.getLockVersion());
-        }
+        if (Objects.equals(binding.getTemplateVersionId(), version.getId())) return BindingAction.UNCHANGED_SYSTEM;
+        templateService.bindDefault(version.getId(), binding.getLockVersion());
         return BindingAction.UPDATED_SYSTEM;
     }
 
@@ -169,7 +168,7 @@ public class SystemDocumentTemplateService {
     }
 
     public enum InstallAction { CREATED, UPGRADED, UNCHANGED }
-    public enum BindingAction { BOUND, UPDATED_SYSTEM, PRESERVED_CUSTOM }
+    public enum BindingAction { BOUND, UPDATED_SYSTEM, UNCHANGED_SYSTEM, PRESERVED_CUSTOM }
 
     public record InstallResult(String businessType, Long templateId, Long versionId, InstallAction action,
                                 BindingAction bindingAction) {

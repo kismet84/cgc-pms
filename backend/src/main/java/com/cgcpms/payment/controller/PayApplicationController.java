@@ -6,6 +6,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.payment.entity.PaymentApplicationSource;
@@ -73,9 +74,9 @@ public class PayApplicationController {
     @PutMapping("/{id}")
     @AuditedOperation(type = "UPDATE", businessType = "PAYMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayApplication app) {
-        app.setId(id);
-        payApplicationService.update(app);
+    public ApiResponse<Void> update(@PathVariable Long id,
+                                    @Valid @RequestBody PayApplicationUpdateRequest request) {
+        payApplicationService.update(id, request);
         return ApiResponse.success();
     }
 

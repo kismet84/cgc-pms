@@ -62,6 +62,9 @@ public class GlobalExceptionHandler {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.fail("RESOURCE_NOT_FOUND", "资源不存在"));
         }
+        if ("PAY_APP_STATUS_CONFLICT".equals(e.getCode())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
     }
 

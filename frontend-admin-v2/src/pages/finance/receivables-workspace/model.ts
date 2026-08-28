@@ -17,6 +17,7 @@ export type SelectOption = V2SelectOption
 
 export interface PaymentEditor {
   id: string
+  version: number | null
   projectId: string
   contractId: string
   partnerId: string
@@ -171,6 +172,7 @@ export function budgetOptions(rows: BudgetLineRecord[], costSubjectId: string): 
 export function emptyPaymentEditor(): PaymentEditor {
   return {
     id: '',
+    version: null,
     projectId: '',
     contractId: '',
     partnerId: '',
