@@ -12,38 +12,28 @@ printf 'fixture' > "$test_root/empty.jar"
 cat > "$test_root/bin/jar" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-case "${1:-}" in
-  tf)
-    if [[ "${2:-}" != *empty.jar ]]; then echo 'BOOT-INF/lib/example.jar'; fi
-    ;;
-  xf)
-    mkdir -p BOOT-INF/lib
-    printf 'fixture' > BOOT-INF/lib/example.jar
-    ;;
-  *)
-    exit 2
-    ;;
-esac
+if [[ "${1:-}" != "tf" ]]; then exit 2; fi
+if [[ "${2:-}" != *empty.jar ]]; then echo 'BOOT-INF/lib/example.jar'; fi
 SH
 chmod +x "$test_root/bin/jar"
 
 cat > "$test_root/bin/docker" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "${!#}" != "/workspace/BOOT-INF/lib" ]]; then
+if [[ "${!#}" != "/workspace/backend.jar" ]]; then
   echo "unexpected scan target: ${!#}" >&2
   exit 2
 fi
 case "${FAKE_TRIVY_MODE:-success}" in
   success)
-    printf '%s\n' '{"Results":[{"Class":"lang-pkgs","Type":"jar","Packages":[{"PkgName":"example","Version":"1.0.0"}]}]}'
+    printf '%s\n' '{"Results":[{"Class":"lang-pkgs","Type":"jar","Packages":[{"Name":"example","Version":"1.0.0"}]}]}'
     ;;
   empty)
     printf '%s\n' '{"Results":[{"Class":"lang-pkgs","Type":"jar","Packages":[]}]}'
     ;;
   warning)
     echo 'unable to detect version for dependency example' >&2
-    printf '%s\n' '{"Results":[{"Class":"lang-pkgs","Type":"jar","Packages":[{"PkgName":"example","Version":"1.0.0"}]}]}'
+    printf '%s\n' '{"Results":[{"Class":"lang-pkgs","Type":"jar","Packages":[{"Name":"example","Version":"1.0.0"}]}]}'
     ;;
   failure)
     exit 1

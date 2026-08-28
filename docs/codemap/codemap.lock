@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-28T16:45:00.929Z",
+  "generation_time": "2026-08-28T17:08:42.723Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 285,
-      "fingerprint": "c71fab6d2909e6890e5488d40087ed0d1c99ac366b89f95bca5820deac2353ec"
+      "fingerprint": "5466e970f1febccae674d58438e1e1bc816f4ff3cf7ed8d7de171ece14025fa7"
     },
     {
       "id": "desktop_launcher",
@@ -134,7 +134,7 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "15afddfce07c3d95ac1561d3169df4fb2c29a242",
+  "generation_base_commit": "10c128e30e313ab248da65b2cbd4748d1734c55d",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
