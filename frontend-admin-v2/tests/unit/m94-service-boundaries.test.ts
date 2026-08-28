@@ -51,7 +51,7 @@ const typeExportHashes = {
 const requestSurfaceHashes = {
   commercial: 'feedbb0e660149d81577edbe33f3492ccd689a8705579e6cbc1936d9b99eb479',
   'supply-chain': '1731f8c4bafd410bc6b98b5d8ead39b5df300346c0f83684a2c847db35669fe6',
-  finance: 'ce8fa34f528ae88b65b74195c4a5d355e90fe75281e3b0f23726fa2842038edf',
+  finance: 'f4017c77f71844e7f6d1b6b7a25729aed7d4b8d8b3466f4d51f011d1c99e6b1d',
   'system-management': '44b00ac8561f7f1340ad1a541581eb8e63cbec754d6df09a8c69f65f6fd4d930',
 } as const
 
