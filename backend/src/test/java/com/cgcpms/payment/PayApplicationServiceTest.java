@@ -7,6 +7,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import com.cgcpms.payment.mapper.PayApplicationBasisMapper;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
@@ -192,13 +193,13 @@ class PayApplicationServiceTest {
         testApp.setPayType("ARBITRARY_PAY_TYPE");
         assertEquals("PAY_TYPE_INVALID",
                 assertThrows(BusinessException.class,
-                        () -> payApplicationService.update(testApp)).getCode());
+                        () -> update(testApp)).getCode());
 
         testApp.setPayType("PROGRESS");
         testApp.setExpenseCategory("ARBITRARY_CATEGORY");
         assertEquals("EXPENSE_CATEGORY_INVALID",
                 assertThrows(BusinessException.class,
-                        () -> payApplicationService.update(testApp)).getCode());
+                        () -> update(testApp)).getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -211,7 +212,7 @@ class PayApplicationServiceTest {
     void testUpdate_DraftCanBeUpdated() {
         testApp.setApplyReason("更新后的理由");
         testApp.setApplyAmount(new BigDecimal("600000.00"));
-        payApplicationService.update(testApp);
+        update(testApp);
 
         PayApplication updated = payApplicationMapper.selectById(testAppId);
         assertEquals("更新后的理由", updated.getApplyReason());
@@ -227,7 +228,7 @@ class PayApplicationServiceTest {
 
         testApp.setApplyReason("试图修改");
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> payApplicationService.update(testApp),
+                () -> update(testApp),
                 "非 DRAFT 状态应抛异常");
         assertEquals("PAY_APP_IN_APPROVAL", ex.getCode());
     }
@@ -242,8 +243,46 @@ class PayApplicationServiceTest {
         ghost.setApplyAmount(BigDecimal.ONE);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> payApplicationService.update(ghost));
+                () -> update(ghost));
         assertEquals("PAY_APP_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update -- 旧版本顺序提交仅第一份成功")
+    void testUpdate_StaleVersionConflicts() {
+        PayApplication snapshot = payApplicationMapper.selectById(testAppId);
+        Integer initialVersion = snapshot.getVersion();
+        snapshot.setApplyReason("并发胜者");
+        PayApplicationUpdateRequest winner = updateRequest(snapshot, null);
+        snapshot.setApplyReason("过期写入");
+        PayApplicationUpdateRequest stale = updateRequest(snapshot, null);
+
+        payApplicationService.update(testAppId, winner);
+        BusinessException conflict = assertThrows(BusinessException.class,
+                () -> payApplicationService.update(testAppId, stale));
+
+        assertEquals("PAY_APP_STATUS_CONFLICT", conflict.getCode());
+        PayApplication saved = payApplicationMapper.selectById(testAppId);
+        assertEquals("并发胜者", saved.getApplyReason());
+        assertEquals(initialVersion + 1, saved.getVersion());
+    }
+
+    @Test
+    @DisplayName("update -- 来源校验失败时申请头与版本一并回滚")
+    void testUpdate_SourceFailureRollsBackHeader() {
+        String beforeReason = testApp.getApplyReason();
+        Integer beforeVersion = testApp.getVersion();
+        testApp.setApplyReason("不应落库");
+        PayApplicationUpdateRequest request = updateRequest(testApp, List.of());
+
+        BusinessException mismatch = assertThrows(BusinessException.class,
+                () -> payApplicationService.update(testAppId, request));
+
+        assertEquals("PAYMENT_SOURCE_REQUIRED", mismatch.getCode());
+        PayApplication saved = payApplicationMapper.selectById(testAppId);
+        assertEquals(beforeReason, saved.getApplyReason());
+        assertEquals(beforeVersion, saved.getVersion());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -310,6 +349,19 @@ class PayApplicationServiceTest {
         assertEquals("中建三局", vo.getPartnerName());
         assertEquals("500000.00", vo.getApplyAmount());
         assertEquals("DRAFT", vo.getApprovalStatus());
+        assertEquals(testApp.getVersion(), vo.getVersion());
+    }
+
+    private void update(PayApplication app) {
+        payApplicationService.update(app.getId(), updateRequest(app, null));
+    }
+
+    private PayApplicationUpdateRequest updateRequest(
+            PayApplication app, List<PayApplicationUpdateRequest.SourceInput> sources) {
+        return new PayApplicationUpdateRequest(
+                app.getProjectId(), app.getContractId(), app.getPartnerId(), app.getCostSubjectId(),
+                app.getBudgetLineId(), app.getExpenseCategory(), app.getApplyAmount(), app.getPayType(),
+                app.getApplyReason(), app.getRemark(), app.getVersion(), sources);
     }
 
     @Test

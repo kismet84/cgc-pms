@@ -30,6 +30,7 @@ import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.constant.PaymentIntegrityConstants;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PaymentApplicationSource;
 import com.cgcpms.payment.handler.PayRequestWorkflowHandler;
@@ -232,7 +233,11 @@ class PaymentApplicationClosedLoopIntegrationTest {
         wfInstanceMapper.updateById(rejected);
         PayApplication revised = applicationMapper.selectById(applicationId);
         revised.setApplyReason("驳回后修订并重新提交");
-        applicationService.update(revised);
+        applicationService.update(revised.getId(), new PayApplicationUpdateRequest(
+                revised.getProjectId(), revised.getContractId(), revised.getPartnerId(),
+                revised.getCostSubjectId(), revised.getBudgetLineId(), revised.getExpenseCategory(),
+                revised.getApplyAmount(), revised.getPayType(), revised.getApplyReason(), revised.getRemark(),
+                revised.getVersion(), null));
         ensureWorkflowApprover();
         WfInstance resubmitted = workflowSubmitService.resubmit(rejected.getId(), 1L, "admin");
         assertEquals(2, resubmitted.getCurrentRound());

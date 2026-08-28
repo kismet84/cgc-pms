@@ -38,4 +38,13 @@ class GlobalExceptionHandlerTest {
         assertEquals("DATA_CONFLICT", response.getCode());
         assertEquals("数据冲突，请刷新后重试", response.getMessage());
     }
+
+    @Test
+    void paymentOptimisticLockConflictsReturn409WithStableCode() {
+        var response = new GlobalExceptionHandler().handleBusinessException(
+                new BusinessException("PAY_APP_STATUS_CONFLICT", "付款申请已被其他用户修改，请刷新后重试"));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals("PAY_APP_STATUS_CONFLICT", response.getBody().getCode());
+    }
 }

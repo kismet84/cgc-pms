@@ -268,7 +268,7 @@ async function installOne(): Promise<void> {
   installing.value = businessType.value
   try {
     const result = await installSystemDocumentTemplate(businessType.value)
-    showToast('success', installMessage(result.action, result.bindingAction))
+    showToast('success', '系统模板处理完成', installMessage(result.action, result.bindingAction))
     businessType.value = result.businessType
     selectedTemplateId.value = result.templateId
     selectedVersionId.value = result.versionId
@@ -349,7 +349,12 @@ function installMessage(action: string, binding: string): string {
       action
     ] ?? action
   const bindingText =
-    binding === 'PRESERVED_CUSTOM' ? '；租户自定义默认保持不变' : '；系统默认已更新'
+    {
+      BOUND: '；已设为系统默认',
+      UPDATED_SYSTEM: '；系统默认已更新',
+      UNCHANGED_SYSTEM: '；系统默认未变化',
+      PRESERVED_CUSTOM: '；租户自定义默认保持不变',
+    }[binding] ?? `；${binding}`
   return actionText + bindingText
 }
 

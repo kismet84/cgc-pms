@@ -5,6 +5,7 @@ import DocumentFlowDesigner from '@/components/document/DocumentFlowDesigner.vue
 import DocumentTemplatePage from '@/pages/system/DocumentTemplatePage.vue'
 import DocumentTemplateDesignerPage from '@/pages/system/DocumentTemplateDesignerPage.vue'
 import * as service from '@/services/system-management'
+import { toastItems } from '@/components/toast'
 
 const route = {
   query: {} as Record<string, string>,
@@ -114,6 +115,7 @@ const versions = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  toastItems.splice(0)
   sessionStorage.removeItem('document-template-collapsed-modules')
   route.query = {}
   route.params = {}
@@ -226,6 +228,29 @@ describe('DocumentTemplatePage', () => {
     wrapper.findComponent({ name: 'V2ConfirmDialog' }).vm.$emit('confirm')
     await flushPromises()
     expect(service.installAllSystemDocumentTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['BOUND', '已设为系统默认'],
+    ['UPDATED_SYSTEM', '系统默认已更新'],
+    ['UNCHANGED_SYSTEM', '系统默认未变化'],
+    ['PRESERVED_CUSTOM', '租户自定义默认保持不变'],
+  ] as const)('reports binding action %s accurately', async (bindingAction, message) => {
+    vi.mocked(service.installSystemDocumentTemplate).mockResolvedValue({
+      businessType: 'PAYMENT',
+      templateId: 't1',
+      versionId: 'v1',
+      action: 'UNCHANGED',
+      bindingAction,
+    })
+    const wrapper = mount(DocumentTemplatePage)
+    await flushPromises()
+
+    const install = wrapper.findAll('button').find((button) => button.text().includes('检查升级'))!
+    await install.trigger('click')
+    await flushPromises()
+
+    expect(toastItems.at(-1)?.message).toContain(message)
   })
 })
 

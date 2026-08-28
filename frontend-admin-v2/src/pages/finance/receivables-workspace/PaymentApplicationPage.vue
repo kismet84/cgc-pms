@@ -23,6 +23,7 @@ import {
   type CostSubjectOption,
 } from '@/services/commercial'
 import { uploadSiteFile } from '@/services/delivery'
+import { isApiClientError } from '@/services/request'
 import {
   createPayment,
   deletePayment,
@@ -324,6 +325,7 @@ async function openForm(row?: PaymentApplicationRecord): Promise<void> {
   value.expenseCategory = defaultOption(expenseCategoryOptions.value, 'SUBCONTRACT')
   if (row) {
     value.id = row.id
+    value.version = row.version
     value.contractId = row.contractId || ''
     value.partnerId = row.partnerId || ''
     value.payType = row.payType
@@ -369,17 +371,29 @@ async function save(): Promise<void> {
       throw new TypeError('材料付款必须选择材料验收来源')
     }
     if (!value.id && !paymentAttachment.value) throw new TypeError('付款附件不能为空')
+    const source = {
+      sourceType,
+      sourceRefId: sourceType === 'DIRECT' ? value.id : required(value.sourceRefId, '付款来源'),
+      sourceAmount: command.applyAmount,
+    }
     const paymentId = value.id || (await createPayment(command))
     if (!value.id) createdPaymentId = paymentId
-    if (value.id) await updatePayment(value.id, command)
+    if (value.id) {
+      if (value.version == null) throw new TypeError('付款申请版本缺失，请刷新后重试')
+      await updatePayment(value.id, {
+        ...command,
+        expectedVersion: value.version,
+        sources: [
+          { ...source, sourceRefId: sourceType === 'DIRECT' ? value.id : source.sourceRefId },
+        ],
+      })
+    }
     value.id = paymentId
-    await savePaymentSources(paymentId, [
-      {
-        sourceType,
-        sourceRefId: sourceType === 'DIRECT' ? paymentId : required(value.sourceRefId, '付款来源'),
-        sourceAmount: command.applyAmount,
-      },
-    ])
+    if (createdPaymentId) {
+      await savePaymentSources(paymentId, [
+        { ...source, sourceRefId: sourceType === 'DIRECT' ? paymentId : source.sourceRefId },
+      ])
+    }
     if (paymentAttachment.value) {
       await uploadSiteFile(paymentAttachment.value, 'PAYMENT', paymentId, 'PAYMENT_PROOF')
     }
@@ -388,6 +402,12 @@ async function save(): Promise<void> {
     await load()
     showToast('success', '保存成功', '已按服务端最新数据刷新。')
   } catch (cause) {
+    if (isApiClientError(cause) && cause.code === 'PAY_APP_STATUS_CONFLICT') {
+      dialog.value = false
+      await load()
+      showToast('error', '数据已变化', '付款申请已被其他用户修改，已刷新最新数据。')
+      return
+    }
     let message = cause instanceof Error ? cause.message : '请稍后重试。'
     if (createdPaymentId) {
       try {
@@ -772,8 +792,8 @@ onBeforeUnmount(() => controller?.abort())
           />
           <V2Input v-model="editor.applyReason" label="申请事由" required />
           <label class="v2-field"
-            ><span class="v2-field__label">付款附件*</span
-            ><input type="file" required @change="onPaymentAttachment"
+            ><span class="v2-field__label">付款附件{{ editor.id ? '' : '*' }}</span
+            ><input type="file" :required="!editor.id" @change="onPaymentAttachment"
           /></label>
         </form>
         <template #footer>

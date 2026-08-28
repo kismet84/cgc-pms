@@ -12,6 +12,17 @@ export interface PaymentApplicationCommand {
   applyReason?: string;
   expenseCategory?: string;
 }
+
+export interface PaymentApplicationSourceCommand {
+  sourceType: string;
+  sourceRefId: string;
+  sourceAmount: FinanceDecimalString;
+}
+
+export interface PaymentApplicationUpdateCommand extends PaymentApplicationCommand {
+  expectedVersion: number;
+  sources: PaymentApplicationSourceCommand[];
+}
 export interface PayRecordWritebackCommand {
   payApplicationId: string;
   payAmount: FinanceDecimalString;
@@ -74,6 +85,7 @@ export interface PaymentApplicationRecord {
   payStatus: string;
   approvalStatus: string;
   applyReason?: string | null;
+  version: number;
   integrityVersion: string;
   projectName?: string | null;
   contractName?: string | null;

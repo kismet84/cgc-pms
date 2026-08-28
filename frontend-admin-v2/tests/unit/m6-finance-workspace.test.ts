@@ -28,6 +28,7 @@ import {
   loadPaymentTraceByInvoice,
   loadPaymentTraceByVoucher,
   reversePaymentRecord,
+  updatePayment,
   writebackPayment,
 } from '@/services/finance'
 
@@ -228,6 +229,12 @@ describe('M6 finance workspace contract', () => {
     expect(page).toContain('材料付款必须选择材料验收来源')
     expect(page).toContain("sourceType === 'DIRECT' ? paymentId")
     expect(page).toContain('await savePaymentSources(paymentId')
+    expect(page).toContain('expectedVersion: value.version')
+    expect(page).toContain('sources: [')
+    expect(page).toContain("cause.code === 'PAY_APP_STATUS_CONFLICT'")
+    expect(page).toContain('已刷新最新数据')
+    expect(source('src/services/finance/payment.ts')).toContain('notifyError: false')
+    expect(page).toContain(':required="!editor.id"')
     expect(page).toContain('await deletePayment(createdPaymentId)')
     expect(page).toContain('本次新建草稿已回滚')
     expect(page).not.toContain('await savePaymentBasis(paymentId')
@@ -235,6 +242,31 @@ describe('M6 finance workspace contract', () => {
       "editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'",
     )
     expect(page).not.toContain('Number(value.applyAmount)')
+  })
+  it('sends expected version and sources in one draft update request', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ code: '0', data: null }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await updatePayment('PA-1', {
+      projectId: 'P-1',
+      contractId: 'C-1',
+      partnerId: 'PARTNER-1',
+      costSubjectId: 'CS-1',
+      budgetLineId: 'BL-1',
+      payType: 'PROGRESS',
+      applyAmount: '100.00',
+      expectedVersion: 3,
+      sources: [{ sourceType: 'SUB_MEASURE', sourceRefId: 'SM-1', sourceAmount: '100.00' }],
+    })
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      expectedVersion: 3,
+      sources: [{ sourceType: 'SUB_MEASURE', sourceRefId: 'SM-1', sourceAmount: '100.00' }],
+    })
+    vi.unstubAllGlobals()
   })
   it('exposes writeback only through the authoritative payment endpoint', () => {
     const pages = receivablesSource()

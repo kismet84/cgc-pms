@@ -28,6 +28,7 @@ import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.service.PaymentReversalService;
 import com.cgcpms.payment.dto.PaymentReversalRequest;
 import com.cgcpms.payment.dto.PaymentFailureRequest;
+import com.cgcpms.payment.dto.PayApplicationUpdateRequest;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -219,6 +220,30 @@ class PaymentMySqlConcurrencyTest {
                 .eq(PayApplication::getApprovalStatus, "APPROVING")).size());
         assertEquals(0L, payRecordMapper.selectCount(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, TENANT).eq(PayRecord::getContractId, CONTRACT)));
+    }
+
+    @Test
+    void concurrentDraftUpdatesWithOneExpectedVersionAllowExactlyOneWinner() throws Exception {
+        updateApplicationStatus(APP_1, "DRAFT");
+        PayApplication snapshot = payApplicationMapper.selectById(APP_1);
+        Integer initialVersion = snapshot.getVersion();
+        PayApplicationUpdateRequest firstRequest = draftUpdate(snapshot, initialVersion, "CAS-WINNER-A");
+        PayApplicationUpdateRequest secondRequest = draftUpdate(snapshot, initialVersion, "CAS-WINNER-B");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> first = executor.submit(() -> attemptDraftUpdate(firstRequest, ready, start));
+            Future<Boolean> second = executor.submit(() -> attemptDraftUpdate(secondRequest, ready, start));
+            ready.await();
+            start.countDown();
+            assertEquals(1, List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)).stream()
+                    .filter(Boolean::booleanValue).count());
+        }
+
+        PayApplication saved = payApplicationMapper.selectById(APP_1);
+        assertEquals(initialVersion + 1, saved.getVersion());
+        assertTrue(List.of("CAS-WINNER-A", "CAS-WINNER-B").contains(saved.getApplyReason()));
     }
 
     @Test
@@ -504,6 +529,31 @@ class PaymentMySqlConcurrencyTest {
         } finally {
             TestUserContext.clear();
         }
+    }
+
+    private boolean attemptDraftUpdate(PayApplicationUpdateRequest request,
+                                       CountDownLatch ready, CountDownLatch start) throws Exception {
+        TestUserContext.setAdmin(TENANT, USER);
+        try {
+            ready.countDown();
+            start.await();
+            try {
+                payApplicationService.update(APP_1, request);
+                return true;
+            } catch (BusinessException rejected) {
+                assertEquals("PAY_APP_STATUS_CONFLICT", rejected.getCode());
+                return false;
+            }
+        } finally {
+            TestUserContext.clear();
+        }
+    }
+
+    private PayApplicationUpdateRequest draftUpdate(PayApplication app, Integer version, String reason) {
+        return new PayApplicationUpdateRequest(
+                app.getProjectId(), app.getContractId(), app.getPartnerId(), app.getCostSubjectId(),
+                app.getBudgetLineId(), app.getExpenseCategory(), app.getApplyAmount(), "PROGRESS", reason,
+                app.getRemark(), version, null);
     }
 
     private String writeback(long applicationId, String externalTxnNo, LocalDateTime paidAt,
