@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-28T16:20:19.274Z",
+  "generation_time": "2026-08-28T16:21:39.196Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 171,
-      "fingerprint": "e54cc01232780e6bac9320cb86cd7e005670e179f197b771f765289d4e252aca"
+      "fingerprint": "9df1c7ee1dfab5d4c89bc5cb6b62dbca898e64d8d1218838f8d7b0297c427337"
     },
     {
       "id": "frontend_v2",
@@ -134,17 +134,13 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "15304fa422a29b777f41e31226ac54c932c659c6",
+  "generation_base_commit": "4ec9b31324131bd41dcce3bccbb59e60c10d92ed",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "45b457d45abedebc0a09358eece6d8b60801c6ee",
+    "previous_generation_base_commit": "15304fa422a29b777f41e31226ac54c932c659c6",
     "stale_modules": [
-      "backend",
-      "delivery_tooling",
-      "documentation",
-      "frontend_v2",
-      "shared_packages"
+      "documentation"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
