@@ -29,6 +29,16 @@ scan_metadata="$scan_output_dir/backend-artifact-metadata.txt"
 artifact_sha256=$(sha256sum "$artifact" | awk '{ print $1 }')
 artifact_dir=$(cd "$(dirname "$artifact")" && pwd -P)
 artifact_name=$(basename "$artifact")
+artifact_path="$artifact_dir/$artifact_name"
+extracted_artifact=$(mktemp -d)
+trap 'rm -rf -- "$extracted_artifact"' EXIT
+(cd "$extracted_artifact" && jar xf "$artifact_path")
+
+extracted_library_count=$(find "$extracted_artifact/BOOT-INF/lib" -maxdepth 1 -type f -name '*.jar' | wc -l)
+if [[ "$extracted_library_count" -ne "$backend_library_count" ]]; then
+  echo "backend artifact extraction lost libraries: archive=$backend_library_count extracted=$extracted_library_count" >&2
+  exit 1
+fi
 
 export MSYS_NO_PATHCONV=1
 docker_args=(--rm)
@@ -39,7 +49,7 @@ if [[ -n "${TRIVY_CACHE_DIR:-}" ]]; then
 fi
 
 if ! docker run "${docker_args[@]}" \
-  -v "$artifact_dir:/workspace:ro" \
+  -v "$extracted_artifact:/workspace:ro" \
   aquasec/trivy:0.65.0@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436 \
   rootfs \
   --scanners vuln \
@@ -49,7 +59,7 @@ if ! docker run "${docker_args[@]}" \
   --exit-code 1 \
   --format json \
   --timeout 10m \
-  "/workspace/$artifact_name" > "$scan_json" 2> "$scan_diagnostics"; then
+  /workspace/BOOT-INF/lib > "$scan_json" 2> "$scan_diagnostics"; then
   cat "$scan_diagnostics" >&2
   echo "Trivy backend artifact scan failed" >&2
   exit 1
