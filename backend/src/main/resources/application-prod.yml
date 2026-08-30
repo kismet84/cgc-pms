@@ -11,6 +11,13 @@ spring:
       idle-timeout: 600000
       max-lifetime: ${DB_HIKARI_MAX_LIFETIME:1740000}
       connection-timeout: 30000
+      data-source-properties:
+        sslMode: VERIFY_IDENTITY
+        trustCertificateKeyStoreUrl: ${DB_TRUSTSTORE_URL}
+        trustCertificateKeyStoreType: ${DB_TRUSTSTORE_TYPE:PKCS12}
+        trustCertificateKeyStorePassword: ${DB_TRUSTSTORE_PASSWORD}
+        fallbackToSystemTrustStore: false
+        allowPublicKeyRetrieval: false
 
   data:
     redis:

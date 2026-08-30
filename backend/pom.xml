@@ -24,6 +24,9 @@
         <maven.compiler.proc>full</maven.compiler.proc>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- Connector/J 8.4.0 is the narrow MySQL 8.0-compatible release outside the
+             Oracle CPU ranges currently affecting the Boot-managed 9.7.0 line. -->
+        <mysql.version>8.4.0</mysql.version>
         <jjwt.version>0.12.6</jjwt.version>
         <minio.version>8.6.0</minio.version>
         <jasypt.version>3.0.5</jasypt.version>

@@ -1,13 +1,14 @@
 # Current Focus
 
-## 2026-08-30 第100条主线：MySQL TLS 信任链与依赖安全整改已规划
+## 2026-08-30 第100条主线：MySQL TLS 信任链与依赖安全整改交付中
 
 - 来源：2026-08-30 上午“每日全量审计报告”的 `AUD-20260830-001/002/003`；当前 `master@5066a5c90bb9` 与审计基线相同，三个问题已按当前代码复核且未与第99条重复。
 - 目标：补齐 MySQL 显式 CA/server certificate/backend truststore 信任链，以 `VERIFY_IDENTITY` 和错误 CA fail-close 验证；移出 Connector/J 9.7.0～9.7.1 受影响范围；修正 Dockerfile MinIO root/application 凭证说明漂移。
-- 状态：`PLANNED / IMPLEMENTATION_NOT_AUTHORIZED / NOT_READY`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)。
-- 前置：当前 `backend/pom.xml` 与 Codemap 存在其他任务脏改动，实施前必须确认归属；Connector/J 26.7 对 MySQL 8.0 的两处官方兼容说明矛盾，须在 G1 取得一致支持依据，不得静默升级 MySQL 8.4。
-- 边界：只规划本地代码、隔离 Docker TLS smoke 与 CI；不改现有脏文件，不授权实现、数据库、Git、生产/目标环境或发布操作。
-- 零悬空：新增正式后续项 1、关闭 0、净变化 `+1`；三个审计 ID 均由同一载体承接，无重复或无载体遗留。
+- 状态：`IMPLEMENTED / G0-G3_PASSED / G4_ENVIRONMENT_SPLIT / G5_GIT_IN_PROGRESS`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)，验收见[`质量报告`](../quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
+- 结果：显式 MySQL CA/server certificate/backend Java truststore 与 `VERIFY_IDENTITY` 已闭环；Connector/J 固定 8.4.0；正确链路 cipher 非空，四类负向失败关闭；MinIO 注释一致。
+- 验证：G0-G3 已通过；G4 production-like backend 曾达到 health `UP`，宿主 Docker Desktop API 500 与 Windows WEPoll 阻断完整浏览器流，分类 `environment_prerequisite`，须由同 SHA CI 补证后才能完成 G5。
+- 边界：仅本地隔离数据、远端 CI 与受保护 Git 交付；原工作区脏改动保持不变，不执行 Tag、Release、版本发布或生产/目标环境操作。
+- 零悬空：实施新增正式后续项 0、关闭 0、净变化 `0`；计划全周期新增 1，Issue 待 G5 后关闭 1，最终净变化应为 `0`。
 
 ## 2026-08-28 第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改已合并并完成 post-merge
 

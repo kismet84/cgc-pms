@@ -4,7 +4,7 @@
 
 当前状态：V1.5 开发版本已封存，V1.6 开发已启动；第58条主线已将新版切为仓库和本地正式前端，Legacy 源码已归档。当前环境与授权边界只读取 [AGENTS.md](../AGENTS.md)，本索引不复制。V1.5 权威结论见[开发版本归档](archive/v1.5/README.md)和[第57条主线正式收口验收报告](archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
 
-最新主线：第100条“MySQL TLS 信任链与依赖安全整改”已规划，唯一载体 `ISSUE-100-001` 承接显式 TLS 信任链、Connector/J 受影响版本和 MinIO 凭证说明一致性整改；当前为 `PLANNED / NOT_READY`。状态与计划分别见[当前 Backlog](backlog/current-focus.md)和[第100条计划](plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)。
+最新主线：第100条“MySQL TLS 信任链与依赖安全整改”已完成实现并进入受保护 Git 交付；唯一载体 `ISSUE-100-001` 承接显式 TLS 信任链、Connector/J 受影响版本和 MinIO 凭证说明一致性整改。状态、计划与验收分别见[当前 Backlog](backlog/current-focus.md)、[第100条计划](plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)和[质量报告](quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
 
 ## 权威层级与文档类型
 

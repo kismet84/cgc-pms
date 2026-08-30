@@ -222,7 +222,7 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test
@@ -253,6 +253,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-backend
+      - name: Verify Connector/J MySQL TLS trust chain
+        shell: pwsh
+        run: ./scripts/ci/run-mysql-tls-smoke.ps1
       - name: Verify MySQL migration user scope
         shell: bash
         run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"

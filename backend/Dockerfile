@@ -73,8 +73,8 @@ ENV SPRING_DATA_REDIS_PORT=6379
 # MinIO object storage
 # =============================================================================
 ENV MINIO_ENDPOINT=http://minio:9000
-# MINIO_ACCESS_KEY — injected by docker-compose from MINIO_ROOT_USER
-# MINIO_SECRET_KEY — injected by docker-compose from MINIO_ROOT_PASSWORD
+# MINIO_ACCESS_KEY — injected as a separate least-privilege application account
+# MINIO_SECRET_KEY — injected as that application account's independent secret
 
 # =============================================================================
 # JWT signing secret (MUST be injected by docker-compose)

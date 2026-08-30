@@ -23,6 +23,8 @@ function Get-ComposeServiceBlock([string]$Compose, [string]$ServiceName) {
 
 $dockerfile = Read-RepoText 'backend\Dockerfile'
 $compose = Read-RepoText 'deploy\docker-compose.prod.yml'
+$prodConfig = Read-RepoText 'backend\src\main\resources\application-prod.yml'
+$envExample = Read-RepoText 'deploy\.env.example'
 $monitoringCompose = Read-RepoText 'deploy\docker-compose.monitoring.yml'
 $prometheus = Read-RepoText 'deploy\monitoring\prometheus.yml'
 $gitignore = Read-RepoText '.gitignore'
@@ -73,6 +75,7 @@ if ($dockerfile -match '(?m)^\s*ENV\s+SPRING_DATASOURCE_URL(?:\s|=)') {
 
 $backend = Get-ComposeServiceBlock $compose 'backend'
 $mysql = Get-ComposeServiceBlock $compose 'mysql'
+$preflight = Get-ComposeServiceBlock $compose 'preflight'
 $monitoringBackend = Get-ComposeServiceBlock $monitoringCompose 'backend'
 if ($backend -notmatch '(?mi)^    mem_limit:\s*["'']?1g["'']?\s*$') {
   throw 'Production backend service must declare service-level mem_limit: 1G'
@@ -91,6 +94,74 @@ if ($mysql -notmatch '(?m)^      MYSQL_DATABASE:\s*\$\{MYSQL_DATABASE:-cgc_pms\}
 }
 if ($backend -notmatch 'jdbc:mysql://mysql:3306/\$\{MYSQL_DATABASE:-cgc_pms\}\?') {
   throw 'Production backend JDBC URL must use the same MYSQL_DATABASE parameter as MySQL initialization'
+}
+foreach ($legacyParameter in @('useSSL=', 'requireSSL=', 'verifyServerCertificate=', 'allowPublicKeyRetrieval=')) {
+  if ($backend.Contains($legacyParameter)) {
+    throw "Production JDBC URL must not duplicate legacy TLS parameter: $legacyParameter"
+  }
+}
+foreach ($mysqlTlsArgument in @(
+  '--require-secure-transport=ON',
+  '--ssl-ca=/run/secrets/mysql/ca.pem',
+  '--ssl-cert=/run/secrets/mysql/server-cert.pem',
+  '--ssl-key=/run/secrets/mysql/server-key.pem'
+)) {
+  if (!$mysql.Contains($mysqlTlsArgument)) { throw "Production MySQL TLS argument is missing: $mysqlTlsArgument" }
+}
+foreach ($mysqlMount in @(
+  '/run/secrets/mysql/ca.pem:ro',
+  '/run/secrets/mysql/server-cert.pem:ro',
+  '/run/secrets/mysql/server-key.pem:ro'
+)) {
+  if (!$mysql.Contains($mysqlMount)) { throw "Production MySQL TLS read-only mount is missing: $mysqlMount" }
+}
+if (!$backend.Contains('/run/secrets/mysql-truststore.p12:ro')) {
+  throw 'Production backend must mount the explicit PKCS12 MySQL truststore read-only'
+}
+if ($backend.Contains('/run/secrets/mysql/server-key.pem') -or $backend.Contains('/run/secrets/mysql/ca.pem')) {
+  throw 'Production backend must not receive the MySQL server key or raw CA mount'
+}
+foreach ($preflightContract in @(
+  'image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'MYSQL_TRUSTSTORE_PASSWORD',
+  'check_file "/run/secrets/mysql/ca.pem"',
+  'check_file "/run/secrets/mysql/server-cert.pem"',
+  'check_file "/run/secrets/mysql/server-key.pem"',
+  'check_file "/run/secrets/mysql-truststore.p12"',
+  'openssl verify -CAfile "$$ca" "$$cert"',
+  "grep -q 'CA:TRUE'",
+  "grep -q 'SSL server : Yes'",
+  'checkend 2592000',
+  'grep -Eq ''DNS:mysql([,[:space:]]|$$)''',
+  'MySQL server certificate and key do not match',
+  "grep -q 'Trusted key usage'",
+  'MySQL truststore CA must be a Java trustedCertEntry',
+  'MySQL truststore CA certificate does not match the MySQL CA'
+)) {
+  if (!$preflight.Contains($preflightContract)) { throw "Production preflight MySQL TLS contract is missing: $preflightContract" }
+}
+foreach ($hikariContract in @(
+  'sslMode: VERIFY_IDENTITY',
+  'trustCertificateKeyStoreUrl: ${DB_TRUSTSTORE_URL}',
+  'trustCertificateKeyStoreType: ${DB_TRUSTSTORE_TYPE:PKCS12}',
+  'trustCertificateKeyStorePassword: ${DB_TRUSTSTORE_PASSWORD}',
+  'fallbackToSystemTrustStore: false',
+  'allowPublicKeyRetrieval: false'
+)) {
+  if (!$prodConfig.Contains($hikariContract)) { throw "Production Hikari TLS contract is missing: $hikariContract" }
+}
+foreach ($envContract in @(
+  'MYSQL_CA_FILE=./secrets/mysql-ca.pem',
+  'MYSQL_SERVER_CERT_FILE=./secrets/mysql-server-cert.pem',
+  'MYSQL_SERVER_KEY_FILE=./secrets/mysql-server-key.pem',
+  'MYSQL_TRUSTSTORE_FILE=./secrets/mysql-truststore.p12',
+  'MYSQL_TRUSTSTORE_PASSWORD=CHANGE-ME-MYSQL-TRUSTSTORE-PASSWORD'
+)) {
+  if (!$envExample.Contains($envContract)) { throw "Deployment environment template is missing: $envContract" }
+}
+if ($dockerfile.Contains('MINIO_ACCESS_KEY — injected by docker-compose from MINIO_ROOT_USER') -or
+    $dockerfile.Contains('MINIO_SECRET_KEY — injected by docker-compose from MINIO_ROOT_PASSWORD')) {
+  throw 'Backend Dockerfile must describe the independent MinIO application account'
 }
 if ($backend -notmatch '(?m)^      -\s*backend-logs:/var/log/cgc-pms\s*$') {
   throw 'Production backend must persist the configured /var/log/cgc-pms log directory'
@@ -128,6 +199,8 @@ if ($gitignore -notmatch '(?m)^deploy/secrets/\s*$') {
   businessTimezone = 'Asia/Shanghai'
   datasourceFallback = $false
   databaseNameSingleSource = $true
+  mysqlTlsTrustChain = $true
+  mysqlIdentityVerification = $true
   persistentLogPath = '/var/log/cgc-pms'
   prometheusMachineAuth = $true
 } | ConvertTo-Json

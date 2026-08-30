@@ -10,11 +10,11 @@
 >
 > 环境边界：仅本地 dev/test/demo、隔离 Docker 临时卷和远端 CI；项目不存在生产或目标环境，不规划或声称非本地环境测试、验收、发布、凭据或数据操作
 >
-> 授权边界：本轮仅获计划书和治理载体写入授权；未授权业务/配置实现、运行环境变更、数据库操作、commit、push、PR、合并、Tag、Release 或版本发布
+> 授权边界：用户已明确要求“完成主线计划书100#，并推送”，授权本地实现、验证及受保护 Git 交付；不授权 Tag、Release、版本发布、生产/目标环境或无关改动
 >
 > 唯一问题载体：`ISSUE-100-001`
 >
-> 当前状态：`PLANNED / IMPLEMENTATION_NOT_AUTHORIZED / NOT_READY`
+> 当前状态：`IMPLEMENTED / G0-G3_PASSED / G4_ENVIRONMENT_SPLIT / G5_GIT_IN_PROGRESS`
 
 ## 1. 当前事实、审计复核与去重
 
@@ -51,7 +51,7 @@
 
 ## 2. 范围与非目标
 
-### 2.1 实施范围（待另行授权）
+### 2.1 实施范围
 
 1. MySQL TLS：显式 CA、服务端证书/私钥、backend PKCS12 truststore、只读挂载、`VERIFY_IDENTITY`、禁止系统 truststore 回退、preflight 与应用启动校验。
 2. TLS 验证：新增本地/CI 隔离 smoke，证明正确 CA 成功、错误/缺失 CA 失败、服务身份不匹配失败、会话 TLS cipher 非空。
@@ -147,7 +147,7 @@
 3. **M2 Connector/J 窄修复：** 只覆盖 driver 版本；执行 effective POM、dependency tree、Maven verify、真实 MySQL 回归和制品扫描。
 4. **M3 文档与合同：** 修正 MinIO 注释，扩展 runtime/workflow contract，核对 `.env.example`、Dockerfile、Compose 与应用配置术语。
 5. **M4 本地 G2～G4：** 使用隔离临时卷执行 TLS 正负向 smoke、backend health、关键 API 和最小浏览器回归。
-6. **M5 G5 收口：** 生成质量报告、回写 `ISSUE-100-001`、统计零悬空；Git 交付仅在另获授权后执行。
+6. **M5 G5 收口：** 生成质量报告、回写 `ISSUE-100-001`、统计零悬空，并按本轮授权执行同 SHA CI、PR、受保护合并、post-merge 验真与源分支安全清理。
 
 ## 7. 验收标准
 
@@ -194,11 +194,11 @@
 
 验证失败先归入唯一类别：`tool_config`、`tool_invocation`、`environment_prerequisite`、`ready_issue_config`、`retrieval_gap`、`quality_or_security`、`unknown`。DNS、镜像/漏洞库下载、旧容器、证书工具缺失和测试夹具问题未分类前不得认定为业务回归；`unknown` 必须失败关闭并保留证据。
 
-## 10. 零悬空、实施前置与计划状态
+## 10. 零悬空与实施状态
 
 - `AUD-20260830-001/002/003` 全部由唯一载体 `ISSUE-100-001` 承接；第99条保持关闭，不制造重复计划。
-- 本轮新增正式后续项 1、关闭 0、后续项净变化 `+1`；无无载体审计遗留项。
+- 实施阶段新增正式后续项 0、关闭 0、后续项净变化 `0`；计划全周期新增 1，待 G5 关闭 1 后净变化归零。无无载体审计遗留项。
 - 生命周期、真实环境性能/监控和 PR #456/#460 未达到本轮确认缺陷或独立可验收价值，不新增后续项。
-- 实施前置：用户明确授权“开始实施第100条主线”；G0 确认 `backend/pom.xml`/Codemap 归属；G1 解决 Connector/J 26.7 与 MySQL 8.0 官方支持口径冲突。
-- 当前 Ready 保持 0；`ISSUE-100-001` 不进入 AutoPilot Ready，不因计划存在自动实施。
-- 当前状态：`PLANNED / IMPLEMENTATION_NOT_AUTHORIZED / NOT_READY`。未运行测试，未修改代码/配置/依赖/运行环境，未执行 Git 交付。
+- G0 已在隔离工作树确认任务归属并刷新 Codemap；G1 选择 Connector/J 8.4.0，避免 26.7 对 MySQL 8.0 的支持口径冲突，且未升级 MySQL。
+- 当前 Ready 保持 0；本轮来自用户直接授权，不进入 AutoPilot Ready。
+- 当前状态：代码、配置、合同、TLS smoke、真实 MySQL、Maven 与制品扫描已完成；G4 的 TLS backend health 已通过，完整浏览器业务流因宿主 Docker Desktop API 500 与 Windows WEPoll 前置故障改由同 SHA CI 补证。Issue 在 G5 Git 与零悬空完成前保持开放。

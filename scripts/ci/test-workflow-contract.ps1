@@ -287,7 +287,7 @@ $timeoutMinutes = @{
   'backend-order-sensitive' = 25
   'backend-dependency-scan' = 10
   'reliability-contracts' = 15
-  'backend-test-mysql' = 20
+  'backend-test-mysql' = 25
   'frontend-lint' = 10
   'type-check' = 10
   'frontend-build' = 10
@@ -358,10 +358,11 @@ $mysqlMainStep = $mysqlMainSteps[0]
 $mysqlUpgradeStep = $mysqlUpgradeSteps[0]
 Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'Verify Connector/J MySQL TLS trust chain','./scripts/ci/run-mysql-tls-smoke.ps1',
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
   'Prepare isolated MySQL upgrade schema','CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test',
-  'Verify isolated MySQL upgrade user scope','timeout-minutes: 20'
+  'Verify isolated MySQL upgrade user scope','timeout-minutes: 25'
 ) 'backend-test-mysql'
 Assert-Contains $mysqlBaselineStep @(
   '-Dtest=BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: "true"',

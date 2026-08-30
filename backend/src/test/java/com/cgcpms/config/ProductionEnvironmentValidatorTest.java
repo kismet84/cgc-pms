@@ -44,6 +44,52 @@ class ProductionEnvironmentValidatorTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"DISABLED", "PREFERRED", "REQUIRED", "VERIFY_CA"})
+    void shouldRequireVerifyIdentityWithoutLeakingTheConfiguredMode(String sslMode) {
+        var key = "spring.datasource.hikari.data-source-properties.sslMode";
+        var environment = validProductionEnvironment().withProperty(key, sslMode);
+
+        var failure = assertThrows(IllegalStateException.class,
+                () -> ProductionEnvironmentValidator.validate(environment));
+
+        assertTrue(failure.getMessage().contains(key));
+        assertFalse(failure.getMessage().contains(sslMode));
+    }
+
+    @Test
+    void shouldRejectSystemTrustStoreFallbackAndMissingExplicitTrustStore() {
+        var fallbackKey = "spring.datasource.hikari.data-source-properties.fallbackToSystemTrustStore";
+        var environment = validProductionEnvironment()
+                .withProperty(fallbackKey, "true")
+                .withProperty("spring.datasource.hikari.data-source-properties.trustCertificateKeyStoreUrl", "");
+
+        var failure = assertThrows(IllegalStateException.class,
+                () -> ProductionEnvironmentValidator.validate(environment));
+
+        assertTrue(failure.getMessage().contains(fallbackKey));
+        assertTrue(failure.getMessage().contains(
+                "spring.datasource.hikari.data-source-properties.trustCertificateKeyStoreUrl"));
+        assertFalse(failure.getMessage().contains("file:/run/secrets/mysql-truststore.p12"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "useSSL=true", "requireSSL=true", "verifyServerCertificate=true",
+            "allowPublicKeyRetrieval=false", "sslMode=VERIFY_IDENTITY",
+            "trustCertificateKeyStoreUrl=file:/tmp/truststore.p12"
+    })
+    void shouldRejectLegacyOrDuplicatedTlsParametersInJdbcUrl(String parameter) {
+        var environment = validProductionEnvironment().withProperty(
+                "spring.datasource.url", "jdbc:mysql://db.internal:3306/cgc?" + parameter);
+
+        var failure = assertThrows(IllegalStateException.class,
+                () -> ProductionEnvironmentValidator.validate(environment));
+
+        assertTrue(failure.getMessage().contains("spring.datasource.url"));
+        assertFalse(failure.getMessage().contains(parameter));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
             "localhost.", "service.localhost.", "example.com.", "app.example.com.",
             "0:0:0:0:0:0:0:1", "[::1]", "[::ffff:127.0.0.1]", "127.0.0.1."
@@ -62,9 +108,17 @@ class ProductionEnvironmentValidatorTest {
     private static MockEnvironment validProductionEnvironment() {
         var environment = new MockEnvironment()
                 .withProperty("spring.datasource.url",
-                        "jdbc:mysql://db.internal:3306/cgc?useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=false")
+                        "jdbc:mysql://db.internal:3306/cgc?useUnicode=true&characterEncoding=UTF-8")
                 .withProperty("spring.datasource.username", "cgc")
                 .withProperty("spring.datasource.password", "database-secret")
+                .withProperty("spring.datasource.hikari.data-source-properties.sslMode", "VERIFY_IDENTITY")
+                .withProperty("spring.datasource.hikari.data-source-properties.trustCertificateKeyStoreUrl",
+                        "file:/run/secrets/mysql-truststore.p12")
+                .withProperty("spring.datasource.hikari.data-source-properties.trustCertificateKeyStoreType", "PKCS12")
+                .withProperty("spring.datasource.hikari.data-source-properties.trustCertificateKeyStorePassword",
+                        "truststore-secret")
+                .withProperty("spring.datasource.hikari.data-source-properties.fallbackToSystemTrustStore", "false")
+                .withProperty("spring.datasource.hikari.data-source-properties.allowPublicKeyRetrieval", "false")
                 .withProperty("spring.data.redis.host", "redis.internal")
                 .withProperty("spring.data.redis.password", "redis-secret")
                 .withProperty("minio.endpoint", "http://minio:9000")

@@ -2,9 +2,9 @@
 
 ## v1.6 当前队列
 
-当前 Ready 为 0，执行中为 0。
+当前 Ready 为 0，用户直接授权执行中为 1；AutoPilot 执行中为 0。
 
-- `ISSUE-100-001` 已形成第100条计划，但实施未授权、`backend/pom.xml`/Codemap 归属和 Connector/J 26.7→MySQL 8.0 厂商支持口径尚未通过 G0/G1；当前为 `PLANNED / NOT_READY`，不进入 AutoPilot Ready。
+- `ISSUE-100-001` 已由用户直接授权实施并进入 G5 Git 交付；不进入 AutoPilot Ready。G0-G3 已通过，G4 TLS/health 已取得，完整浏览器流待同 SHA CI 补证后关闭。
 
 - `ISSUE-078-001`已完成G0～G5并关闭，不进入AutoPilot Ready。
 
