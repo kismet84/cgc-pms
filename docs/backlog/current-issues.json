@@ -1,8 +1,22 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-29T00:15:00+08:00",
+  "updatedAt": "2026-08-30T13:44:29+08:00",
   "issues": [
+    {
+      "issueKey": "ISSUE-100-001",
+      "title": "MySQL TLS信任链、Connector/J依赖安全与MinIO说明一致性整改",
+      "status": "PLANNED",
+      "classification": "CONFIRMED_DEFECT",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "承接AUD-20260830-001/002/003：标准Compose要求MySQL服务器证书校验却未提供CA/truststore，当前运行时Connector/J 9.7.0命中Oracle 2026-07 CPU受影响范围，Dockerfile仍误称MinIO应用凭证来自root。P1阻断标准部署合同成立，但项目仅有本地环境，不虚构现存生产发布阻塞。",
+      "acceptanceCriteria": "正确CA与VERIFY_IDENTITY可在隔离MySQL 8.0 TLS smoke中建连并确认非空cipher；错误/缺失CA、错误密码和身份不匹配失败关闭；JAR/SBOM不含9.7.0/9.7.1且选定driver获厂商支持当前MySQL 8.0；Maven/MySQL/供应链门禁通过；MinIO root/application说明一致。",
+      "deferReason": "计划已编制但实施未授权；backend/pom.xml与Codemap存在其他任务脏改动需先确认归属，Connector/J 26.7对MySQL 8.0的官方支持说明冲突需在G1闭合。",
+      "sourceRefs": [
+        "docs/plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md"
+      ]
+    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

@@ -1,5 +1,14 @@
 # Current Focus
 
+## 2026-08-30 第100条主线：MySQL TLS 信任链与依赖安全整改已规划
+
+- 来源：2026-08-30 上午“每日全量审计报告”的 `AUD-20260830-001/002/003`；当前 `master@5066a5c90bb9` 与审计基线相同，三个问题已按当前代码复核且未与第99条重复。
+- 目标：补齐 MySQL 显式 CA/server certificate/backend truststore 信任链，以 `VERIFY_IDENTITY` 和错误 CA fail-close 验证；移出 Connector/J 9.7.0～9.7.1 受影响范围；修正 Dockerfile MinIO root/application 凭证说明漂移。
+- 状态：`PLANNED / IMPLEMENTATION_NOT_AUTHORIZED / NOT_READY`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)。
+- 前置：当前 `backend/pom.xml` 与 Codemap 存在其他任务脏改动，实施前必须确认归属；Connector/J 26.7 对 MySQL 8.0 的两处官方兼容说明矛盾，须在 G1 取得一致支持依据，不得静默升级 MySQL 8.4。
+- 边界：只规划本地代码、隔离 Docker TLS smoke 与 CI；不改现有脏文件，不授权实现、数据库、Git、生产/目标环境或发布操作。
+- 零悬空：新增正式后续项 1、关闭 0、净变化 `+1`；三个审计 ID 均由同一载体承接，无重复或无载体遗留。
+
 ## 2026-08-28 第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改已合并并完成 post-merge
 
 - 目标：关闭付款申请 0 行乐观锁假成功、定时后端依赖复扫不完整、模板重复安装提示失真、MinIO 注释漂移和 Tomcat 10.1.55 受影响版本风险；付款服务行数型重构按第94/98条既有证据关闭，仅删除失真 TODO。
