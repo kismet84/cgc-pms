@@ -5,7 +5,7 @@
 > 日期：2026-09-06
 > 父计划：[第100条主线](第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)
 > 唯一问题载体：`ISSUE-100-001`；本文件是独立升级阶段计划，不另造重复 Issue
-> 状态：`AUTHORIZED / G0_PASSED / G1_IMAGE_SCAN_PASSED / ENGINE_CANDIDATE_VERIFIED / G2_REGRESSION_PENDING`
+> 状态：`AUTHORIZED / G0_G3_PASSED / G4_ENVIRONMENT_BLOCKED / G5_NOT_READY`；`c2b81a21`已推送，同SHA CI与pre-PR verifier通过；G4测试桶创建受执行策略阻塞，未合并
 > 授权：2026-09-06 用户明确“批准实施，你自己根据任务上下文判断，不再需要询问我”。本阶段代码/配置、隔离数据库升级与恢复验证及既有受保护 Git 交付均已授权；同范围阶段切换不再重复询问。现有 dev 库/活动卷、生产、Tag/Release 及其他任务仍不在范围内。
 > 边界：仅本地与远端 CI；现有 dev 库、其他任务工作区、Tag、Release 和非本地环境不在操作范围。
 

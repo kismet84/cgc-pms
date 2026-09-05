@@ -4,7 +4,7 @@
 > 唯一载体：`ISSUE-100-001`
 > 编制基线：`master@5066a5c90bb9048289307a5d60e25c051e399577`
 > 复核日期：2026-09-06
-> 当前裁决：`M6 AUTHORIZED / G1 IMAGE_SCAN_PASSED / G2_G5_PENDING`；尚未通过完整验收，功能分支已推送，首次CI未通过，尚未合并
+> 当前裁决：`G0_G3_PASSED / G4_ENVIRONMENT_BLOCKED / G5_NOT_READY`；功能分支 `c2b81a21` 已推送，同 SHA CI 与 pre-PR 证据核验通过；新组合真实浏览器验收未完成，未创建 PR、未合并
 
 ## M6 当前权威记录（2026-09-06）
 
@@ -14,9 +14,9 @@
 | --- | --- |
 | G0 | 独立 `codex/mainline-100` 工作树；旧 dev 卷及原工作区脏改动保留，无业务 schema/API/权限语义变更 |
 | G1 供应链 | Oracle 固定输入，移除 mysql-shell 及 Python、SQLite 官方修复 RPM；独立 Alpine/OpenSSL 预检；精确 runtime ID `sha256:ee7bf662aa692abb5c6384b39796de4796001990b83b47ab020abafde96f2895`、preflight ID `sha256:99f3bf5ead9d68b9a33886d144bcfd90b3f073d25f640c2f0d5be1ebb7229d84`，Trivy Metadata.ImageID 与运行输入相等，高危/严重均0；不是永久无漏洞声明 |
-| G2 跨引擎 | 原候选230表行数/全行字节守恒；加强版补生成列表达式、CHECK文本/ENFORCED、外键动作后真实复验中；同份升级前8.0备份先恢复8.0再导入8.4；完整Flyway/并发组待完成 |
-| G3 静态与本地测试 | validator22项通过；备份/恢复28项、实际cleanup AST18项通过，PowerShell7/5.1；部署、工作流契约通过；前端完整串行649/649通过。新driver完整Maven与MySQL/JAR/SPDX/最终SHA CI待完成 |
-| G4 | 旧组合真实浏览器仅保留历史；新8.4.12/26.7与最终JAR的有样本链路待验证 |
+| G2 跨引擎 | 加强对象语义后的本地与 `c2b81a21` CI 均通过：同一8.0备份先恢复8.0再导入8.4.12，230表行数、全部行字节、生成列/CHECK/ENFORCED/外键动作等一致；fresh/V180迁移、租户和并发组通过 |
+| G3 静态与测试 | validator22、备份/恢复28、cleanup AST18、部署/工作流契约通过；前端649/649及浏览器contract98项通过。`c2b81a21` 的完整Maven/MySQL、JAR/SPDX与供应链等16个required jobs全绿，pre-PR verifier通过；Windows本地Office错误不冒充本地成功，以该CI平台等价验证 |
+| G4 | 本地新8.4.12/26.7、精确JAR已启动，TLS preflight、真实认证API通过；健康503且新MinIO无必需测试桶。创建测试桶命令被执行策略拒绝，不换入口绕过、不禁用健康检查。浏览器仅观察到登录页，尚无有样本链路与最终DOM/console证据；保持阻塞 |
 | G5 | 独立只读复核发现已修复，动态与远端收口未完成，唯一Issue保持开放，不创建非Draft PR、不合并、不清理源分支 |
 
 失败按首次事实保留：Docker Desktop代理出现 `192.168.65.7:2376: no route to host`（environment_prerequisite），随后只读version恢复，未重启共享服务；首次完整Maven漏注入CI测试JWT环境（tool_config），2743测试/1728错误/30跳过、BUILD FAILURE，补环境后复验；前端默认并发645/649、4项约5秒超时，原断言/默认超时不变，单worker完整649通过，归environment_prerequisite。镜像绑定与对象快照缺口、cleanup异常及.NET空变量恢复差异归quality_or_security，本轮直接修复并复验，不延期。
@@ -24,6 +24,10 @@
 具体版本来源、升级前备份哈希、保留资源、风险与恢复边界见 [M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。新增后续项0、关闭0、净变化0；`ISSUE-100-001`未关闭。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
 
 ### 补充失败分类与工具风险边界
+
+- **2026-09-06 03:12 最新证据**：远端功能分支与本地HEAD均为 `c2b81a2108971416209948383e7b4a3f1e3155e8`；[修订版Push CI](https://github.com/kismet84/cgc-pms/actions/runs/33985531989)完整通过，pre-PR verifier绑定16个required jobs为PASS。CI实际运行镜像 `f3c7f3947ee4a3a4cdf187e6348b25ad782c7182ae35aa0fe22532d0ff691993`、预检镜像 `551bb65e46ec6f4b4cbcdd42f057af031bd27432bffd024c5bd0f0be977d2dd9` 的Metadata.ImageID与该SHA一致，高危/严重0；跨引擎批次 `369a53c88e0a` 的同备份8.0恢复、8.4导入和全部对象/行字节通过，CI批次清理完成。首次失败run仍保留，不追溯改写。
+- **本地恢复补证**：Docker API再次自行恢复，未重启共享服务。加强版批次 `5e8ee57217f1` 完成230表及全对象/行字节守恒，升级前dump SHA256=`71FA050213BCAEBC0582025B3ED50842DE4EE9905BDABE6BA32ECFB0425C2C21`。在该隔离8.4.12目标内另行执行真实原生socket备份/恢复，230张BASE TABLE计数及二进制/存储过程探针一致，gzip SHA256=`B89733FC765B0C25416D8E7C1C035C851BD376568C0528343F345CC598BAA48A`。未触碰dev库。已停止全部本任务跨引擎服务，保留容器、卷与备份供恢复。
+- **G4前置与策略阻塞**：隔离项目 `cgc-pms-m100-g4b` 使用新卷、只读信任材料及本地JAR SHA256=`1CCAE573F17932250BFD17E6FA43A73B685EE6F2AD5C2D5D7117CF210A97AD8F`。Windows bind权限呈现导致preflight拒绝可写key，改为本任务Linux命名卷中UID27、0400文件再只读挂载后通过；本地prod-profile CORS拒绝loopback配置，改为内部origin并使用仓库已有Vite同源代理，未修改validator。新MinIO经认证列桶为空，缺少健康检查必需的`cgc-pms`测试桶，归environment_prerequisite；准备该桶的命令被工具执行策略拒绝，归tool_config/执行权限不可用，停止该步骤，不重试同一动作或改用其他入口。健康503未放行。已停止本项目5个运行服务与本任务Vite31648并关闭临时浏览器，保留7个容器、6个卷、网络及信任材料；未删除数据、未影响现有dev服务。解除执行限制后，仍需补测试桶、健康UP、有样本浏览器及G5，再提交本次状态回写并取得最终SHA Git证据。
 
 - 功能分支 `codex/mainline-100` 已推送，远端HEAD确认为 `bef6aaf9aaf8161ed409d17675873a86ae9671dd`；[首次Push CI](https://github.com/kismet84/cgc-pms/actions/runs/33983978708)未通过，未创建PR、未合并。该次本地pre-push完整门禁通过，浏览器contract98项、0skip/0flaky。CI reliability-contracts暴露Linux隐藏临时SQL的Get-Item未加Force，已用Windows Hidden属性等价复现并修复，28项复验通过；backend-test-mysql四组真实preflight通过但TLS库就绪超时，归unknown，补实际应用账号探测和脱敏错误/容器日志后复验。两项均为本轮直接门禁问题，不记为外部Runner故障；修后不追溯修改首次CI结论。尚不能声明可提PR或G5完成。
 - 正确注入测试JWT后的完整Maven：2962项、1 failure、5 errors、30个条件skip，30分钟、BUILD FAILURE。两项成本工作流因规则夹具CURRENT_DATE晚于固定2026-08业务期间而失败；仅将测试规则生效日固定为2020-01-01。付款冲销时间断言在秒为0时比较了不同字符串格式；改为同格式解析后的LocalDateTime相等，并显式覆盖整分钟。不改业务Resolver、金额、状态或时间语义；三项最小复验通过，两完整测试类34/34通过。OfficePreviewClientTest三项为Windows WEPollSelectorImpl创建loopback失败、SocketException `Invalid argument: connect`，归environment_prerequisite，待Linux同SHA CI等价验证，不计本地通过。

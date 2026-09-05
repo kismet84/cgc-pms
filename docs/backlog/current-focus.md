@@ -1,14 +1,14 @@
 # Current Focus
 
-## 2026-09-06 第100条主线：M6已批准实施，精确镜像扫描通过，完整回归待完成
+## 2026-09-06 第100条主线：实现已推送、同SHA CI通过，G4前置受执行策略阻塞
 
 - 来源：2026-08-30 上午“每日全量审计报告”的 `AUD-20260830-001/002/003`；当前 `master@5066a5c90bb9` 与审计基线相同，三个问题已按当前代码复核且未与第99条重复。
 - 目标：补齐 MySQL 显式 CA/server certificate/backend truststore 信任链，以 `VERIFY_IDENTITY` 和错误 CA fail-close 验证；移出 Connector/J 9.7.0～9.7.1 受影响范围；修正 Dockerfile MinIO root/application 凭证说明漂移。
-- 状态：`M6_AUTHORIZED / IMAGE_SCAN_PASSED / G2_G5_PENDING`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)，验收见[`质量报告`](../quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
+- 状态：`G0_G3_PASSED / G4_ENVIRONMENT_BLOCKED / G5_NOT_READY`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)，验收见[`质量报告`](../quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
 - 结果：显式 MySQL CA/server certificate/backend Java truststore 与 `VERIFY_IDENTITY` 已验证；正确链路 cipher 非空，四类负向失败关闭；额外 CA、私钥用户权限与 hostname 假阳性缺口已修复复验；MinIO 注释一致。
 - 历史：旧组合TLS backend health、真实登录与合同列表已验证，但8.4.0 driver安全结论撤回；这些记录不替代新组合门禁。M6改用厂商正式支持的MySQL8.4.12/ConnectorJ26.7.0。
 - 边界：仅本地隔离数据、远端 CI 与受保护 Git 交付；原工作区脏改动保持不变，不执行 Tag、Release、版本发布或生产/目标环境操作。
-- 当前进展：用户明确批准 [M6](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)自主实施。运行/预检精确image ID扫描高危严重均0，前端649项、备份恢复28项、异常清理18项通过；230表候选恢复已验证，加强对象语义后重跑。功能分支 `bef6aaf9aaf8` 已推送；首次 CI `33983978708` 的 Linux 隐藏临时文件读取已修复，TLS 就绪超时已补实际测试账号探测与脱敏诊断，待新同 SHA CI 复验。日期边界测试修正后相关两类34项通过；Windows Office loopback 与再次发生的 Docker 代理故障仍待等价/本地验证。现有 dev 卷不动，不重启共享服务；新组合 G2-G5 未完成、尚未合并，无重复授权待答复。
+- 当前进展：用户明确批准 [M6](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)自主实施。`c2b81a21` 已推送，同SHA CI `33985531989` 及pre-PR verifier通过，16项required jobs全绿；本地与CI加强版230表跨引擎恢复均通过，另行真实原生socket备份恢复通过。Docker自行恢复后已停止本任务旧服务，现有dev不动。G4新组合认证API通过、健康503，新MinIO缺少测试桶；创建桶命令被执行策略拒绝，不换入口绕过。已停止本任务临时服务并保留恢复资源；有样本浏览器、G5、PR合并及源分支清理未完成，无重复授权待答复。
 - 零悬空：实施新增正式后续项 0、关闭 0、净变化 `0`；计划全周期新增 1，Issue 待 G5 后关闭 1，最终净变化应为 `0`。
 
 ## 2026-08-28 第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改已合并并完成 post-merge

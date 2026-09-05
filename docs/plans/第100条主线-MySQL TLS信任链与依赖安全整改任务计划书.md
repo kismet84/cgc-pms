@@ -14,7 +14,7 @@
 >
 > 唯一问题载体：`ISSUE-100-001`
 >
-> 当前状态（2026-09-06 M6实施）：`G0_PASSED / G1_IMAGE_SCAN_PASSED / ENGINE_CANDIDATE_VERIFIED / G2_REGRESSION_PENDING / G5_NOT_READY`；新组合8.4.12/26.7已实施，功能分支已推送，首次CI未通过，尚未合并
+> 当前状态（2026-09-06 M6实施）：`G0_G3_PASSED / G4_ENVIRONMENT_BLOCKED / G5_NOT_READY`；新组合8.4.12/26.7实现 `c2b81a21` 已推送，同SHA CI与pre-PR verifier通过；G4测试桶创建被执行策略拒绝，健康及有样本浏览器未通过，尚未合并。最新证据见质量报告M6更新。
 
 > 2026-09-06 用户已明确批准 [M6 MySQL 8.4 升级计划](第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)实施并要求自行判断、不再重复询问。M6第7节是新增版本、镜像安全、隔离升级/恢复的当前权威记录；本父计划后续8.0/8.4.0限制和旧阻塞描述仅为M6之前的历史，不覆盖新授权。现有dev卷依旧排除。
 
