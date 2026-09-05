@@ -20,7 +20,7 @@ require_env CI_MYSQL_DATABASE
 require_env CI_MYSQL_USER
 require_env CI_MYSQL_PASSWORD
 
-grants="$(docker exec -e "MYSQL_PWD=${CI_MYSQL_PASSWORD}" "$container_id" \
+grants="$(MYSQL_PWD="$CI_MYSQL_PASSWORD" docker exec -e MYSQL_PWD "$container_id" \
   mysql -u"${CI_MYSQL_USER}" -Nse 'SHOW GRANTS FOR CURRENT_USER')"
 printf '%s\n' "$grants"
 normalized_grants="$(printf '%s\n' "$grants" | sed 's/\\//g')"

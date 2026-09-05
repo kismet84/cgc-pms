@@ -54,7 +54,7 @@ ENV SPRING_PROFILES_ACTIVE=prod
 # =============================================================================
 
 # =============================================================================
-# Database — MySQL 8.0. URL and credentials MUST be provided by deployment
+# Database — MySQL 8.4. URL and credentials MUST be provided by deployment
 # configuration. The image intentionally has no datasource fallback so prod
 # validation cannot be bypassed by an unsafe image default.
 # =============================================================================

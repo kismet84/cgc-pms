@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-08-30T09:34:15.795Z",
+  "generation_time": "2026-09-05T18:11:25.224Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,9 +50,9 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4229,
-  "repository_file_count": 4242,
-  "included_file_count": 2978,
+  "tracked_file_count": 4232,
+  "repository_file_count": 4240,
+  "included_file_count": 2976,
   "excluded_file_count": 1264,
   "modules": [
     {
@@ -71,7 +71,7 @@
         "backend/**"
       ],
       "file_count": 1949,
-      "fingerprint": "a5a74278db6c13a36993c65b04116a5a3cddf7e5231ee14849f603707a8a9d25"
+      "fingerprint": "743546b28d9bef85b80e446cbc58646a13772fed1972b7ffaa23c3f127a6d668"
     },
     {
       "id": "delivery_tooling",
@@ -82,8 +82,8 @@
         "scripts/**",
         "tools/**"
       ],
-      "file_count": 296,
-      "fingerprint": "e1af902b407a888b5b3ba0258e91f2dee08496a41009a5558916edf369f486e9"
+      "file_count": 293,
+      "fingerprint": "79658211e4af47d43c291ea5a7678dde4defda09ff79d0d8860602d6b6ecc149"
     },
     {
       "id": "desktop_launcher",
@@ -98,8 +98,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 173,
-      "fingerprint": "03df270b0e0aedfdf5850fb43b3ca8da2ec71d2357a44456e88643e621bdc0d0"
+      "file_count": 174,
+      "fingerprint": "32109430971a1ffe1953847806287a6e8b57537cb3dfa535dce6d690823a0b71"
     },
     {
       "id": "frontend_v2",
@@ -134,15 +134,14 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "e7b53d4ff4e78e474b024d20ce4c6bc11673c4d2",
+  "generation_base_commit": "567df5785c2f90f486643307c87b7ad96d3669de",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "e7b53d4ff4e78e474b024d20ce4c6bc11673c4d2",
+    "previous_generation_base_commit": "567df5785c2f90f486643307c87b7ad96d3669de",
     "stale_modules": [
       "backend",
-      "delivery_tooling",
-      "documentation"
+      "delivery_tooling"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

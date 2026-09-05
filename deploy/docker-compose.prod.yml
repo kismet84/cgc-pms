@@ -19,7 +19,9 @@ services:
   # Other services depend on it so they won't start until preflight succeeds.
   # ===========================================================================
   preflight:
-    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+    build:
+      context: ./mysql
+      dockerfile: Preflight.Dockerfile
     container_name: cgc-pms-preflight
     restart: "no"
     entrypoint: []
@@ -51,6 +53,8 @@ services:
           cert=/run/secrets/mysql/server-cert.pem
           key=/run/secrets/mysql/server-key.pem
           truststore=/run/secrets/mysql-truststore.p12
+          su-exec 27:27 test -r "$$key" || fail "MySQL server key must be readable by the MySQL image user"
+          su-exec 27:27 test ! -w "$$key" || fail "MySQL server key must not be writable by the MySQL runtime"
           openssl verify -CAfile "$$ca" "$$cert" >/dev/null 2>&1 || fail "MySQL server certificate chain is invalid"
           openssl x509 -in "$$ca" -noout -text 2>/dev/null | grep -q 'CA:TRUE' || fail "MySQL CA certificate lacks CA:TRUE"
           openssl x509 -in "$$cert" -noout -purpose 2>/dev/null | grep -q 'SSL server : Yes' || fail "MySQL server certificate lacks serverAuth purpose"
@@ -61,6 +65,9 @@ services:
           [ -n "$$cert_public" ] && [ "$$cert_public" = "$$key_public" ] || fail "MySQL server certificate and key do not match"
           truststore_dump="$$(openssl pkcs12 -in "$$truststore" -passin env:MYSQL_TRUSTSTORE_PASSWORD -nokeys -info 2>&1)" || fail "MySQL truststore password or PKCS12 structure is invalid"
           printf '%s\n' "$$truststore_dump" | grep -q 'Trusted key usage' || fail "MySQL truststore CA must be a Java trustedCertEntry"
+          [ "$$(printf '%s\n' "$$truststore_dump" | grep -c -- '-----BEGIN CERTIFICATE-----')" = 1 ] || fail "MySQL truststore must contain exactly one CA certificate"
+          [ "$$(printf '%s\n' "$$truststore_dump" | grep -c 'Trusted key usage')" = 1 ] || fail "MySQL truststore must contain exactly one trustedCertEntry"
+          if printf '%s\n' "$$truststore_dump" | grep -Eiq 'keybag'; then fail "MySQL truststore must not contain private key entries"; fi
           trust_ca_fingerprint="$$(printf '%s\n' "$$truststore_dump" | openssl x509 -noout -fingerprint -sha256 2>/dev/null)"
           ca_fingerprint="$$(openssl x509 -in "$$ca" -noout -fingerprint -sha256 2>/dev/null)"
           [ -n "$$trust_ca_fingerprint" ] && [ "$$trust_ca_fingerprint" = "$$ca_fingerprint" ] || fail "MySQL truststore CA certificate does not match the MySQL CA"
@@ -136,10 +143,13 @@ services:
     networks:
       - cgc-pms-net
   # ===========================================================================
-  # MySQL 8.0 — database server
+  # MySQL 8.4.12 — new volume only; see the logical upgrade/rollback procedure.
   # ===========================================================================
   mysql:
-    image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: cgc-pms-mysql
     restart: unless-stopped
     environment:
@@ -153,7 +163,7 @@ services:
     # ports:
     #   - "3307:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql84-data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
       - ${MYSQL_CA_FILE:?MYSQL_CA_FILE must point to the MySQL CA certificate}:/run/secrets/mysql/ca.pem:ro
       - ${MYSQL_SERVER_CERT_FILE:?MYSQL_SERVER_CERT_FILE must point to the MySQL server certificate}:/run/secrets/mysql/server-cert.pem:ro
@@ -167,7 +177,7 @@ services:
       - --ssl-cert=/run/secrets/mysql/server-cert.pem
       - --ssl-key=/run/secrets/mysql/server-key.pem
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost -u root || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -384,7 +394,7 @@ networks:
 # Volumes
 # ===========================================================================
 volumes:
-  mysql-data:
+  mysql84-data:
   redis-data:
   minio-data:
   backend-heapdumps:

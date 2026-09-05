@@ -81,6 +81,29 @@ function Get-StepBlocks([string]$Workflow) {
   )
 }
 
+function Assert-MySqlRuntimeBuildStep([string]$Step) {
+  Assert-Contains $Step @(
+    'shell: pwsh',
+    '$image = & ./scripts/ci/build-mysql-runtime.ps1',
+    'MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}',
+    'MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}',
+    'MYSQL_PWD: ${{ env.CI_MYSQL_PASSWORD }}',
+    '$deadline = [DateTime]::UtcNow.AddSeconds(120)',
+    "-Nse 'SELECT 1'",
+    'if ($LASTEXITCODE -ne 0)',
+    'if (!$ready) { throw'
+  ) 'MySQL built-image step'
+  $logicalStep = [regex]::Replace($Step, '`\r?\n\s*', ' ')
+  $runs = @([regex]::Matches($logicalStep, '(?m)^\s*docker\s+(?:run|pull)\s+([^\r\n]+)'))
+  $expectedRun = 'docker run --detach --name $env:CI_MYSQL_CONTAINER --publish 127.0.0.1:3306:3306 -e MYSQL_ROOT_PASSWORD -e MYSQL_DATABASE -e MYSQL_USER -e MYSQL_PASSWORD $image | Out-Host'
+  if ($runs.Count -ne 1 -or [regex]::Replace($runs[0].Value.Trim(), '\s+', ' ') -cne $expectedRun) {
+    throw 'MySQL CI must run exactly the helper-returned immutable image ID with password-free arguments'
+  }
+  if ([regex]::Matches($Step, '(?m)^\s*\$image\s*=').Count -ne 1) {
+    throw 'MySQL CI must not overwrite its verified image ID'
+  }
+}
+
 function Get-ActionSteps([string]$Workflow,[string]$Action) {
   $actionPattern = [regex]::Escape($Action)
   $usesPattern = '(?m)^(?:      - |        )uses: ' + $actionPattern + '@[0-9a-f]{40}[ \t]*(?:#.*)?\r?$'
@@ -157,6 +180,39 @@ $artifactScanScript = Read-RepoText 'scripts\ci\scan-backend-artifact.sh'
 $minioScript = Read-RepoText 'scripts\ci\start-e2e-minio.sh'
 $prodCompose = Read-RepoText 'deploy\docker-compose.prod.yml'
 $frontendDockerfile = Read-RepoText 'frontend-admin-v2\Dockerfile'
+$mysqlDockerfile = Read-RepoText 'deploy\mysql\Dockerfile'
+$mysqlBuildHelper = Read-RepoText 'scripts\ci\build-mysql-runtime.ps1'
+$mysqlBuildSteps = @(Get-StepBlocks (Get-JobBlock $workflow 'backend-test-mysql') | Where-Object { $_.Contains('- name: Build and start immutable MySQL runtime') })
+if ($mysqlBuildSteps.Count -ne 1) { throw 'MySQL CI requires exactly one local runtime build step' }
+$mysqlBuildStep = $mysqlBuildSteps[0]
+Assert-MySqlRuntimeBuildStep $mysqlBuildStep
+Assert-Rejected { Assert-MySqlRuntimeBuildStep ($mysqlBuildStep.Replace('$image | Out-Host', 'mysql:latest | Out-Host')) } 'mutable MySQL build-step image'
+Assert-Contains $mysqlBuildHelper @(
+  "'deploy/mysql'", "'Dockerfile'", 'Test-Path -LiteralPath $dockerfilePath -PathType Leaf',
+  'Get-FileHash -LiteralPath $dockerfilePath -Algorithm SHA256',
+  '$imageTag = "cgc-pms-mysql-${Component}:build-$dockerfileHash"',
+  'docker build --provenance=false --platform linux/amd64 --file $dockerfilePath --tag $imageTag $contextPath 2>&1 | Out-Host',
+  'if ($LASTEXITCODE -ne 0)',
+  "docker image inspect --format '{{.Id}}'", "'^sha256:[0-9a-f]{64}$'"
+) 'MySQL runtime build helper'
+Assert-Contains $mysqlBuildStep @(
+  '$preflightImage = & ./scripts/ci/build-mysql-runtime.ps1 -Component preflight',
+  './scripts/ci/scan-mysql-runtime.ps1 -RuntimeImage $image -PreflightImage $preflightImage',
+  '"CI_MYSQL_RUNTIME_IMAGE=$image" >> $env:GITHUB_ENV',
+  '"CI_MYSQL_PREFLIGHT_IMAGE=$preflightImage" >> $env:GITHUB_ENV'
+) 'MySQL exact image security binding'
+$mysqlSecurityScan = Read-RepoText 'scripts\ci\scan-mysql-runtime.ps1'
+Assert-Contains $mysqlSecurityScan @(
+  '$report.Metadata.ImageID -cne $image',
+  '--exit-code 1', '--list-all-pkgs', '--severity HIGH,CRITICAL',
+  '@($report.Results.Packages | Where-Object Name).Count -eq 0',
+  '@($report.Results.Vulnerabilities | Where-Object VulnerabilityID).Count -ne 0'
+) 'MySQL image scan failure closure'
+Assert-Contains $workflow @(
+  './scripts/ci/run-mysql-tls-smoke.ps1 -MysqlImage $env:CI_MYSQL_RUNTIME_IMAGE -PreflightImage $env:CI_MYSQL_PREFLIGHT_IMAGE',
+  './scripts/ci/run-mysql-engine-upgrade.ps1 -TargetImage $env:CI_MYSQL_RUNTIME_IMAGE'
+) 'MySQL scanned image consumers'
+Assert-ImmutableDockerfileBaseRefs $mysqlDockerfile 'MySQL runtime Dockerfile'
 foreach ($pathFilterSample in @(
   "on:`n  push:`n    `"paths`":`n      - docs/**",
   "on:`n  pull_request:`n    'paths-ignore' :`n      - docs/**",
@@ -175,7 +231,10 @@ Assert-ImmutableActionRefs $postMergeWorkflow 'post-merge workflow'
 Assert-ImmutableActionRefs $supplyChainRescan 'supply-chain rescan workflow'
 Assert-ImmutableActionRefs $backendAction 'backend setup action'
 Assert-ImmutableActionRefs $frontendAction 'frontend setup action'
-Assert-ImmutableImageRefs "$workflow`n$dependencyScanScript`n$artifactScanScript`n$minioScript" 'CI execution inputs'
+# This one step has the stricter helper-returned-ID contract above. All other
+# Docker executions still require literal immutable registry digests.
+$literalImageWorkflow = $workflow.Replace($mysqlBuildStep, '')
+Assert-ImmutableImageRefs "$literalImageWorkflow`n$dependencyScanScript`n$artifactScanScript`n$minioScript" 'CI execution inputs'
 Assert-ImmutableThirdPartyImageRefs $prodCompose 'production compose'
 Assert-ImmutableDockerfileBaseRefs $frontendDockerfile 'frontend Dockerfile'
 Assert-Contains $prodCompose @(
@@ -287,7 +346,7 @@ $timeoutMinutes = @{
   'backend-order-sensitive' = 25
   'backend-dependency-scan' = 10
   'reliability-contracts' = 15
-  'backend-test-mysql' = 25
+  'backend-test-mysql' = 35
   'frontend-lint' = 10
   'type-check' = 10
   'frontend-build' = 10
@@ -357,13 +416,25 @@ $mysqlBaselineStep = $mysqlBaselineSteps[0]
 $mysqlMainStep = $mysqlMainSteps[0]
 $mysqlUpgradeStep = $mysqlUpgradeSteps[0]
 Assert-Contains $backendMySql @(
-  'mysql:','image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'CI_MYSQL_CONTAINER: cgc-pms-ci-mysql',
+  './scripts/ci/build-mysql-runtime.ps1',
   'Verify Connector/J MySQL TLS trust chain','./scripts/ci/run-mysql-tls-smoke.ps1',
   'redis:','image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2',
-  'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
+  'bash ./scripts/ci/verify-mysql-grants.sh "$CI_MYSQL_CONTAINER"',
   'Prepare isolated MySQL upgrade schema','CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test',
-  'Verify isolated MySQL upgrade user scope','timeout-minutes: 25'
+  'Verify isolated MySQL upgrade user scope','timeout-minutes: 35',
+  './scripts/ci/run-mysql-engine-upgrade.ps1',
+  'Clean up MySQL CI runtime','docker rm -f "$CI_MYSQL_CONTAINER"'
 ) 'backend-test-mysql'
+if ($backendMySql -match '(?m)^      mysql:\r?$' -or $backendMySql.Contains('job.services.mysql.id')) {
+  throw 'MySQL CI must not reuse a prebuilt MySQL service instead of the patched runtime'
+}
+if ($backendMySql.IndexOf($mysqlBuildStep) -gt $backendMySql.IndexOf('Verify Connector/J MySQL TLS trust chain')) {
+  throw 'MySQL CI runtime build must precede database verification'
+}
+$engineEvidenceSteps = @(Get-StepBlocks $backendMySql | Where-Object { $_.Contains('- name: Upload MySQL cross-engine upgrade evidence') })
+if ($engineEvidenceSteps.Count -ne 1) { throw 'MySQL engine upgrade must upload its evidence once' }
+Assert-Contains $engineEvidenceSteps[0] @('if: always()', 'backend/target/mysql-engine-upgrade', 'backend/target/mysql-runtime-security/*.json', 'retention-days: 7') 'MySQL engine upgrade evidence'
 Assert-Contains $mysqlBaselineStep @(
   '-Dtest=BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: "true"',
   'jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}'
@@ -448,7 +519,7 @@ Assert-Contains $sqlSafety @(
   './scripts/check-sql-safety.ps1'
 ) 'sql-safety-scan'
 
-Assert-ActionStepInputs $workflow 'actions/upload-artifact' 9 @(
+Assert-ActionStepInputs $workflow 'actions/upload-artifact' 10 @(
   '(?m)^          retention-days: (?:7|14|30)\r?$'
 ) 'artifact upload'
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@[0-9a-f]{40}').Count -ne 3) { throw 'artifact download count changed' }
@@ -623,7 +694,7 @@ Assert-Contains $readmeSyncGate @('--cached','--range','readFileSync(0','merge-b
   ok = $true
   jobs = @($actualJobs)
   requiredJobCount = $requiredJobs.Count
-  artifactUploads = 9
+  artifactUploads = 10
   artifactDownloads = 3
   permissionBlocks = 4
   postMergeJobs = $postMergeJobs.Count

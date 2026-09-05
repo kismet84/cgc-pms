@@ -24,9 +24,9 @@
         <maven.compiler.proc>full</maven.compiler.proc>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <springdoc.version>2.6.0</springdoc.version>
-        <!-- Connector/J 8.4.0 is the narrow MySQL 8.0-compatible release outside the
-             Oracle CPU ranges currently affecting the Boot-managed 9.7.0 line. -->
-        <mysql.version>8.4.0</mysql.version>
+        <!-- ISSUE-100-001: Connector/J 26.7 requires MySQL 8.4+; Compose and CI
+             pin the matching LTS server. Do not restore the unsupported 8.0 pairing. -->
+        <mysql.version>26.7.0</mysql.version>
         <jjwt.version>0.12.6</jjwt.version>
         <minio.version>8.6.0</minio.version>
         <jasypt.version>3.0.5</jasypt.version>

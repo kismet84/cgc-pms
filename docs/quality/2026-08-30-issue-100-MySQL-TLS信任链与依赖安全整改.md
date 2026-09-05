@@ -3,11 +3,29 @@
 > 日期：2026-08-30
 > 唯一载体：`ISSUE-100-001`
 > 编制基线：`master@5066a5c90bb9048289307a5d60e25c051e399577`
-> 当前裁决：`G0-G3 PASSED / G4 ENVIRONMENT_SPLIT / G5 GIT_IN_PROGRESS`
+> 复核日期：2026-09-06
+> 当前裁决：`M6 AUTHORIZED / G1 IMAGE_SCAN_PASSED / G2_G5_PENDING`；尚未通过完整验收，尚未推送/合并
+
+## M6 当前权威记录（2026-09-06）
+
+用户已明确批准 MySQL 8.4 隔离升级、实施与既有受保护 Git 交付，不再等待重复授权。当前采用 Connector/J 26.7.0 与 MySQL 8.4.12，厂商兼容性页与正式发布说明均覆盖该组合。后续编号章节保留 M6 前历史；其中 driver8.4.0、MySQL8.0、等待升级授权、旧浏览器通过等不再代表当前版本或门禁结论。
+
+| 门禁/证据 | 当前结果 |
+| --- | --- |
+| G0 | 独立 `codex/mainline-100` 工作树；旧 dev 卷及原工作区脏改动保留，无业务 schema/API/权限语义变更 |
+| G1 供应链 | Oracle 固定输入，移除 mysql-shell 及 Python、SQLite 官方修复 RPM；独立 Alpine/OpenSSL 预检；精确 runtime ID `sha256:ee7bf662aa692abb5c6384b39796de4796001990b83b47ab020abafde96f2895`、preflight ID `sha256:99f3bf5ead9d68b9a33886d144bcfd90b3f073d25f640c2f0d5be1ebb7229d84`，Trivy Metadata.ImageID 与运行输入相等，高危/严重均0；不是永久无漏洞声明 |
+| G2 跨引擎 | 原候选230表行数/全行字节守恒；加强版补生成列表达式、CHECK文本/ENFORCED、外键动作后真实复验中；同份升级前8.0备份先恢复8.0再导入8.4；完整Flyway/并发组待完成 |
+| G3 静态与本地测试 | validator22项通过；备份/恢复28项、实际cleanup AST18项通过，PowerShell7/5.1；部署、工作流契约通过；前端完整串行649/649通过。新driver完整Maven与MySQL/JAR/SPDX/最终SHA CI待完成 |
+| G4 | 旧组合真实浏览器仅保留历史；新8.4.12/26.7与最终JAR的有样本链路待验证 |
+| G5 | 独立只读复核发现已修复，动态与远端收口未完成，唯一Issue保持开放，不创建非Draft PR、不合并、不清理源分支 |
+
+失败按首次事实保留：Docker Desktop代理出现 `192.168.65.7:2376: no route to host`（environment_prerequisite），随后只读version恢复，未重启共享服务；首次完整Maven漏注入CI测试JWT环境（tool_config），2743测试/1728错误/30跳过、BUILD FAILURE，补环境后复验；前端默认并发645/649、4项约5秒超时，原断言/默认超时不变，单worker完整649通过，归environment_prerequisite。镜像绑定与对象快照缺口、cleanup异常及.NET空变量恢复差异归quality_or_security，本轮直接修复并复验，不延期。
+
+具体版本来源、升级前备份哈希、保留资源、风险与恢复边界见 [M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。新增后续项0、关闭0、净变化0；`ISSUE-100-001`未关闭。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
 
 ## 1. 范围与边界
 
-本轮关闭 `AUD-20260830-001/002/003`：补齐 MySQL 显式 CA、服务证书、Java PKCS12 truststore 与 Connector/J `VERIFY_IDENTITY`；将 Connector/J 从 9.7.0 窄覆盖到 8.4.0；修正 MinIO application credential 注释。无 migration、业务 API、权限、租户、金额或状态机变化。
+本轮承接 `AUD-20260830-001/002/003`：补齐 MySQL 显式 CA、服务证书、Java PKCS12 truststore 与 Connector/J `VERIFY_IDENTITY`；试验 Connector/J 8.4.0 兼容性；修正 MinIO application credential 注释。8.4.0 安全支持证据不足，F02 未关闭，整个主线未完成。无 migration、业务 API、权限、租户、金额或状态机变化。
 
 只验证本地隔离 Docker、临时证书、当前 JAR 与远端同 SHA CI；项目不存在生产或目标环境，本报告不构成生产发布证据。测试证书、私钥、truststore、密码和临时卷均不得入库。
 
@@ -33,20 +51,23 @@
 - 代码修改前刷新 Code map。`prod-config-gate` 调用入口为 `CgcPmsApplication.application.addInitializers`，影响 Spring API 启动，覆盖测试为 `ProductionEnvironmentValidatorTest`。
 - 本轮改变依赖与部署数据流，最终实现后必须再次生成并执行 `--verify`。
 
-### G1 兼容性与安全契约 — PASS
+### G1 兼容性与安全契约 — BLOCKED（撤回此前 PASS）
 
-- 独立只读复核确认 Connector/J 8.4.0 为 GA，支持 MySQL 8.0+ 与 Java 21；Maven 可解析。
-- Oracle CPU 范围核对截至 2026-08-30 未命中选定 8.4.0。结论仅为“未命中已核对 CPU 受影响范围”，不宣称最新版本或零漏洞。
-- 26.7 文档对 MySQL 8.0/8.4 支持口径冲突，未采用；没有静默升级 MySQL。
+- 8.4.0 的 GA、MySQL 8.0/Java 21 兼容及本地测试证据保留，但不证明当前安全支持。此前用“未命中公告版本范围”将 F02 判为闭合，依据不足，现撤回。
+- [Oracle July 2026 CPU](https://www.oracle.com/security-alerts/cpujul2026.html) 表头为受影响的受支持版本；旧版本未列不能据此认定不受影响。
+- 2026-09-06 核对：[当前主指南](https://dev.mysql.com/doc/connector-j/en/)（2026-08-31 修订）与 [26.7 简介](https://dev.mysql.com/doc/connector-j/en/connector-j-whats-new.html) 称 MySQL 8.0+；[兼容性页](https://dev.mysql.com/doc/connector-j/en/connector-j-versions.html) 仍称 8.4+。尚不满足本计划的一致厂商支持要求；不得仅用本地回归替代，也不静默升级 MySQL。
+- 分类 `quality_or_security`（版本安全闭合证据不足）。需要取得一致支持证据，或由用户明确调整验收约束后验证 26.7；在此之前保持 Issue 开放，不进入 Git 交付。
+- 补查发布源：[26.7.0 正式发布说明](https://dev.mysql.com/doc/relnotes/connector-j/en/news-26-7-0.html)也明确要求 MySQL 8.4+，不是只有兼容性单页如此。Maven Central `com/mysql/mysql-connector-j/maven-metadata.xml` 当前 latest/release 均为 26.7.0，9.x 最后一项为 9.7.0，没有可选的 9.7.2；不能借用 MySQL Server 的 9.7.x 版本号作为 JDBC 驱动版本。推荐保留厂商支持验收门，等待厂商澄清；如需立即采用受支持组合，必须另获 MySQL 8.4 升级范围授权并按计划独立评估迁移，不能继续把保持 MySQL 8.0 的 26.7 回归视为等价的厂商支持证明。
+- 用户随后授权另立升级计划，已编制 [M6](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。该计划按当前只读运行基线与真实镜像注册表结果编制，不将缺失的 8.4.12 标签或可读取的 8.4.11 manifest 当作已通过安全门；升级实施澄清尚未返回，本次未改运行态/driver 版本、未迁移现有库。
 
-### G2 数据、迁移与真实 MySQL — PASS
+### G2 数据、迁移与真实 MySQL — 既有候选版本证据保留
 
 - 无 migration；所有数据库验证使用固定 MySQL 8.0 digest、隔离网络和临时卷，未复用或重置现有 `cgc_pms` 数据。
 - fresh baseline/Flyway `1/1`，付款并发 `10/10`，材料删除并发 `2/2`，通讯并发 `2/2`，投标项目范围 `2/2`，RBAC tenant association `3/3`，code generation 聚焦复验 `5/5`。
 - Windows 固定 MySQL 8.0 的 V180→V307 upgrade `1/1`。
 - code generation 首轮因测试只允许 loopback、容器使用 `mysql` hostname 而未执行逻辑，分类 `tool_invocation`；改为共享网络命名空间并使用 `127.0.0.1` 后通过。
 
-### G3 服务端、制品与供应链 — PASS
+### G3 服务端、制品与供应链 — 本地证据保留，SPDX/同 SHA CI 未完成
 
 - `ProductionEnvironmentValidatorTest`：`22/22`。
 - TLS smoke：`1/1` 正向、4 个负向全部按预期失败；cipher 非空。
@@ -58,16 +79,22 @@
 
 失败分类：首次 Maven verify 缺 `TEST_JWT_SECRET`、Office Windows loopback、两次直接 surefire 未展开 `@{argLine}` 分别归 `tool_invocation`、`environment_prerequisite`、`tool_invocation`；修正合法前置或 Linux 聚焦复验后均闭合，不掩盖产品失败。
 
-### G4 本地运行与浏览器 — ENVIRONMENT SPLIT
+### G4 本地运行与浏览器 — 本地真实链路已补齐，整体仍受 G1 阻塞
 
 - 隔离 production-like Compose 的 preflight、MySQL、Redis、MinIO、ClamAV 已健康；backend 使用本轮 JAR、Java `trustedCertEntry` truststore完成 V1→V307 migration，在数据库名校准后以 79.673 秒记录 `Started CgcPmsApplication`。创建临时 `cgc-pms` bucket 后 `/api/actuator/health` 返回 `UP/200`；前端入口及其代理健康均返回 200。该链证明真实 `VERIFY_IDENTITY`、Flyway 与健康检查成立。
 - 运行态发现并修复普通 OpenSSL cert bag 不是 Java trust anchor 的门禁缺口：新版 preflight 要求 `Trusted key usage`；Java `keytool` truststore 正向通过。
 - 应用内浏览器确认旧本地镜像 `cgc-pms-frontend-v2:m0` 只是历史静态健康页。当前 SPA 已在宿主执行 `vue-tsc` 与 production Vite build 成功；准备挂入 production nginx 时 Docker Desktop engine 全面返回 API 500，随后现有 dev/G4 容器端口均超时。宿主 JAR fallback 完成 H2 V307 后又被已知 Windows WEPoll `Unable to establish loopback connection` 阻断 Tomcat。两项均分类 `environment_prerequisite`，未判产品回归，也未越权重启影响其他容器的全局 Docker Desktop。
-- 本地已取得 TLS backend health；完整登录、列表 DOM 与 console 仍须由同 SHA CI/e2e 补证。取得前不将 G4 写成无条件通过。
+- 2026-09-05/06 Docker 恢复后，以本轮同一 JAR（SHA-256 与 G3 相同）重新取得 backend `http://localhost:18081/api/actuator/health` 的 `UP/200`。当前工作树 Vite 仅绑定 `127.0.0.1:18082` 并代理该 TLS backend，没有使用普通 dev backend 或 mock API。
+- 应用内浏览器真实账号、租户 0 登录后落到 `/dashboard`，再进入 `/contract/ledger?contractStatus=DRAFT`；`/api/contracts?pageNo=1&pageSize=10&contractStatus=DRAFT` 返回 HTTP 200、`code=0`、`total=0/records=[]`，与隔离空业务数据基线一致。页面“合同台账”标题唯一、旧“隔离底座已启动”标识为 0，warn/error console 为空。不将空列表描述为有业务行样本。
+- 旧 Docker/WEPoll 失败保留为历史 `environment_prerequisite`，本次真实浏览器补证已恢复；此前“由同 SHA contract E2E 替代登录列表”的建议无效，现已纠正。
 
-### G5 收口与 Git — IN PROGRESS
+### G5 收口与 Git — NOT_READY
 
-- 最终 Codemap、问题源与零悬空已进入回写；待最终本地合同门通过后执行同 source SHA Push CI、PR checks、受保护合并、post-merge 验真和源分支清理。
+- G1 重开后停止 Git 交付。远端 `master` 仍为 `5066a5c90bb9048289307a5d60e25c051e399577`，`codex/mainline-100` 远端分支不存在、无 PR；上次 Schannel 上传失败没有成功送达。已重新核对 master 15 个 required contexts，未绕过保护。
+- 2026-09-06 独立安全复核的直接 TLS 缺口在本轮修复：preflight 限定唯一 CA/唯一 trusted entry、拒绝 private-key entry；以镜像 mysql 用户确认 server key 可读不可写，手册规定 Linux 精确 UID 与 0400；smoke 仅挂载服务端三文件，不提供 CA 私钥，并在容器私有目录复制设权；hostname 负向先以同地址 VERIFY_CA 成功证明可达，再断言 CertificateException 原因。
+- 实际 Compose 函数动态用例 valid、额外 CA、普通 cert bag、不可读私钥均符合预期；真实 MySQL TLS smoke `1/1`、四类负向、cipher 与 hostname 控制通过。临时 Vitest 串行/延长超时配置已撤销，未以降低门禁换取通过。最终全量同 SHA CI、SPDX、PR、合并与清理均未完成。
+- 第二次独立只读复核确认上述直接 TLS 缺口已关闭。preflight 的只读检查不等于宿主 POSIX 保密权限检查，Linux 0400/所有权仍须按手册核验；不夸大自动门禁覆盖。
+- 已按项目标签核对并移除本任务临时 G4 的 7 个容器、5 个测试卷和 1 个网络，停止临时 Vite；未清理镜像或其他 dev 容器。临时测试卷已删除，不能恢复原卷，只能重新生成。工作树内本任务证书与临时 override 的删除被工具策略拒绝，文件保留且添加本地 Git exclude 防止误入库，后续清理仍由本 Issue 承接，不声称已全部清理。
 - Git 交付授权来自用户指令“完成主线计划书100#，并推送”；不包含 Tag、Release、版本发布或生产操作。
 
 ## 4. 恢复与剩余风险
@@ -79,5 +106,5 @@
 ## 5. 零悬空
 
 - 三个审计 ID 全部由 `ISSUE-100-001` 唯一承接，无重复载体。
-- 当前实施新增正式后续项 0、关闭 0、净变化 0；G4 补证/G5 尚未完成，因此 Issue 暂不关闭。
+- 当前实施新增正式后续项 0、关闭 0、净变化 0；所有直接缺口仍由 `ISSUE-100-001` 承接，G1/G5 尚未完成，因此 Issue 暂不关闭。
 - 计划全周期已新增 1；完成时应关闭 1，净变化回到 0。无价值不明或无验收标准的建议不进入 Backlog。

@@ -5,6 +5,8 @@
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1 -BackupDir "D:\backups\cgc-pms\mysql"
+#   powershell -ExecutionPolicy Bypass -File scripts\mysql-backup.ps1 -MysqlContainer "cgc-pms-mysql-dev"
+# MysqlContainer uses that server's local socket/client; MysqlHost/MysqlPort are ignored.
 #
 # Exit 0 = success, Exit 1 = failure.
 #
@@ -25,6 +27,7 @@ param(
     [string]$MysqlHost = "",
     [string]$MysqlPort = "",
     [string]$MysqlDatabase = "",
+    [string]$MysqlContainer = "",
     [switch]$SkipRetention = $false
 )
 
@@ -33,14 +36,19 @@ $ErrorActionPreference = 'Stop'
 # -------------------------------------------------------------------
 # Load environment
 # -------------------------------------------------------------------
-if (-not $MysqlHost) { $MysqlHost = if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { '127.0.0.1' } }
-if (-not $MysqlPort) { $MysqlPort = if ($env:MYSQL_PORT) { $env:MYSQL_PORT } else { '3307' } }
+if ($MysqlContainer -and $MysqlContainer -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$') {
+    throw 'MysqlContainer must be a valid explicit container name or ID'
+}
+if (!$MysqlContainer) {
+    if (-not $MysqlHost) { $MysqlHost = if ($env:MYSQL_HOST) { $env:MYSQL_HOST } else { '127.0.0.1' } }
+    if (-not $MysqlPort) { $MysqlPort = if ($env:MYSQL_PORT) { $env:MYSQL_PORT } else { '3307' } }
+}
 if (-not $MysqlDatabase) { $MysqlDatabase = if ($env:MYSQL_DATABASE) { $env:MYSQL_DATABASE } else { 'cgc_pms' } }
 if ($MysqlDatabase -cnotmatch '^[A-Za-z0-9_]+$') {
     Write-Error "MysqlDatabase must contain only ASCII letters, digits, and underscore: $MysqlDatabase"
     exit 1
 }
-if ($MysqlPort -notmatch '^[0-9]+$' -or [int]$MysqlPort -lt 1 -or [int]$MysqlPort -gt 65535) {
+if (!$MysqlContainer -and ($MysqlPort -notmatch '^[0-9]+$' -or [int]$MysqlPort -lt 1 -or [int]$MysqlPort -gt 65535)) {
     Write-Error "MysqlPort must be an integer from 1 through 65535: $MysqlPort"
     exit 1
 }
@@ -92,16 +100,17 @@ $partialBackupFile = "$backupFile.partial"
 # -------------------------------------------------------------------
 # Run mysqldump via Docker (always available; no local MySQL client needed)
 # -------------------------------------------------------------------
-Write-Host "Backing up ${MysqlDatabase}@${MysqlHost}:${MysqlPort} → $backupFile"
+$mysqlTarget = if ($MysqlContainer) { "container:$MysqlContainer/local-socket" } else { "${MysqlHost}:${MysqlPort}" }
+Write-Host "Backing up ${MysqlDatabase}@$mysqlTarget -> $backupFile"
 
-$mysqldumpArgs = @(
-    'run', '--rm',
-    '--network', 'host',
-    '-e', 'MYSQL_PWD',
-    'mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
-    'mysqldump',
-    '-h', $MysqlHost,
-    '-P', $MysqlPort,
+if ($MysqlContainer) {
+    $mysqldumpArgs = @('exec', '-e', 'MYSQL_PWD', $MysqlContainer, 'mysqldump', '--protocol=SOCKET', '--host=localhost')
+}
+else {
+    $mysqlImage = & (Join-Path $PSScriptRoot 'ci/build-mysql-runtime.ps1')
+    $mysqldumpArgs = @('run', '--rm', '--network', 'host', '-e', 'MYSQL_PWD', $mysqlImage, 'mysqldump', '-h', $MysqlHost, '-P', $MysqlPort)
+}
+$mysqldumpArgs += @(
     '-u', 'root',
     '--single-transaction',
     '--routines',

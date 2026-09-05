@@ -13,10 +13,13 @@
 
 services:
   # ===========================================================================
-  # MySQL 8.0
+  # MySQL 8.4 (new volume; existing 8.0 installations require logical migration)
   # ===========================================================================
   mysql:
-    image: mysql:8.0
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: cgc-pms-mysql-dev
     restart: unless-stopped
     environment:
@@ -28,14 +31,14 @@ services:
     ports:
       - "127.0.0.1:3307:3306"
     volumes:
-      - mysql-dev-data:/var/lib/mysql
+      - mysql84-dev-data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost -u root || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -265,7 +268,7 @@ networks:
 # Volumes
 # ===========================================================================
 volumes:
-  mysql-dev-data:
+  mysql84-dev-data:
   redis-dev-data:
   minio-dev-data:
   maven-repo:

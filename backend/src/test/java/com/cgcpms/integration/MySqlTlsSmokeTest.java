@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.security.cert.CertificateException;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,8 +42,18 @@ class MySqlTlsSmokeTest {
                 user, password, trustStore.resolveSibling("missing-truststore.p12"), trustStorePassword));
         assertConnectionRejected(url, connectionProperties(user, password, trustStore, "wrong-password"));
         assertConnectionRejected(url, connectionProperties(user, password, wrongTrustStore, trustStorePassword));
-        assertConnectionRejected(url.replace("127.0.0.1", "localhost"),
+        var hostnameUrl = url.replace("127.0.0.1", "localhost");
+        var caOnlyControl = connectionProperties(user, password, trustStore, trustStorePassword);
+        // Test-only control proves the same hostname is reachable and its CA is valid.
+        // Only identity verification differs in the following negative case.
+        caOnlyControl.setProperty("sslMode", "VERIFY_CA");
+        try (var connection = DriverManager.getConnection(hostnameUrl, caOnlyControl)) {
+            assertTrue(connection.isValid(5), "Hostname control must reach the same MySQL server");
+        }
+        var identityFailure = assertConnectionRejected(hostnameUrl,
                 connectionProperties(user, password, trustStore, trustStorePassword));
+        assertTrue(hasCertificateCause(identityFailure),
+                "Hostname mismatch must fail certificate validation, not DNS or TCP connectivity");
     }
 
     private static Properties connectionProperties(String user, String password, Path trustStore,
@@ -59,12 +70,21 @@ class MySqlTlsSmokeTest {
         return properties;
     }
 
-    private static void assertConnectionRejected(String url, Properties properties) {
-        assertThrows(SQLException.class, () -> {
+    private static SQLException assertConnectionRejected(String url, Properties properties) {
+        return assertThrows(SQLException.class, () -> {
             try (var ignored = DriverManager.getConnection(url, properties)) {
                 // A successful connection is the failure condition for this negative test.
             }
         });
+    }
+
+    private static boolean hasCertificateCause(Throwable failure) {
+        for (var cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof CertificateException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String requiredEnvironment(String name) {

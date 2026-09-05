@@ -206,6 +206,7 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/ci/test-runtime-deployment-contract.ps1
+          ./scripts/ci/test-mysql-engine-upgrade-contract.ps1
           ./scripts/ci/test-backup-restore-drill.ps1
       - name: Verify backup failure atomicity
         shell: bash
@@ -222,28 +223,15 @@ jobs:
     needs: pr-push-evidence
     if: needs.pr-push-evidence.outputs.run-full == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
+      CI_MYSQL_CONTAINER: cgc-pms-ci-mysql
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_UPGRADE_DATABASE: cgc_pms_upgrade_test
       CI_MYSQL_USER: cgc_test
       CI_MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD || format('ci-mysql-{0}', github.run_id) }}
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
-      mysql:
-        image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
-          MYSQL_USER: ${{ env.CI_MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
       redis:
         image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
         ports:
@@ -253,25 +241,55 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-backend
+      - name: Build and start immutable MySQL runtime
+        shell: pwsh
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
+          MYSQL_USER: ${{ env.CI_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
+          MYSQL_PWD: ${{ env.CI_MYSQL_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $image = & ./scripts/ci/build-mysql-runtime.ps1
+          $preflightImage = & ./scripts/ci/build-mysql-runtime.ps1 -Component preflight
+          ./scripts/ci/scan-mysql-runtime.ps1 -RuntimeImage $image -PreflightImage $preflightImage
+          "CI_MYSQL_RUNTIME_IMAGE=$image" >> $env:GITHUB_ENV
+          "CI_MYSQL_PREFLIGHT_IMAGE=$preflightImage" >> $env:GITHUB_ENV
+          docker run --detach --name $env:CI_MYSQL_CONTAINER --publish 127.0.0.1:3306:3306 `
+            -e MYSQL_ROOT_PASSWORD -e MYSQL_DATABASE -e MYSQL_USER -e MYSQL_PASSWORD $image | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw 'MySQL CI container did not start' }
+          $deadline = [DateTime]::UtcNow.AddSeconds(120)
+          $ready = $false
+          do {
+            $probe = docker exec -e MYSQL_PWD $env:CI_MYSQL_CONTAINER mysql `
+              --protocol=TCP --host=127.0.0.1 --connect-timeout=3 -u $env:CI_MYSQL_USER `
+              -Nse 'SELECT 1' $env:CI_MYSQL_DATABASE 2>$null
+            if ($LASTEXITCODE -eq 0 -and ($probe -join '').Trim() -eq '1') { $ready = $true; break }
+            Start-Sleep -Seconds 2
+          } while ([DateTime]::UtcNow -lt $deadline)
+          if (!$ready) { throw 'MySQL CI SELECT 1 readiness timed out after 120 seconds' }
       - name: Verify Connector/J MySQL TLS trust chain
         shell: pwsh
-        run: ./scripts/ci/run-mysql-tls-smoke.ps1
+        run: ./scripts/ci/run-mysql-tls-smoke.ps1 -MysqlImage $env:CI_MYSQL_RUNTIME_IMAGE -PreflightImage $env:CI_MYSQL_PREFLIGHT_IMAGE
       - name: Verify MySQL migration user scope
         shell: bash
-        run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
+        run: bash ./scripts/ci/verify-mysql-grants.sh "$CI_MYSQL_CONTAINER"
       - name: Prepare isolated MySQL upgrade schema
         shell: bash
+        env:
+          MYSQL_PWD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
         run: |
           set -euo pipefail
           [[ "$CI_MYSQL_UPGRADE_DATABASE" =~ ^[a-z0-9_]+$ ]]
           [[ "$CI_MYSQL_USER" =~ ^[a-z0-9_]+$ ]]
-          docker exec -e "MYSQL_PWD=$CI_MYSQL_ROOT_PASSWORD" "${{ job.services.mysql.id }}" \
+          docker exec -e MYSQL_PWD "$CI_MYSQL_CONTAINER" \
             mysql -uroot -e "CREATE DATABASE \`$CI_MYSQL_UPGRADE_DATABASE\`; GRANT ALL PRIVILEGES ON \`$CI_MYSQL_UPGRADE_DATABASE\`.* TO '$CI_MYSQL_USER'@'%'; FLUSH PRIVILEGES;"
       - name: Verify isolated MySQL upgrade user scope
         shell: bash
         env:
           CI_MYSQL_DATABASE: ${{ env.CI_MYSQL_UPGRADE_DATABASE }}
-        run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
+        run: bash ./scripts/ci/verify-mysql-grants.sh "$CI_MYSQL_CONTAINER"
       - name: Run fresh MySQL baseline smoke test
         run: cd backend && ./mvnw -C -Dtest=BaselineMySqlSmokeTest test -Dspring.profiles.active=test
         env:
@@ -299,6 +317,19 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_UPGRADE_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
+      - name: Verify MySQL cross-engine upgrade and recovery
+        shell: pwsh
+        run: ./scripts/ci/run-mysql-engine-upgrade.ps1 -TargetImage $env:CI_MYSQL_RUNTIME_IMAGE
+      - name: Upload MySQL cross-engine upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: backend-mysql-engine-upgrade-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            backend/target/mysql-engine-upgrade
+            backend/target/mysql-runtime-security/*.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload MySQL smoke test reports
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -307,6 +338,16 @@ jobs:
           path: backend/target/surefire-reports
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Clean up MySQL CI runtime
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker container inspect "$CI_MYSQL_CONTAINER" >/dev/null 2>&1; then
+            docker logs "$CI_MYSQL_CONTAINER"
+            docker rm -f "$CI_MYSQL_CONTAINER"
+          fi
 
   frontend-lint:
     needs: pr-push-evidence

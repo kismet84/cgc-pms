@@ -76,6 +76,23 @@ if ($dockerfile -match '(?m)^\s*ENV\s+SPRING_DATASOURCE_URL(?:\s|=)') {
 $backend = Get-ComposeServiceBlock $compose 'backend'
 $mysql = Get-ComposeServiceBlock $compose 'mysql'
 $preflight = Get-ComposeServiceBlock $compose 'preflight'
+$basicCompose = Read-RepoText 'deploy/docker-compose.yml'
+foreach ($mysqlService in @($mysql, (Get-ComposeServiceBlock $devCompose 'mysql'), (Get-ComposeServiceBlock $basicCompose 'mysql'))) {
+  if ($mysqlService -match '-p\$|--password[= ]') { throw 'MySQL healthcheck must not put password values in process arguments' }
+  if (!$mysqlService.Contains('dockerfile: Dockerfile') -or !$mysqlService.Contains('platform: linux/amd64')) {
+    throw 'MySQL services must build the fixed and patched 8.4 runtime'
+  }
+  if ($mysqlService -match '(?m)^\s*- mysql(?:-dev)?-data:/var/lib/mysql') {
+    throw 'MySQL 8.4 must not silently mount the existing 8.0 data volume'
+  }
+  if (!$mysqlService.Contains('MYSQL_PWD=')) { throw 'MySQL healthcheck must use the password environment' }
+}
+$mysqlDockerfile = Read-RepoText 'deploy/mysql/Dockerfile'
+foreach ($contract in @('sha256:7dcc4add9183664de3a214daf85a50c3ba6cccfd7534f700b6561bf5b41885be',
+  'ADD --checksum=sha256:fbf3fab2833d74866a02db82e4efb8e93d80e80757d83c1142357724026db6c5',
+  'rpm -e mysql-shell','rpm -U /tmp/sqlite-libs.rpm','27:27')) {
+  if (!$mysqlDockerfile.Contains($contract)) { throw "MySQL runtime contract missing: $contract" }
+}
 $monitoringBackend = Get-ComposeServiceBlock $monitoringCompose 'backend'
 if ($backend -notmatch '(?mi)^    mem_limit:\s*["'']?1g["'']?\s*$') {
   throw 'Production backend service must declare service-level mem_limit: 1G'
@@ -122,7 +139,9 @@ if ($backend.Contains('/run/secrets/mysql/server-key.pem') -or $backend.Contains
   throw 'Production backend must not receive the MySQL server key or raw CA mount'
 }
 foreach ($preflightContract in @(
-  'image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+  'dockerfile: Preflight.Dockerfile',
+  'su-exec 27:27 test -r',
+  'su-exec 27:27 test ! -w',
   'MYSQL_TRUSTSTORE_PASSWORD',
   'check_file "/run/secrets/mysql/ca.pem"',
   'check_file "/run/secrets/mysql/server-cert.pem"',
@@ -136,6 +155,11 @@ foreach ($preflightContract in @(
   'MySQL server certificate and key do not match',
   "grep -q 'Trusted key usage'",
   'MySQL truststore CA must be a Java trustedCertEntry',
+  'MySQL truststore must contain exactly one CA certificate',
+  'MySQL truststore must contain exactly one trustedCertEntry',
+  'MySQL truststore must not contain private key entries',
+  'MySQL server key must be readable by the MySQL image user',
+  'MySQL server key must not be writable by the MySQL runtime',
   'MySQL truststore CA certificate does not match the MySQL CA'
 )) {
   if (!$preflight.Contains($preflightContract)) { throw "Production preflight MySQL TLS contract is missing: $preflightContract" }
