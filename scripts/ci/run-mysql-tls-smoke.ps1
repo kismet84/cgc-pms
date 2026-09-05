@@ -184,13 +184,23 @@ exec /entrypoint.sh mysqld --require-secure-transport=ON --ssl-ca=/run/mysql-tls
   if ([string]::IsNullOrWhiteSpace($containerId)) { throw 'Docker did not return a MySQL TLS smoke container id' }
   $containerCreated = $true
 
+  # Probe the same application account as JDBC, not root's image-specific host grants.
+  $env:MYSQL_PWD = $databasePassword
   $ready = $false
+  $probeOutput = @()
   for ($attempt = 0; $attempt -lt 60; $attempt++) {
-    & $docker exec --env MYSQL_PWD $containerName mysql --user=root --host=127.0.0.1 --batch --skip-column-names -e 'SELECT 1' *> $null
-    if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    $probeOutput = & $docker exec --env MYSQL_PWD $containerName mysql "--user=$databaseUser" --host=127.0.0.1 --connect-timeout=3 --ssl-mode=REQUIRED --batch --skip-column-names -e 'SELECT 1' $database 2>&1
+    if ($LASTEXITCODE -eq 0 -and ($probeOutput -join '').Trim() -eq '1') { $ready = $true; break }
     Start-Sleep -Seconds 2
   }
-  if (!$ready) { throw 'MySQL TLS smoke container did not become ready within 120 seconds' }
+  if (!$ready) {
+    $diagnostic = ((@($probeOutput) + @(& $docker logs --tail 40 $containerName 2>&1)) -join "`n")
+    foreach ($secret in @($rootPassword,$databasePassword,$trustStorePassword)) {
+      $diagnostic = $diagnostic.Replace($secret,'[redacted]')
+    }
+    Write-Warning $diagnostic
+    throw 'MySQL TLS smoke container did not become ready within 120 seconds'
+  }
 
   $env:CGCPMS_MYSQL_TLS_SMOKE = 'true'
   $env:CGCPMS_MYSQL_TLS_PORT = [string]$port

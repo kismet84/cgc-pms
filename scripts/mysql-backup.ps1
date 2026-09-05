@@ -142,7 +142,7 @@ try {
         $dumpError = Get-Content -LiteralPath $tempErrorFile -Raw -ErrorAction SilentlyContinue
         throw "mysqldump failed (exit $($dumpProcess.ExitCode)): $dumpError"
     }
-    if (-not (Test-Path -LiteralPath $tempSqlFile -PathType Leaf) -or (Get-Item -LiteralPath $tempSqlFile).Length -eq 0) {
+    if (-not (Test-Path -LiteralPath $tempSqlFile -PathType Leaf) -or (Get-Item -LiteralPath $tempSqlFile -Force).Length -eq 0) {
         throw 'mysqldump produced an empty SQL file'
     }
     if (-not (Select-String -LiteralPath $tempSqlFile -Pattern '(CREATE TABLE|INSERT INTO|DROP TABLE|CREATE DATABASE)' -Quiet)) {

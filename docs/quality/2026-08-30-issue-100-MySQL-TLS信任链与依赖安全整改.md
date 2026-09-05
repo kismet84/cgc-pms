@@ -4,7 +4,7 @@
 > 唯一载体：`ISSUE-100-001`
 > 编制基线：`master@5066a5c90bb9048289307a5d60e25c051e399577`
 > 复核日期：2026-09-06
-> 当前裁决：`M6 AUTHORIZED / G1 IMAGE_SCAN_PASSED / G2_G5_PENDING`；尚未通过完整验收，尚未推送/合并
+> 当前裁决：`M6 AUTHORIZED / G1 IMAGE_SCAN_PASSED / G2_G5_PENDING`；尚未通过完整验收，功能分支已推送，首次CI未通过，尚未合并
 
 ## M6 当前权威记录（2026-09-06）
 
@@ -22,6 +22,13 @@
 失败按首次事实保留：Docker Desktop代理出现 `192.168.65.7:2376: no route to host`（environment_prerequisite），随后只读version恢复，未重启共享服务；首次完整Maven漏注入CI测试JWT环境（tool_config），2743测试/1728错误/30跳过、BUILD FAILURE，补环境后复验；前端默认并发645/649、4项约5秒超时，原断言/默认超时不变，单worker完整649通过，归environment_prerequisite。镜像绑定与对象快照缺口、cleanup异常及.NET空变量恢复差异归quality_or_security，本轮直接修复并复验，不延期。
 
 具体版本来源、升级前备份哈希、保留资源、风险与恢复边界见 [M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。新增后续项0、关闭0、净变化0；`ISSUE-100-001`未关闭。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
+
+### 补充失败分类与工具风险边界
+
+- 功能分支 `codex/mainline-100` 已推送，远端HEAD确认为 `bef6aaf9aaf8161ed409d17675873a86ae9671dd`；[首次Push CI](https://github.com/kismet84/cgc-pms/actions/runs/33983978708)未通过，未创建PR、未合并。该次本地pre-push完整门禁通过，浏览器contract98项、0skip/0flaky。CI reliability-contracts暴露Linux隐藏临时SQL的Get-Item未加Force，已用Windows Hidden属性等价复现并修复，28项复验通过；backend-test-mysql四组真实preflight通过但TLS库就绪超时，归unknown，补实际应用账号探测和脱敏错误/容器日志后复验。两项均为本轮直接门禁问题，不记为外部Runner故障；修后不追溯修改首次CI结论。尚不能声明可提PR或G5完成。
+- 正确注入测试JWT后的完整Maven：2962项、1 failure、5 errors、30个条件skip，30分钟、BUILD FAILURE。两项成本工作流因规则夹具CURRENT_DATE晚于固定2026-08业务期间而失败；仅将测试规则生效日固定为2020-01-01。付款冲销时间断言在秒为0时比较了不同字符串格式；改为同格式解析后的LocalDateTime相等，并显式覆盖整分钟。不改业务Resolver、金额、状态或时间语义；三项最小复验通过，两完整测试类34/34通过。OfficePreviewClientTest三项为Windows WEPollSelectorImpl创建loopback失败、SocketException `Invalid argument: connect`，归environment_prerequisite，待Linux同SHA CI等价验证，不计本地通过。
+- Docker再次代理不可达，WSL配置上限4GB、swap2GB；因果关系尚不能确认。停止4个已完成任务容器的请求均返回API500，不能声称已停止。已实现后续新演练每个MySQL上限512MB，并在目的库验证后停止该服务、保留卷，避免同时保留多组运行实例。未修改WSL配置、未重启共享环境；真实跨引擎最终目标、备份与G4仍受阻。
+- Upgrade Checker使用固定Oracle工具镜像digest `7dcc4add9183664de3a214daf85a50c3ba6cccfd7534f700b6561bf5b41885be`，旧扫描Metadata.ImageID与之相等，存在5条High：sqlite-libs `3.34.1-10.el9_8` 的 `CVE-2026-11822/11824`，cryptography `46.0.7` 的 `CVE-2026-69247/69249` 与 `GHSA-537c-gmf6-5ccf`。独立只读复核并由主线程核对实际代码：checker仅调用 `util.check_for_server_upgrade`，只连接内部本批次源MySQL，输入为仓库schema、合成fixture和该容器my.cnf；无端口发布、`--rm`、证据只读挂载。没有恶意SQLite FTS5/MATCH、PKCS7解密服务、攻击者证书链或超大DER输入，因此上述触发条件不进入本次调用。按当前不可达证据关闭本次风险，不制造后续Issue；这不是整个CI镜像零漏洞声明。若增加外部数据库/证书/SQLite/PKCS7输入、服务监听或持久写挂载，裁决立即失效，必须重新扫描复核或使用修复镜像。runtime与preflight的0高危/严重结论不包含此一次性工具镜像。
 
 ## 1. 范围与边界
 

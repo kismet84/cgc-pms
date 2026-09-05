@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-09-06T01:57:00+08:00",
+  "updatedAt": "2026-09-06T02:40:00+08:00",
   "issues": [
     {
       "issueKey": "ISSUE-100-001",
@@ -12,7 +12,7 @@
       "blocking": true,
       "summary": "AUD-20260830-001/002/003唯一承接。M6已明确批准实施；Connector/J26.7.0配对MySQL8.4.12，派生运行镜像移除Shell并修复SQLite，精确运行/预检镜像ID扫描高危严重0。Upgrade Checker零错误，230表候选行字节守恒；加强完整对象语义后复验中。前端649、备份恢复28、异常清理18通过，新组合剩余服务端/浏览器/同SHA CI和Git尚未完成。",
       "acceptanceCriteria": "正确CA与VERIFY_IDENTITY可在隔离MySQL8.4.12中建连并确认非空cipher；缺失/错误CA、错误密码和身份不匹配失败关闭；Connector/J26.7.0厂商支持、单一JAR/SBOM、精确制品扫描；8.0升级前同备份先恢复8.0再导入8.4、对象数据守恒；完整Maven/MySQL/浏览器/CI及受保护Git门禁通过。",
-      "deferReason": "无待用户答复的实施授权。现有dev卷不动；Docker代理no route to host后API已恢复，未重启共享服务。首次完整Maven测试JWT环境缺失，修前置后重跑；继续完成新组合G2-G5、最终同SHA CI/SPDX、PR合并、post-merge与安全清理。",
+      "deferReason": "无待用户答复的实施授权。功能分支bef6aaf9aaf8已推送，首次CI33983978708的Linux隐藏文件缺陷已修复，TLS就绪超时已补实际账号探测与脱敏诊断待复验；日期边界修正后相关34项通过。Docker代理再次no route to host，未重启共享服务、未动现有dev卷。继续完成新组合G2-G5、最终同SHA CI/SPDX、真实浏览器、PR合并、post-merge与安全清理。",
       "sourceRefs": [
         "docs/plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md",
         "docs/plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md",

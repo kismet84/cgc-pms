@@ -4,6 +4,16 @@ param([string]$RepoRoot = '')
 $ErrorActionPreference = 'Stop'
 if (!$RepoRoot) { $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
 
+function Format-ContractFailure([object[]]$OutputItems) {
+  $detail = ($OutputItems | ForEach-Object { [string]$_ }) -join "`n"
+  foreach ($secret in @($env:MYSQL_ROOT_PASSWORD, $env:MYSQL_PWD, $previousPassword, $previousPwd,
+                        'contract-only-password', 'preexisting-caller-value')) {
+    if ($secret) { $detail = $detail.Replace([string]$secret, '<redacted>') }
+  }
+  if ($detail.Length -gt 4000) { $detail = $detail.Substring(0, 4000) + ' [truncated]' }
+  return $detail
+}
+
 function Invoke-ExpectedFailure([string[]]$ScriptArguments, [string]$TargetScriptPath = $scriptPath) {
   # Windows PowerShell 5.1 turns redirected native stderr into error records.
   # Expected validation errors must not abort the negative-test harness.
@@ -164,7 +174,14 @@ try {
     if ($FilePath -ne 'docker') { throw 'Unexpected restore process' }
     Assert-RestoreClientArguments $ArgumentList
     if ($ArgumentList -contains 'mysqldump') {
-      if ($backupCase -eq 'success') { [IO.File]::WriteAllBytes($RedirectStandardOutput, $dumpBytes) }
+      if ($backupCase -eq 'success') {
+        [IO.File]::WriteAllBytes($RedirectStandardOutput, $dumpBytes)
+        # Unix dotfiles are hidden to the FileSystem provider. Give Windows the
+        # same temporary-file semantics so this contract detects missing -Force.
+        if ([IO.Path]::DirectorySeparatorChar -eq '\') {
+          [IO.File]::SetAttributes($RedirectStandardOutput, [IO.FileAttributes]::Hidden)
+        }
+      }
       [pscustomobject]@{ ExitCode = $(if ($backupCase -eq 'dump-failure') { 1 } else { 0 }) }
       return
     }
@@ -184,7 +201,9 @@ try {
       else { Remove-Item -LiteralPath Env:MYSQL_PWD -ErrorAction SilentlyContinue }
       $restoreResult = & $restoreScriptPath -BackupFile $restoreFixture -TargetDatabase cgc_pms_restore_test @transportArgs 2>&1 6>$null
       $expectedExit = if ($restoreCase -eq 'success') { 0 } else { 1 }
-      if ($LASTEXITCODE -ne $expectedExit) { throw "Restore case $restoreCase returned $LASTEXITCODE, expected $expectedExit" }
+      if ($LASTEXITCODE -ne $expectedExit) {
+        throw "Restore case $transport/$restoreCase returned $LASTEXITCODE, expected $expectedExit. $(Format-ContractFailure $restoreResult)"
+      }
       if ($preserveExisting -and $env:MYSQL_PWD -ne 'preexisting-caller-value') {
         throw "Restore case $restoreCase changed the caller's MYSQL_PWD"
       }
@@ -201,10 +220,12 @@ try {
       $backupCaseDir = Join-Path $testRoot "backup-$transport-$backupCase-$preserveExisting"
       $backupResult = & $scriptPath -BackupDir $backupCaseDir -MysqlDatabase contract_probe -SkipRetention @transportArgs 2>&1 6>$null
       $expectedExit = if ($backupCase -eq 'success') { 0 } else { 1 }
-      if ($LASTEXITCODE -ne $expectedExit) { throw "Backup case $backupCase returned $LASTEXITCODE, expected $expectedExit" }
+      if ($LASTEXITCODE -ne $expectedExit) {
+        throw "Backup case $transport/$backupCase returned $LASTEXITCODE, expected $expectedExit. $(Format-ContractFailure $backupResult)"
+      }
       if ($preserveExisting -and $env:MYSQL_PWD -ne 'preexisting-caller-value') { throw 'Backup changed caller MYSQL_PWD' }
       if (!$preserveExisting -and (Test-Path -LiteralPath Env:MYSQL_PWD)) { throw 'Backup leaked MYSQL_PWD into the caller' }
-      $archives = @(Get-ChildItem -LiteralPath $backupCaseDir -File)
+      $archives = @(Get-ChildItem -LiteralPath $backupCaseDir -File -Force)
       if ($backupCase -eq 'success') {
         if ($archives.Count -ne 1 -or $archives[0].Extension -ne '.gz') { throw 'Backup did not atomically publish one gzip' }
         $compressed = [IO.File]::OpenRead($archives[0].FullName)

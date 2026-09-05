@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-09-05T18:11:25.224Z",
+  "generation_time": "2026-09-05T18:46:13.446Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -50,7 +50,7 @@
     "untracked_files": "included unless ignored, out of scope, or excluded",
     "self_reference": "docs/codemap excluded"
   },
-  "tracked_file_count": 4232,
+  "tracked_file_count": 4240,
   "repository_file_count": 4240,
   "included_file_count": 2976,
   "excluded_file_count": 1264,
@@ -71,7 +71,7 @@
         "backend/**"
       ],
       "file_count": 1949,
-      "fingerprint": "743546b28d9bef85b80e446cbc58646a13772fed1972b7ffaa23c3f127a6d668"
+      "fingerprint": "0e83a98740840263fcf81790449008c7cd225a7f1fbc08c6a78a1101e105101e"
     },
     {
       "id": "delivery_tooling",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 293,
-      "fingerprint": "79658211e4af47d43c291ea5a7678dde4defda09ff79d0d8860602d6b6ecc149"
+      "fingerprint": "ac2fc70d151751c2d15db4937906aa591906ac4df84bae41431afc5ac82e2221"
     },
     {
       "id": "desktop_launcher",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 174,
-      "fingerprint": "32109430971a1ffe1953847806287a6e8b57537cb3dfa535dce6d690823a0b71"
+      "fingerprint": "f4fd44eeb914676f76ab34b33f1d12da6c6291357316998a7c51e06fd928dd8a"
     },
     {
       "id": "frontend_v2",
@@ -134,14 +134,15 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "567df5785c2f90f486643307c87b7ad96d3669de",
+  "generation_base_commit": "bef6aaf9aaf8161ed409d17675873a86ae9671dd",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
     "previous_generation_base_commit": "567df5785c2f90f486643307c87b7ad96d3669de",
     "stale_modules": [
       "backend",
-      "delivery_tooling"
+      "delivery_tooling",
+      "documentation"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }

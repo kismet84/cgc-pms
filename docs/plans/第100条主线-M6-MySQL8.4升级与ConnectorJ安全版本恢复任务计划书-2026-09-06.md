@@ -5,7 +5,7 @@
 > 日期：2026-09-06
 > 父计划：[第100条主线](第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)
 > 唯一问题载体：`ISSUE-100-001`；本文件是独立升级阶段计划，不另造重复 Issue
-> 状态：`AUTHORIZED / G0_PASSED / G1_EXACT_IMAGE_RECHECK / ENGINE_CANDIDATE_VERIFIED / G2_REGRESSION_PENDING`
+> 状态：`AUTHORIZED / G0_PASSED / G1_IMAGE_SCAN_PASSED / ENGINE_CANDIDATE_VERIFIED / G2_REGRESSION_PENDING`
 > 授权：2026-09-06 用户明确“批准实施，你自己根据任务上下文判断，不再需要询问我”。本阶段代码/配置、隔离数据库升级与恢复验证及既有受保护 Git 交付均已授权；同范围阶段切换不再重复询问。现有 dev 库/活动卷、生产、Tag/Release 及其他任务仍不在范围内。
 > 边界：仅本地与远端 CI；现有 dev 库、其他任务工作区、Tag、Release 和非本地环境不在操作范围。
 
@@ -99,3 +99,4 @@
 - **失败与恢复**：新8.4.12 TLS真实preflight四组通过；JDBC复验期间Docker Desktop代理出现 `192.168.65.7:2376: no route to host`，只读docker ps同样失败，分类environment_prerequisite；随后只读version恢复，未重启共享Docker。首次完整Maven未注入CI测试JWT变量，2743测试/1728错误/30跳过、BUILD FAILURE，根因WeakKeyException，分类tool_config；补与CI相同环境后重跑。前端原并发649项中645通过、4项约5秒超时；降低worker数的同用例57项全部通过，完整串行复验中，未修改业务或放宽测试断言。
 - **剩余验证**：精确镜像安全、完整对象语义、异常清理保护、新组合G2 fresh/V180迁移、G3完整Maven/MySQL/JAR/SPDX、安全CI、G4有样本浏览器、G5受保护Git待最终证据。旧组合浏览器证据仅为历史。
 - **边界**：现有 `deploy_mysql-dev-data` 未迁移、未切换。早先临时Secret目录删除被策略拒绝，仍忽略保留，不绕策略、不提交私钥；临时批次资源清理须在G5逐一核对所有权。
+- **后续复验更新**：实际运行ID `ee7bf662aa692abb5c6384b39796de4796001990b83b47ab020abafde96f2895` 与预检ID `99f3bf5ead9d68b9a33886d144bcfd90b3f073d25f640c2f0d5be1ebb7229d84` 已与扫描Metadata.ImageID精确一致，高危/严重均0。前端649/649、lint、type-check、build通过；备份/恢复28项、实际finally清理AST18项在PS7/5.1通过。完整Maven2962项留下3项既有时间夹具/格式断言缺陷与3项Windows loopback错误；前3项只改测试并复验，后3项仍需等价平台证据。Docker第二次不可达，停止旧任务容器请求也失败；共享WSL4GB上限未改，任务新演练已限每库512MB并顺序停止保留卷。5条Upgrade Checker工具镜像High的不可达依据与失效边界在质量报告单列，不能宣称全部CI镜像零漏洞。当前Git提交 `bef6aaf9` 为阶段快照，正式交付未完成。

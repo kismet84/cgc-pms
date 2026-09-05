@@ -5,7 +5,7 @@
 - v1.5 质量与验收报告：[归档入口](../archive/v1.5/quality/)
 - v1.0 质量与验收报告：[归档入口](../archive/v1.0/quality/)
 - 当前工作焦点：[Backlog](../backlog/current-focus.md)
-- [第100条主线：MySQL TLS 信任链与依赖安全整改（M6 已批准实施，新组合完整门禁复验中，尚未推送）](2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)
+- [第100条主线：MySQL TLS 信任链与依赖安全整改（M6 已批准实施，新组合完整门禁复验中，功能分支已推送，尚未合并）](2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)
 - [第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改（PR #461 已合并，Push/PR CI 与 post-merge verifier 通过）](2026-08-28-issue-099-每日审计并发一致性供应链扫描与依赖安全整改.md)
 - [第98条主线：全量审计发现整改与本地就绪收口（PR #458 已合并，Push/PR CI 与 post-merge 验真通过）](2026-08-20-issue-098-全量审计发现整改与本地就绪收口.md)
 - [2026-08-20 CGC-PMS 13 阶段全量审计整改后最终报告（仓库、本地与同 SHA 交付就绪，评分 97/100）](full-audit/FINAL-AUDIT-REPORT.md)
