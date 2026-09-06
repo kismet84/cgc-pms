@@ -1,15 +1,13 @@
 # Current Focus
 
-## 2026-09-06 第100条主线：G0～G4通过，进入最终Git交付
+## 2026-09-06 第100条主线：G0～G5通过，已合并并完成清理
 
-- 来源：2026-08-30 上午“每日全量审计报告”的 `AUD-20260830-001/002/003`；当前 `master@5066a5c90bb9` 与审计基线相同，三个问题已按当前代码复核且未与第99条重复。
-- 目标：补齐 MySQL 显式 CA/server certificate/backend truststore 信任链，以 `VERIFY_IDENTITY` 和错误 CA fail-close 验证；移出 Connector/J 9.7.0～9.7.1 受影响范围；修正 Dockerfile MinIO root/application 凭证说明漂移。
-- 状态：`G0_G4_PASSED / G5_GIT_DELIVERY_PENDING`；唯一载体 `ISSUE-100-001`，计划见[`第100条主线`](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)，验收见[`质量报告`](../quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
-- 结果：显式 MySQL CA/server certificate/backend Java truststore 与 `VERIFY_IDENTITY` 已验证；正确链路 cipher 非空，四类负向失败关闭；额外 CA、私钥用户权限与 hostname 假阳性缺口已修复复验；MinIO 注释一致。
-- 历史：旧组合TLS backend health、真实登录与合同列表已验证，但8.4.0 driver安全结论撤回；这些记录不替代新组合门禁。M6改用厂商正式支持的MySQL8.4.12/ConnectorJ26.7.0。
-- 边界：仅本地隔离数据、远端 CI 与受保护 Git 交付；原工作区脏改动保持不变，不执行 Tag、Release、版本发布或生产/目标环境操作。
-- 当前进展：用户明确批准 [M6](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)自主实施并再次授权完整交付。`7c14dca1`完整Push CI通过；230表跨引擎恢复和原生备份恢复通过。恢复原隔离项目并成功初始化测试桶后，health UP、真实登录、合作方两条样本列表及详情、API/数据库回读、新旧DOM与console验证通过；保留草稿项目准入，不伪造合同。现有dev不动。正在完成最终证据SHA、PR合并、post-merge及源分支清理，Issue尚未关闭。
-- 零悬空：实施新增正式后续项 0、关闭 0、净变化 `0`；计划全周期新增 1，Issue 待 G5 后关闭 1，最终净变化应为 `0`。
+- 状态：`COMPLETED / G0-G5_PASSED / ISSUE_CLOSED / GIT_DELIVERY_MERGED / POST_MERGE_VERIFIED`；唯一载体`ISSUE-100-001`。计划见[第100条主线](../plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md)，验收见[质量报告](../quality/2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)。
+- 结果：MySQL8.4.12/ConnectorJ26.7.0支持组合、显式TLS信任链及四类负向、精确镜像扫描、230表跨引擎恢复、完整Maven与真实样本浏览器通过；旧版本安全结论不恢复。
+- 交付：源HEAD `0ec8516ba07a050efc2cd463c86e319cd1c880c0` 的Push CI `34007590151`、pre-PR verifier及PR #465首次CI `34008218761`通过；受保护合并为 `77fda61537bc45e909fb40459636c4f9ceb0b0e2`，post-merge `34008925255`与verifier通过，源/合并tree一致。
+- 清理与保留：实现源分支本地/远端已删除；14个任务测试容器、13个卷、4个网络已按归属清理。临时凭据删除先被策略拒绝，随后用户手动删除；已回读确认deploy下临时Secret目录、ssl与G4 override均不存在。升级前备份及恢复证据保留，原dev库未迁移。原工作区23项改动保留，19个不重叠文件字节一致，POM保留Sentry与MySQL属性，Codemap保留Sentry语义。
+- 零悬空：本次新增0、关闭1、净变化-1；计划全周期新增1、关闭1、净变化0，无无载体遗留项。
+- 本次收口文档仍走独立同SHA CI/PR/post-merge，不将文档的待交付状态冒充已完成；最终Git证明随收口PR及交付记录提供。不含Tag、Release或非本地环境。
 
 ## 2026-08-28 第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改已合并并完成 post-merge
 
