@@ -960,13 +960,13 @@ class CostSubjectV2WorkflowIntegrationTest {
                 INSERT INTO cost_subject_assignment_rule
                 (id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,
                  cost_subject_id,priority,status,effective_from,created_by)
-                VALUES (?,0,?,'M89-FINANCE-RULE','ACCOUNTING_ENTRY_LINE','*',NULL,?,100,'ACTIVE',CURRENT_DATE,?)
+                VALUES (?,0,?,'M89-FINANCE-RULE','ACCOUNTING_ENTRY_LINE','*',NULL,?,100,'ACTIVE',DATE '2020-01-01',?)
                 """, FINANCE_RULE, MAPPING_VERSION, TARGET_SUBJECT, ACCOUNTANT_USER);
         jdbc.update("""
                 INSERT INTO cost_subject_assignment_rule
                 (id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,
                  cost_subject_id,priority,status,effective_from,created_by)
-                VALUES (?,0,?,'M96-BID-RECALC-RULE','BID_COST','*',NULL,?,100,'ACTIVE',CURRENT_DATE,?)
+                VALUES (?,0,?,'M96-BID-RECALC-RULE','BID_COST','*',NULL,?,100,'ACTIVE',DATE '2020-01-01',?)
                 """, BID_RULE, MAPPING_VERSION, TARGET_SUBJECT, ACCOUNTANT_USER);
         jdbc.update("""
                 INSERT INTO bid_cost

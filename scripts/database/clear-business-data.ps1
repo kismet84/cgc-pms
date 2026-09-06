@@ -17,7 +17,14 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $policyPath = Join-Path $repoRoot 'backend/src/main/resources/data-maintenance-table-policy.json'
 $markerPath = Join-Path $repoRoot '.codex-autopilot/ALLOW_TEST_DATA_RESET'
-$mysqlImage = 'mysql:8.0'
+function Get-MySqlClientImage {
+    # Match the explicitly selected server; never build or upgrade it in a preview.
+    $image = (& docker inspect --format '{{.Image}}' $MysqlContainer).Trim()
+    if ($LASTEXITCODE -ne 0 -or $image -cnotmatch '^sha256:[0-9a-f]{64}$') {
+        throw 'Cannot resolve the selected MySQL container image ID'
+    }
+    return $image
+}
 
 function Get-Sha256Text([string]$Text) {
     $bytes = [Text.Encoding]::UTF8.GetBytes($Text)
@@ -55,10 +62,11 @@ function Invoke-MySql([string]$Sql, [string]$TargetDatabase = $Database) {
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['MYSQL_PWD'] = $rootPassword
     foreach ($arg in @(
             'run', '--rm', '-i', '--network', 'host',
-            '-e', "MYSQL_PWD=$rootPassword",
-            $mysqlImage, 'mysql',
+            '-e', 'MYSQL_PWD',
+            (Get-MySqlClientImage), 'mysql',
             '-h', $MysqlHost, '-P', [string]$MysqlPort, '-uroot',
             '--batch', '--raw', '--skip-column-names', $TargetDatabase
         )) {
@@ -154,12 +162,20 @@ function Get-TableDigest([string]$Table, [string]$TargetDatabase = $Database) {
     Assert-Identifier $Table 'Table'
     Assert-Identifier $TargetDatabase 'Database'
     $rootPassword = (Get-ContainerEnvironment $MysqlContainer)['MYSQL_ROOT_PASSWORD']
-    $command = 'MYSQL_PWD="$MYSQL_PWD_VALUE" mysqldump -h 127.0.0.1 -P ' + $MysqlPort +
+    $command = 'set -o pipefail; mysqldump -h 127.0.0.1 -P ' + $MysqlPort +
         ' -uroot --no-create-info --skip-comments --compact --skip-extended-insert --order-by-primary ' +
         '"$TARGET_DB" "$TARGET_TABLE" | sha256sum | cut -d" " -f1'
-    $result = & docker run --rm --network host `
-        -e "MYSQL_PWD_VALUE=$rootPassword" -e "TARGET_DB=$TargetDatabase" -e "TARGET_TABLE=$Table" `
-        $mysqlImage sh -lc $command 2>&1
+    $previousPwd = [Environment]::GetEnvironmentVariable('MYSQL_PWD')
+    try {
+        $env:MYSQL_PWD = $rootPassword
+        $result = & docker run --rm --network host `
+            -e MYSQL_PWD -e "TARGET_DB=$TargetDatabase" -e "TARGET_TABLE=$Table" `
+            (Get-MySqlClientImage) bash -lc $command 2>&1
+    }
+    finally {
+        if ($null -eq $previousPwd) { Remove-Item -LiteralPath Env:MYSQL_PWD -ErrorAction SilentlyContinue }
+        else { [Environment]::SetEnvironmentVariable('MYSQL_PWD',$previousPwd) }
+    }
     if ($LASTEXITCODE -ne 0 -or $result -notmatch '^[0-9a-f]{64}$') {
         throw "Cannot hash table '$TargetDatabase.$Table': $result"
     }

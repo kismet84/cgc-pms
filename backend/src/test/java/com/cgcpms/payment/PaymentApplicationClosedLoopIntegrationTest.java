@@ -7,6 +7,7 @@ import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.document.provider.DocumentDataSnapshot;
@@ -928,7 +929,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
         PaymentReversalRequest request = new PaymentReversalRequest();
         request.setReason("银行退汇，恢复待付款额度");
         request.setExternalTxnNo("PAYMENT-CLOSED-LOOP-REVERSAL");
-        request.setReversedAt(LocalDateTime.now());
+        // Exercise zero seconds explicitly: LocalDateTime.toString omits them.
+        request.setReversedAt(LocalDateTime.now().withSecond(0).withNano(0));
         var reversal = reversalService.reverse(paidId, request);
         var duplicate = reversalService.reverse(paidId, request);
         assertEquals(1L, jdbcTemplate.queryForObject("""
@@ -954,7 +956,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
         assertNotNull(reversalJournal);
         assertEquals(journal.getId(), reversalJournal.getReverseOfEntryId());
         var reversalRecord = payRecordService.getById(Long.valueOf(reversal.getId()));
-        assertEquals(reversalRecord.getPaidAt(), reversalJournal.getArchivedAt().toString().replace('T', ' '));
+        assertEquals(LocalDateTime.parse(reversalRecord.getPaidAt(), DateTimeUtils.DTF),
+                reversalJournal.getArchivedAt());
         var reversalTrace = traceService.byCashJournal(reversalJournal.getId());
         assertEquals(2, reversalTrace.getCashJournals().size());
         assertEquals(2, reversalTrace.getPaymentDocuments().size());

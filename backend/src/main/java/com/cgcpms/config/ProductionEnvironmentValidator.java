@@ -17,12 +17,21 @@ import java.util.regex.Pattern;
 public final class ProductionEnvironmentValidator
         implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
-    private static final Pattern UNSAFE_JDBC_PARAMETER = Pattern.compile(
-            "(?i)[?&](?:allowPublicKeyRetrieval=true|useSSL=false|requireSSL=false|verifyServerCertificate=false)(?:&|$)");
+    private static final Pattern FORBIDDEN_JDBC_PARAMETER = Pattern.compile(
+            "(?i)[?&](?:useSSL|requireSSL|verifyServerCertificate|allowPublicKeyRetrieval|sslMode|trustCertificateKeyStoreUrl|"
+                    + "trustCertificateKeyStoreType|trustCertificateKeyStorePassword|fallbackToSystemTrustStore)="
+                    + "[^&]*(?:&|$)");
+    private static final String HIKARI_PROPERTIES = "spring.datasource.hikari.data-source-properties.";
     private static final Set<String> REQUIRED_KEYS = Set.of(
             "spring.datasource.url",
             "spring.datasource.username",
             "spring.datasource.password",
+            HIKARI_PROPERTIES + "sslMode",
+            HIKARI_PROPERTIES + "trustCertificateKeyStoreUrl",
+            HIKARI_PROPERTIES + "trustCertificateKeyStoreType",
+            HIKARI_PROPERTIES + "trustCertificateKeyStorePassword",
+            HIKARI_PROPERTIES + "fallbackToSystemTrustStore",
+            HIKARI_PROPERTIES + "allowPublicKeyRetrieval",
             "spring.data.redis.host",
             "spring.data.redis.password",
             "minio.endpoint",
@@ -57,9 +66,17 @@ public final class ProductionEnvironmentValidator
         }
 
         var databaseUrl = values.get("spring.datasource.url");
-        if (databaseUrl != null && (unsafeEndpoint(databaseUrl) || UNSAFE_JDBC_PARAMETER.matcher(databaseUrl).find())) {
+        if (databaseUrl != null && (!databaseUrl.startsWith("jdbc:mysql://")
+                || unsafeEndpoint(databaseUrl)
+                || FORBIDDEN_JDBC_PARAMETER.matcher(databaseUrl).find())) {
             invalidKeys.add("spring.datasource.url");
         }
+        requireExact(values, invalidKeys, HIKARI_PROPERTIES + "sslMode", "VERIFY_IDENTITY");
+        requireExact(values, invalidKeys, HIKARI_PROPERTIES + "trustCertificateKeyStoreType", "PKCS12");
+        requireExact(values, invalidKeys, HIKARI_PROPERTIES + "trustCertificateKeyStoreUrl",
+                "file:/run/secrets/mysql-truststore.p12");
+        requireExact(values, invalidKeys, HIKARI_PROPERTIES + "fallbackToSystemTrustStore", "false");
+        requireExact(values, invalidKeys, HIKARI_PROPERTIES + "allowPublicKeyRetrieval", "false");
         var redisHost = values.get("spring.data.redis.host");
         if (redisHost != null && unsafeHost(redisHost)) {
             invalidKeys.add("spring.data.redis.host");
@@ -79,6 +96,14 @@ public final class ProductionEnvironmentValidator
 
         if (!invalidKeys.isEmpty()) {
             throw new IllegalStateException("Unsafe production configuration keys: " + String.join(", ", invalidKeys));
+        }
+    }
+
+    private static void requireExact(java.util.Map<String, String> values, Set<String> invalidKeys,
+                                     String key, String expected) {
+        var value = values.get(key);
+        if (value != null && !expected.equalsIgnoreCase(value)) {
+            invalidKeys.add(key);
         }
     }
 
