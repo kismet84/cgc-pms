@@ -39,6 +39,13 @@ logging:
     root: INFO
     com.cgcpms: INFO
 
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  release: ${SENTRY_RELEASE:}
+  send-default-pii: false
+  traces-sample-rate: 0.0
+
 app:
   async:
     core-pool-size: 4

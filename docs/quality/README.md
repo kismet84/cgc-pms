@@ -5,6 +5,7 @@
 - v1.5 质量与验收报告：[归档入口](../archive/v1.5/quality/)
 - v1.0 质量与验收报告：[归档入口](../archive/v1.0/quality/)
 - 当前工作焦点：[Backlog](../backlog/current-focus.md)
+- [工作区Sentry接入与治理规则交付核验](2026-09-06-workspace-sentry-governance-delivery.md)
 - [第100条主线：MySQL TLS 信任链与依赖安全整改（G0～G5通过，PR #465已合并，清理核验完成）](2026-08-30-issue-100-MySQL-TLS信任链与依赖安全整改.md)
 - [第99条主线：每日审计并发一致性、供应链扫描与依赖安全整改（PR #461 已合并，Push/PR CI 与 post-merge verifier 通过）](2026-08-28-issue-099-每日审计并发一致性供应链扫描与依赖安全整改.md)
 - [第98条主线：全量审计发现整改与本地就绪收口（PR #458 已合并，Push/PR CI 与 post-merge 验真通过）](2026-08-20-issue-098-全量审计发现整改与本地就绪收口.md)

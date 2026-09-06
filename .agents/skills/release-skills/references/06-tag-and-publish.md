@@ -1,29 +1,34 @@
 ### Step 9: Create Release Commit and Annotated Tag
 
-After user confirmation:
+Execute only the actions explicitly approved in Step 8. Recheck branch, worktree ownership, staged changes, target, and authorization immediately before mutation; stop only the affected action if they no longer match the reviewed operation. In `--dry-run`, report the planned actions without executing them.
 
-1. **Stage version and changelog files**:
-   ```bash
-   git add <version-file>
-   git add CHANGELOG*.md
-   ```
+1. **Commit approved task-owned files**:
+   - Use the exact paths and groups reviewed in Steps 6 and 8, including only the approved version and changelog files.
+   - Inspect the staged diff before each commit. Do not include unrelated staged or working-tree changes, and do not stage directory or changelog globs.
+   - Reuse existing commits; create only the approved necessary module commits and release commit.
 
-2. **Create release commit**:
+   Approved release commit example:
    ```bash
    git commit -m "chore: release v{VERSION}"
    ```
 
-3. **Create annotated tag**:
+2. **Integrate through the approved repository route when authorized**:
+   - Resolve the actual source and target branches; never assume `main`.
+   - Follow repository-required checks, branch push, PR, and merge requirements using the corresponding approvals. Never push directly to a protected `master/main`, bypass checks, or invoke unapproved cleanup.
+   - Verify the resulting remote commit when remote integration is part of the approved release. If release is local-only, retain the local release commit and do not perform remote actions.
+
+3. **Create the approved annotated tag on the verified release commit**:
+   - Resolve the exact local release SHA or approved integrated SHA before tagging. Do not tag an unrelated current checkout or silently move an existing Tag.
    ```bash
-   git tag -a v{VERSION} -F <release-notes-file>
+   git tag -a v{VERSION} <verified-release-sha> -F <release-notes-file>
    ```
    If `.releaserc.yml` sets `tag.sign: true`, use `git tag -s` with the same notes file.
 
-4. **Push if user confirmed** (Step 8):
+4. **Push only the approved Tag to the reviewed remote**:
    ```bash
-   git push origin main
-   git push origin v{VERSION}
+   git push <approved-remote> refs/tags/v{VERSION}
    ```
+   Verify the remote Tag resolves to the intended release commit. Respect `no push` and `autoPush=false`; do not use a broad `--tags` push.
 
 **Note**: Do NOT add Co-Authored-By line. This is a release commit, not a code contribution.
 
@@ -32,12 +37,13 @@ After user confirmation:
 Project artifact publishing and GitHub Releases are separate outputs:
 
 1. **Project artifacts**:
-   - If `release.hooks.publish_artifact` exists, run it once per prepared target
+   - Run `release.hooks.publish_artifact` only when that exact publication and destination were explicitly approved in Step 8; configuration does not grant authorization
+   - Run once per approved prepared target and verify the outcome before retrying an uncertain publication
    - Pass the same `{release_notes_file}` used for the tag and GitHub Release
-   - In dry-run mode, pass `{dry_run}=true` and report what would be published
+   - In dry-run mode, report the proposed hook and destination without invoking a publishing hook
 
 2. **GitHub Release**:
-   - Run only if the user confirmed remote publishing and GitHub support is available
+   - Run only if the user explicitly approved this GitHub Release create/update action and visibility, and GitHub support is available
    - Ensure the tag exists on the remote before creating the release
    - Create or update using the extracted notes:
      ```bash
@@ -62,5 +68,5 @@ Commits:
 Tag: v1.3.0
 Tag type: annotated
 GitHub Release: published  # or "skipped/local only"
-Status: Pushed to origin  # or "Local only - run git push when ready"
+Status: verified remote publication  # or "Local-only result; remote actions not executed"
 ```

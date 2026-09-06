@@ -1,24 +1,100 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { apiRequest } = vi.hoisted(() => ({
+const { apiRequest, captureException, sentryInit } = vi.hoisted(() => ({
   apiRequest: vi.fn().mockResolvedValue(undefined),
+  captureException: vi.fn(),
+  sentryInit: vi.fn(),
 }))
 
 vi.mock('@/services/request', () => ({ apiRequest }))
+vi.mock('@sentry/vue', () => ({ captureException, init: sentryInit }))
 
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-07-26T12:00:00Z'))
   apiRequest.mockClear()
+  captureException.mockClear()
+  sentryInit.mockClear()
 })
 
 afterEach(() => {
   vi.useRealTimers()
   vi.resetModules()
+  vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
 
 describe('V2 client error reporter', () => {
+  it('enables Sentry only from environment configuration and excludes duplicate global handlers', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.ingest.sentry.io/1')
+    vi.stubEnv('VITE_SENTRY_ENVIRONMENT', 'test')
+    vi.stubEnv('VITE_SENTRY_RELEASE', 'cgc-pms-frontend-v2@test')
+    const { initializeClientErrorReporting, reportClientError } =
+      await import('@/services/clientErrorReporter')
+
+    initializeClientErrorReporting({} as never)
+
+    expect(sentryInit).toHaveBeenCalledTimes(1)
+    const options = sentryInit.mock.calls[0]?.[0]
+    expect(options).toMatchObject({
+      dsn: 'https://public@example.ingest.sentry.io/1',
+      environment: 'test',
+      release: 'cgc-pms-frontend-v2@test',
+      sendDefaultPii: false,
+      attachErrorHandler: false,
+      tracesSampleRate: 0,
+      dataCollection: { userInfo: false, httpBodies: [] },
+    })
+    expect(options.integrations([
+      { name: 'GlobalHandlers' }, { name: 'BrowserApiErrors' }, { name: 'Dedupe' },
+    ])).toEqual([
+      { name: 'Dedupe' },
+    ])
+
+    const error = new TypeError('test failure')
+    await reportClientError('VUE', error)
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: { client_error_source: 'VUE', client_error_kind: 'TYPE_ERROR' },
+    })
+    await reportClientError('WINDOW', error)
+    expect(captureException).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Sentry disabled when no DSN is configured', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', '')
+    const { initializeClientErrorReporting } = await import('@/services/clientErrorReporter')
+
+    initializeClientErrorReporting({} as never)
+
+    expect(sentryInit).not.toHaveBeenCalled()
+  })
+
+  it('keeps the bounded API report when the Sentry SDK throws', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.ingest.sentry.io/1')
+    captureException.mockImplementationOnce(() => { throw new Error('SDK failure') })
+    const { initializeClientErrorReporting, reportClientError } =
+      await import('@/services/clientErrorReporter')
+    initializeClientErrorReporting({} as never)
+
+    await expect(reportClientError('WINDOW', new Error('test'))).resolves.toBeUndefined()
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the application running and reports a diagnostic when Sentry initialization fails', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.ingest.sentry.io/1')
+    sentryInit.mockImplementationOnce(() => {
+      throw new Error('invalid SDK configuration')
+    })
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { initializeClientErrorReporting } = await import('@/services/clientErrorReporter')
+
+    expect(() => initializeClientErrorReporting({} as never)).not.toThrow()
+    expect(warning).toHaveBeenCalledWith(
+      'Sentry client error monitoring initialization failed',
+      expect.any(Error),
+    )
+  })
+
   it('sends only bounded fields and deduplicates the same error', async () => {
     const { reportClientError } = await import('@/services/clientErrorReporter')
     const error = new ReferenceError('token=secret https://host/private')

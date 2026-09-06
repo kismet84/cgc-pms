@@ -3,7 +3,11 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { showToast } from './components'
 import router from './router'
-import { installGlobalErrorReporting, reportClientError } from './services/clientErrorReporter'
+import {
+  initializeClientErrorReporting,
+  installGlobalErrorReporting,
+  reportClientError,
+} from './services/clientErrorReporter'
 import { clearAllFieldDrafts } from './services/fieldDrafts'
 import { configurePwa } from './services/pwa'
 import { configureRequestLifecycle } from './services/request'
@@ -90,6 +94,7 @@ if (desktopShell) {
 const app = createApp(App)
 const pinia = createPinia()
 
+initializeClientErrorReporting(app)
 app.use(pinia)
 
 const session = useSessionStore(pinia)

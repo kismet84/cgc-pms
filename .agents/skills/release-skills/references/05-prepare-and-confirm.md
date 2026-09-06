@@ -1,5 +1,7 @@
 ### Step 7: Generate Changelog and Update Version
 
+Prepare the complete reviewable version changes and release notes within the user's authorized local scope. For `--dry-run` or a notes-only request, show the proposed content without changing version files. Do not stage or commit during preparation.
+
 1. **Generate multi-language changelogs** (as described in Step 4)
 2. **Update version file**:
    - Read version file (JSON/TOML/text)
@@ -26,26 +28,23 @@
 
 ### Step 8: User Confirmation
 
-Before creating the release commit, ask user to confirm:
+Before any proposed commit, Tag, or remote mutation, present the prepared version, change summary, release-notes source, exact file groups, resolved destination, and actions for review.
 
-**Use AskUserQuestion with three questions**:
+Record explicit decisions for each applicable action; they may be collected together:
 
-1. **Version bump** (single select):
-   - Show recommended version based on Step 3 analysis
-   - Options: recommended (with label), other semver options
-   - Example: `1.2.3 → 1.3.0 (Recommended)`, `1.2.3 → 1.2.4`, `1.2.3 → 2.0.0`
+1. **Local release**: exact target version, proposed module/release commits, Tag name and type, and intended target commit or approved integration route.
+2. **Remote branch delivery**: remote, source/target branches, push, and any required PR/merge actions. Each action must be authorized under repository rules; branch push alone does not authorize merge or cleanup.
+3. **Remote Tag**: exact Tag and remote. Local Tag creation does not authorize its push.
+4. **GitHub Release**: exact repository, Tag, draft/public status, and create/update action. Offer only when supported; do not infer this approval from a branch or Tag push.
+5. **Project artifacts**: exact hook, destination, and intended publication. Hook configuration alone is not approval.
 
-2. **Push to remote** (single select):
-   - Options: "Yes, push after commit", "No, keep local only"
+Reuse an explicit approval already given for this same reviewed operation; do not ask again at each later step. Ask only for missing decisions or changes to the approved target, scope, or visibility. Preserve any rule requiring fresh approval at execution time. Silence, suggested defaults, and approval of another action do not grant approval.
 
-3. **Publish GitHub Release** (single select):
-   - Offer this only when GitHub release support is available
-   - Default to "Yes, publish after tag push" when the user also chose push
-   - If the user keeps the release local, do not create or edit a GitHub Release
+Use a currently available tool only if it permits approval questions; otherwise ask in ordinary conversation. Do not depend on a fixed approval-tool name. Continue independent preparation while awaiting required decisions, but do not execute dependent mutations. Respect `--dry-run`, `no push`, and `autoPush=false`.
 
 **Example Output Before Confirmation**:
 ```
-Commits created:
+Proposed commits (not executed):
   1. feat(baoyu-cover-image): add watercolor and minimalist styles
   2. fix(baoyu-comic): improve panel layout for long dialogues
   3. docs(project): update architecture documentation
@@ -58,5 +57,6 @@ Changelog preview (en):
   - Improve panel layout for long dialogues in comic
 
 Release notes source: CHANGELOG.md#1.3.0
-Ready to create release commit, annotated tag, and GitHub Release.
+Prepared for review: local commits and annotated tag.
+Remote branch, Tag, GitHub Release, and artifact publication: separate decisions required.
 ```

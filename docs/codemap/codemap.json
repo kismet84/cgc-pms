@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-06T03:45:36.933Z",
-  "generation_base_commit": "77fda61537bc45e909fb40459636c4f9ceb0b0e2",
+  "generated_at": "2026-09-06T05:19:33.489Z",
+  "generation_base_commit": "d88c8569495d4ca4a9fdd51a5a66ca41863144c4",
   "scope": [
     "desktop-launcher",
     "frontend-admin-v2",
@@ -1117,6 +1117,51 @@
         {
           "path": "backend/src/main/resources/application-prod.yml",
           "symbol": "prometheus:"
+        }
+      ]
+    },
+    {
+      "id": "sentry-error-monitoring",
+      "label": "Sentry 错误监控",
+      "type": "external-observability",
+      "boundary": "外部 SaaS",
+      "layer": 5,
+      "path": "backend/src/main/java/com/cgcpms/common/exception/GlobalExceptionHandler.java",
+      "role": "按环境变量启用，接收后端未预期 500 异常和 V2 客户端受控错误事件；监控失败不替代稳定业务响应。",
+      "entrypoints": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/exception/GlobalExceptionHandler.java",
+          "symbol": "Sentry.captureException"
+        },
+        {
+          "path": "frontend-admin-v2/src/services/clientErrorReporter.ts",
+          "symbol": "initializeClientErrorReporting"
+        }
+      ],
+      "tests": [
+        {
+          "path": "backend/src/test/java/com/cgcpms/common/exception/GlobalExceptionHandlerTest.java",
+          "symbol": "unexpectedExceptionsAreCapturedBySentryBeforeReturningStableEnvelope"
+        },
+        {
+          "path": "frontend-admin-v2/tests/unit/client-error-reporting.test.ts",
+          "symbol": "enables Sentry only from environment configuration"
+        }
+      ],
+      "constraints": [
+        "SENTRY_DSN 或 VITE_SENTRY_DSN 为空时禁用；DSN 与 Release 只从环境注入。",
+        "默认关闭 PII、用户信息与 HTTP Body 自动采集，不开启 Tracing、Profiling 与 Replay；异常正文和堆栈仍属于诊断内容，不承诺任意文本脱敏。",
+        "前端禁用 GlobalHandlers、BrowserApiErrors 和 Vue 自动异常处理，捕获只走已有去重及限流上报器。",
+        "本图确认代码连接，不等同于任何非本地环境已经部署或产生真实业务事件。"
+      ],
+      "evidence": [
+        {
+          "path": "backend/pom.xml",
+          "symbol": "sentry-spring-boot-starter-jakarta"
+        },
+        {
+          "path": "frontend-admin-v2/package.json",
+          "symbol": "@sentry/vue"
         }
       ]
     },
@@ -2297,6 +2342,28 @@
         {
           "path": "deploy/monitoring/prometheus.yml",
           "symbol": "/api/actuator/prometheus"
+        }
+      ]
+    },
+    {
+      "from": "spring-api",
+      "to": "sentry-error-monitoring",
+      "type": "reports",
+      "evidence": [
+        {
+          "path": "backend/src/main/java/com/cgcpms/common/exception/GlobalExceptionHandler.java",
+          "symbol": "Sentry.captureException"
+        }
+      ]
+    },
+    {
+      "from": "v2-client",
+      "to": "sentry-error-monitoring",
+      "type": "reports",
+      "evidence": [
+        {
+          "path": "frontend-admin-v2/src/services/clientErrorReporter.ts",
+          "symbol": "Sentry.captureException"
         }
       ]
     },

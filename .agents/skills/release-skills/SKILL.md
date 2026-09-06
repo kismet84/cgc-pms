@@ -38,7 +38,7 @@ description: Universal version-release workflow for version bumps, release notes
 1. [项目与发布钩子检测](references/01-detect-project.md)
 2. [变更分析与版本选择](references/02-analyze-and-version.md)
 3. [多语言 changelog](references/03-changelog.md)
-4. [模块分组与提交](references/04-module-commits.md)
+4. [模块分组与提交清单准备](references/04-module-commits.md)
 5. [版本文件、release notes 与确认门](references/05-prepare-and-confirm.md)
 6. [release commit、Tag、产物与 GitHub Release](references/06-tag-and-publish.md)
 
@@ -53,6 +53,8 @@ description: Universal version-release workflow for version bumps, release notes
 - 先显示项目类型、当前/目标版本、变更摘要、release notes 来源和将执行的写操作。
 - 创建 release commit/Tag 前确认目标版本。
 - 远端分支/Tag、GitHub Release 和项目产物发布分别确认；本地版本准备不自动授权远端写入。
+- 确认前准备可审核的版本、变更说明、精确文件范围和写操作清单；模块分组阶段不自动 stage/commit。一次确认可以分别记录各项决定，后续步骤复用同一次明确批准；目标、范围或可见性改变时重新确认受影响项。沉默、预选值或批准一个动作不构成其他动作的批准。
+- 分支提交、push、PR 与合并沿用仓库认可的受保护路线并具备各自授权；不因版本发布而直接推送 `master/main`、启用完整分支清理或绕过检查。审批工具不可用时使用普通对话，不依赖固定工具名。
 - 不强推、不重写公开 Tag、不绕过分支保护；公开轻量 Tag 转 annotated Tag 必须单独确认。
 - 发布说明写入 UTF-8 临时文件，通过文件传给 Tag、hook 和 GitHub Release；禁止把多行内容内联进 shell。
 - `.releaserc.yml` 存在 hook 时复用 hook，不把项目专用发布细节写回本 Skill。

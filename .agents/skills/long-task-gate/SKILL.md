@@ -5,6 +5,8 @@ description: Register and enforce deterministic completion checks for an explici
 
 # Long Task Gate
 
+Two distinct settings exist: contract-specific terminal notification and repository ordinary-Stop notification. `notification.enabled=false` disables only the contract-specific channel; it is not a global mute and may fall back to the repository channel. Do not change either recipient or send a message while inspecting this setting.
+
 Use repository Hook and private per-user state. Every terminal main-thread Stop sends a best-effort Feishu notification through `LTG_FEISHU_CHAT_ID`, including a sanitized, single-line report from the latest assistant message for normal completion, failure, and waiting for user input; notification failure warns but never continues or blocks an ordinary task. Keep business work, Git delivery, AutoPilot, and existing notifications authoritative in their own workflows.
 
 ## Activation workflow
