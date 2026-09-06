@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-09-05T19:17:25.642Z",
+  "generation_time": "2026-09-06T02:46:30.178Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -99,7 +99,7 @@
         "docs/**"
       ],
       "file_count": 174,
-      "fingerprint": "f7d308e431e60627e312bc69b7d8dc688c422dc893db5c4cefed2df9671e21f5"
+      "fingerprint": "9c249be7d123b464789cc2729bf137083e1a0c35a14fc930dc69e4e8c3b30276"
     },
     {
       "id": "frontend_v2",
@@ -134,11 +134,11 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "c2b81a2108971416209948383e7b4a3f1e3155e8",
+  "generation_base_commit": "7c14dca145b932bee26d79d49654fedf1704d7d8",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "bef6aaf9aaf8161ed409d17675873a86ae9671dd",
+    "previous_generation_base_commit": "7c14dca145b932bee26d79d49654fedf1704d7d8",
     "stale_modules": [
       "documentation"
     ],

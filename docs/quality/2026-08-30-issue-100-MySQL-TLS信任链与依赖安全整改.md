@@ -4,7 +4,7 @@
 > 唯一载体：`ISSUE-100-001`
 > 编制基线：`master@5066a5c90bb9048289307a5d60e25c051e399577`
 > 复核日期：2026-09-06
-> 当前裁决：`G0_G3_PASSED / G4_ENVIRONMENT_BLOCKED / G5_NOT_READY`；功能分支 `c2b81a21` 已推送，同 SHA CI 与 pre-PR 证据核验通过；新组合真实浏览器验收未完成，未创建 PR、未合并
+> 当前裁决：`G0_G4_PASSED / G5_GIT_DELIVERY_PENDING`；功能分支 `7c14dca1` 的完整同 SHA Push CI 已通过；新组合真实登录、有样本列表/详情、API及数据库回读通过。本次证据回写后的最终 SHA、PR、合并及清理尚待完成。
 
 ## M6 当前权威记录（2026-09-06）
 
@@ -14,16 +14,27 @@
 | --- | --- |
 | G0 | 独立 `codex/mainline-100` 工作树；旧 dev 卷及原工作区脏改动保留，无业务 schema/API/权限语义变更 |
 | G1 供应链 | Oracle 固定输入，移除 mysql-shell 及 Python、SQLite 官方修复 RPM；独立 Alpine/OpenSSL 预检；精确 runtime ID `sha256:ee7bf662aa692abb5c6384b39796de4796001990b83b47ab020abafde96f2895`、preflight ID `sha256:99f3bf5ead9d68b9a33886d144bcfd90b3f073d25f640c2f0d5be1ebb7229d84`，Trivy Metadata.ImageID 与运行输入相等，高危/严重均0；不是永久无漏洞声明 |
-| G2 跨引擎 | 加强对象语义后的本地与 `c2b81a21` CI 均通过：同一8.0备份先恢复8.0再导入8.4.12，230表行数、全部行字节、生成列/CHECK/ENFORCED/外键动作等一致；fresh/V180迁移、租户和并发组通过 |
-| G3 静态与测试 | validator22、备份/恢复28、cleanup AST18、部署/工作流契约通过；前端649/649及浏览器contract98项通过。`c2b81a21` 的完整Maven/MySQL、JAR/SPDX与供应链等16个required jobs全绿，pre-PR verifier通过；Windows本地Office错误不冒充本地成功，以该CI平台等价验证 |
-| G4 | 本地新8.4.12/26.7、精确JAR已启动，TLS preflight、真实认证API通过；健康503且新MinIO无必需测试桶。创建测试桶命令被执行策略拒绝，不换入口绕过、不禁用健康检查。浏览器仅观察到登录页，尚无有样本链路与最终DOM/console证据；保持阻塞 |
-| G5 | 独立只读复核发现已修复，动态与远端收口未完成，唯一Issue保持开放，不创建非Draft PR、不合并、不清理源分支 |
+| G2 跨引擎 | 加强对象语义后的本地与 `c2b81a21` CI 均通过，文档修订 `7c14dca1` 完整CI再次通过：同一8.0备份先恢复8.0再导入8.4.12，230表行数、全部行字节、生成列/CHECK/ENFORCED/外键动作等一致；fresh/V180迁移、租户和并发组通过 |
+| G3 静态与测试 | validator22、备份/恢复28、cleanup AST18、部署/工作流契约通过；前端649/649及浏览器contract98项通过。实现证据及pre-PR verifier通过绑定 `c2b81a21`；仅改文档/Codemap的 `7c14dca1` 完整Maven/MySQL、JAR/SPDX与供应链等16个required jobs再次全绿；本次最终证据SHA的pre-PR仍待完成。Windows本地Office错误不冒充本地成功，以CI平台等价验证 |
+| G4 | 重新授权后在原任务容器初始化测试桶成功，health UP；8.4.12/26.7、精确JAR、租户0及隔离库一致。内置浏览器真实登录、合同空列表、两条合作方样本列表与切换详情通过；API/数据库回读一致，新DOM存在、旧占位标识不存在，warn/error为空。详细证据见下节 |
+| G5 | 既有独立只读复核发现已修复；运行态证据已补齐。唯一Issue保持开放，继续最终SHA CI、受保护PR/合并、post-merge及安全清理；不提前宣称交付完成 |
 
 失败按首次事实保留：Docker Desktop代理出现 `192.168.65.7:2376: no route to host`（environment_prerequisite），随后只读version恢复，未重启共享服务；首次完整Maven漏注入CI测试JWT环境（tool_config），2743测试/1728错误/30跳过、BUILD FAILURE，补环境后复验；前端默认并发645/649、4项约5秒超时，原断言/默认超时不变，单worker完整649通过，归environment_prerequisite。镜像绑定与对象快照缺口、cleanup异常及.NET空变量恢复差异归quality_or_security，本轮直接修复并复验，不延期。
 
 具体版本来源、升级前备份哈希、保留资源、风险与恢复边界见 [M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。新增后续项0、关闭0、净变化0；`ISSUE-100-001`未关闭。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
 
-### 补充失败分类与工具风险边界
+### 2026-09-06 G4恢复与真实样本验收
+
+- 用户再次明确授权完整交付；重新核对任务分支干净、容器Compose标签后，只恢复 `cgc-pms-m100-g4b`。同一MinIO内创建 `cgc-pms` 空测试桶成功，未修改健康检查或安全校验；此前执行拒绝保留为历史，不再是当前阻塞。
+- backend health `http://127.0.0.1:18081/api/actuator/health` 返回200/UP。实际MySQL `8.4.12`、`require_secure_transport=1`、数据库 `cgc_pms_m100_g4_test`；backend datasource指向该库，profile `prod`仅用于本地隔离校验。JAR SHA256仍为 `1CCAE573F17932250BFD17E6FA43A73B685EE6F2AD5C2D5D7117CF210A97AD8F`，未用旧driver制品替代。
+- 当前源码Vite仅绑定 `127.0.0.1:31648`，代理该backend。内置浏览器以已有隔离测试账号登录至 `/dashboard`；进入 `/contract/ledger`显示真实空列表。草稿项目不满足主合同项目准入，因此未伪造审批状态或提交合同。
+- 通过真实API在该空隔离库建立一个 `M100-G4-TLS-PROJECT` 草稿项目与两个合作方样本；API回读成功。数据库只读复验：租户均0，项目DRAFT；`PTN-20260906-001 / M100-G4-CUSTOMER`和`PTN-20260906-002 / M100-G4-SUPPLIER`均ENABLE。没有改现有dev库或业务规则。
+- 浏览器 `/partner` 列表显示上述两条，点击客户行后详情名称、编号、类型同步为客户样本。DOM断言：`合作方管理` h1恰好1个，两样本存在，旧 `隔离底座已启动` 占位标识不存在；全程warn/error日志为空。满足M6-G4“至少一个有合成样本的列表读取”，不把合同空列表说成有合同样本。
+- 测试前置错误均已分类处理：只读字典SQL引用不存在列为tool_invocation，按实际表结构联表后成功；API测试脚本未发送Secure Cookie和XSRF header为tool_invocation，按已有认证/CSRF合同补齐后同范围创建与回读成功；未禁用CSRF或改变Cookie属性。页面异步更新使旧元素脱离，刷新定位后成功，非业务缺陷。
+- `7c14dca145b932bee26d79d49654fedf1704d7d8` 的[Push CI](https://github.com/kismet84/cgc-pms/actions/runs/33987025780)完整通过：后端2962项、0fail/0error、30条件skip，16个required jobs通过。新证据文档提交后必须重新取得最终SHA证据；尚无PR/合并证据。
+- 普通dev/test不误伤的合同由 `ProductionEnvironmentValidatorTest.shouldIgnoreNonProductionProfiles`、22项validator测试与该SHA完整Maven CI覆盖；本轮没有切换或重建既有dev服务。
+
+### 补充失败分类与工具风险边界（以下为此前事实，当前状态以上节为准）
 
 - **2026-09-06 03:12 最新证据**：远端功能分支与本地HEAD均为 `c2b81a2108971416209948383e7b4a3f1e3155e8`；[修订版Push CI](https://github.com/kismet84/cgc-pms/actions/runs/33985531989)完整通过，pre-PR verifier绑定16个required jobs为PASS。CI实际运行镜像 `f3c7f3947ee4a3a4cdf187e6348b25ad782c7182ae35aa0fe22532d0ff691993`、预检镜像 `551bb65e46ec6f4b4cbcdd42f057af031bd27432bffd024c5bd0f0be977d2dd9` 的Metadata.ImageID与该SHA一致，高危/严重0；跨引擎批次 `369a53c88e0a` 的同备份8.0恢复、8.4导入和全部对象/行字节通过，CI批次清理完成。首次失败run仍保留，不追溯改写。
 - **本地恢复补证**：Docker API再次自行恢复，未重启共享服务。加强版批次 `5e8ee57217f1` 完成230表及全对象/行字节守恒，升级前dump SHA256=`71FA050213BCAEBC0582025B3ED50842DE4EE9905BDABE6BA32ECFB0425C2C21`。在该隔离8.4.12目标内另行执行真实原生socket备份/恢复，230张BASE TABLE计数及二进制/存储过程探针一致，gzip SHA256=`B89733FC765B0C25416D8E7C1C035C851BD376568C0528343F345CC598BAA48A`。未触碰dev库。已停止全部本任务跨引擎服务，保留容器、卷与备份供恢复。
@@ -34,13 +45,15 @@
 - Docker再次代理不可达，WSL配置上限4GB、swap2GB；因果关系尚不能确认。停止4个已完成任务容器的请求均返回API500，不能声称已停止。已实现后续新演练每个MySQL上限512MB，并在目的库验证后停止该服务、保留卷，避免同时保留多组运行实例。未修改WSL配置、未重启共享环境；真实跨引擎最终目标、备份与G4仍受阻。
 - Upgrade Checker使用固定Oracle工具镜像digest `7dcc4add9183664de3a214daf85a50c3ba6cccfd7534f700b6561bf5b41885be`，旧扫描Metadata.ImageID与之相等，存在5条High：sqlite-libs `3.34.1-10.el9_8` 的 `CVE-2026-11822/11824`，cryptography `46.0.7` 的 `CVE-2026-69247/69249` 与 `GHSA-537c-gmf6-5ccf`。独立只读复核并由主线程核对实际代码：checker仅调用 `util.check_for_server_upgrade`，只连接内部本批次源MySQL，输入为仓库schema、合成fixture和该容器my.cnf；无端口发布、`--rm`、证据只读挂载。没有恶意SQLite FTS5/MATCH、PKCS7解密服务、攻击者证书链或超大DER输入，因此上述触发条件不进入本次调用。按当前不可达证据关闭本次风险，不制造后续Issue；这不是整个CI镜像零漏洞声明。若增加外部数据库/证书/SQLite/PKCS7输入、服务监听或持久写挂载，裁决立即失效，必须重新扫描复核或使用修复镜像。runtime与preflight的0高危/严重结论不包含此一次性工具镜像。
 
-## 1. 范围与边界
+## 1. 阶段历史：范围与边界
+
+> 第1～3节完整保留当前M6裁决前的实现、失败、撤回裁决和旧资源状态，仅用于追溯；其中版本、G1阻塞、G3/G4/G5未完成及远端分支不存在等不是当前状态。当前G0～G5只以上方“M6当前权威记录”和“G4恢复与真实样本验收”为准。
 
 本轮承接 `AUD-20260830-001/002/003`：补齐 MySQL 显式 CA、服务证书、Java PKCS12 truststore 与 Connector/J `VERIFY_IDENTITY`；试验 Connector/J 8.4.0 兼容性；修正 MinIO application credential 注释。8.4.0 安全支持证据不足，F02 未关闭，整个主线未完成。无 migration、业务 API、权限、租户、金额或状态机变化。
 
 只验证本地隔离 Docker、临时证书、当前 JAR 与远端同 SHA CI；项目不存在生产或目标环境，本报告不构成生产发布证据。测试证书、私钥、truststore、密码和临时卷均不得入库。
 
-## 2. 实现结果
+## 2. 阶段历史：实现结果
 
 | 项目 | 结果 |
 | --- | --- |
@@ -54,7 +67,7 @@
 
 运行态验收中额外发现：仅用 `openssl pkcs12 -export -nokeys` 生成的普通证书包可被旧 preflight 读取，却不是 Java `trustedCertEntry`，Connector/J 会报 `trustAnchors parameter must be non-empty`。本轮已将此直接引入风险纳入修复：preflight 要求 `Trusted key usage`，部署手册明确必须使用 `keytool -importcert -storetype PKCS12`。
 
-## 3. G0～G5 证据
+## 3. 阶段历史：G0～G5 证据
 
 ### G0 基线与 Code map — PASS
 
@@ -117,5 +130,5 @@
 ## 5. 零悬空
 
 - 三个审计 ID 全部由 `ISSUE-100-001` 唯一承接，无重复载体。
-- 当前实施新增正式后续项 0、关闭 0、净变化 0；所有直接缺口仍由 `ISSUE-100-001` 承接，G1/G5 尚未完成，因此 Issue 暂不关闭。
+- 当前实施新增正式后续项 0、关闭 0、净变化 0；直接实现缺口已修复并通过G0～G4，`ISSUE-100-001`仍承接G5最终Git交付和清理，因此暂不关闭。
 - 计划全周期已新增 1；完成时应关闭 1，净变化回到 0。无价值不明或无验收标准的建议不进入 Backlog。
