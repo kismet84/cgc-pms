@@ -109,6 +109,43 @@ if ([regex]::Matches($businessCodeFixture, 'WHERE NOT \(t\.record_code <=> n\.ne
     throw 'LIVE_EVIDENCE_PAY_RECORD_NULL_CODE_NOT_STANDARDIZED'
 }
 $m3Fixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/210-m3-domain-permission-data.sql'))
+$projectRoleCodes = @('PROJECT_MANAGER', 'PROJECT_ACCOUNTANT', 'TECHNICAL_LEAD', 'SAFETY_LEAD',
+    'CONSTRUCTION_LEAD', 'PROCUREMENT_LEAD', 'EMPLOYEE')
+$memberBlocks = [regex]::Matches($m3Fixture, '(?ms)^INSERT INTO pm_project_member\r?\n.*?^ON DUPLICATE KEY UPDATE.*?;\r?$')
+$memberRoleMatches = @($memberBlocks | ForEach-Object {
+    [regex]::Matches($_.Value, ",'(?<role>[A-Z][A-Z0-9_]*)','[^']*',CURDATE\(\),NULL,'ACTIVE'")
+})
+if ($memberRoleMatches.Count -ne 31) {
+    throw "LIVE_EVIDENCE_PROJECT_MEMBER_FIXTURE_COUNT_INVALID:$($memberRoleMatches.Count)"
+}
+foreach ($match in $memberRoleMatches) {
+    if ($match.Groups['role'].Value -notin $projectRoleCodes) {
+        throw "LIVE_EVIDENCE_PROJECT_MEMBER_ROLE_INVALID:$($match.Groups['role'].Value)"
+    }
+}
+$memberRows = @($memberBlocks | ForEach-Object {
+    [regex]::Matches($_.Value, "(?m)^\s*\(\d+,0,[^,]+,(?<user>[^,]+),'(?<role>[A-Z][A-Z0-9_]*)',")
+})
+if ($memberRows.Count -ne 31) { throw 'LIVE_EVIDENCE_PROJECT_MEMBER_ROWS_UNPARSED' }
+foreach ($row in $memberRows) {
+    $expectedRole = if ($row.Groups['user'].Value -eq '@demo_admin') { 'PROJECT_MANAGER' } else { 'EMPLOYEE' }
+    if ($row.Groups['role'].Value -ne $expectedRole) {
+        throw "LIVE_EVIDENCE_CUSTOM_ACCOUNT_DUTY_ESCALATION:$($row.Groups['user'].Value)"
+    }
+}
+$dashboardFixture = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/160-role-dashboard-data.sql'))
+$controlledNodes = @([regex]::Matches($dashboardFixture, '(?ms)^INSERT INTO wf_node_instance\r?\n.*?^ON DUPLICATE KEY UPDATE.*?;\r?$') |
+    Where-Object { $_.Value.Contains('SELECT 520000000000009542,', [StringComparison]::Ordinal) })
+if ($controlledNodes.Count -ne 1) { throw 'LIVE_EVIDENCE_CONTROLLED_NODE_MISSING' }
+foreach ($field in @('node_type', 'approver_config', 'allow_transfer', 'allow_add_sign', 'timeout_hours')) {
+    $nodeSql = $controlledNodes[0].Value
+    $insertColumns = $nodeSql.Substring(0, $nodeSql.IndexOf('SELECT', [StringComparison]::Ordinal))
+    if (-not [regex]::IsMatch($insertColumns, "\b$field\b") `
+        -or -not $nodeSql.Contains("n.$field", [StringComparison]::Ordinal) `
+        -or -not $nodeSql.Contains("$field=VALUES($field)", [StringComparison]::Ordinal)) {
+        throw "LIVE_EVIDENCE_CONTROLLED_NODE_SNAPSHOT_MISSING:$field"
+    }
+}
 foreach ($status in @('PREPARING', 'COMPLETION', 'WARRANTY')) {
     if (-not $m3Fixture.Contains("THEN '$status'", [StringComparison]::Ordinal)) {
         throw "LIVE_EVIDENCE_PROJECT_STATUS_FIXTURE_MISSING:$status"
@@ -135,6 +172,7 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
     -or -not $verifySource.Contains("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.approver_config,'$.type')),'')='ROLE'", [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.project_manager_variation_permissions -eq 1', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.role_workflow_action_permissions -eq 36', [StringComparison]::Ordinal) `
+    -or -not $verifySource.Contains('$metrics.role_workflow_business_types -eq 24', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains("'m3_daily_self_account'", [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains('$metrics.m3_daily_self_account -eq 1', [StringComparison]::Ordinal) `
     -or -not $verifySource.Contains("'m3_query_only_role_leak'", [StringComparison]::Ordinal) `
@@ -145,7 +183,7 @@ if (-not $verifySource.Contains("'settlement_action_permission',COUNT(DISTINCT p
 $loadSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'load.ps1'))
 $fixtureVersions = @(
     "Id = 'ROLE_TEST_ACCOUNTS'; Version = 7",
-    "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 5",
+    "Id = 'ROLE_WORKFLOW_STATUS_DATA'; Version = 6",
     "Id = 'SETTLEMENT_SOURCE_DATA'; Version = 7"
 )
 foreach ($fixtureVersion in $fixtureVersions) {
@@ -182,6 +220,7 @@ if ($roleFixtureSource.Contains('INSERT IGNORE INTO sys_role_menu', [StringCompa
 }
 $workflowFixtureSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sql/200-role-workflow-status-data.sql'))
 if ($workflowFixtureSource.Contains('INSERT IGNORE INTO sys_role_menu', [StringComparison]::Ordinal) `
+    -or $workflowFixtureSource.Contains("'COST_SUBJECT_MAPPING'", [StringComparison]::Ordinal) `
     -or -not $workflowFixtureSource.Contains('Mainline 89 owns the least-privilege role matrix', [StringComparison]::Ordinal)) {
     throw 'LIVE_EVIDENCE_WORKFLOW_FIXTURE_M89_CONTRACT_INVALID'
 }

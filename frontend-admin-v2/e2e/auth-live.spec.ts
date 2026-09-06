@@ -50,13 +50,13 @@ test.describe('V2 live local authentication', () => {
 
       await page.goto('/session')
       await expect(page).not.toHaveURL(/\/(?:login|session)/)
-      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: /驾驶舱$/ })).toBeVisible()
       await expect(
         page.getByRole('banner').getByText(identity.visibleName, { exact: true }),
       ).toBeVisible()
 
       await page.reload()
-      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: /驾驶舱$/ })).toBeVisible()
 
       if (identity.username === 'admin') {
         await page.goto('/system/users')

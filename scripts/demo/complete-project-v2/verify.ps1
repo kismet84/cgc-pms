@@ -736,7 +736,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.cost_breakdown_dynamic_delta -eq 0 -and $metrics.cost_breakdown_deviation_delta -eq 0 `
     -and $metrics.role_workflow_status_instances -eq 40 -and $metrics.role_workflow_status_pairs -eq 40 `
     -and $metrics.role_workflow_status_todos -eq 8 -and $metrics.role_workflow_status_done -eq 40 `
-    -and $metrics.role_workflow_status_cc -eq 40 -and $metrics.role_workflow_business_types -eq 25 `
+    -and $metrics.role_workflow_status_cc -eq 40 -and $metrics.role_workflow_business_types -eq 24 `
     -and $metrics.role_workflow_action_permissions -eq 36 `
     -and $metrics.role_workflow_unauthorized_records -eq 0 `
     -and $metrics.role_workflow_orphans -eq 0 `

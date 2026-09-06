@@ -282,16 +282,17 @@ test.describe('M2 live approval workbench', () => {
     const response = await responsePromise
     expect(response.ok()).toBe(true)
     const envelope = (await response.json()) as {
-      data: { title: string; businessCode: string }
+      data: { title: string; businessCode: string; availableActions: string[] }
     }
+    expect(envelope.data.availableActions).toEqual(['withdraw', 'approve', 'reject'])
     const detailDialog = page.getByRole('dialog', { name: '审批详情' })
     await expect(detailDialog.getByText(envelope.data.title, { exact: true })).toBeVisible()
     await expect(detailDialog.getByText(envelope.data.businessCode, { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '同意', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '驳回', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '撤回', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '转办', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '加签', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '转办', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '加签', exact: true })).toHaveCount(0)
 
     const accessibility = await new AxeBuilder({ page }).include('.workflow-page').analyze()
     expect(accessibility.violations).toEqual([])

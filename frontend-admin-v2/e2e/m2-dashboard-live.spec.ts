@@ -316,10 +316,10 @@ test.describe('M2 live nine-role dashboard', () => {
     await expect(rows).toHaveCount(envelope.data.contractFundBreakdowns.length)
   })
 
-  test('business manager defaults to all and can switch between aggregate and specific context', async ({
+  test('project accountant business view defaults to all and switches aggregate context', async ({
     page,
   }) => {
-    const login = await page.goto('/api/auth/dev-login?username=ui26.bm01')
+    const login = await page.goto('/api/auth/dev-login?username=ui26.cost01')
     expect(login?.ok()).toBe(true)
 
     const aggregateResponse = page.waitForResponse((response) => {
@@ -432,7 +432,7 @@ test.describe('M2 live nine-role dashboard', () => {
 
     await page.goto('/dashboard?role=chiefEngineer')
     await selectOption(page.locator('#global-project'), projectId)
-    await expect(page.getByText('经营动态', { exact: true })).toBeVisible()
+    await expect(page.getByText('技术履约动态', { exact: true })).toBeVisible()
     await expect(page.locator('#cost-trend').getByText('楼梯节点做法逾期未闭环')).toBeVisible()
     await expect(page.getByText('当前角色暂无趋势数据')).toHaveCount(0)
     const activityList = page.locator('#cost-trend .dashboard-activity-list')

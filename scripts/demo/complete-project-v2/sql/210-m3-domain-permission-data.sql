@@ -31,10 +31,13 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
   (520000000000013004,0,520000000000013001,803),
   (520000000000013005,0,520000000000013001,1085);
 
+-- V295 owns the canonical project-duty role. Custom-only test accounts use
+-- EMPLOYEE membership for project scope, without system EMPLOYEE permission grants.
+-- Do not manufacture professional duty: PROJECT_ROLE routing consumes this field.
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000013006,0,520000000000009002,520000000000013002,'SCHEDULE_VIEWER','计划只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收：复用在建项目')
+  (520000000000013006,0,520000000000009002,520000000000013002,'EMPLOYEE','计划只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收：复用在建项目')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),user_id=VALUES(user_id),role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 -- ISSUE-053-044: stable project-member query-only identity for the live authorization gate.
@@ -65,7 +68,7 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000013012,0,520000000000009002,520000000000013008,'PROJECT_VIEWER','项目成员只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收：复用在建项目')
+  (520000000000013012,0,520000000000009002,520000000000013008,'EMPLOYEE','项目成员只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收：复用在建项目')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),user_id=VALUES(user_id),role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 INSERT INTO sys_role
@@ -110,12 +113,12 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000010051,0,@demo_project,520000000000010011,'QUALITY_VIEWER','质量查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
-  (520000000000010052,0,@demo_project,520000000000010012,'QUALITY_PLAN_OWNER','质量计划',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
-  (520000000000010053,0,@demo_project,520000000000010013,'QUALITY_INSPECTOR','质量检查',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
-  (520000000000010054,0,@demo_project,520000000000010014,'QUALITY_RECTIFIER','质量整改',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
-  (520000000000010055,0,@demo_project,520000000000010015,'QUALITY_REINSPECTOR','质量复检',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
-  (520000000000010056,0,@demo_project,520000000000010016,'QUALITY_CONSEQUENCE','质量后果',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收')
+  (520000000000010051,0,@demo_project,520000000000010011,'EMPLOYEE','质量查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
+  (520000000000010052,0,@demo_project,520000000000010012,'EMPLOYEE','质量计划',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
+  (520000000000010053,0,@demo_project,520000000000010013,'EMPLOYEE','质量检查',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
+  (520000000000010054,0,@demo_project,520000000000010014,'EMPLOYEE','质量整改',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
+  (520000000000010055,0,@demo_project,520000000000010015,'EMPLOYEE','质量复检',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收'),
+  (520000000000010056,0,@demo_project,520000000000010016,'EMPLOYEE','质量后果',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量分权验收')
 ON DUPLICATE KEY UPDATE role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 INSERT INTO qs_inspection_plan
@@ -223,17 +226,17 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000012101,0,@demo_project,520000000000012021,'CLOSEOUT_VIEWER','收尾查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012102,0,@demo_project,520000000000012022,'CLOSEOUT_INITIATOR','收尾发起',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012103,0,@demo_project,520000000000012023,'CLOSEOUT_SECTION','分部验收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012104,0,@demo_project,520000000000012024,'CLOSEOUT_ACCEPTANCE','竣工验收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012105,0,@demo_project,520000000000012025,'CLOSEOUT_SETTLEMENT','最终结算',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012106,0,@demo_project,520000000000012026,'CLOSEOUT_COLLECTION','尾款核验',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012107,0,@demo_project,520000000000012027,'CLOSEOUT_WARRANTY','质保维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012108,0,@demo_project,520000000000012028,'CLOSEOUT_DEFECT','缺陷维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012109,0,@demo_project,520000000000012029,'CLOSEOUT_DEFECT_VERIFY','缺陷复验',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012110,0,@demo_project,520000000000012030,'CLOSEOUT_ARCHIVE','档案移交',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
-  (520000000000012111,0,@demo_project,520000000000012031,'CLOSEOUT_CLOSER','项目关闭',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收')
+  (520000000000012101,0,@demo_project,520000000000012021,'EMPLOYEE','收尾查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012102,0,@demo_project,520000000000012022,'EMPLOYEE','收尾发起',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012103,0,@demo_project,520000000000012023,'EMPLOYEE','分部验收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012104,0,@demo_project,520000000000012024,'EMPLOYEE','竣工验收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012105,0,@demo_project,520000000000012025,'EMPLOYEE','最终结算',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012106,0,@demo_project,520000000000012026,'EMPLOYEE','尾款核验',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012107,0,@demo_project,520000000000012027,'EMPLOYEE','质保维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012108,0,@demo_project,520000000000012028,'EMPLOYEE','缺陷维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012109,0,@demo_project,520000000000012029,'EMPLOYEE','缺陷复验',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012110,0,@demo_project,520000000000012030,'EMPLOYEE','档案移交',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收'),
+  (520000000000012111,0,@demo_project,520000000000012031,'EMPLOYEE','项目关闭',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3收尾分权验收')
 ON DUPLICATE KEY UPDATE role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 INSERT INTO owner_settlement
@@ -453,16 +456,16 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000011071,0,@demo_project,520000000000011011,'TECH_VIEWER','技术查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011072,0,@demo_project,520000000000011012,'TECH_SCHEME_MAINTAIN','方案维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011073,0,@demo_project,520000000000011013,'TECH_SCHEME_SUBMIT','方案提交',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011074,0,@demo_project,520000000000011014,'TECH_DRAWING_RECEIVE','图纸接收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011075,0,@demo_project,520000000000011015,'TECH_DRAWING_REVIEW','图纸会审',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011076,0,@demo_project,520000000000011016,'TECH_RFI_RAISE','RFI发起',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011077,0,@demo_project,520000000000011017,'TECH_RFI_RESPOND','RFI回复',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011078,0,@demo_project,520000000000011018,'TECH_RFI_ACCEPT','RFI接受',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011079,0,@demo_project,520000000000011019,'TECH_DISCLOSURE','技术交底',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
-  (520000000000011080,0,@demo_project,520000000000011020,'TECH_ARCHIVE','技术归档',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收')
+  (520000000000011071,0,@demo_project,520000000000011011,'EMPLOYEE','技术查询',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011072,0,@demo_project,520000000000011012,'EMPLOYEE','方案维护',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011073,0,@demo_project,520000000000011013,'EMPLOYEE','方案提交',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011074,0,@demo_project,520000000000011014,'EMPLOYEE','图纸接收',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011075,0,@demo_project,520000000000011015,'EMPLOYEE','图纸会审',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011076,0,@demo_project,520000000000011016,'EMPLOYEE','RFI发起',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011077,0,@demo_project,520000000000011017,'EMPLOYEE','RFI回复',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011078,0,@demo_project,520000000000011018,'EMPLOYEE','RFI接受',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011079,0,@demo_project,520000000000011019,'EMPLOYEE','技术交底',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收'),
+  (520000000000011080,0,@demo_project,520000000000011020,'EMPLOYEE','技术归档',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3技术分权验收')
 ON DUPLICATE KEY UPDATE role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 INSERT INTO tech_drawing

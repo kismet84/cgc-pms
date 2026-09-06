@@ -182,15 +182,21 @@ ON DUPLICATE KEY UPDATE
   project_id=VALUES(project_id),contract_id=VALUES(contract_id),title=VALUES(title),amount=VALUES(amount),instance_status=VALUES(instance_status),
   business_summary=VALUES(business_summary),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0;
 
+-- Keep the controlled detail fixture deterministic on fresh load and replay:
+-- M89 CONTRACT_APPROVAL snapshots explicitly disable transfer and add-sign.
 INSERT INTO wf_node_instance
-  (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,node_status,round_no,started_at,ended_at,
+  (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,
+   node_type,approver_config,allow_transfer,allow_add_sign,timeout_hours,node_status,round_no,started_at,ended_at,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-SELECT 520000000000009542,0,520000000000009541,n.id,n.node_code,n.node_name,n.node_order,n.approve_mode,'ACTIVE',1,NOW(),NULL,
+SELECT 520000000000009542,0,520000000000009541,n.id,n.node_code,n.node_name,n.node_order,n.approve_mode,
+       n.node_type,n.approver_config,n.allow_transfer,n.allow_add_sign,n.timeout_hours,'ACTIVE',1,NOW(),NULL,
        @demo_admin,NOW(),@demo_admin,NOW(),0,'M2项目经理待审批节点'
 FROM wf_template_node n WHERE n.id=@contract_node
 ON DUPLICATE KEY UPDATE
   template_node_id=VALUES(template_node_id),node_code=VALUES(node_code),node_name=VALUES(node_name),node_order=VALUES(node_order),
-  approve_mode=VALUES(approve_mode),node_status=VALUES(node_status),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0;
+  approve_mode=VALUES(approve_mode),node_type=VALUES(node_type),approver_config=VALUES(approver_config),
+  allow_transfer=VALUES(allow_transfer),allow_add_sign=VALUES(allow_add_sign),timeout_hours=VALUES(timeout_hours),
+  node_status=VALUES(node_status),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0;
 
 INSERT INTO wf_task
   (id,tenant_id,instance_id,node_instance_id,business_type,business_id,approver_id,approver_name,task_status,round_no,task_version,

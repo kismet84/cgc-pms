@@ -7,6 +7,10 @@ test.skip(
 
 test('root-path artifact restores authenticated representative deep links', async ({ page }) => {
   const errors: string[] = []
+  await page.addInitScript(() => {
+    sessionStorage.setItem('cgc-pms-stream-client-id', 'm8-root-rehearsal')
+    sessionStorage.setItem('cgc-pms-stream-document', String(performance.timeOrigin))
+  })
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
@@ -15,7 +19,7 @@ test('root-path artifact restores authenticated representative deep links', asyn
   expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
 
   for (const [path, heading] of [
-    ['/dashboard', '经营驾驶舱'],
+    ['/dashboard', '公司老板驾驶舱'],
     ['/project/list', '项目台账'],
     ['/approval/todo', '审批工作台'],
     ['/system/users', '用户管理'],
