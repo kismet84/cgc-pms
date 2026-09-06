@@ -2,10 +2,9 @@
 
 ## v1.6 当前队列
 
-当前 Ready 为 0，用户直接授权执行中为 1；AutoPilot 执行中为 0。
+当前 Ready 为 0，用户直接授权业务实施执行中为 0；AutoPilot 执行中为 0。
 
-- `ISSUE-100-001` 与 M6 已由用户直接授权实施；不进入 AutoPilot Ready。MySQL8.4.12/ConnectorJ26.7 支持与隔离跨引擎恢复已取得证据；新组合完整服务端/浏览器/同SHA CI与G5尚未完成，无待用户答复的同范围授权。
-  当前按已批准的 [M6 MySQL 8.4 升级计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)补齐精确镜像扫描绑定与完整对象语义复验；不把计划或候选试验通过视为 Ready 或 G5 通过。
+- `ISSUE-100-001` 已完成G0～G5并关闭；PR #465合并与post-merge通过，任务资源、临时凭据与实现源分支清理已核验。本次仅交付收口文档，不进入AutoPilot Ready。
 
 - `ISSUE-078-001`已完成G0～G5并关闭，不进入AutoPilot Ready。
 

@@ -4,7 +4,7 @@
 > 唯一载体：`ISSUE-100-001`
 > 编制基线：`master@5066a5c90bb9048289307a5d60e25c051e399577`
 > 复核日期：2026-09-06
-> 当前裁决：`G0_G4_PASSED / G5_GIT_DELIVERY_PENDING`；功能分支 `7c14dca1` 的完整同 SHA Push CI 已通过；新组合真实登录、有样本列表/详情、API及数据库回读通过。本次证据回写后的最终 SHA、PR、合并及清理尚待完成。
+> 当前裁决：`COMPLETED / G0-G5_PASSED / ISSUE_CLOSED / POST_MERGE_VERIFIED`；实现PR #465已合并，任务资源、临时凭据与实现源分支清理核验通过。本次收口文档最终Git证明随其独立PR提供。
 
 ## M6 当前权威记录（2026-09-06）
 
@@ -15,13 +15,22 @@
 | G0 | 独立 `codex/mainline-100` 工作树；旧 dev 卷及原工作区脏改动保留，无业务 schema/API/权限语义变更 |
 | G1 供应链 | Oracle 固定输入，移除 mysql-shell 及 Python、SQLite 官方修复 RPM；独立 Alpine/OpenSSL 预检；精确 runtime ID `sha256:ee7bf662aa692abb5c6384b39796de4796001990b83b47ab020abafde96f2895`、preflight ID `sha256:99f3bf5ead9d68b9a33886d144bcfd90b3f073d25f640c2f0d5be1ebb7229d84`，Trivy Metadata.ImageID 与运行输入相等，高危/严重均0；不是永久无漏洞声明 |
 | G2 跨引擎 | 加强对象语义后的本地与 `c2b81a21` CI 均通过，文档修订 `7c14dca1` 完整CI再次通过：同一8.0备份先恢复8.0再导入8.4.12，230表行数、全部行字节、生成列/CHECK/ENFORCED/外键动作等一致；fresh/V180迁移、租户和并发组通过 |
-| G3 静态与测试 | validator22、备份/恢复28、cleanup AST18、部署/工作流契约通过；前端649/649及浏览器contract98项通过。实现证据及pre-PR verifier通过绑定 `c2b81a21`；仅改文档/Codemap的 `7c14dca1` 完整Maven/MySQL、JAR/SPDX与供应链等16个required jobs再次全绿；本次最终证据SHA的pre-PR仍待完成。Windows本地Office错误不冒充本地成功，以CI平台等价验证 |
+| G3 静态与测试 | validator22、备份/恢复28、cleanup AST18、部署/工作流契约通过；前端649及browser contract98通过。最终实现源0ec8516b的完整Push/PR CI均通过，Maven2962项、0fail/0error、30条件skip，JAR/SPDX及供应链16个required jobs全绿；pre-PR verifier通过。Windows本地Office错误保留为历史，以CI平台等价验证 |
 | G4 | 重新授权后在原任务容器初始化测试桶成功，health UP；8.4.12/26.7、精确JAR、租户0及隔离库一致。内置浏览器真实登录、合同空列表、两条合作方样本列表与切换详情通过；API/数据库回读一致，新DOM存在、旧占位标识不存在，warn/error为空。详细证据见下节 |
-| G5 | 既有独立只读复核发现已修复；运行态证据已补齐。唯一Issue保持开放，继续最终SHA CI、受保护PR/合并、post-merge及安全清理；不提前宣称交付完成 |
+| G5 | PASS；PR #465、合并后证据、实现源分支及测试资源清理、用户手动删除临时凭据后的回读均通过。唯一Issue关闭，详见下节 |
 
 失败按首次事实保留：Docker Desktop代理出现 `192.168.65.7:2376: no route to host`（environment_prerequisite），随后只读version恢复，未重启共享服务；首次完整Maven漏注入CI测试JWT环境（tool_config），2743测试/1728错误/30跳过、BUILD FAILURE，补环境后复验；前端默认并发645/649、4项约5秒超时，原断言/默认超时不变，单worker完整649通过，归environment_prerequisite。镜像绑定与对象快照缺口、cleanup异常及.NET空变量恢复差异归quality_or_security，本轮直接修复并复验，不延期。
 
-具体版本来源、升级前备份哈希、保留资源、风险与恢复边界见 [M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。新增后续项0、关闭0、净变化0；`ISSUE-100-001`未关闭。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
+具体版本来源、升级前备份哈希与恢复边界见[M6阶段计划](../plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md)。本次新增0、关闭1、净变化-1；全周期新增1、关闭1、净变化0。没有升级实际dev库，没有生产、Tag、Release或镜像仓库发布。
+
+### 2026-09-06 G5交付与清理核验（当前最终事实）
+
+- 源HEAD `0ec8516ba07a050efc2cd463c86e319cd1c880c0` 的Push CI `34007590151`、pre-PR verifier及PR #465首次CI `34008218761`通过；受保护合并为 `77fda61537bc45e909fb40459636c4f9ceb0b0e2`，post-merge `34008925255`与verifier通过，源/合并tree一致。
+- 实现源分支本地/远端已删除；14个任务测试容器、13个卷、4个网络已按归属清理。临时凭据删除先被策略拒绝，随后用户手动删除；已回读确认deploy下临时Secret目录、ssl与G4 override均不存在。升级前备份及恢复证据保留，原dev库未迁移。原工作区23项改动保留，19个不重叠文件字节一致，POM保留Sentry与MySQL属性，Codemap保留Sentry语义。
+- 后端最终PR运行：2962项、0失败、0错误、30条件跳过，BUILD SUCCESS；前端649项、browser contract98项通过。首次PR CI通过，历史Push失败不追溯改写。
+- 当前裁决：通过、无阻塞。三项审计发现本轮修复并复验，不新增范围外事项；临时凭据执行策略拒绝归tool_config，用户手动删除后仅作只读存在性核验，未绕策略。
+- 恢复：升级前dump SHA256 `71FA050213BCAEBC0582025B3ED50842DE4EE9905BDABE6BA32ECFB0425C2C21` 与原生gzip `B89733FC765B0C25416D8E7C1C035C851BD376568C0528343F345CC598BAA48A`保留于本地恢复包。测试卷不能原地恢复，只能由保留备份/合成夹具重建；原dev库仍保持原状。TLS失败时按计划原子恢复受支持组合，不降级证书验证。
+- 本次收口只修改文档/状态与派生地图，仍走独立同SHA CI、受保护PR和post-merge。最终收口PR证明随交付记录提供，不为记录自身SHA无限追加提交。
 
 ### 2026-09-06 G4恢复与真实样本验收
 
@@ -130,5 +139,5 @@
 ## 5. 零悬空
 
 - 三个审计 ID 全部由 `ISSUE-100-001` 唯一承接，无重复载体。
-- 当前实施新增正式后续项 0、关闭 0、净变化 0；直接实现缺口已修复并通过G0～G4，`ISSUE-100-001`仍承接G5最终Git交付和清理，因此暂不关闭。
-- 计划全周期已新增 1；完成时应关闭 1，净变化回到 0。无价值不明或无验收标准的建议不进入 Backlog。
+- 本次收口新增正式后续项0、关闭`ISSUE-100-001`共1项、净变化-1；直接实现缺口全部本轮修复复验。
+- 计划全周期新增1、关闭1、净变化0，无无载体遗留项；无价值或不可验收建议不建Backlog。

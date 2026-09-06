@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-09-06T10:40:00+08:00",
+  "updatedAt": "2026-09-06T12:00:00+08:00",
   "issues": [
     {
       "issueKey": "ISSUE-100-001",
       "title": "MySQL TLS信任链、Connector/J依赖安全与MinIO说明一致性整改",
-      "status": "IN_PROGRESS",
+      "status": "CLOSED",
       "classification": "CONFIRMED_DEFECT",
       "priority": "P1",
-      "blocking": true,
-      "summary": "AUD-20260830-001/002/003唯一承接。MySQL8.4.12/ConnectorJ26.7.0的7c14dca1完整Push CI通过，精确镜像高危严重0；230表对象与行字节跨引擎守恒、原生备份恢复通过。G4健康UP、真实登录、两条合作方样本列表/详情及API/数据库回读通过；G5最终SHA、受保护合并及清理仍待完成。",
+      "blocking": false,
+      "summary": "AUD-20260830-001/002/003本轮修复复验。MySQL8.4.12/ConnectorJ26.7.0、TLS正负向、230表跨引擎恢复、完整测试与真实样本浏览器通过。PR465已合并77fda615，post-merge通过，任务资源/临时凭据/实现源分支清理已核验；G0至G5通过。",
       "acceptanceCriteria": "正确CA与VERIFY_IDENTITY可在隔离MySQL8.4.12中建连并确认非空cipher；缺失/错误CA、错误密码和身份不匹配失败关闭；Connector/J26.7.0厂商支持、单一JAR/SBOM、精确制品扫描；8.0升级前同备份先恢复8.0再导入8.4、对象数据守恒；完整Maven/MySQL/浏览器/CI及受保护Git门禁通过。",
-      "deferReason": "G0至G4已通过，无待用户答复事项。用户再次授权后原隔离MinIO测试桶创建成功，真实样本验收通过。保持开放直至本次证据回写提交取得最终同SHA CI、pre-PR verifier、受保护PR合并、post-merge和源分支安全清理；不提前关闭。",
+      "deferReason": "无延期：实现和清理证据齐全，关闭本Issue；本次收口文档仍须按独立同SHA CI及受保护PR路线交付。未升级现有dev库，不含Tag、Release或非本地环境。",
       "sourceRefs": [
         "docs/plans/第100条主线-MySQL TLS信任链与依赖安全整改任务计划书.md",
         "docs/plans/第100条主线-M6-MySQL8.4升级与ConnectorJ安全版本恢复任务计划书-2026-09-06.md",
