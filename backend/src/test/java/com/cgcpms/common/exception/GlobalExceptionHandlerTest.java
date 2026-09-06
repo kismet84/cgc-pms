@@ -1,10 +1,13 @@
 package com.cgcpms.common.exception;
 
+import io.sentry.Sentry;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mockStatic;
 
 class GlobalExceptionHandlerTest {
 
@@ -46,5 +49,32 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
         assertEquals("PAY_APP_STATUS_CONFLICT", response.getBody().getCode());
+    }
+
+    @Test
+    void unexpectedExceptionsAreCapturedBySentryBeforeReturningStableEnvelope() {
+        var exception = new IllegalStateException("test failure");
+
+        try (MockedStatic<Sentry> sentry = mockStatic(Sentry.class)) {
+            var response = new GlobalExceptionHandler().handleException(exception);
+
+            sentry.verify(() -> Sentry.captureException(exception));
+            assertEquals("SYSTEM_ERROR", response.getCode());
+            assertEquals("系统异常，请稍后重试", response.getMessage());
+        }
+    }
+
+    @Test
+    void monitoringFailureDoesNotReplaceStableSystemErrorEnvelope() {
+        var exception = new IllegalStateException("original failure");
+        try (MockedStatic<Sentry> sentry = mockStatic(Sentry.class)) {
+            sentry.when(() -> Sentry.captureException(exception))
+                    .thenThrow(new IllegalStateException("SDK callback failed"));
+
+            var response = new GlobalExceptionHandler().handleException(exception);
+
+            assertEquals("SYSTEM_ERROR", response.getCode());
+            assertEquals("系统异常，请稍后重试", response.getMessage());
+        }
     }
 }

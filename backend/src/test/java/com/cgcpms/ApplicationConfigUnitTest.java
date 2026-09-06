@@ -21,4 +21,14 @@ class ApplicationConfigUnitTest {
         assertTrue(content.contains("      max-file-size: 20MB"));
         assertTrue(content.contains("      max-request-size: 21MB"));
     }
+
+    @Test
+    void sentryShouldBeEnvironmentDrivenAndPiiSafeByDefault() throws Exception {
+        var content = Files.readString(Path.of("src/main/resources/application.yml"));
+        assertTrue(content.contains("  dsn: ${SENTRY_DSN:}"));
+        assertTrue(content.contains("  environment: ${SENTRY_ENVIRONMENT:local}"));
+        assertTrue(content.contains("  release: ${SENTRY_RELEASE:}"));
+        assertTrue(content.contains("  send-default-pii: false"));
+        assertTrue(content.contains("  traces-sample-rate: 0.0"));
+    }
 }

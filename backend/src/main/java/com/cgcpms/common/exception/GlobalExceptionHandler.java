@@ -2,6 +2,7 @@ package com.cgcpms.common.exception;
 
 import com.cgcpms.common.context.TraceIdContext;
 import com.cgcpms.common.result.ApiResponse;
+import io.sentry.Sentry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -119,6 +120,12 @@ public class GlobalExceptionHandler {
         String traceId = TraceIdContext.get();
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString().replace("-", "");
+        }
+        try {
+            Sentry.captureException(e);
+        } catch (RuntimeException monitoringFailure) {
+            // Monitoring must not replace the application's stable error response.
+            log.warn("Error monitoring failed, traceId={}", traceId);
         }
         log.error("System exception, traceId={}", traceId, e);
         return ApiResponse.fail(SYSTEM_ERROR_CODE, "系统异常，请稍后重试");

@@ -8,6 +8,8 @@
 
 ## 权威层级与文档类型
 
+工作区既有改动交付：[Sentry接入、治理规则与验证边界](quality/2026-09-06-workspace-sentry-governance-delivery.md)；该批次独立于主线100，不修改其已完成裁决。
+
 | 层级 | 唯一入口 | 边界 |
 | --- | --- | --- |
 | 根硬门禁 | [AGENTS.md](../AGENTS.md) | 自动加载；授权、安全、工作区、验证、Git 与收口 |

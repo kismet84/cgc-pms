@@ -32,6 +32,8 @@ Windows `PreToolUse` 还会调用仓库内命令预检：PowerShell 语法错误
 
 ## 飞书目标与重试
 
+`notification.enabled=false` 只关闭显式契约的专用通知，仓库普通 Stop 通知是独立通道，可能作为回退继续发送；它不是全局静音。需要静音时，应先识别适用的仓库 Hook，再通过其支持的控制关闭。查看或说明设置不授权修改收件人或发送测试消息。
+
 V1 只使用已认证 Bot。普通终态通知从 `LTG_FEISHU_CHAT_ID` 读取 `oc_` 群聊目标；显式契约可使用 `chat-id` 或 `user-id`，但只保存私有环境变量名，例如 `LTG_FEISHU_USER_ID`。真实收件值不得进入仓库、契约、状态或日志。Windows 用户环境变量变更后必须完全重启 Codex，Hook 子进程才能继承新值。
 
 通知恢复路径（`TASK_PASSED`、`NOTIFYING`、`BLOCKED_NOTIFICATION`，以及存在未发送 outbox 的 `COMPLETED`）不重跑已经通过的业务检查。通知失败不会把已通过任务改为阻塞；任务保持 `COMPLETED`，未发送 outbox 可在恢复认证、网络或目标后显式重试：

@@ -24,22 +24,22 @@ project:
   - docs: update CLAUDE.md architecture section
 ```
 
-### Step 6: Commit Each Skill/Module Separately
+### Step 6: Prepare the Module Commit Plan
 
-For each skill/module group (in order of changes):
+Prepare the reviewable file groups and commit messages before Step 8. This step does not authorize staging or committing. Reuse existing commits; grouping their contents for release notes never authorizes splitting or rewriting history.
+
+For each skill/module group:
 
 1. **Check README updates needed**:
    - Scan `README*.md` for mentions of this skill/module
    - Verify options/flags documented correctly
-   - Update usage examples if syntax changed
-   - Update feature descriptions if behavior changed
+   - Record suggested usage-example or feature-description updates when syntax or behavior changed
+   - Apply only necessary documentation updates within the user's authorized local scope. A release-notes-only request does not authorize README, version, or business-code edits
 
-2. **Stage and commit**:
-   ```bash
-   git add skills/<skill-name>/*
-   git add README.md README.zh.md  # If updated for this skill
-   git commit -m "<type>(<skill-name>): <meaningful description>"
-   ```
+2. **Prepare exact task-owned paths**:
+   - Record the files and proposed message for each necessary new commit.
+   - Preserve unrelated working-tree and staged changes; do not use directory globs to collect a group.
+   - Execute approved groups in Step 9 only after the corresponding commit authorization is established in Step 8. A release-notes-only request authorizes no commits.
 
 3. **Commit message format**:
    - Use conventional commit format: `<type>(<scope>): <description>`
@@ -47,11 +47,11 @@ For each skill/module group (in order of changes):
    - `<scope>`: skill name or "project"
    - `<description>`: Clear, meaningful description of changes
 
-**Example Commits**:
-```bash
-git commit -m "feat(baoyu-cover-image): add watercolor and minimalist styles"
-git commit -m "fix(baoyu-comic): improve panel layout for long dialogues"
-git commit -m "docs(project): update architecture documentation"
+**Example Proposed Messages**:
+```text
+feat(baoyu-cover-image): add watercolor and minimalist styles
+fix(baoyu-comic): improve panel layout for long dialogues
+docs(project): update architecture documentation
 ```
 
 **Common README Updates Needed**:

@@ -59,3 +59,7 @@ REQUESTED -> ARMED -> CHECKING -> REPAIRING -> CHECKING
                                                 \-> COMPLETED (notification pending)
 REQUESTED|ARMED|REPAIRING|TASK_PASSED -> CANCELLED
 ```
+
+## Notification switch scope
+
+`notification.enabled` means “contract-specific notification enabled”, not “all repository notifications enabled”. The existing repository Stop fallback is independent. To request silence, identify and disable the applicable repository Hook through its supported control; do not assume this contract field globally mutes it. Inspecting or documenting the setting never authorizes a test message. This clarification preserves the existing schema and runtime behavior.

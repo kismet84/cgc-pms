@@ -27,6 +27,7 @@
         <!-- ISSUE-100-001: Connector/J 26.7 requires MySQL 8.4+; Compose and CI
              pin the matching LTS server. Do not restore the unsupported 8.0 pairing. -->
         <mysql.version>26.7.0</mysql.version>
+        <sentry.version>8.54.0</sentry.version>
         <jjwt.version>0.12.6</jjwt.version>
         <minio.version>8.6.0</minio.version>
         <jasypt.version>3.0.5</jasypt.version>
@@ -86,6 +87,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Error monitoring; disabled unless SENTRY_DSN is configured. -->
+        <dependency>
+            <groupId>io.sentry</groupId>
+            <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+            <version>${sentry.version}</version>
         </dependency>
 
         <!-- Prometheus Micrometer registry -->

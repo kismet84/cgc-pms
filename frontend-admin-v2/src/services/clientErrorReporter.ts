@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/vue'
+import type { App } from 'vue'
 import { apiRequest } from './request'
 
 export type ClientErrorSource = 'VUE' | 'WINDOW' | 'PROMISE'
@@ -11,6 +13,35 @@ const sentAt = new Map<string, number>()
 let windowStartedAt = 0
 let reportsInWindow = 0
 let globalReportingInstalled = false
+let sentryInitialized = false
+
+export function initializeClientErrorReporting(app: App): void {
+  if (sentryInitialized) return
+  const dsn = import.meta.env.VITE_SENTRY_DSN?.trim()
+  if (!dsn) return
+
+  try {
+    Sentry.init({
+      app,
+      dsn,
+      environment: import.meta.env.VITE_SENTRY_ENVIRONMENT?.trim() || import.meta.env.MODE,
+      release: import.meta.env.VITE_SENTRY_RELEASE?.trim() || undefined,
+      sendDefaultPii: false,
+      attachErrorHandler: false,
+      tracesSampleRate: 0,
+      dataCollection: {
+        userInfo: false,
+        httpBodies: [],
+      },
+      integrations: (integrations) =>
+        integrations.filter((integration) =>
+          integration.name !== 'GlobalHandlers' && integration.name !== 'BrowserApiErrors'),
+    })
+    sentryInitialized = true
+  } catch (error) {
+    console.warn('Sentry client error monitoring initialization failed', error)
+  }
+}
 
 export async function reportClientError(source: ClientErrorSource, error: unknown): Promise<void> {
   const kind = errorKind(error)
@@ -26,6 +57,15 @@ export async function reportClientError(source: ClientErrorSource, error: unknow
 
   reportsInWindow += 1
   sentAt.set(fingerprint, now)
+  if (sentryInitialized) {
+    try {
+      Sentry.captureException(error, {
+        tags: { client_error_source: source, client_error_kind: kind },
+      })
+    } catch {
+      // Observability must never create another user-facing error.
+    }
+  }
   try {
     await apiRequest('/client-errors', {
       method: 'POST',

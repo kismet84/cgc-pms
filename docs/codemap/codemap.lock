@@ -1,5 +1,5 @@
 {
-  "generation_time": "2026-09-06T03:45:36.933Z",
+  "generation_time": "2026-09-06T05:19:33.489Z",
   "scanned_scope": [
     ".github",
     ".githooks",
@@ -51,8 +51,8 @@
     "self_reference": "docs/codemap excluded"
   },
   "tracked_file_count": 4240,
-  "repository_file_count": 4240,
-  "included_file_count": 2976,
+  "repository_file_count": 4241,
+  "included_file_count": 2977,
   "excluded_file_count": 1264,
   "modules": [
     {
@@ -63,7 +63,7 @@
         "plugins/**"
       ],
       "file_count": 87,
-      "fingerprint": "4ebaebbfd3495a58d5df421dac061d5900dc3777169da946ada198579a8ff91f"
+      "fingerprint": "e5c1d6bde00e34d2b0def10cba76939b886e12ad4bfca5a8ade2b60a728ebcd6"
     },
     {
       "id": "backend",
@@ -71,7 +71,7 @@
         "backend/**"
       ],
       "file_count": 1949,
-      "fingerprint": "0e83a98740840263fcf81790449008c7cd225a7f1fbc08c6a78a1101e105101e"
+      "fingerprint": "7c0fa3f9f702dfa05a92dffd3b3823c9784e6fdec9669484a1d4211d0b7b5579"
     },
     {
       "id": "delivery_tooling",
@@ -83,7 +83,7 @@
         "tools/**"
       ],
       "file_count": 293,
-      "fingerprint": "ac2fc70d151751c2d15db4937906aa591906ac4df84bae41431afc5ac82e2221"
+      "fingerprint": "983e6be99d2288e176a2cae9fa57ce4794460b24583e172748599bc19465176a"
     },
     {
       "id": "desktop_launcher",
@@ -98,8 +98,8 @@
       "scope": [
         "docs/**"
       ],
-      "file_count": 174,
-      "fingerprint": "e0c60e624e9ac1a0ea948ca75c88574d1874e1e623f58bf0ac7f63fd46a0c963"
+      "file_count": 175,
+      "fingerprint": "0c831258dc0b5f83a31fd89ebef4cd8b1b3f7a24c6951f4b6759309717adf60e"
     },
     {
       "id": "frontend_v2",
@@ -107,7 +107,7 @@
         "frontend-admin-v2/**"
       ],
       "file_count": 412,
-      "fingerprint": "e66a8b2fa398e15e7c4666eccefa35d6eed272ebcc9ee0f6193d09bb186e3f68"
+      "fingerprint": "400607a1c21f7f48928b2672ac581041a0ea95c0f7ed962b9d2bf7c2733bad78"
     },
     {
       "id": "mobile",
@@ -123,7 +123,7 @@
         "tracked and untracked repository root files"
       ],
       "file_count": 6,
-      "fingerprint": "da84021b8d8fe7b89fb607b8dbae4cef99939e5799f6ca59516758013cd4db6a"
+      "fingerprint": "408693a748b028ee1873e36b33e0937c41bb1b1bd51115b8704383a5aab0cbd7"
     },
     {
       "id": "shared_packages",
@@ -134,13 +134,17 @@
       "fingerprint": "60e988b431ba2730bfc39a37d9837f2b2dd59c36b5ce87d9adf58bb1216378d9"
     }
   ],
-  "generation_base_commit": "77fda61537bc45e909fb40459636c4f9ceb0b0e2",
+  "generation_base_commit": "d88c8569495d4ca4a9fdd51a5a66ca41863144c4",
   "input_scope_dirty": true,
   "comparison_to_previous_generation": {
     "previous_lock_found": true,
-    "previous_generation_base_commit": "77fda61537bc45e909fb40459636c4f9ceb0b0e2",
+    "previous_generation_base_commit": "d88c8569495d4ca4a9fdd51a5a66ca41863144c4",
     "stale_modules": [
-      "documentation"
+      "backend",
+      "delivery_tooling",
+      "documentation",
+      "frontend_v2",
+      "repository_meta"
     ],
     "reason": "Generation inputs changed since the previous code map snapshot."
   }
