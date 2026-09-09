@@ -27,6 +27,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { formatAmount } from '@/shared/display'
+import { nextDraftKey } from '@/shared/draftKey'
 import { pageSlice, statusLabel } from './model'
 import './styles.css'
 
@@ -80,6 +81,7 @@ const impactPreview = computed(() =>
 
 function newLine() {
   return {
+    draftKey: nextDraftKey(),
     costSubjectId: '',
     enabled: 'false',
     effectiveFrom: new Date().toISOString().slice(0, 10),
@@ -496,7 +498,7 @@ onBeforeUnmount(() => controller?.abort())
           <legend>排除项与例外项</legend>
           <div
             v-for="(line, index) in form.lines"
-            :key="index"
+            :key="line.draftKey"
             class="cost-subject-page__line-grid"
           >
             <V2Select

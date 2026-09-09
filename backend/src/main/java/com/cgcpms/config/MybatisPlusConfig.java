@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerIntercept
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
 import com.cgcpms.auth.context.UserContext;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Configuration;
  * Tenant-line interceptor auto-injects tenant_id into every query.
  * Use {@code @InterceptorIgnore(tenantLine = "true")} on mapper methods to bypass.
  */
+@Slf4j
 @Configuration
 public class MybatisPlusConfig {
 
@@ -47,9 +49,20 @@ public class MybatisPlusConfig {
             @Override
             public Expression getTenantId() {
                 Long tenantId = UserContext.getCurrentTenantId();
-                // Keep tenant-0 fallback for legacy startup/scheduled discovery paths. RBAC
-                // association mappers apply the stricter missing-context guard above.
-                return new LongValue(tenantId == null ? 0L : tenantId);
+                if (tenantId == null) {
+                    // Legacy tenant-0 fallback for startup and fixture seeding, kept because
+                    // no HTTP path reaches a mapper without context (the JWT filter fails closed
+                    // outside /auth/login, /auth/refresh and /actuator/health/**) and RBAC
+                    // association mappers apply the stricter guard above.
+                    // Background work must NOT rely on it: a scheduler that reads through the
+                    // fallback silently sees tenant 0 only. Bind the tenant explicitly with
+                    // UserContext.runAsTenant and discover tenants through a mapper method
+                    // annotated @InterceptorIgnore(tenantLine = "true").
+                    log.warn("Tenant context missing; falling back to tenant 0. "
+                            + "Background work must bind a tenant with UserContext.runAsTenant.");
+                    return new LongValue(0L);
+                }
+                return new LongValue(tenantId);
             }
 
             @Override

@@ -59,6 +59,31 @@ public final class UserContext {
         ROLES.set(snapshot.roles());
     }
 
+    /**
+     * Run background work bound to one tenant.
+     *
+     * <p>The MyBatis-Plus tenant-line interceptor reads the tenant from this thread context and
+     * falls back to tenant 0 when it is absent, so a scheduler thread that does not bind a tenant
+     * silently reads and writes tenant 0 only. Each iterated tenant must be bound explicitly.
+     * Cross-tenant discovery queries stay on mapper methods annotated with
+     * {@code @InterceptorIgnore(tenantLine = "true")}.</p>
+     *
+     * @param tenantId tenant to bind for the duration of the action; must not be null
+     * @param actor    name recorded as the acting principal, for audit and log correlation
+     */
+    public static void runAsTenant(Long tenantId, String actor, Runnable action) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("tenantId is required for tenant-scoped background work");
+        }
+        Snapshot original = capture();
+        try {
+            restore(new Snapshot(null, actor, tenantId, List.of()));
+            action.run();
+        } finally {
+            restore(original);
+        }
+    }
+
     public record Snapshot(Long userId, String username, Long tenantId, List<String> roles) {
         public Snapshot {
             roles = roles == null ? List.of() : List.copyOf(roles);

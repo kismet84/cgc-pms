@@ -19,5 +19,8 @@ runs:
         cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
     - name: Install dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile
+      # --ignore-scripts: a compromised transitive package must not run arbitrary code on the
+      # runner. The image build and the scheduled rescan already pass it; the e2e job installs
+      # the Playwright browsers explicitly with `pnpm exec playwright install`.
+      run: pnpm install --frozen-lockfile --ignore-scripts
       working-directory: ${{ inputs.working-directory }}

@@ -6,15 +6,18 @@
 
 set -euo pipefail
 
+# [BV] rather than V: the baseline B215__cgc_pms_baseline.sql is exactly the file whose
+# checksum mismatch would break every existing database, and a V-only glob never saw it.
 MIGRATION_PATHS=(
-  "backend/src/main/resources/db/migration/V*.sql"
-  "backend/src/main/resources/db/migration-legacy/V*.sql"
-  "backend/src/main/resources/db/migration-h2/V*.sql"
-  "backend/src/main/resources/db/migration-h2-legacy/V*.sql"
+  "backend/src/main/resources/db/migration/[BV]*.sql"
+  "backend/src/main/resources/db/migration-legacy/[BV]*.sql"
+  "backend/src/main/resources/db/migration-h2/[BV]*.sql"
+  "backend/src/main/resources/db/migration-h2-legacy/[BV]*.sql"
 )
 
 for path in "${MIGRATION_PATHS[@]}"; do
-  [ -d "${path%/V\*.sql}" ] || { echo "ERROR: Missing migration directory: ${path%/V\*.sql}" >&2; exit 2; }
+  dir="${path%/\[BV\]*.sql}"
+  [ -d "$dir" ] || { echo "ERROR: Missing migration directory: $dir" >&2; exit 2; }
 done
 
 if [ "$#" -eq 0 ]; then

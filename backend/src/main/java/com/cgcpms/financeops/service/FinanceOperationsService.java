@@ -2,6 +2,7 @@ package com.cgcpms.financeops.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.scheduling.ScheduledJobLock;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -31,6 +33,7 @@ import java.util.*;
 @Slf4j
 public class FinanceOperationsService {
     private final JdbcTemplate jdbc;
+    private final ScheduledJobLock scheduledJobLock;
     private final ObjectMapper objectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final TransactionTemplate transactionTemplate;
@@ -294,12 +297,14 @@ public class FinanceOperationsService {
 
     @Scheduled(cron = "0 15 1 * * ?")
     public void scheduledReconciliationAndAlerts() {
-        for (Long tenantId : scheduledTenantIds()) {
-            runScheduledOperation("reconciliation", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
-                    runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null)));
-            runScheduledOperation("alerts", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
-                    generateAlertsForTenant(tenantId, LocalDateTime.now())));
-        }
+        scheduledJobLock.runExclusively("finance-reconciliation", Duration.ofHours(2), () -> {
+            for (Long tenantId : scheduledTenantIds()) {
+                runScheduledOperation("reconciliation", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
+                        runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null)));
+                runScheduledOperation("alerts", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
+                        generateAlertsForTenant(tenantId, LocalDateTime.now())));
+            }
+        });
     }
 
     List<Long> scheduledTenantIds() {

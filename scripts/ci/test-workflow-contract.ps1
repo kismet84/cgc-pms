@@ -246,7 +246,8 @@ Assert-Contains $supplyChainRescan @(
   'schedule:','cron:','workflow_dispatch:','permissions:','contents: read',
   './mvnw -q -DskipTests package','bash ./scripts/ci/scan-backend-artifact.sh',
   'EXPECTED_GIT_SHA: ${{ github.sha }}','backend-artifact-trivy.json',
-  'backend-${{ github.sha }}.jar','pnpm audit','${{ github.sha }}'
+  'backend-${{ github.sha }}.jar','pnpm audit','${{ github.sha }}',
+  'bash ./scripts/ci/scan-deploy-images.sh'
 ) 'scheduled supply-chain rescan'
 Assert-Contains $workflow @(
   'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
@@ -256,6 +257,9 @@ Assert-Contains $workflow @(
   'actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6'
 ) 'pinned CI actions'
 Assert-Contains $postMergeWorkflow @('actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1') 'pinned post-merge action'
+Assert-ActionStepInputs $postMergeWorkflow 'actions/checkout' 1 @(
+  '(?m)^          persist-credentials: false\r?$'
+) 'post-merge checkout'
 $jobsMatch = [regex]::Match($workflow,'(?m)^jobs:\r?$')
 if (!$jobsMatch.Success) { throw 'workflow jobs mapping is missing' }
 $jobsText = $workflow.Substring($jobsMatch.Index + $jobsMatch.Length)
@@ -532,7 +536,7 @@ Assert-Contains $frontendAction @(
   'using: composite','working-directory:',
   'pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996',
   'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38',
-  'node-version: ''22''','pnpm install --frozen-lockfile'
+  'node-version: ''22''','pnpm install --frozen-lockfile --ignore-scripts'
 ) 'frontend setup action'
 Assert-DependabotActionsConfig $dependabot
 

@@ -1078,7 +1078,7 @@ onBeforeUnmount(() => {
         >
           <div
             v-for="(item, index) in itemDrafts"
-            :key="index"
+            :key="item.contractItemId"
             class="subcontract-workspace__item-row"
           >
             <V2Select

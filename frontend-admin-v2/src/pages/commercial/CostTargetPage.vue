@@ -13,6 +13,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatAmount } from '@/shared/display'
+import { centsToDecimalString, parseCents, sumCents } from '@/shared/decimal'
 import {
   V2ActionMenu,
   V2Badge,
@@ -479,9 +480,9 @@ function applyDefaultAllocation(allocation: CostTargetDefaultAllocation): void {
 }
 
 function amountDifference(key: 'targetAmount' | 'responsibilityAmount'): string {
-  const expected = Number(form.totalTargetAmount || 0)
-  const actual = items.value.reduce((sum, item) => sum + Number(item[key] || 0), 0)
-  return (expected - actual).toFixed(2)
+  const expected = parseCents(form.totalTargetAmount)
+  const actual = sumCents(items.value.map((item) => item[key]))
+  return centsToDecimalString(expected - actual)
 }
 
 async function saveHeader(): Promise<void> {

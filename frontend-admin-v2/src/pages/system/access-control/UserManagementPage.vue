@@ -232,6 +232,9 @@ async function saveUser(): Promise<void> {
     await refreshUsers()
     showToast('success', '用户已保存', '最新用户与角色事实已载入。')
   } catch (value) {
+    // 用户更新与角色分配是两次调用：第二次失败时第一次已提交，
+    // 必须仍然刷新列表，否则表格继续展示改前的旧值。
+    await refreshUsers()
     showToast('error', '用户保存失败', messageOf(value))
   } finally {
     saving.value = false

@@ -246,6 +246,7 @@ public class BidCostService {
     }
 
     @EventListener
+    @Transactional(rollbackFor = Exception.class)
     public void advanceStatus(BidDocumentVersionService.BidDocumentFinalizedEvent event) {
         BidCost bid = requireExisting(event.bidCostId());
         String current = normalizeStatus(bid.getBidStatus());
@@ -358,12 +359,14 @@ public class BidCostService {
 
     /** Compatibility input; projectId is intentionally ignored because WON now creates the project. */
     @Deprecated
+    @Transactional(rollbackFor = Exception.class)
     public void markAsWon(Long bidCostId, Long projectId) {
         BidCost bid = requireExisting(bidCostId);
         changeStatus(bidCostId, normalizeStatus(bid.getBidStatus()), "WON", null, true);
     }
 
     @Deprecated
+    @Transactional(rollbackFor = Exception.class)
     public void markAsLost(Long bidCostId) {
         BidCost bid = requireExisting(bidCostId);
         changeStatus(bidCostId, normalizeStatus(bid.getBidStatus()), "LOST", "兼容入口登记未中标", true);

@@ -19,6 +19,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.variation.entity.VarOrder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,6 +32,8 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class CtContractChangeService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final CtContractChangeMapper ctContractChangeMapper;
     private final CtContractMapper ctContractMapper;
@@ -90,18 +93,34 @@ public class CtContractChangeService {
         change.setReason(request.reason());
         change.setRemark(request.remark());
 
-        // 自动编号: CC-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
-        change.setChangeCode(codeGenerationService.nextCode(
-                ctContractChangeMapper, CtContractChange::getChangeCode,
-                "CC-", UserContext.getCurrentTenantId(), true));
-
         change.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
         change.setEffectiveFlag(0);
         change.setCostGeneratedFlag(0);
-        ctContractChangeMapper.insert(change);
+        insertWithGeneratedCode(change);
         businessMatterRegistryService.register(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
                 change.getId(), change.getProjectId(), change.getContractId(), change.getBusinessMatterKey());
         return change.getId();
+    }
+
+    /**
+     * 自动编号 CC-yyyyMMdd-XXX 并插入。
+     *
+     * <p>{@code nextCode} 不加锁，同租户同日并发会算出同一编号，且同事务内重新读取拿到的仍是旧快照，
+     * 因此必须按 {@code attempt} 偏移重试，由 {@code uk_ct_change_code} 兜底。</p>
+     */
+    private void insertWithGeneratedCode(CtContractChange change) {
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            change.setChangeCode(codeGenerationService.nextCode(
+                    ctContractChangeMapper, CtContractChange::getChangeCode,
+                    "CC-", UserContext.getCurrentTenantId(), true, attempt));
+            try {
+                ctContractChangeMapper.insert(change);
+                return;
+            } catch (DuplicateKeyException e) {
+                log.warn("合同变更编号冲突，重试生成 changeCode={}", change.getChangeCode());
+            }
+        }
+        throw new BusinessException("CT_CHANGE_CODE_CONFLICT", "合同变更编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -221,9 +240,6 @@ public class CtContractChangeService {
         change.setProjectId(order.getProjectId());
         change.setContractId(order.getContractId());
         change.setSourceVarOrderId(order.getId());
-        change.setChangeCode(codeGenerationService.nextCode(
-                ctContractChangeMapper, CtContractChange::getChangeCode,
-                "CC-", UserContext.getCurrentTenantId(), true));
         change.setChangeName("业主核定-" + order.getVarCode() + "-" + order.getVarName());
         change.setChangeType("AMOUNT");
         change.setBeforeAmount(before);
@@ -234,7 +250,7 @@ public class CtContractChangeService {
         change.setEffectiveFlag(0);
         change.setCostGeneratedFlag(0);
         change.setRemark("系统自动生成，禁止脱离来源签证修改");
-        ctContractChangeMapper.insert(change);
+        insertWithGeneratedCode(change);
 
         workflowEngine.submit(UserContext.getCurrentUserId(), UserContext.getCurrentUsername(),
                 UserContext.getCurrentTenantId(), "CT_CHANGE", change.getId(), change.getChangeCode(), amount,

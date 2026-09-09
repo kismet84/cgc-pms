@@ -162,6 +162,8 @@ function identity(userInfo: UserInfo): { tenantId: string; userId: string } {
 }
 
 function rememberOfflineSession(userInfo: UserInfo): void {
+  // Identity only. Roles and permissions must never come from client storage: a snapshot the
+  // user can edit would drive the menu and the route guards.
   sessionStorage.setItem(
     OFFLINE_SESSION_KEY,
     JSON.stringify({
@@ -170,8 +172,8 @@ function rememberOfflineSession(userInfo: UserInfo): void {
         tenantId: userInfo.tenantId,
         userId: userInfo.userId,
         username: 'offline',
-        roles: userInfo.roles,
-        permissions: userInfo.permissions,
+        roles: [],
+        permissions: [],
       } satisfies UserInfo,
     }),
   )
@@ -190,19 +192,15 @@ function readOfflineSession(): UserInfo | null {
     if (
       !candidate ||
       typeof candidate.tenantId !== 'string' ||
-      typeof candidate.userId !== 'string' ||
-      !Array.isArray(candidate.roles) ||
-      !Array.isArray(candidate.permissions)
+      typeof candidate.userId !== 'string'
     )
       return null
     return {
       tenantId: candidate.tenantId,
       userId: candidate.userId,
       username: 'offline',
-      roles: candidate.roles.filter((role): role is string => typeof role === 'string'),
-      permissions: candidate.permissions.filter(
-        (permission): permission is string => typeof permission === 'string',
-      ),
+      roles: [],
+      permissions: [],
     }
   } catch {
     return null

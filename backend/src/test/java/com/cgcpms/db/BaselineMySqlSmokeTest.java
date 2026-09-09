@@ -41,7 +41,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("307", flyway.info().current().getVersion().getVersion());
+        assertEquals("309", flyway.info().current().getVersion().getVersion());
         assertEquals(9, count("""
                 SELECT COUNT(*) FROM sys_menu
                 WHERE perms IN ('variation:order:add','variation:order:edit','variation:order:delete',

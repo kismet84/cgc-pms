@@ -8,6 +8,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { formatAmount, formatDecimal } from '@/shared/display'
 import { isApiClientError } from '@/services/request'
+import { nextDraftKey } from '@/shared/draftKey'
 
 export type PurchaseExecutionMode = 'request' | 'order' | 'receipt'
 export type PurchaseExecutionRecord = PurchaseRequestRecord | PurchaseOrderRecord | ReceiptRecord
@@ -18,6 +19,9 @@ export interface DetailTable {
 }
 
 export interface RequestItemDraft {
+  /** 本地稳定键，仅用于 v-for :key，不进入请求体。用下标做 key 会在删除中间行时把焦点、
+   *  aria 关联和进行中的输入法组合搬到错误的行上。 */
+  draftKey: string
   materialId: string
   budgetLineId: string
   quantity: string
@@ -101,16 +105,32 @@ export function optional(form: Record<string, string>, name: string): string | u
   return form[name]?.trim() || undefined
 }
 
-export function decimal(form: Record<string, string>, name: string, label: string): string {
+/**
+ * 后端数量与金额列统一为 decimal(18,4)，所以小数位上界是 4。
+ * 客户端必须用同样的上界校验，否则超位输入只能等后端返回一条没有字段定位的 400。
+ * 不限制整数位：超大整数由后端和数据库裁决，前端只负责原样透传字符串，避免 IEEE754 舍入。
+ */
+function decimalPattern(maxFractionDigits: number): RegExp {
+  return new RegExp(`^\\d+(?:\\.\\d{1,${maxFractionDigits}})?$`)
+}
+
+export function decimal(
+  form: Record<string, string>,
+  name: string,
+  label: string,
+  maxFractionDigits = 4,
+): string {
   const value = required(form, name, label)
-  if (!/^\d+(?:\.\d+)?$/.test(value)) throw new TypeError(`${label}必须为非负十进制数`)
+  if (!decimalPattern(maxFractionDigits).test(value)) {
+    throw new TypeError(`${label}必须为非负十进制数，最多${maxFractionDigits}位小数`)
+  }
   return value
 }
 
-export function positiveValue(value: string, label: string): string {
+export function positiveValue(value: string, label: string, maxFractionDigits = 4): string {
   const normalized = value.trim()
-  if (!/^\d+(?:\.\d+)?$/.test(normalized) || /^0+(?:\.0+)?$/.test(normalized)) {
-    throw new TypeError(`${label}必须大于0`)
+  if (!decimalPattern(maxFractionDigits).test(normalized) || /^0+(?:\.0+)?$/.test(normalized)) {
+    throw new TypeError(`${label}必须大于0，且最多${maxFractionDigits}位小数`)
   }
   return normalized
 }
@@ -137,6 +157,7 @@ export function requiredSourceId(value: string | null | undefined, label: string
 
 export function newRequestItemDraft(): RequestItemDraft {
   return {
+    draftKey: nextDraftKey(),
     materialId: '',
     budgetLineId: '',
     quantity: '1',
