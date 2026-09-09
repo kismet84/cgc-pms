@@ -14,6 +14,7 @@ import {
 } from '@/components'
 import V2Tabs from '@/components/V2Tabs.vue'
 import { formatAmount } from '@/shared/display'
+import { nextDraftKey } from '@/shared/draftKey'
 import {
   cancelRecalculationBatch,
   cancelReversalRequest,
@@ -163,7 +164,7 @@ const allocationForm = reactive({
   accountingPeriod: '',
   costSubjectId: '',
   remark: '',
-  lines: [{ projectId: '', basisValue: '1' }],
+  lines: [allocationLine()],
 })
 const recalculationForm = reactive({
   batchType: 'HISTORY_RECALCULATION' as 'HISTORY_RECALCULATION' | 'POST_CLOSE_ADJUSTMENT',
@@ -349,13 +350,17 @@ function openAllocation(): void {
     accountingPeriod: '',
     costSubjectId: '',
     remark: '',
-    lines: [{ projectId: '', basisValue: '1' }],
+    lines: [allocationLine()],
   })
   allocationDialog.value = true
 }
 
+function allocationLine() {
+  return { draftKey: nextDraftKey(), projectId: '', basisValue: '1' }
+}
+
 function addAllocationLine(): void {
-  allocationForm.lines.push({ projectId: '', basisValue: '1' })
+  allocationForm.lines.push(allocationLine())
 }
 
 async function saveAllocation(): Promise<void> {
@@ -377,7 +382,11 @@ async function saveAllocation(): Promise<void> {
       accountingPeriod: allocationForm.accountingPeriod,
       costSubjectId: allocationForm.costSubjectId,
       remark: allocationForm.remark.trim(),
-      lines: allocationForm.lines.map((line) => ({ ...line })),
+      // draftKey 只服务于 v-for，不能进入请求体
+      lines: allocationForm.lines.map((line) => ({
+        projectId: line.projectId,
+        basisValue: line.basisValue,
+      })),
     })
     allocationDialog.value = false
     await loadTrace()
@@ -1214,7 +1223,7 @@ onBeforeUnmount(() => controller?.abort())
           <legend>项目与依据</legend>
           <div
             v-for="(line, index) in allocationForm.lines"
-            :key="index"
+            :key="line.draftKey"
             class="cost-subject-page__line-grid"
           >
             <V2Select

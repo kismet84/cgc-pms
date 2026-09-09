@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("307", flyway.info().current().getVersion().getVersion());
+        assertEquals("309", flyway.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(flyway);
         assertCostGovernanceSchema(flyway);
         assertUnifiedAuditColumns(flyway);
@@ -255,7 +255,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("307", current.info().current().getVersion().getVersion());
+        assertEquals("309", current.info().current().getVersion().getVersion());
         assertAccountingSubjectCatalog(current);
         assertCostGovernanceSchema(current);
         assertEquals(1, count(current, "wf_template_node", """
@@ -445,7 +445,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
         current.migrate();
 
-        assertEquals("307", current.info().current().getVersion().getVersion());
+        assertEquals("309", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "finance_cost_allocation_batch",
                 "id=301990000000000018 AND reversal_of_id=301990000000000014 AND status='REVERSED'"));
     }
@@ -485,7 +485,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway current = flyway(databaseName, ACTIVE, LEGACY, JAVA);
         current.migrate();
 
-        assertEquals("307", current.info().current().getVersion().getVersion());
+        assertEquals("309", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, "fund_account",
                 "id=307001 AND accounting_subject_code IS NULL"));
         assertEquals(1, count(current, "fund_account",

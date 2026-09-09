@@ -122,7 +122,31 @@ async function sendRequest<T, TBody>(
     return sendRequest(path, options, true)
   }
 
+  if (response.status === 401 && retried) {
+    // Refresh succeeded but the resource still rejects us (revoked account, tenant switch).
+    // Expire the session instead of letting a plain error loop a red toast on every page.
+    return expireSession(response)
+  }
+
   return parseResponse<T>(response)
+}
+
+async function expireSession(response: Response): Promise<never> {
+  let traceId: string | undefined
+  try {
+    traceId = ((await response.json()) as ApiResponse<unknown>).traceId ?? undefined
+  } catch {
+    traceId = undefined
+  }
+  if (!sessionFailureNotified) {
+    sessionFailureNotified = true
+    await lifecycle.onSessionExpired?.({
+      code: 'AUTH_SESSION_EXPIRED',
+      message: '登录已过期，请重新登录',
+      traceId,
+    })
+  }
+  throw new SessionExpiredError(traceId)
 }
 
 async function refreshSessionOnce(): Promise<void> {

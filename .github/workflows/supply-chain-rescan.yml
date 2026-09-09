@@ -79,3 +79,28 @@ jobs:
           path: artifacts/frontend-${{ github.sha }}.log
           if-no-files-found: error
           retention-days: 30
+
+  deploy-image-rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Scan third-party runtime images pinned in deploy/
+        shell: bash
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/trivy-cache
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          echo "commit=${GITHUB_SHA}" > "artifacts/deploy-images-${GITHUB_SHA}.log"
+          bash ./scripts/ci/scan-deploy-images.sh 2>&1 | tee -a "artifacts/deploy-images-${GITHUB_SHA}.log"
+      - name: Upload deploy image rescan result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: supply-chain-deploy-images-${{ github.sha }}
+          path: artifacts/deploy-images-${{ github.sha }}.log
+          if-no-files-found: error
+          retention-days: 30

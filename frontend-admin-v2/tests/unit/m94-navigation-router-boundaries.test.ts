@@ -64,7 +64,7 @@ describe('M94 navigation and router boundaries', () => {
       router.indexOf('function safeRedirect'),
     )
     expect(sourceHash(guard.replaceAll(/\s+/g, ' ').trim())).toBe(
-      '8d62a662bb490813510b9f3fb215217e35d2bace93a55e10844d0373a7f92be5',
+      'd65c877e31ee011016062c2a9dc84acfa7a5e6b41614778d857ff8166c83ad98',
     )
   })
 

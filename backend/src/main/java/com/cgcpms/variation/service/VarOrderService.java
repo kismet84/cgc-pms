@@ -36,6 +36,7 @@ import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class VarOrderService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final VarOrderMapper varOrderMapper;
     private final VarOrderItemMapper varOrderItemMapper;
@@ -169,10 +172,7 @@ public class VarOrderService {
         validatePartner(order.getPartnerId(), contract, order.getDirection(), false);
 
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
-        order.setVarCode(codeGenerationService.nextCode(
-                varOrderMapper, VarOrder::getVarCode,
-                "VO-", UserContext.getCurrentTenantId(), true));
-
+        // 见 insertWithGeneratedCode：nextCode 无锁，必须按 attempt 偏移重试
         // Default approval status
         if (order.getApprovalStatus() == null || order.getApprovalStatus().isBlank()) {
             order.setApprovalStatus("DRAFT");
@@ -200,10 +200,31 @@ public class VarOrderService {
 
         order.setTenantId(UserContext.getCurrentTenantId());
         order.setBusinessMatterKey(businessMatterRegistryService.normalize(order.getBusinessMatterKey()));
-        varOrderMapper.insert(order);
+        insertWithGeneratedCode(order);
         businessMatterRegistryService.register(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
                 order.getId(), order.getProjectId(), order.getContractId(), order.getBusinessMatterKey());
         return order.getId();
+    }
+
+    /**
+     * 自动编号 VO-yyyyMMdd-XXX 并插入。
+     *
+     * <p>{@code nextCode} 不加锁，同租户同日并发会算出同一编号，且同事务内重新读取拿到的仍是旧快照，
+     * 因此必须按 {@code attempt} 偏移重试，由 {@code uk_var_order_code} 兜底。</p>
+     */
+    private void insertWithGeneratedCode(VarOrder order) {
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            order.setVarCode(codeGenerationService.nextCode(
+                    varOrderMapper, VarOrder::getVarCode,
+                    "VO-", UserContext.getCurrentTenantId(), true, attempt));
+            try {
+                varOrderMapper.insert(order);
+                return;
+            } catch (DuplicateKeyException e) {
+                log.warn("变更签证编号冲突，重试生成 varCode={}", order.getVarCode());
+            }
+        }
+        throw new BusinessException("VAR_ORDER_CODE_CONFLICT", "变更签证编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)

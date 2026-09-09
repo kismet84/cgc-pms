@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.scheduling.ScheduledJobLock;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
@@ -33,6 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class OverheadAllocationService {
     private static final String SOURCE_TYPE = "OVERHEAD_ALLOCATION";
 
     private final OverheadAllocationRuleMapper ruleMapper;
+    private final ScheduledJobLock scheduledJobLock;
     private final OverheadAllocationRunMapper runMapper;
     private final CostItemMapper costItemMapper;
     private final CostFactLineageResolver costFactLineageResolver;
@@ -248,14 +251,16 @@ public class OverheadAllocationService {
             return;
         }
         try {
-            LocalDate period = YearMonth.now().minusMonths(1).atEndOfMonth();
-            for (Long tenantId : runMapper.selectActiveTenantIds()) {
-                try {
-                    executeScheduledAllocation(tenantId, period);
-                } catch (Exception e) {
-                    log.error("月度分摊失败 tenantId={} period={}", tenantId, period, e);
+            scheduledJobLock.runExclusively("overhead-monthly-allocation", Duration.ofHours(2), () -> {
+                LocalDate period = YearMonth.now().minusMonths(1).atEndOfMonth();
+                for (Long tenantId : runMapper.selectActiveTenantIds()) {
+                    try {
+                        executeScheduledAllocation(tenantId, period);
+                    } catch (Exception e) {
+                        log.error("月度分摊失败 tenantId={} period={}", tenantId, period, e);
+                    }
                 }
-            }
+            });
         } finally {
             scheduledMonthlyAllocationRunning.set(false);
         }
@@ -286,14 +291,9 @@ public class OverheadAllocationService {
     }
 
     private void executeScheduledAllocation(Long tenantId, LocalDate period) {
-        UserContext.Snapshot original = UserContext.capture();
-        try {
-            // 租户插件从线程上下文追加条件，定时线程必须显式绑定当前遍历租户。
-            UserContext.restore(new UserContext.Snapshot(null, "overhead-scheduler", tenantId, List.of()));
-            executeAllocationInCurrentTenant(tenantId, period, "SCHEDULED", null);
-        } finally {
-            UserContext.restore(original);
-        }
+        // 租户插件从线程上下文追加条件，定时线程必须显式绑定当前遍历租户。
+        UserContext.runAsTenant(tenantId, "overhead-scheduler", () ->
+                executeAllocationInCurrentTenant(tenantId, period, "SCHEDULED", null));
     }
 
     /** 显式 TransactionTemplate 保证同类内定时调用也覆盖完整执行事务。 */

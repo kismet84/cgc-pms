@@ -49,7 +49,7 @@ services:
   # Redis 7
   # ===========================================================================
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     container_name: cgc-pms-redis-dev
     restart: unless-stopped
     ports:
@@ -71,7 +71,7 @@ services:
   # MinIO
   # ===========================================================================
   minio:
-    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: cgc-pms-minio-dev
     restart: unless-stopped
     environment:
@@ -95,7 +95,7 @@ services:
   # ClamAV malware scanner — uploads fail closed when this service is unavailable
   # ===========================================================================
   clamav:
-    image: clamav/clamav:1.4.3_base
+    image: clamav/clamav:1.4.3_base@sha256:629a3050df6a706aedb31859fbb8139e9aaf8f56b0ffefbf251b8358a7c9e76c
     container_name: cgc-pms-clamav-dev
     restart: unless-stopped
     ports:

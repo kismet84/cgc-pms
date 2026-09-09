@@ -1,5 +1,6 @@
 package com.cgcpms.document.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.document.entity.DocumentGeneration;
 import org.apache.ibatis.annotations.Mapper;
@@ -38,6 +39,11 @@ public interface DocumentGenerationMapper extends BaseMapper<DocumentGeneration>
             """)
     List<Long> selectOrphanGeneratedFileIds(@Param("tenantId") Long tenantId);
 
+    /**
+     * 定时线程没有认证租户，跨租户发现待重试的失败生成事实；
+     * 重试本身由 {@code generateSystem} 绑定该行的租户后执行。
+     */
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT g.* FROM biz_document_generation g
              WHERE g.deleted_flag = 0 AND g.status = 'FAILED'

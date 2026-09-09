@@ -968,7 +968,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in drafts" :key="item.requestItemId || index">
+                <tr v-for="(item, index) in drafts" :key="item.draftKey">
                   <td>
                     <span v-if="createMode === 'FROM_REQUEST'">{{
                       materialLabel(item.materialId)

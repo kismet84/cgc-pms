@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.scheduling.ScheduledJobLock;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -47,6 +48,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,11 +61,14 @@ import java.util.stream.Collectors;
 // 已提取共享计算逻辑到 CostSummaryAssembler，后续可进一步拆分为 Query/Write 子服务
 public class CostSummaryService {
 
+    private static final String COST_SUMMARY_SCHEDULER_ACTOR = "cost-summary-scheduler";
+
     private final CostSummaryMapper costSummaryMapper;
     private final CostTargetMapper costTargetMapper;
     private final CostTargetItemMapper costTargetItemMapper;
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper projectMapper;
+    private final ScheduledJobLock scheduledJobLock;
     private final CostSubjectMapper costSubjectMapper;
     private final PayRecordMapper payRecordMapper;
     private final CtContractMapper ctContractMapper;
@@ -589,25 +594,38 @@ public class CostSummaryService {
             log.warn("Previous scheduled cost summary refresh still running, skipping this trigger");
             return;
         }
+        try {
+            scheduledJobLock.runExclusively("cost-summary-refresh", Duration.ofMinutes(55),
+                    this::refreshAllTenants);
+        } finally {
+            scheduledRefreshRunning.set(false);
+        }
+    }
+
+    private void refreshAllTenants() {
         log.info("Starting scheduled cost summary refresh...");
         try {
-            LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(PmProject::getStatus, "ACTIVE");
-            List<PmProject> activeProjects = projectMapper.selectList(wrapper);
-
-            log.info("Found {} active projects for cost summary refresh", activeProjects.size());
-            for (PmProject project : activeProjects) {
-                try {
-                    // M-004: Use AOP proxy to ensure @Transactional is applied
-                    ((CostSummaryService) AopContext.currentProxy()).refreshSummary(project.getTenantId(), project.getId());
-                } catch (Exception e) {
-                    log.error("Failed to refresh summary for project {}", project.getId(), e);
-                }
+            // 定时线程没有认证租户：先跨租户发现活跃租户，再逐租户绑定上下文查询项目。
+            for (Long tenantId : projectMapper.selectActiveTenantIds()) {
+                UserContext.runAsTenant(tenantId, COST_SUMMARY_SCHEDULER_ACTOR, () -> {
+                    LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+                    wrapper.eq(PmProject::getStatus, "ACTIVE");
+                    List<PmProject> activeProjects = projectMapper.selectList(wrapper);
+                    log.info("Found {} active projects for cost summary refresh in tenant {}",
+                            activeProjects.size(), tenantId);
+                    for (PmProject project : activeProjects) {
+                        try {
+                            // M-004: Use AOP proxy to ensure @Transactional is applied
+                            ((CostSummaryService) AopContext.currentProxy())
+                                    .refreshSummary(project.getTenantId(), project.getId());
+                        } catch (Exception e) {
+                            log.error("Failed to refresh summary for project {}", project.getId(), e);
+                        }
+                    }
+                });
             }
         } catch (Exception e) {
             log.error("Scheduled cost summary refresh failed", e);
-        } finally {
-            scheduledRefreshRunning.set(false);
         }
         log.info("Scheduled cost summary refresh completed");
     }

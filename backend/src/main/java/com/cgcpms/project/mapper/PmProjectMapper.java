@@ -1,5 +1,6 @@
 package com.cgcpms.project.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.common.util.DeletedCodeSource;
 import com.cgcpms.project.entity.PmProject;
@@ -8,8 +9,24 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface PmProjectMapper extends BaseMapper<PmProject>, DeletedCodeSource {
+
+    /**
+     * 定时线程没有认证租户，只在这里跨租户发现存在活跃项目的租户。
+     * 项目明细仍在显式租户上下文中查询。
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT DISTINCT tenant_id
+            FROM pm_project
+            WHERE status = 'ACTIVE'
+              AND deleted_flag = 0
+            ORDER BY tenant_id
+            """)
+    List<Long> selectActiveTenantIds();
 
     @Select("SELECT project_code FROM pm_project WHERE project_code LIKE CONCAT(#{prefix}, '%') AND tenant_id = #{tenantId} ORDER BY CHAR_LENGTH(project_code) DESC, project_code DESC LIMIT 1")
     String selectLastCodeByPrefix(@Param("prefix") String prefix, @Param("tenantId") Long tenantId);

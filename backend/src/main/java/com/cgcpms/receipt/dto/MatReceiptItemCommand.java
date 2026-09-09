@@ -17,7 +17,9 @@ public class MatReceiptItemCommand {
 
     @NotNull
     @DecimalMin(value = "0.0001")
-    @Digits(integer = 16, fraction = 2)
+    // mat_receipt_item.qualified_quantity 是 decimal(18,4)：整数位 14、小数位 4。
+    // 原来的 (16, 2) 既放过数据库会截断的 16 位整数，又让 @DecimalMin("0.0001") 永远无法满足。
+    @Digits(integer = 14, fraction = 4)
     private BigDecimal acceptedQuantity;
 
     @Size(max = 200)

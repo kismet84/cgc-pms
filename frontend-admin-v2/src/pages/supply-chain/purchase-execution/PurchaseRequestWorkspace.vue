@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in drafts" :key="index">
+                <tr v-for="(item, index) in drafts" :key="item.draftKey">
                   <td>
                     <V2Select
                       v-model="item.materialId"

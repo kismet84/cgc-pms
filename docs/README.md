@@ -35,10 +35,10 @@
 | 04 | 开发规范 | Active | [后端开发规范](standards/04-后端开发规范.md) |
 | 05 | 开发规范 | Active | [前端开发规范](standards/05-前端开发规范.md) |
 | 06 | 契约规范 | Active | [API 契约规范](standards/06-API契约规范.md) |
-| 07 | 数据规范 | Active | [数据库设计与迁移规范](standards/07-数据库与迁移规范.md) |
+| 07 | 数据规范 | Active | [数据库设计与迁移规范](standards/07-数据库与迁移规范.md)（含滚动发布 expand/contract 与租户前导索引规则） |
 | 08 | 业务技术规范 | Active | [权限与审批流程](standards/08-权限与审批流程.md) |
 | 09 | 验收规范 | Active | [测试规范](standards/09-测试规范.md) |
-| 10 | 运行手册 | Active | [部署运维手册](standards/10-部署运维手册.md) |
+| 10 | 运行手册 | Active | [部署运维手册](standards/10-部署运维手册.md)（含备份原子批次的一致性与持久化边界） |
 | 11 | 安全规范 | Active | [安全规范](standards/11-安全规范.md) |
 | 12 | 已退役 | Retired | 原子智能体实施计划已删除；保留编号，不重排后续文档 |
 | 13 | 数据展示规范 | Active | [驾驶舱摘要字段规范](standards/13-驾驶舱摘要字段生成与展示规范.md) |

@@ -18,7 +18,11 @@ export function installSessionGuard(targetRouter: Router): void {
 
     if (to.meta.public && !to.meta.guestOnly) return true
 
-    if (session.status === 'idle') await session.restore()
+    // 'restoring' must await too: restore() flips the status synchronously before it awaits the
+    // network call, so a navigation that starts mid-restore would otherwise read
+    // isAuthenticated === false and bounce a signed-in user to /login. restore() returns the
+    // shared in-flight task, so this coalesces rather than refetching.
+    if (session.status === 'idle' || session.status === 'restoring') await session.restore()
 
     if (to.meta.guestOnly) {
       return session.isAuthenticated ? safeRedirect(to, '/session') : true

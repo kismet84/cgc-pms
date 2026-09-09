@@ -15,6 +15,7 @@ import com.cgcpms.alert.mapper.AlertNotificationSendRecordMapper;
 import com.cgcpms.alert.notification.AlertNotificationDispatcher;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.scheduling.ScheduledJobLock;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -48,6 +49,7 @@ import java.util.stream.Collectors;
 public class AlertEvaluationService {
 
     private static final int MAX_EVALUATION_BATCH_SIZE = 500;
+    private static final String ALERT_SCHEDULER_ACTOR = "alert-scheduler";
 
     private final AlertLogMapper alertLogMapper;
     private final PmProjectMapper projectMapper;
@@ -62,6 +64,7 @@ public class AlertEvaluationService {
     private final AlertNotificationSendRecordMapper notificationSendRecordMapper;
     private final SysNotificationMapper notificationMapper;
     private final com.cgcpms.cashbook.service.CashJournalAlertService cashJournalAlertService;
+    private final ScheduledJobLock scheduledJobLock;
 
     private final AtomicBoolean scheduledEvaluateRunning = new AtomicBoolean(false);
 
@@ -75,39 +78,53 @@ public class AlertEvaluationService {
             log.warn("Previous scheduled alert evaluation still running, skipping this trigger");
             return;
         }
+        try {
+            scheduledJobLock.runExclusively("alert-evaluation", Duration.ofMinutes(25), this::evaluateAllTenants);
+        } finally {
+            scheduledEvaluateRunning.set(false);
+        }
+    }
+
+    private void evaluateAllTenants() {
         log.info("Starting scheduled alert evaluation...");
         try {
-            LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(PmProject::getStatus, "ACTIVE");
-            List<PmProject> activeProjects = projectMapper.selectList(wrapper);
-            Map<Long, List<Long>> projectsByTenant = activeProjects.stream()
-                    .collect(Collectors.groupingBy(PmProject::getTenantId, LinkedHashMap::new,
-                            Collectors.mapping(PmProject::getId, Collectors.toList())));
-            Set<Long> cashJournalTenants = new LinkedHashSet<>(projectsByTenant.keySet());
+            // 定时线程没有认证租户：先跨租户发现活跃租户，再逐租户绑定上下文查询项目。
+            // 直接 selectList 会被租户插件按缺失上下文处理，只能看到单一租户。
+            List<Long> activeTenantIds = projectMapper.selectActiveTenantIds();
+            Set<Long> cashJournalTenants = new LinkedHashSet<>(activeTenantIds);
 
-            log.info("Found {} active projects for alert evaluation", activeProjects.size());
-            for (Map.Entry<Long, List<Long>> tenantProjects : projectsByTenant.entrySet()) {
+            for (Long tenantId : activeTenantIds) {
                 try {
-                    ((AlertEvaluationService) AopContext.currentProxy())
-                            .evaluateProjects(tenantProjects.getKey(), tenantProjects.getValue());
+                    UserContext.runAsTenant(tenantId, ALERT_SCHEDULER_ACTOR, () -> {
+                        LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+                        wrapper.eq(PmProject::getStatus, "ACTIVE");
+                        List<Long> projectIds = projectMapper.selectList(wrapper).stream()
+                                .map(PmProject::getId)
+                                .toList();
+                        if (projectIds.isEmpty()) return;
+                        log.info("Evaluating alerts for tenant {} across {} active projects",
+                                tenantId, projectIds.size());
+                        ((AlertEvaluationService) AopContext.currentProxy())
+                                .evaluateProjects(tenantId, projectIds);
+                    });
                 } catch (Exception e) {
-                    log.error("Failed to evaluate alerts for tenant {}", tenantProjects.getKey(), e);
+                    log.error("Failed to evaluate alerts for tenant {}", tenantId, e);
                 }
             }
             cashJournalTenants.addAll(cashJournalAlertService.pendingTenantIds());
             cashJournalTenants.addAll(alertLogMapper.selectPendingEscalationTenantIds());
             for (Long tenantId : cashJournalTenants) {
                 try {
-                    cashJournalAlertService.evaluateOverdue(tenantId);
-                    ((AlertEvaluationService) AopContext.currentProxy()).escalateOverdueAlerts(tenantId);
+                    UserContext.runAsTenant(tenantId, ALERT_SCHEDULER_ACTOR, () -> {
+                        cashJournalAlertService.evaluateOverdue(tenantId);
+                        ((AlertEvaluationService) AopContext.currentProxy()).escalateOverdueAlerts(tenantId);
+                    });
                 } catch (Exception e) {
                     log.error("Failed to evaluate or escalate alerts for tenant {}", tenantId, e);
                 }
             }
         } catch (Exception e) {
             log.error("Scheduled alert evaluation failed", e);
-        } finally {
-            scheduledEvaluateRunning.set(false);
         }
         log.info("Scheduled alert evaluation completed");
     }
@@ -527,7 +544,7 @@ public class AlertEvaluationService {
                 continue;
             }
             try {
-                markRead(tenantId, id);
+                ((AlertEvaluationService) AopContext.currentProxy()).markRead(tenantId, id);
                 successIds.add(id);
             } catch (BusinessException e) {
                 failures.add(batchFailure(id, e.getMessage()));
@@ -641,7 +658,8 @@ public class AlertEvaluationService {
 
     public Map<String, Object> batchUpdateStatus(Long tenantId, List<Long> alertIds,
                                                  String processStatus, String statusRemark) {
-        return batch(alertIds, alertId -> updateStatus(tenantId, alertId, processStatus, statusRemark));
+        return batch(alertIds, alertId -> ((AlertEvaluationService) AopContext.currentProxy())
+                .updateStatus(tenantId, alertId, processStatus, statusRemark));
     }
 
     // ──────────────────────────────────────────────

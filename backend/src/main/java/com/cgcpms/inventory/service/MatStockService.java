@@ -161,8 +161,9 @@ public class MatStockService {
                 stock.setVersion(0);
                 matStockMapper.insert(stock);
             } catch (DuplicateKeyException e) {
-                // 并发线程已创建了同 warehouse+material 的库存，重新查询后走累加路径
-                stock = findStock(tenantId, warehouseId, materialId);
+                // 并发线程已创建了同 warehouse+material 的库存，重新查询后走累加路径。
+                // 必须用加锁读：REPEATABLE READ 下普通读看不到并发事务刚提交的这一行。
+                stock = matStockMapper.selectByKeyForUpdate(tenantId, warehouseId, materialId);
                 if (stock == null) {
                     throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                             "库存并发冲突，请稍后重试");
@@ -187,7 +188,7 @@ public class MatStockService {
      * <p>
      * 每次迭代从 DB 最新数据出发重新计算，避免基于过期快照累加。
      * 流程：load current → add quantity → updateById（@Version 乐观锁）→
-     * 冲突时 reload from DB → 重新计算 → retry。
+     * 冲突时以加锁读 reload → 重新计算 → retry。
      *
      * @param tenantId   租户ID
      * @param warehouseId 仓库ID
@@ -220,8 +221,14 @@ public class MatStockService {
                 throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                         "库存并发冲突，请稍后重试");
             }
-            // 版本冲突：从 DB 重新加载最新数据，下一次迭代基于最新值重新计算
-            stock = findStock(tenantId, warehouseId, materialId);
+            // 版本冲突：必须用加锁读重新加载。REPEATABLE READ 下普通读仍返回本事务快照，
+            // version 不变，重试必然再次失败；SELECT ... FOR UPDATE 读到的是最新已提交版本。
+            MatStock reloaded = matStockMapper.selectByIdForUpdate(stock.getId(), tenantId);
+            if (reloaded == null) {
+                throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
+                        "库存并发冲突，请稍后重试");
+            }
+            stock = reloaded;
         }
     }
 
@@ -345,8 +352,8 @@ public class MatStockService {
                 throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                         "库存并发冲突，请稍后重试");
             }
-            // 版本冲突：重新加载最新数据
-            stock = findStock(tenantId, warehouseId, materialId);
+            // 版本冲突：必须用加锁读重新加载，普通读在 REPEATABLE READ 下仍是旧快照
+            stock = matStockMapper.selectByIdForUpdate(stock.getId(), tenantId);
             if (stock == null) {
                 throw new BusinessException("INSUFFICIENT_STOCK",
                         "库存不足：库存记录已被删除");

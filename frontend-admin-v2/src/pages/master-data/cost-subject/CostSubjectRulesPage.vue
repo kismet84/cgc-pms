@@ -39,6 +39,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { formatAmount } from '@/shared/display'
+import { nextDraftKey } from '@/shared/draftKey'
 import { pageSlice, ruleProjectLabel, statusLabel } from './model'
 import './styles.css'
 
@@ -183,6 +184,7 @@ function monthEndDate(value: string): string {
 
 function mappingLine() {
   return {
+    draftKey: nextDraftKey(),
     sourceSubjectId: '',
     targetGroupCode: '',
     targetSubjectId: '',
@@ -192,6 +194,7 @@ function mappingLine() {
 }
 function ruleLine() {
   return {
+    draftKey: nextDraftKey(),
     ruleCode: '',
     sourceType: '',
     businessCategory: '*',
@@ -395,9 +398,20 @@ async function savePlan(): Promise<void> {
       versionName: planForm.versionName.trim(),
       effectiveDate: planForm.effectiveDate,
       remark: planForm.remark.trim(),
-      items: mappings.map((line) => ({ ...line, targetSubjectId: line.targetSubjectId || null })),
+      // draftKey 只服务于 v-for，不能进入请求体，因此逐字段列举
+      items: mappings.map((line) => ({
+        sourceSubjectId: line.sourceSubjectId,
+        targetGroupCode: line.targetGroupCode,
+        targetSubjectId: line.targetSubjectId || null,
+        historicalDisplayName: line.historicalDisplayName,
+        mappingReason: line.mappingReason,
+      })),
       rules: planRules.map((line) => ({
-        ...line,
+        ruleCode: line.ruleCode,
+        sourceType: line.sourceType,
+        businessCategory: line.businessCategory,
+        costSubjectId: line.costSubjectId,
+        remark: line.remark,
         projectId: line.projectId || null,
         priority: Number(line.priority),
         effectiveFrom: line.effectiveFrom || null,
@@ -842,7 +856,7 @@ onBeforeUnmount(() => controller?.abort())
           <legend>源科目 → 归集组 → 目标末级成本科目</legend>
           <div
             v-for="(line, index) in planForm.mappings"
-            :key="index"
+            :key="line.draftKey"
             class="cost-subject-page__line-grid"
           >
             <V2Select
@@ -879,7 +893,7 @@ onBeforeUnmount(() => controller?.abort())
           <legend>自动归集规则</legend>
           <div
             v-for="(line, index) in planForm.rules"
-            :key="index"
+            :key="line.draftKey"
             class="cost-subject-page__line-grid"
           >
             <V2Input v-model="line.ruleCode" :label="`规则编码 ${index + 1}`" required /><V2Select
